@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.exception.TaskNotFoundException;
+import uk.ac.ebi.tsc.tesk.util.constant.Constants;
 
 import java.util.List;
 import java.util.Optional;
@@ -81,9 +82,10 @@ public class KubernetesClientWrapper {
 
     /**
      * Gets all Taskmaster job objects, a User is allowed to see
-     * @param pageToken - pageToken supplied by user (from previous result; points to next page of results)
+     *
+     * @param pageToken    - pageToken supplied by user (from previous result; points to next page of results)
      * @param itemsPerPage - value submitted by user, limiting number of results
-     * @param user - authenticated user
+     * @param user         - authenticated user
      * @return all Taskmaster job objects, a User is allowed to see in V1JobList
      */
     public V1JobList listAllTaskmasterJobsForUser(String pageToken, Integer itemsPerPage, User user) {
@@ -105,6 +107,17 @@ public class KubernetesClientWrapper {
             result.setItems(filteredJobList);
         }
         return result;
+    }
+
+    /**
+     */
+    public V1JobList listAllTaskmasterJobsForGroup(String groupName) {
+        //Jobs of taskmaster type
+        String labelSelector = new StringJoiner("=").add(LABEL_JOBTYPE_KEY).add(LABEL_JOBTYPE_VALUE_TASKM).toString();
+        StringBuilder sb = new StringBuilder(labelSelector);
+        sb.append(",").append(Constants.LABEL_GROUPNAME_KEY).append("=").append(groupName);
+        labelSelector = sb.toString();
+        return this.listJobs(null, labelSelector, null);
     }
 
     public V1JobList listSingleTaskExecutorJobs(String taskId) {

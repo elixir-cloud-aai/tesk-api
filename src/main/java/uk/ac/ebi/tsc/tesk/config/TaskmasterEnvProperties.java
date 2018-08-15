@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.config;
 
-import org.apache.commons.lang.StringUtils;
+
+import com.google.common.base.Strings;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -110,7 +111,7 @@ public class TaskmasterEnvProperties {
 
         public void setSecretName(String secretName) {
             this.secretName = secretName;
-            if (!StringUtils.isEmpty(this.secretName)) {
+            if (!Strings.isNullOrEmpty(this.secretName)) {
                 this.enabled = true;
             }
         }

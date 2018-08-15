@@ -1,6 +1,6 @@
 package uk.ac.ebi.tsc.tesk.util;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import uk.ac.ebi.tsc.tesk.model.TesExecutor;
 
 import java.util.ArrayList;
