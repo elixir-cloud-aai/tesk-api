@@ -111,11 +111,13 @@ public class KubernetesClientWrapper {
 
     /**
      */
-    public V1JobList listAllTaskmasterJobsForGroup(String groupName) {
+    public V1JobList listAllTaskmasterJobsForUserOrGroup(String name, boolean isGroup) {
         //Jobs of taskmaster type
         String labelSelector = new StringJoiner("=").add(LABEL_JOBTYPE_KEY).add(LABEL_JOBTYPE_VALUE_TASKM).toString();
+        //With a label indicating User or Group
+        String label = isGroup ? Constants.LABEL_GROUPNAME_KEY : Constants.LABEL_USERID_KEY;
         StringBuilder sb = new StringBuilder(labelSelector);
-        sb.append(",").append(Constants.LABEL_GROUPNAME_KEY).append("=").append(groupName);
+        sb.append(",").append(label).append("=").append(name);
         labelSelector = sb.toString();
         return this.listJobs(null, labelSelector, null);
     }
