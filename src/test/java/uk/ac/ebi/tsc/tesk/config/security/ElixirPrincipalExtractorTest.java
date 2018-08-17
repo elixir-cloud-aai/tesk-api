@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.util.StringUtils;
+import uk.ac.ebi.tsc.tesk.common.data.security.User;
 
 import java.util.Arrays;
 import java.util.HashMap;

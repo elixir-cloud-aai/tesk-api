@@ -2,12 +2,11 @@ package uk.ac.ebi.tsc.tesk.limits.service;
 
 import io.kubernetes.client.models.V1JobList;
 import io.kubernetes.client.models.V1PodList;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import uk.ac.ebi.tsc.tesk.k8s.data.TaskBuilder;
+import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
+import uk.ac.ebi.tsc.tesk.limits.convert.K8sStatsConverter;
 import uk.ac.ebi.tsc.tesk.limits.data.GroupTaskStats;
-import uk.ac.ebi.tsc.tesk.limits.util.K8sStatsConverter;
-import uk.ac.ebi.tsc.tesk.util.component.KubernetesClientWrapper;
-import uk.ac.ebi.tsc.tesk.util.data.TaskBuilder;
 
 import java.time.Instant;
 

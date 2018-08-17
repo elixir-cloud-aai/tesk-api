@@ -1,6 +1,5 @@
 package uk.ac.ebi.tsc.tesk.limits.data;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 

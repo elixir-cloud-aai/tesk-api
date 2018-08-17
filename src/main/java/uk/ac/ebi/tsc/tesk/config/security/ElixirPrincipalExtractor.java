@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.PrincipalExtractor;
 import org.springframework.security.core.GrantedAuthority;
+import uk.ac.ebi.tsc.tesk.common.data.security.User;
 
 import java.util.Map;
 import java.util.Optional;

@@ -1,12 +1,11 @@
 package uk.ac.ebi.tsc.tesk.limits.controller;
 
 import org.springframework.web.bind.annotation.*;
-import uk.ac.ebi.tsc.tesk.exception.TaskNotFoundException;
+import uk.ac.ebi.tsc.tesk.common.data.TaskView;
+import uk.ac.ebi.tsc.tesk.common.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.limits.data.GroupResourceUsage;
-import uk.ac.ebi.tsc.tesk.limits.data.GroupTaskStats;
 import uk.ac.ebi.tsc.tesk.limits.data.TaskResourceUsage;
 import uk.ac.ebi.tsc.tesk.limits.service.UsageService;
-import uk.ac.ebi.tsc.tesk.util.constant.TaskView;
 
 import java.time.Instant;
 import java.util.List;

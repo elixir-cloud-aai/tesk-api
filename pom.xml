@@ -126,8 +126,8 @@
                         </goals>
                         <configuration>
                             <inputSpec>src/main/resources/task_execution.swagger.json</inputSpec>
-                            <modelPackage>uk.ac.ebi.tsc.tesk.model</modelPackage>
-                            <apiPackage>uk.ac.ebi.tsc.tesk.api</apiPackage>
+                            <modelPackage>uk.ac.ebi.tsc.tesk.common.data.tes</modelPackage>
+                            <apiPackage>uk.ac.ebi.tsc.tesk.tes.controller</apiPackage>
                             <language>spring</language>
                             <output>${project.build.sourceDirectory}</output>
                             <addCompileSourceRoot>false</addCompileSourceRoot>
@@ -193,7 +193,7 @@
                 <version>0.8.1</version>
                 <configuration>
                     <excludes>
-                        <exclude>uk/ac/ebi/tsc/tesk/model/**/*</exclude>
+                        <exclude>uk/ac/ebi/tsc/tesk/common/data/tes/**/*</exclude>
                     </excludes>
                 </configuration>
                 <executions>
@@ -246,7 +246,7 @@
                         <configuration>
                             <filesets>
                                 <fileset>
-                                    <directory>${project.build.sourceDirectory}/uk/ac/ebi/tsc/tesk/model</directory>
+                                    <directory>${project.build.sourceDirectory}/uk/ac/ebi/tsc/tesk/common/data/tes</directory>
                                 </fileset>
                             </filesets>
                         </configuration>
