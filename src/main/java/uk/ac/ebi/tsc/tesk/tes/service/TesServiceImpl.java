@@ -13,6 +13,7 @@ import uk.ac.ebi.tsc.tesk.k8s.data.Task;
 import uk.ac.ebi.tsc.tesk.k8s.data.TaskBuilder;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
+import uk.ac.ebi.tsc.tesk.limits.service.QuotaService;
 import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;
 
 import java.util.List;
@@ -36,9 +37,14 @@ public class TesServiceImpl implements TesService {
 
     private final TesKubernetesConverter converter;
 
-    public TesServiceImpl(KubernetesClientWrapper kubernetesClientWrapper, TesKubernetesConverter converter) {
+    private final QuotaService quotaService;
+
+    public TesServiceImpl(KubernetesClientWrapper kubernetesClientWrapper,
+                          TesKubernetesConverter converter,
+                          QuotaService quotaService) {
         this.kubernetesClientWrapper = kubernetesClientWrapper;
         this.converter = converter;
+        this.quotaService = quotaService;
     }
 
     /**
@@ -48,10 +54,17 @@ public class TesServiceImpl implements TesService {
     @Override
     public TesCreateTaskResponse createTask(TesTask task, User user) {
 
+        V1Job taskMasterJob = this.converter.fromTesTaskToK8sJob(task, user);
+        String userId = this.converter.getUserIdFromTaskmasterJob(taskMasterJob);
+        String groupName = this.converter.getGroupNameFromTaskmasterJob(taskMasterJob);
+        //TODO -> Breaks integration tests (add)
+        //this.quotaService.checkUsageWithinLimitForUser(userId);
+        //this.quotaService.checkUsageWithinLimitForGroup(groupName);
+
         int attemptsNo = 0;
         while (true) {
             try {
-                V1Job taskMasterJob = this.converter.fromTesTaskToK8sJob(task, user);
+
                 V1Job createdJob = this.kubernetesClientWrapper.createJob(taskMasterJob);
                 return this.converter.fromK8sJobToTesCreateTaskResponse(createdJob);
             } catch (KubernetesException e) {

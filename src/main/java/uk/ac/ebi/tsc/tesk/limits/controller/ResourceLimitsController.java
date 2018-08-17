@@ -26,23 +26,23 @@ public class ResourceLimitsController {
 
     @GetMapping(value = "/groups/{groupName}")
     public GroupResourceUsage getResourceUsageForGroup(@PathVariable("groupName") String groupName, @RequestParam(name = "view", required = false, defaultValue = "MINIMAL") TaskView view) {
-        return this.usageService.getTaskStatisticsForUserOrGroup(groupName, true).toGroupResourceUsage(Instant.now(), view != TaskView.MINIMAL, view == TaskView.FULL);
+        return this.usageService.getTaskStatisticsForGroup(groupName).toGroupResourceUsage(Instant.now(), view != TaskView.MINIMAL, view == TaskView.FULL);
     }
 
     @GetMapping(value = "/users/{userId}")
     public GroupResourceUsage getResourceUsageForUser(@PathVariable("userId") String userId, @RequestParam(name = "view", required = false, defaultValue = "MINIMAL") TaskView view) {
-        return this.usageService.getTaskStatisticsForUserOrGroup(userId, false).toGroupResourceUsage(Instant.now(), view != TaskView.MINIMAL, view == TaskView.FULL);
+        return this.usageService.getTaskStatisticsForUser(userId).toGroupResourceUsage(Instant.now(), view != TaskView.MINIMAL, view == TaskView.FULL);
     }
 
     @GetMapping(value = "/users/{userId}/tasks")
     public List<TaskResourceUsage> getUserTasks(@PathVariable("userId") String userId, @RequestParam(name = "view", required = false, defaultValue = "MINIMAL") TaskView view) {
-        GroupResourceUsage groupUsage = this.usageService.getTaskStatisticsForUserOrGroup(userId, false).toGroupResourceUsage(Instant.now(), true, view == TaskView.FULL);
+        GroupResourceUsage groupUsage = this.usageService.getTaskStatisticsForUser(userId).toGroupResourceUsage(Instant.now(), true, view == TaskView.FULL);
         return groupUsage.getTasks();
     }
 
     @GetMapping(value = "/users/{userId}/tasks/{taskId}")
-    public TaskResourceUsage getUserTasks(@PathVariable("userId") String userId, @PathVariable("taskId") String taskId, @RequestParam(name = "view", required = false, defaultValue = "MINIMAL") TaskView view) {
-        GroupResourceUsage groupUsage = this.usageService.getTaskStatisticsForUserOrGroup(userId, false).toGroupResourceUsage(Instant.now(), true, view == TaskView.FULL);
+    public TaskResourceUsage getUserTask(@PathVariable("userId") String userId, @PathVariable("taskId") String taskId, @RequestParam(name = "view", required = false, defaultValue = "MINIMAL") TaskView view) {
+        GroupResourceUsage groupUsage = this.usageService.getTaskStatisticsForUser(userId).toGroupResourceUsage(Instant.now(), true, view == TaskView.FULL);
         return groupUsage.getTasks().stream().filter(task -> task.getTaskName().equals(taskId)).findFirst().orElseThrow(() -> new TaskNotFoundException(taskId));
     }
 }

@@ -17,7 +17,7 @@ public class GroupTaskStats {
 
     public GroupResourceUsage toGroupResourceUsage(Instant now, boolean withTasks, boolean withExecutors) {
         return GroupResourceUsage.builder().
-                groupName(this.groupName).
+                name(this.groupName).
                 resourceUsage(this.getResourceUsage(now)).
                 tasks(withTasks ? this.tasks.stream().map(task -> task.toTaskResourceUsage(now, withExecutors)).collect(Collectors.toList()) : null).
                 build();

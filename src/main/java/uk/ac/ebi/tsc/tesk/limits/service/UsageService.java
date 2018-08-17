@@ -7,6 +7,7 @@ import uk.ac.ebi.tsc.tesk.k8s.data.TaskBuilder;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.limits.convert.K8sStatsConverter;
 import uk.ac.ebi.tsc.tesk.limits.data.GroupTaskStats;
+import uk.ac.ebi.tsc.tesk.limits.data.LimitType;
 
 import java.time.Instant;
 
@@ -28,9 +29,18 @@ public class UsageService {
     }
 
     //@Cacheable -TODO <-- think of caching results of this query
-    public GroupTaskStats getTaskStatisticsForUserOrGroup(String name, boolean isGroup) {
+    public GroupTaskStats getTaskStatisticsForGroup(String groupName) {
+        return this.getTaskStatistics(groupName, LimitType.GROUP);
+    }
 
-        V1JobList taskmasterJobs = this.kubernetesClient.listAllTaskmasterJobsForUserOrGroup(name, isGroup);
+    //@Cacheable -TODO <-- think of caching results of this query
+    public GroupTaskStats getTaskStatisticsForUser(String userId) {
+        return this.getTaskStatistics(userId, LimitType.USER);
+    }
+
+    private GroupTaskStats getTaskStatistics(String name, LimitType type) {
+
+        V1JobList taskmasterJobs = this.kubernetesClient.listAllTaskmasterJobsForUserOrGroup(name, type == LimitType.GROUP);
         V1JobList executorJobs = this.kubernetesClient.listAllTaskExecutorJobs();
         V1PodList jobPods = this.kubernetesClient.listAllJobPods();
         TaskBuilder taskListBuilder = TaskBuilder.newTaskList().

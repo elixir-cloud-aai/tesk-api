@@ -56,6 +56,14 @@ public class TesKubernetesConverter {
         this.gson = gson;
     }
 
+    public String getGroupNameFromTaskmasterJob(V1Job job) {
+        return job.getMetadata().getLabels().get(LABEL_GROUPNAME_KEY);
+    }
+
+    public String getUserIdFromTaskmasterJob(V1Job job) {
+        return job.getMetadata().getLabels().get(LABEL_USERID_KEY);
+    }
+
     /**
      * Converts TES task to new K8s Job object with random generated name
      *

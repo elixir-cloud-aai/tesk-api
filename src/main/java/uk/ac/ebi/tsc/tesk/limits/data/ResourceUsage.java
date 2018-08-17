@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.limits.data;
 
-import lombok.Getter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
@@ -8,7 +9,8 @@ import java.math.BigDecimal;
  * @author aniewielska
  * @since 13/08/2018
  */
-@Getter
+@Data
+@NoArgsConstructor
 public class ResourceUsage {
 
     public static ResourceUsage ZERO = new ResourceUsage(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
@@ -30,5 +32,11 @@ public class ResourceUsage {
                 this.cpuHours.add(augend.cpuHours),
                 this.memoryGBHours.add(augend.memoryGBHours),
                 this.storageGBHours.add(augend.storageGBHours));
+    }
+
+    public boolean exceeds(ResourceUsage limit) {
+        return cpuHours.compareTo(limit.cpuHours) > 0
+                || memoryGBHours.compareTo(limit.memoryGBHours) > 0
+                || storageGBHours.compareTo(limit.storageGBHours) > 0;
     }
 }

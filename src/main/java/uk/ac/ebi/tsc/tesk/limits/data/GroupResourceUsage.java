@@ -13,8 +13,13 @@ import java.util.List;
 @Builder
 public class GroupResourceUsage {
 
-    private String groupName;
+    private String name;
+    private LimitType type;
     private ResourceUsage resourceUsage;
     private List<TaskResourceUsage> tasks;
+
+    public boolean exceeds(GroupResourceUsage limit) {
+        return resourceUsage.exceeds(limit.resourceUsage);
+    }
 
 }
