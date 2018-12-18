@@ -123,7 +123,7 @@ public class Constants {
      */
     public static final String ABSOLUTE_PATH_MESSAGE = "must be an absolute path";
 
-    public static final double RESOURCE_DISK_DEFAULT = 0.1;
+    public static final double RESOURCE_DISK_DEFAULT = 2;
 
     /**
      * TES task states, indicating task is not running and cannot be cancelled
