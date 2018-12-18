@@ -139,7 +139,7 @@ public class TesKubernetesConverterMinimalTest {
 
         taskMasterInputJson.extractingJsonPathMapValue("executors[0].spec.template.spec.containers[0]").containsOnlyKeys("name", "image", "command", "resources");
 
-        taskMasterInputJson.extractingJsonPathNumberValue("resources.disk_gb").isEqualTo(0.1);
+        taskMasterInputJson.extractingJsonPathNumberValue("resources.disk_gb").isEqualTo(2.0);
 
         taskMasterInputJson.isEqualToJson(new ClassPathResource("fromTesToK8s_minimal/taskmaster_param.json"), JSONCompareMode.NON_EXTENSIBLE);
 
