@@ -42,6 +42,26 @@
                     "optional": true
                   }
                 }
+              },
+              {
+                "name": "TESK_S3_ACCESS_KEY",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "name": "s3-secret",
+                    "key": "access_key",
+                    "optional": true
+                  }
+                }
+              },
+              {
+                "name": "TESK_S3_SECRET_KEY",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "name": "s3-secret",
+                    "key": "secret_key",
+                    "optional": true
+                  }
+                }
               }
             ],
             "volumeMounts": [
