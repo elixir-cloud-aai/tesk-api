@@ -1,8 +1,13 @@
-FROM openjdk:8-jdk-alpine
+FROM maven:3.3.3-jdk-8 as build
+
+WORKDIR /
+ADD . /
+RUN mvn clean package
+
+FROM openjdk:8-jre-alpine
 VOLUME /tmp
-ADD target/tesk-0.0.1-SNAPSHOT.jar app.jar
-#ADD ./config config
-#ENV KUBECONFIG="/config"
+COPY --from=build /target/tesk-*.jar app.jar
+
 EXPOSE 8080
 ENV JAVA_OPTS=""
 ENTRYPOINT exec java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar /app.jar
