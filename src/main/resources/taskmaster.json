@@ -14,7 +14,7 @@
         "containers": [
           {
             "name": "taskmaster",
-            "image": "eu.gcr.io/tes-wes/taskmaster:v0.0.5.2",
+            "image": "registry.gitlab.com/precmed/deployment/taskmaster:latest-pmu",
             "args": [
               "$(JSON_INPUT)"
             ],
