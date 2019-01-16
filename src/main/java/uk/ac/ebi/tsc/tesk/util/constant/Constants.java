@@ -140,6 +140,15 @@ public class Constants {
     public static final String FTP_SECRET_PASSWORD_ENV = "TESK_FTP_PASSWORD";
 
     /**
+     * Name of taskmaster's ENV variable with access_key of S3 account used for storage
+     */
+    public static final String S3_SECRET_ACCESS_KEY_ENV = "TESK_S3_ACCESS_KEY";
+    /**
+     * Name of taskmaster's ENV variable with secret_key of S3 account used for storage
+     */
+    public static final String S3_SECRET_SECRET_KEY_ENV = "TESK_S3_SECRET_KEY";
+
+    /**
      * Patch object passed to job API, when cancelling task
      */
     public static final V1Job JOB_CANCEL_PATCH = new V1Job().metadata(new V1ObjectMeta().putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC));

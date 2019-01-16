@@ -31,6 +31,11 @@ public class TaskmasterEnvProperties {
     private Ftp ftp;
 
     /**
+     * Test S3 account settings
+     */
+    private S3 s3;
+
+    /**
      * Service Account name for taskmaster
      */
     private String serviceAccountName;
@@ -48,6 +53,14 @@ public class TaskmasterEnvProperties {
 
     public void setFtp(Ftp ftp) {
         this.ftp = ftp;
+    }
+
+    public S3 getS3() {
+        return s3;
+    }
+
+    public void setS3(S3 s3) {
+        this.s3 = s3;
     }
 
     public String getImageName() {
@@ -95,7 +108,7 @@ public class TaskmasterEnvProperties {
      */
     public static class Ftp {
         /**
-         * Name of the secret with FTP acoount credentials
+         * Name of the secret with FTP account credentials
          */
         private String secretName;
         /**
@@ -118,7 +131,36 @@ public class TaskmasterEnvProperties {
         public boolean isEnabled() {
             return enabled;
         }
+    }
 
+    /**
+     * Test S3 account settings
+     */
+    public static class S3 {
+        /**
+         * Name of the secret with S3 account credentials
+         */
+        private String secretName;
+        /**
+         * If S3 account enabled (based on non-emptiness of secretName)
+         * Does not check the existence of real secret via API
+         */
+        private boolean enabled;
+
+        public String getSecretName() {
+            return secretName;
+        }
+
+        public void setSecretName(String secretName) {
+            this.secretName = secretName;
+            if (!StringUtils.isEmpty(this.secretName)) {
+                this.enabled = true;
+            }
+        }
+
+        public boolean isEnabled() {
+            return enabled;
+        }
 
     }
 }

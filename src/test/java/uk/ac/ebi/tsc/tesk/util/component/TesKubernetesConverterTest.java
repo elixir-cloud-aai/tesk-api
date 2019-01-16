@@ -54,6 +54,7 @@ import static uk.ac.ebi.tsc.tesk.util.constant.Constants.LABEL_TASKSTATE_VALUE_C
                 "tesk.api.taskmaster.image-version = task-full-image-version",
                 "tesk.api.taskmaster.filer-image-version = task-full-filer-image-version",
                 "tesk.api.taskmaster.ftp.secret-name = secretstorage",
+                "tesk.api.taskmaster.s3.secret-name = secretstorage",
                 "tesk.api.taskmaster.service-account-name = custom-service-account",
                 "tesk.api.taskmaster.debug = true"
         })
