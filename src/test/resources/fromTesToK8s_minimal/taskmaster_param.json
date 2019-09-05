@@ -45,6 +45,6 @@
     }
   ],
   "resources": {
-    "disk_gb": 15.0
+    "disk_gb": 0.1
   }
 }
