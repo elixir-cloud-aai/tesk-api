@@ -57,7 +57,9 @@ import static uk.ac.ebi.tsc.tesk.util.constant.Constants.LABEL_TASKSTATE_VALUE_C
         properties = {"tesk.api.taskmaster.image-name = task-minimal-image-name",
                 "tesk.api.taskmaster.image-version = task-minimal-image-version",
                 "tesk.api.taskmaster.filer-image-version = task-minimal-filer-image-version",
-                "tesk.api.k8s.namespace = test-namespace"})
+                "tesk.api.k8s.namespace = test-namespace",
+                "tesk.api.taskmaster.secret-volume-name = secreto",
+                "tesk.api.taskmaster.secret-mount-point = /secret"})
 @EnableConfigurationProperties(TaskmasterEnvProperties.class)
 public class TesKubernetesConverterMinimalTest {
 

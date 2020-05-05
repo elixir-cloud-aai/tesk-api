@@ -57,7 +57,9 @@ import static uk.ac.ebi.tsc.tesk.util.constant.Constants.LABEL_TASKSTATE_VALUE_C
                 "tesk.api.taskmaster.service-account-name = custom-service-account",
                 "tesk.api.taskmaster.debug = true",
                 "tesk.api.taskmaster.environment.wes.base.path = /usr/sth/path",
-                "tesk.api.taskmaster.environment.TES_BASE_PATH = /tesk/share"
+                "tesk.api.taskmaster.environment.TES_BASE_PATH = /tesk/share",
+                "tesk.api.taskmaster.secret-volume-name = secreto",
+                "tesk.api.taskmaster.secret-mount-point = /secret"
         })
 @EnableConfigurationProperties(TaskmasterEnvProperties.class)
 public class TesKubernetesConverterTest {

@@ -69,6 +69,10 @@
                 "name": "podinfo",
                 "mountPath": "/podinfo",
                 "readOnly": true
+              },
+              {
+                "name": "secreto",
+                "mountPath": "/secret"
               }
             ],
             "image": "task-full-image-name:task-full-image-version",
@@ -88,6 +92,12 @@
                   }
                 }
               ]
+            }
+          },
+          {
+            "name": "secreto",
+            "secret": {
+              "secretName": "secreto"
             }
           }
         ],

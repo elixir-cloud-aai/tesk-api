@@ -37,6 +37,10 @@
                 "name": "podinfo",
                 "mountPath": "/podinfo",
                 "readOnly": true
+              },
+              {
+                "name": "secreto",
+                "mountPath": "/secret"
               }
             ]
           }
@@ -53,6 +57,12 @@
                   }
                 }
               ]
+            }
+          },
+          {
+            "name": "secreto",
+            "secret": {
+              "secretName": "secreto"
             }
           }
         ],

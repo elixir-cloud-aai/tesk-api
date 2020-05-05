@@ -34,6 +34,18 @@ public class TaskmasterEnvProperties {
     private Ftp ftp;
 
     /**
+     * Volume name to store the extra secret files
+     */
+    private String secretVolumeName;
+
+    /**
+     * Mount point to put the secret volume
+     * Default: /secret
+     */
+    private String secretMountPoint;
+
+
+    /**
      * Service Account name for taskmaster
      */
     private String serviceAccountName;
@@ -57,6 +69,22 @@ public class TaskmasterEnvProperties {
 
     public void setFtp(Ftp ftp) {
         this.ftp = ftp;
+    }
+
+    public String getSecretVolumeName() {
+        return secretVolumeName;
+    }
+
+    public void setSecretVolumeName(final String secretVolumeName) {
+        this.secretVolumeName = secretVolumeName;
+    }
+
+    public String getSecretMountPoint() {
+        return secretMountPoint;
+    }
+
+    public void setSecretMountPoint(final String secretMountPoint) {
+        this.secretMountPoint = secretMountPoint;
     }
 
     public String getImageName() {

@@ -84,6 +84,22 @@ public class KubernetesObjectsSupplier {
                     });
 
             toBeRemoved.stream().forEach(containerEnvironment::remove);
+
+            final String secretVolumeName = taskmasterEnvProperties.getSecretVolumeName();
+            // TODO Should make this in a more JAVA-way, probably
+            if (secretVolumeName != null) {
+                job.getSpec().getTemplate().getSpec().getVolumes().add(new V1Volume()
+                    .secret(new V1SecretVolumeSource().secretName(secretVolumeName))
+                    .name(secretVolumeName));
+
+                String secretMountPoint = (taskmasterEnvProperties.getSecretMountPoint() != null ?
+                    taskmasterEnvProperties.getSecretMountPoint(): "/secret");
+
+                job.getSpec().getTemplate().getSpec().getContainers()
+                    .get(0).getVolumeMounts().add(new V1VolumeMount()
+                    .mountPath(secretMountPoint).name(secretVolumeName));
+            }
+
             return job;
         } catch (IOException ex) {
             throw new RuntimeException(ex);
