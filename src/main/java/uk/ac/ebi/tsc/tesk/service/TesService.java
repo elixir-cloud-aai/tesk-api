@@ -21,7 +21,10 @@ public interface TesService {
      * Creates new TES task, by converting input and calling create method.
      * In case of detecting duplicated task ID, retries with new generated ID (up to a limit of retries)
      */
-    @PreAuthorize("(#user.username == task.logs[0].metadata['USER_ID'])")
+    @PreAuthorize("(#user.username == authentication.principal.username) OR ( " +
+            "hasRole(@authorisationProperties.baseGroupFull) AND" +
+            "(#user.member OR #user.teskAdmin) AND" +
+            "(#task.tags?.get('GROUP_NAME') == null OR #user.isGroupMember(#task.tags['GROUP_NAME'])))")
     TesCreateTaskResponse createTask(TesTask task, User user);
 
     /**
@@ -32,7 +35,10 @@ public interface TesService {
      * @param view   - one of {@link TaskView} values, decides on how much detail is put in results
      * @return - TES task details
      */
-    @PostAuthorize("(#user.username == returnObject.logs[0].metadata['USER_ID'])")
+    @PostAuthorize("(#user.username == authentication.principal.username)" +
+            " OR (#user.username == returnObject.logs[0].metadata['USER_ID'] AND returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupMember(returnObject.logs[0].metadata['GROUP_NAME']))" +
+            " OR (#user.teskAdmin)" +
+            " OR (returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupManager(returnObject.logs[0].metadata['GROUP_NAME']))")
     TesTask getTask(String taskId, TaskView view, User user);
 
     /**
@@ -45,7 +51,7 @@ public interface TesService {
      * @param view       - one of {@link TaskView} values, decides on how much detail is put in each resulting task
      * @return - resulting list of tasks plus paging token (when supported)
      */
-    @PreAuthorize("#user.username == authentication.principal.username")
+    @PreAuthorize("#user.teskAdmin OR #user.manager OR #user.member OR (#user.username == authentication.principal.username)")
     TesListTasksResponse listTasks(String namePrefix,
                                    Long pageSize,
                                    String pageToken,
