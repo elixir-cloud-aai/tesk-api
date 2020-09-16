@@ -11,7 +11,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
+import uk.ac.ebi.tsc.tesk.config.security.AuthorisationProperties;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.exception.TaskNotFoundException;
@@ -41,14 +43,18 @@ public class KubernetesClientWrapper {
 
     private final String namespace;
 
+    private final AuthorisationProperties authorisationProperties;
+
+
     public KubernetesClientWrapper(BatchV1Api batchApi, @Qualifier("patchBatchApi") BatchV1Api patchBatchApi,
                                    CoreV1Api coreApi, @Qualifier("patchCoreApi") CoreV1Api patchCoreApi,
-                                   @Value("${tesk.api.k8s.namespace}") String namespace) {
+                                   @Value("${tesk.api.k8s.namespace}") String namespace, AuthorisationProperties authorisationProperties) {
         this.batchApi = batchApi;
         this.patchBatchApi = patchBatchApi;
         this.coreApi = coreApi;
         this.patchCoreApi = patchCoreApi;
         this.namespace = namespace;
+        this.authorisationProperties = authorisationProperties;
     }
 
     public V1Job createJob(V1Job job) {
@@ -100,8 +106,14 @@ public class KubernetesClientWrapper {
             //filter the results (as it was not handled by label selector)
             List<V1Job> filteredJobList = result.getItems();
             filteredJobList = filteredJobList.stream().filter(job ->
-                    user.isGroupManager(job.getMetadata().getLabels().get(LABEL_GROUPNAME_KEY))
-                            || user.getUsername().equals(job.getMetadata().getLabels().get(LABEL_USERID_KEY))).collect(Collectors.toList());
+                    user.isGroupManager(job.getMetadata().getLabels().get(LABEL_GROUPNAME_KEY)) ||
+                            user.getUsername().equals(job.getMetadata().getLabels().get(LABEL_USERID_KEY))).collect(Collectors.toList());
+            result.setItems(filteredJobList);
+        }
+        if(authorisationProperties.isListUserJobsOnly()){
+            List<V1Job> filteredJobList = result.getItems();
+            filteredJobList = filteredJobList.stream().filter(job ->
+                    job.getMetadata().getLabels().get(LABEL_USERID_KEY).equals(user.getUsername())).collect(Collectors.toList());
             result.setItems(filteredJobList);
         }
         return result;
