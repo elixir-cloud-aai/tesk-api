@@ -3,10 +3,14 @@ package uk.ac.ebi.tsc.tesk.service;
 import io.kubernetes.client.models.V1Job;
 import io.kubernetes.client.models.V1JobList;
 import io.kubernetes.client.models.V1PodList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import uk.ac.ebi.tsc.tesk.config.security.AuthorisationProperties;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.exception.CancelNotRunningTask;
 import uk.ac.ebi.tsc.tesk.exception.KubernetesException;
+import uk.ac.ebi.tsc.tesk.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.model.*;
 import uk.ac.ebi.tsc.tesk.util.component.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.util.component.TesKubernetesConverter;
@@ -19,6 +23,7 @@ import java.util.stream.Collectors;
 
 import static uk.ac.ebi.tsc.tesk.util.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.util.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
+import static uk.ac.ebi.tsc.tesk.util.constant.Constants.LABEL_USERID_KEY;
 
 /**
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
@@ -30,13 +35,18 @@ import static uk.ac.ebi.tsc.tesk.util.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
 @Service
 public class TesServiceImpl implements TesService {
 
+    Logger logger = LoggerFactory.getLogger(TesServiceImpl.class);
+
     private final KubernetesClientWrapper kubernetesClientWrapper;
 
     private final TesKubernetesConverter converter;
 
-    public TesServiceImpl(KubernetesClientWrapper kubernetesClientWrapper, TesKubernetesConverter converter) {
+    private final AuthorisationProperties authorisationProperties;
+
+    public TesServiceImpl(KubernetesClientWrapper kubernetesClientWrapper, TesKubernetesConverter converter, AuthorisationProperties authorisationProperties) {
         this.kubernetesClientWrapper = kubernetesClientWrapper;
         this.converter = converter;
+        this.authorisationProperties = authorisationProperties;
     }
 
     /**
@@ -72,7 +82,14 @@ public class TesServiceImpl implements TesService {
     @Override
     public TesTask getTask(String taskId, TaskView view, User user) {
 
+
         V1Job taskMasterJob = this.kubernetesClientWrapper.readTaskmasterJob(taskId);
+        if(authorisationProperties.isListUserJobsOnly()){
+            if(!taskMasterJob.getMetadata().getLabels().get(LABEL_USERID_KEY).equals(user.getUsername())){
+                logger.info("Will throw exception here");
+                throw new TaskNotFoundException(taskId);
+            }
+        }
         V1JobList executorJobs = this.kubernetesClientWrapper.listSingleTaskExecutorJobs(taskMasterJob.getMetadata().getName());
         V1PodList taskMasterPods = this.kubernetesClientWrapper.listSingleJobPods(taskMasterJob);
         TaskBuilder taskBuilder = TaskBuilder.newSingleTask().addJob(taskMasterJob).addJobList(executorJobs.getItems()).addPodList(taskMasterPods.getItems());
@@ -118,8 +135,6 @@ public class TesServiceImpl implements TesService {
             }
         }
         return task;
-
-
     }
 
     /**
@@ -173,6 +188,4 @@ public class TesServiceImpl implements TesService {
         this.kubernetesClientWrapper.labelJobAsCancelled(taskId);
         this.converter.getNameOfFirstRunningPod(taskMasterPods).ifPresent(this.kubernetesClientWrapper::labelPodAsCancelled);
     }
-
-
 }

@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.service;
 
 import org.springframework.security.access.prepost.PostAuthorize;
+import org.springframework.security.access.prepost.PostFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.model.TesCreateTaskResponse;
@@ -52,6 +53,7 @@ public interface TesService {
      * @return - resulting list of tasks plus paging token (when supported)
      */
     @PreAuthorize("#user.teskAdmin OR #user.manager OR #user.member OR (authentication.authenticated)")
+    @PostFilter("filterObject != #user.username")
     TesListTasksResponse listTasks(String namePrefix,
                                    Long pageSize,
                                    String pageToken,

@@ -43,6 +43,8 @@ public class AuthorisationProperties {
      */
     private String adminGroupFull;
 
+    private boolean listUserJobsOnly;
+
     public String getGroupsClaim() {
         return groupsClaim;
     }
@@ -98,4 +100,8 @@ public class AuthorisationProperties {
     public void setAdminGroupFull(String adminGroupFull) {
         this.adminGroupFull = adminGroupFull;
     }
+
+    public boolean isListUserJobsOnly() { return listUserJobsOnly; }
+
+    public void setListUserJobsOnly(boolean listUserJobsOnly) { this.listUserJobsOnly = listUserJobsOnly; }
 }
