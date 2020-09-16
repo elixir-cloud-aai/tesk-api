@@ -53,7 +53,6 @@ public interface TesService {
      * @return - resulting list of tasks plus paging token (when supported)
      */
     @PreAuthorize("#user.teskAdmin OR #user.manager OR #user.member OR (authentication.authenticated)")
-    @PostFilter("filterObject != #user.username")
     TesListTasksResponse listTasks(String namePrefix,
                                    Long pageSize,
                                    String pageToken,
