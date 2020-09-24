@@ -84,9 +84,9 @@ public class TesServiceImpl implements TesService {
 
 
         V1Job taskMasterJob = this.kubernetesClientWrapper.readTaskmasterJob(taskId);
-        if(authorisationProperties.isListUserJobsOnly()){
+        if(authorisationProperties.isIgnoreGroupMembership()){
             if(!taskMasterJob.getMetadata().getLabels().get(LABEL_USERID_KEY).equals(user.getUsername())){
-                logger.info("Will throw exception here");
+                logger.info("The task doesn't belong to the user");
                 throw new TaskNotFoundException(taskId);
             }
         }
@@ -164,9 +164,7 @@ public class TesServiceImpl implements TesService {
         List<TesTask> tasks = taskListBuilder.getTaskList().stream().map(task -> this.getTask(task, view, true)).collect(Collectors.toList());
         TesListTasksResponse response = new TesListTasksResponse();
         response.tasks(tasks).nextPageToken(taskmasterJobs.getMetadata().getContinue());
-
         return response;
-
     }
 
     /**

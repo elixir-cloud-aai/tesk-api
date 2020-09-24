@@ -110,7 +110,7 @@ public class KubernetesClientWrapper {
                             user.getUsername().equals(job.getMetadata().getLabels().get(LABEL_USERID_KEY))).collect(Collectors.toList());
             result.setItems(filteredJobList);
         }
-        if(authorisationProperties.isListUserJobsOnly()){
+        if(authorisationProperties.isIgnoreGroupMembership()){
             List<V1Job> filteredJobList = result.getItems();
             filteredJobList = filteredJobList.stream().filter(job ->
                     job.getMetadata().getLabels().get(LABEL_USERID_KEY).equals(user.getUsername())).collect(Collectors.toList());

@@ -43,7 +43,7 @@ public class AuthorisationProperties {
      */
     private String adminGroupFull;
 
-    private boolean listUserJobsOnly;
+    private boolean ignoreGroupMembership;
 
     public String getGroupsClaim() {
         return groupsClaim;
@@ -101,7 +101,9 @@ public class AuthorisationProperties {
         this.adminGroupFull = adminGroupFull;
     }
 
-    public boolean isListUserJobsOnly() { return listUserJobsOnly; }
+    public boolean isIgnoreGroupMembership() { return ignoreGroupMembership; }
 
-    public void setListUserJobsOnly(boolean listUserJobsOnly) { this.listUserJobsOnly = listUserJobsOnly; }
+    public void setIgnoreGroupMembership(boolean ignoreGroupMembership) { this.ignoreGroupMembership = ignoreGroupMembership; }
+
+
 }
