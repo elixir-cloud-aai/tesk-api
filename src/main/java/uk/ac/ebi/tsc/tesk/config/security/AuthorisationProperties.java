@@ -43,6 +43,11 @@ public class AuthorisationProperties {
      */
     private String adminGroupFull;
 
+    /**
+     * Ignore user's group membership
+     */
+    private boolean ignoreGroupMembership;
+
     public String getGroupsClaim() {
         return groupsClaim;
     }
@@ -97,5 +102,13 @@ public class AuthorisationProperties {
 
     public void setAdminGroupFull(String adminGroupFull) {
         this.adminGroupFull = adminGroupFull;
+    }
+
+    public boolean isIgnoreGroupMembership() {
+        return ignoreGroupMembership;
+    }
+
+    public void setIgnoreGroupMembership(boolean ignoreGroupMembership) {
+        this.ignoreGroupMembership = ignoreGroupMembership;
     }
 }
