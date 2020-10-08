@@ -98,8 +98,8 @@ public class KubernetesClientWrapper {
             // and optionally also to only those jobs, which were created bu the user
             labelSelector += "," + user.getLabelSelector();
         }
-        if(authorisationProperties.isIgnoreGroupMembership()) {
-            labelSelector += "," + new StringJoiner("=").add(LABEL_USERID_KEY).add(user.getUsername()).toString();
+        if (authorisationProperties.isIgnoreGroupMembership ()) {
+            labelSelector += "," + new StringJoiner ("=").add (LABEL_USERID_KEY).add (user.getUsername ()).toString ();
         }
         V1JobList result = this.listJobs(pageToken, labelSelector, itemsPerPage);
         if (user.isMemberInNonManagedGroups()) {
