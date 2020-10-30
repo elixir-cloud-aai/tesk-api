@@ -48,6 +48,15 @@ public class AuthIgnoreGroupMembershipIT {
     @Autowired
     private MockMvc mvc;
 
+    @TestConfiguration
+    static class KubernetesClientMock {
+        @Bean
+        @Primary
+        public ApiClient kubernetesApiClient() {
+            return Config.fromUrl("http://localhost:9000", false);
+        }
+    }
+
     @Test
     public void authorizedUser_createTask() throws Exception {
 
@@ -67,25 +76,6 @@ public class AuthIgnoreGroupMembershipIT {
                 .accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk());
     }
 
-    @Test
-    public void author_in_group_getList() throws Exception {
-
-        mockElixir.givenThat(
-                WireMock.get("/")
-                        .willReturn(okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : [\"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI#perun.elixir-czech.cz\",\"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:TEST#perun.elixir-czech.cz\"]}")));
-
-        mockKubernetes.givenThat(
-                WireMock.get("/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster%2Ccreator-user-id%3D123")
-                        .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
-        MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
-
-        this.mvc.perform(get("/v1/tasks")
-                .header("Authorization", "Bearer BAR"))
-                .andExpect(status().isOk());
-
-        verify(exactly(0), getRequestedFor(urlEqualTo("/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster" +
-                "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-id%3D123")));
-    }
 
     @Test
     public void author_getTask() throws Exception {
@@ -130,11 +120,11 @@ public class AuthIgnoreGroupMembershipIT {
     }
 
     @Test
-    public void author_getList() throws Exception {
+    public void author_not_in_group_getList() throws Exception {
 
         mockElixir.givenThat(
                 WireMock.get("/")
-                        .willReturn(okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : [\"sth\",\"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP#perun.elixir-czech.cz\"]}")));
+                        .willReturn(okJson("{\"sub\" : \"123\"}")));
 
         mockKubernetes.givenThat(
                 WireMock.get("/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster" +
@@ -152,6 +142,27 @@ public class AuthIgnoreGroupMembershipIT {
         this.mvc.perform(get("/v1/tasks?view=FULL")
                 .header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk());
+    }
+
+
+    @Test
+    public void author_in_group_getList() throws Exception {
+
+        mockElixir.givenThat(
+                WireMock.get("/")
+                        .willReturn(okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : [\"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI#perun.elixir-czech.cz\",\"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:TEST#perun.elixir-czech.cz\"]}")));
+
+        mockKubernetes.givenThat(
+                WireMock.get("/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster%2Ccreator-user-id%3D123")
+                        .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
+        MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
+
+        this.mvc.perform(get("/v1/tasks")
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk());
+
+        verify(exactly(0), getRequestedFor(urlEqualTo("/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster" +
+                "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-id%3D123")));
     }
 
     @Test
@@ -184,12 +195,4 @@ public class AuthIgnoreGroupMembershipIT {
 
     }
 
-    @TestConfiguration
-    static class KubernetesClientMock {
-        @Bean
-        @Primary
-        public ApiClient kubernetesApiClient() {
-            return Config.fromUrl("http://localhost:9000", false);
-        }
-    }
 }

@@ -55,6 +55,8 @@ public class ElixirPrincipalExtractor implements PrincipalExtractor {
                     return matcher.group(1);
                 }).collect(Collectors.toSet());
         boolean isAdmin = allGroups.stream().anyMatch(name -> authorisationProperties.getAdminGroupFull().equals(name));
-        return builder.allGroups(allGroups).teskMemberedGroups(memberedGroups).teskManagedGroups(managedGroups).teskAdmin(isAdmin).build();
+        boolean isIgnoreGroupMembership = authorisationProperties.isIgnoreGroupMembership();
+        return builder.allGroups(allGroups).teskMemberedGroups(memberedGroups).teskManagedGroups(managedGroups).teskAdmin(isAdmin).
+                ignoreGroupMembership(isIgnoreGroupMembership).build();
     }
 }
