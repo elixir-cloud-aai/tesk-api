@@ -93,14 +93,13 @@ public class KubernetesClientWrapper {
     public V1JobList listAllTaskmasterJobsForUser(String pageToken, Integer itemsPerPage, User user) {
         //Jobs of taskmaster type
         String labelSelector = new StringJoiner("=").add(LABEL_JOBTYPE_KEY).add(LABEL_JOBTYPE_VALUE_TASKM).toString();
-        if (user.getLabelSelector() != null && !authorisationProperties.isIgnoreGroupMembership()) {
+
+        if (user.getLabelSelector() != null) {
             //additional label selectors; limiting results to jobs belonging to chosen groups (where the user is member and/or manager)
             // and optionally also to only those jobs, which were created bu the user
             labelSelector += "," + user.getLabelSelector();
         }
-        if (authorisationProperties.isIgnoreGroupMembership()) {
-            labelSelector += "," + new StringJoiner("=").add(LABEL_USERID_KEY).add(user.getUsername()).toString();
-        }
+
         V1JobList result = this.listJobs(pageToken, labelSelector, itemsPerPage);
         if (user.isMemberInNonManagedGroups()) {
             //if there are groups, where user is a manager and other groups, where user is only a member
