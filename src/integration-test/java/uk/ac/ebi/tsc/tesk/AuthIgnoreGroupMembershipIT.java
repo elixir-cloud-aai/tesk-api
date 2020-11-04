@@ -22,6 +22,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 
@@ -57,13 +58,17 @@ public class AuthIgnoreGroupMembershipIT {
         }
     }
 
+    /**
+     * Any authenticated user should be able to create a task
+     *
+     * @throws Exception
+     */
     @Test
-    public void authorizedUser_createTask() throws Exception {
+    public void author_not_in_group_createTask() throws Exception {
 
         mockElixir.givenThat(
                 WireMock.get("/")
-                        .willReturn(okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : [\"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI#perun.elixir-czech.cz\", \"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:TEST#perun.elixir-czech.cz\"]}")));
-
+                        .willReturn(okJson("{\"sub\" : \"123\" }")));
         mockKubernetes.givenThat(
                 WireMock.post("/apis/batch/v1/namespaces/default/jobs")
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
@@ -73,16 +78,60 @@ public class AuthIgnoreGroupMembershipIT {
                 .content(getFileContentFromResources(path))
                 .header("Authorization", "Bearer BAR")
                 .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk());
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void author_in_a_group_createTask() throws Exception {
+
+        mockElixir.givenThat(
+                WireMock.get("/")
+                        .willReturn(okJson("{\"sub\" : \"123\", " +
+                                " \"eduperson_entitlement\" : [\"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI#perun.elixir-czech.cz\", \"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:TEST#perun.elixir-czech.cz\"]}")));
+
+        mockKubernetes.givenThat(
+                WireMock.post("/apis/batch/v1/namespaces/default/jobs")
+                        .withRequestBody(matchingJsonPath("$.metadata.labels[?(@.creator-group-name == 'TEST')]"))
+                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
+
+        String path = "fromTesToK8s_minimal/task.json";
+        this.mvc.perform(post("/v1/tasks")
+                .content(getFileContentFromResources(path))
+                .header("Authorization", "Bearer BAR")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
     }
 
 
     @Test
-    public void author_getTask() throws Exception {
+    public void author_in_a_group_getTask() throws Exception {
 
         mockElixir.givenThat(
                 WireMock.get("/")
                         .willReturn(okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : [\"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI#perun.elixir-czech.cz\", \"urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:TEST#perun.elixir-czech.cz\"]}")));
+
+        MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
+
+
+        this.mvc.perform(get("/v1/tasks/{id}", "task-123")
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk());
+        this.mvc.perform(get("/v1/tasks/{id}?view=BASIC", "task-123")
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk());
+        this.mvc.perform(get("/v1/tasks/{id}?view=FULL", "task-123")
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void author_not_in_a_group_getTask() throws Exception {
+
+        mockElixir.givenThat(
+                WireMock.get("/")
+                        .willReturn(okJson("{\"sub\" : \"123\"}")));
 
         MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
 
@@ -129,20 +178,14 @@ public class AuthIgnoreGroupMembershipIT {
         mockKubernetes.givenThat(
                 WireMock.get("/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster" +
                         "%2Ccreator-user-id%3D123")
-                        .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
+                        .willReturn(aResponse().withBodyFile("list/taskmasters_nogroup.json")));
 
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
-        this.mvc.perform(get("/v1/tasks")
-                .header("Authorization", "Bearer BAR"))
-                .andExpect(status().isOk());
-        this.mvc.perform(get("/v1/tasks?view=BASIC")
-                .header("Authorization", "Bearer BAR"))
-                .andExpect(status().isOk());
-        this.mvc.perform(get("/v1/tasks?view=FULL")
-                .header("Authorization", "Bearer BAR"))
-                .andExpect(status().isOk());
+        perFormListTask(5);
+
     }
+
 
 
     @Test
@@ -154,7 +197,7 @@ public class AuthIgnoreGroupMembershipIT {
 
         mockKubernetes.givenThat(
                 WireMock.get("/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster%2Ccreator-user-id%3D123")
-                        .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
+                        .willReturn(aResponse().withBodyFile("list/taskmasters_nogroup.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
         this.mvc.perform(get("/v1/tasks")
@@ -163,6 +206,9 @@ public class AuthIgnoreGroupMembershipIT {
 
         verify(exactly(0), getRequestedFor(urlEqualTo("/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster" +
                 "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-id%3D123")));
+
+        perFormListTask(5);
+
     }
 
     @Test
@@ -194,5 +240,22 @@ public class AuthIgnoreGroupMembershipIT {
                 .andExpect(status().isUnauthorized());
 
     }
+
+    private void perFormListTask(int expectedTasksLength) throws Exception {
+
+        this.mvc.perform(get("/v1/tasks")
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(5));
+        this.mvc.perform(get("/v1/tasks?view=BASIC")
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(5));
+        this.mvc.perform(get("/v1/tasks?view=FULL")
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(5));
+    }
+
 
 }
