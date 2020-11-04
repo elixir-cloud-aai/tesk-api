@@ -246,15 +246,15 @@ public class AuthIgnoreGroupMembershipIT {
         this.mvc.perform(get("/v1/tasks")
                 .header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(5));
+                .andExpect(jsonPath("$.tasks.length()").value(expectedTasksLength));
         this.mvc.perform(get("/v1/tasks?view=BASIC")
                 .header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(5));
+                .andExpect(jsonPath("$.tasks.length()").value(expectedTasksLength));
         this.mvc.perform(get("/v1/tasks?view=FULL")
                 .header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(5));
+                .andExpect(jsonPath("$.tasks.length()").value(expectedTasksLength));
     }
 
 
