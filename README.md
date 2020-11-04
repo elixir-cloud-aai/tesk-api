@@ -75,6 +75,7 @@ The meaning of chosen environment variables:
  `SPRING_PROFILES_ACTIVE` | (default) `noauth` - authN/Z switched off. `auth` - authN/Z switched on.
  `TESK_API_AUTHORISATION_*` | A set of env variables configuring authorisation using Elixir group membership
  `TESK_API_SWAGGER_OAUTH_*` | A set of env variables configuring OAuth2/OIDC client built in Swagger UI
+ `TESK_API_AUTHORISATION_IGNORE_GROUP_MEMBERSHIP` | If `true` a user can see all the tasks he created, irrespective of group memberships
  
  
 ### Generating new API version stub

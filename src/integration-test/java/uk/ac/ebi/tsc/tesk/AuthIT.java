@@ -38,7 +38,7 @@ import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 @AutoConfigureMockMvc
 @TestPropertySource(locations = {"classpath:application.properties"},
         properties = {"security.oauth2.resource.user-info-uri = http://localhost:8090",
-                "spring.profiles.active=auth"})
+                "spring.profiles.active=auth","tesk.api.authorisation.ignoreGroupMembership=false"})
 public class AuthIT {
 
     @Autowired

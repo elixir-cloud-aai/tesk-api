@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
+import uk.ac.ebi.tsc.tesk.config.security.AuthorisationProperties;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.exception.TaskNotFoundException;
 
@@ -42,6 +43,8 @@ public class KubernetesClientWrapperTest {
     @MockBean
     private CoreV1Api coreApi;
 
+    @MockBean
+    private AuthorisationProperties authorisationProperties;
 
     private KubernetesClientWrapper wrapper;
 
@@ -49,7 +52,7 @@ public class KubernetesClientWrapperTest {
     public void setUp() {
 
         this.wrapper = new KubernetesClientWrapper(batchApi, batchApi,
-                coreApi, coreApi, namespace);
+                coreApi, coreApi, namespace, authorisationProperties);
     }
 
     @Test

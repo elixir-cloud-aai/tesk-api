@@ -50,6 +50,12 @@ public class User implements Serializable, UserDetails, Principal {
      */
     private Set<String> teskManagedGroups;
 
+    /**
+     * Ignore group membership, so that task creator can see his tasks, irrespective of group
+     * membership
+     */
+    private boolean ignoreGroupMembership;
+
     public User() {
     }
 
@@ -93,30 +99,39 @@ public class User implements Serializable, UserDetails, Principal {
         return false;
     }
 
+    public boolean isIgnoreGroupMembership() {
+        return ignoreGroupMembership;
+    }
+
     public String getLabelSelector() {
-        Set<String> allTeskGroups = new LinkedHashSet<>();
-        if (this.teskMemberedGroups != null) {
-            allTeskGroups.addAll(this.teskMemberedGroups);
-        }
-        if (this.teskManagedGroups != null) {
-            allTeskGroups.addAll(this.teskManagedGroups);
-        }
-        if (isTeskAdmin()) {
+        if (isIgnoreGroupMembership()) {
+            return new StringBuilder().append(Constants.LABEL_USERID_KEY).append("=").append(getUsername()).toString();
+        } else {
+            Set<String> allTeskGroups = new LinkedHashSet<>();
+            if (this.teskMemberedGroups != null) {
+                allTeskGroups.addAll(this.teskMemberedGroups);
+            }
+            if (this.teskManagedGroups != null) {
+                allTeskGroups.addAll(this.teskManagedGroups);
+            }
+            if (isTeskAdmin()) {
+                return null;
+            }
+            if (isMember() || isManager()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(Constants.LABEL_GROUPNAME_KEY).append(" in (").append(StringUtils.collectionToCommaDelimitedString(allTeskGroups)).append(")");
+                if (!isManager()) {
+                    sb.append(",").append(Constants.LABEL_USERID_KEY).append("=").append(getUsername());
+                }
+                return sb.toString();
+            }
             return null;
         }
-        if (isMember() || isManager()) {
-            StringBuilder sb = new StringBuilder();
-            sb.append(Constants.LABEL_GROUPNAME_KEY).append(" in (").append(StringUtils.collectionToCommaDelimitedString(allTeskGroups)).append(")");
-            if (!isManager()) {
-                sb.append(",").append(Constants.LABEL_USERID_KEY).append("=").append(getUsername());
-            }
-            return sb.toString();
-        }
-        return null;
     }
 
     User(String userId, String preferredUsername, String name, String givenName, String familyName, String email,
-         Set<String> allGroups, Set<String> teskMemberedGroups, Set<String> teskManagedGroups, boolean teskAdmin) {
+         Set<String> allGroups, Set<String> teskMemberedGroups, Set<String> teskManagedGroups, boolean teskAdmin,
+         boolean ignoreGroupMembership) {
         this.userId = userId;
         this.preferredUsername = preferredUsername;
         this.name = name;
@@ -127,6 +142,7 @@ public class User implements Serializable, UserDetails, Principal {
         this.teskMemberedGroups = teskMemberedGroups;
         this.teskManagedGroups = teskManagedGroups;
         this.teskAdmin = teskAdmin;
+        this.ignoreGroupMembership = ignoreGroupMembership;
     }
 
     @Override
@@ -181,6 +197,7 @@ public class User implements Serializable, UserDetails, Principal {
                 ", memberedGroups=(" + StringUtils.collectionToCommaDelimitedString(teskMemberedGroups) + ")" +
                 ", managedGroups=(" + StringUtils.collectionToCommaDelimitedString(teskManagedGroups) + ")" +
                 ", iasAdmin=" + isTeskAdmin() +
+                ", isIgnoreGroupMembership=" + isIgnoreGroupMembership() +
                 "}";
     }
 
@@ -202,6 +219,7 @@ public class User implements Serializable, UserDetails, Principal {
         if (allGroups != null ? !allGroups.equals(user.allGroups) : user.allGroups != null) return false;
         if (teskMemberedGroups != null ? !teskMemberedGroups.equals(user.teskMemberedGroups) : user.teskMemberedGroups != null)
             return false;
+        if (ignoreGroupMembership != user.ignoreGroupMembership) return false;
         return teskManagedGroups != null ? teskManagedGroups.equals(user.teskManagedGroups) : user.teskManagedGroups == null;
     }
 
@@ -217,6 +235,7 @@ public class User implements Serializable, UserDetails, Principal {
         result = 31 * result + (teskAdmin ? 1 : 0);
         result = 31 * result + (teskMemberedGroups != null ? teskMemberedGroups.hashCode() : 0);
         result = 31 * result + (teskManagedGroups != null ? teskManagedGroups.hashCode() : 0);
+        result = 31 * result + (ignoreGroupMembership ? 1 : 0);
         return result;
     }
 
@@ -231,6 +250,7 @@ public class User implements Serializable, UserDetails, Principal {
         private Set<String> teskMemberedGroups;
         private Set<String> teskManagedGroups;
         private boolean teskAdmin = false;
+        private boolean ignoreGroupMembership = false;
 
         UserBuilder(String userId) {
             this.userId = userId;
@@ -286,9 +306,14 @@ public class User implements Serializable, UserDetails, Principal {
             return this;
         }
 
+        public UserBuilder ignoreGroupMembership(boolean ignoreGroupMembership) {
+            this.ignoreGroupMembership = ignoreGroupMembership;
+            return this;
+        }
+
         public User build() {
             return new User(userId, preferredUsername, name, givenName, familyName, email,
-                    allGroups, teskMemberedGroups, teskManagedGroups, teskAdmin);
+                    allGroups, teskMemberedGroups, teskManagedGroups, teskAdmin, ignoreGroupMembership);
         }
     }
 
