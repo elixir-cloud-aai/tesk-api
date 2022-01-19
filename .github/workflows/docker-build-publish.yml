@@ -16,6 +16,9 @@ jobs:
   build-from-source:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout elixir-cloud-aai/tesk-api
+        uses: actions/checkout@v2
+
       - name: run mvnw script
         run: |
           bash -c ./mvnw clean verify
