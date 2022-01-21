@@ -45,7 +45,7 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: |
-            elixircloud/${{ github.repository }}
+            elixircloud/${{ github.workflow }}
       
       - name: Build and push Docker images
         uses: docker/build-push-action@v2
