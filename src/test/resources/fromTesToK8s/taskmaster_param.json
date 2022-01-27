@@ -65,6 +65,9 @@
                 ],
                 "image": "ubuntu",
                 "name": "task-35605447-ex-00",
+                "securityContext": {
+                  "runAsUser": 100
+                },
                 "resources": {
                   "requests": {
                     "cpu": "4",
@@ -133,6 +136,9 @@
                 ],
                 "image": "alpine",
                 "name": "task-35605447-ex-01",
+                "securityContext": {
+                  "runAsUser": 100
+                },
                 "resources": {
                   "requests": {
                     "cpu": "4",
