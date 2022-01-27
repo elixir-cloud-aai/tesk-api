@@ -104,7 +104,8 @@ public class KubernetesObjectsSupplier {
     @Scope(value = "prototype")
     public V1Job executorTemplate() {
         V1Container container = new V1Container().
-                resources(new V1ResourceRequirements());
+                resources(new V1ResourceRequirements()).
+		securityContext(new V1SecurityContext().runAsUser(new Long(100)));
         if (this.taskmasterEnvProperties.isExecutorSecretEnabled()) {
             container.addVolumeMountsItem(new V1VolumeMount().
                     readOnly(Boolean.TRUE).
