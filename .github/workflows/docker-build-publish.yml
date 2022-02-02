@@ -3,7 +3,7 @@ name: tesk-api
 on:
   push:
     branches: [ 'testing-gh-action' ]
-    tags: [ '*' ]
+    #tags: [ '*' ]
 
   workflow_dispatch:
     inputs:
