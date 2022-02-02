@@ -3,7 +3,7 @@ name: tesk-api
 on:
   push:
     branches: [ 'testing-gh-action' ]
-    #tags: [ '*' ]
+    tags: [ '*' ]
 
   workflow_dispatch:
     inputs:
@@ -45,7 +45,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: elixircloud/tesk-api
+          images: elixircloud/${{ github.GITHUB_EVENT_NAME }}
       
       - name: Build and push Docker images
         uses: docker/build-push-action@v2
