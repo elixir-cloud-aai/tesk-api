@@ -12,6 +12,7 @@ on:
         required: false
         default: tesk-api
 
+
 jobs:
   build-from-source:
     runs-on: ubuntu-latest
@@ -45,7 +46,7 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: |
-            elixircloud/${{ github.workflow }}
+            elixircloud/tesk-api:${{ push.tags }}
       
       - name: Build and push Docker images
         uses: docker/build-push-action@v2
