@@ -45,8 +45,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: |
-            elixircloud/tesk-api$-{{ github.GITHUB_REF_TYPE }}-${{ github.GITHUB_REF_NAME }}
+          images: elixircloud/tesk-api
       
       - name: Build and push Docker images
         uses: docker/build-push-action@v2
@@ -54,6 +53,7 @@ jobs:
           context: .
           push: true
           file: ./Dockerfile
+          tags: 
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
