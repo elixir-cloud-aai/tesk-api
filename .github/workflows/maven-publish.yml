@@ -22,7 +22,8 @@ jobs:
       with:
         java-version: '8'
         distribution: 'temurin'
-
+    - name: checkout
+      run: git checkout master
     - name: Build with Maven
       run: ./mvnw clean verify
   
