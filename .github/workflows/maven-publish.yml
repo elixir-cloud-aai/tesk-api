@@ -28,7 +28,7 @@ jobs:
 
     # Login against a Docker registry except on PR
     # https://github.com/docker/login-action
-    - name: Log into registry ${{ secrets.DOCKER_REGISTRY }}
+    - name: Log into registry
       if: github.event_name != 'pull_request'
       uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
       with:
@@ -37,7 +37,7 @@ jobs:
 
     - name: Get current date
       id: date
-      run: echo "::set-output name=date::$(date +'%Y%m%d%s')" && ls /home/runner/work/tesk-api/tesk-api
+      run: echo "::set-output name=date::$(date +'%Y%m%d%s')"
 
 
     # Build and push Docker image with Buildx (don't push on PR)
