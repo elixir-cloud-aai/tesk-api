@@ -48,7 +48,7 @@ jobs:
       uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
       with:
         context: .
-        push: ${{ github.event_name = 'push' }}
+        push: ${{ github.event_name == 'push' }}
         tags: ${{ secrets.DOCKER_REGISTRY }}/tesk-api:latest, ${{ secrets.DOCKER_REGISTRY }}/tesk-api:${{ steps.date.outputs.date }}
     
     
