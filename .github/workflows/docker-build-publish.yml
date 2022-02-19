@@ -45,7 +45,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: elixircloud/tesk-api${{ github.GITHUB_REF_NAME }}
+          images: elixircloud/tesk-api #${{ github.GITHUB_REF_TYPE }}
       
       - name: Build and push Docker images
         uses: docker/build-push-action@v2
