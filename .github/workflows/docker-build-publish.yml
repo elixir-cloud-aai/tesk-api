@@ -45,7 +45,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: elixircloud/${{ github.GITHUB_EVENT_NAME }}
+          images: elixircloud/${{ github.GITHUB_REF }}
       
       - name: Build and push Docker images
         uses: docker/build-push-action@v2
