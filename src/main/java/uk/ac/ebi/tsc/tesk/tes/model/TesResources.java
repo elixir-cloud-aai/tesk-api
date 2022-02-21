@@ -11,7 +11,7 @@ import javax.validation.Valid;
 /**
  * Resources describes the resources requested by a task.
  */
-@ApiModel(description = "Resources describes the resources requested by a task.")
+@ApiModel(description = "Resources describes the resources requested by a task.", value="tesResources")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesResources   {
   @JsonProperty("cpu_cores")
