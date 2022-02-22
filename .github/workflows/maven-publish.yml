@@ -11,7 +11,7 @@ jobs:
   build:
     # There is a bug on GitHub that triggers the workflow even when 
     # one pushes with an empty tag. So I added the if to cancel the 
-    # workflow when a push is performed.
+    # workflow when a push is performed .
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     permissions:
