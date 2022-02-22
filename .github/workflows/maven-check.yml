@@ -2,9 +2,12 @@ name: Check push/pull request
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
   pull_request:
-    types: [ opened, edited ]
+    types: 
+      - opened
+      - edited
 
 jobs:
   build:
