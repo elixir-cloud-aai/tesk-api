@@ -1,10 +1,10 @@
-name: Maven Package
+name: Check pushed
 
 on:
   push:
     branches: [ master ]
   pull_request:
-    types: [ review_requested ]
+    types: [ opened, edited ]
 
 jobs:
   build:
