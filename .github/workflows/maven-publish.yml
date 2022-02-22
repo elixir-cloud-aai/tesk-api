@@ -21,9 +21,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Get tags
       id: get_tag
-      run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
-    - run: |
-        echo ${GITHUB_REF#refs/tags/}
+      run: echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
     # - name: Set up JDK 8
     #   uses: actions/setup-java@v2
     #   with:
