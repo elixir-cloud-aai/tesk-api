@@ -25,7 +25,7 @@ public class Constants {
      * Key in JSON taskmaster input, which holds list of executors
      */
     public static final String TASKMASTER_INPUT_EXEC_KEY = "executors";
-
+    
     /**
      *
      */
@@ -68,6 +68,11 @@ public class Constants {
      * Key of the annotation, that stores whole input TES task serialized to JSON
      */
     public static final String ANN_JSON_INPUT_KEY = "json-input";
+
+    /**
+     * Key of the annotation, that stores the callback URL
+     */
+    public static final String ANN_CALLBACK_URL_KEY = "callback_url";
 
     /**
      * Key of the label, that stores taskmaster's name (==TES task generated ID) in executor jobs

@@ -32,6 +32,9 @@ public class TesTask   {
   @JsonProperty("description")
   private String description;
 
+  @JsonProperty("callback_url")
+  private String callbackUrl;
+
   @JsonProperty("inputs")
   @Valid
   private List<TesInput> inputs = null;
@@ -142,6 +145,26 @@ public class TesTask   {
 
   public void setDescription(String description) {
     this.description = description;
+  }
+
+  public TesTask callbackUrl(String callbackUrl) {
+    this.callbackUrl = callbackUrl;
+    return this;
+  }
+
+  /**
+   * Optional user-provided callback URL.
+   * @return callbackUrl
+   */
+  @ApiModelProperty(value = "Optional user-provided callback URL.")
+
+
+  public String getCallbackUrl() {
+    return callbackUrl;
+  }
+
+  public void setCallbackUrl(String callbackUrl) {
+    this.callbackUrl = callbackUrl;
   }
 
   public TesTask inputs(List<TesInput> inputs) {
@@ -372,6 +395,7 @@ public class TesTask   {
         Objects.equals(this.state, tesTask.state) &&
         Objects.equals(this.name, tesTask.name) &&
         Objects.equals(this.description, tesTask.description) &&
+        Objects.equals(this.callbackUrl, tesTask.callbackUrl) &&
         Objects.equals(this.inputs, tesTask.inputs) &&
         Objects.equals(this.outputs, tesTask.outputs) &&
         Objects.equals(this.resources, tesTask.resources) &&
@@ -384,7 +408,7 @@ public class TesTask   {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, state, name, description, inputs, outputs, resources, executors, volumes, tags, logs, creationTime);
+    return Objects.hash(id, state, name, description, callbackUrl, inputs, outputs, resources, executors, volumes, tags, logs, creationTime);
   }
 
   @Override
@@ -396,6 +420,7 @@ public class TesTask   {
     sb.append("    state: ").append(toIndentedString(state)).append("\n");
     sb.append("    name: ").append(toIndentedString(name)).append("\n");
     sb.append("    description: ").append(toIndentedString(description)).append("\n");
+    sb.append("    callbackUrl: ").append(toIndentedString(callbackUrl)).append("\n");
     sb.append("    inputs: ").append(toIndentedString(inputs)).append("\n");
     sb.append("    outputs: ").append(toIndentedString(outputs)).append("\n");
     sb.append("    resources: ").append(toIndentedString(resources)).append("\n");
