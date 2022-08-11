@@ -75,10 +75,6 @@ public class TesKubernetesConverter {
         V1Job taskMasterJob = this.taskmasterTemplateSupplier.get();
         //put input task name as annotation
         taskMasterJob.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, task.getName());
-        // put callback URL as annotation
-        if (task.getCallbackUrl() != null) {
-            taskMasterJob.getMetadata().putAnnotationsItem(ANN_CALLBACK_URL_KEY, task.getCallbackUrl());
-        }
         //creating user and owning group
         taskMasterJob.getMetadata().putLabelsItem(LABEL_USERID_KEY, user.getUsername());
         if (task.getTags() != null && task.getTags().containsKey("GROUP_NAME")) {
@@ -117,6 +113,10 @@ public class TesKubernetesConverter {
         String taskMasterInputAsJSON = this.gson.toJson(taskMasterInput);
         //placing taskmaster's parameter (JSONed map of: inputs, outputs, volumes, executors (as jobs) into ENV variable in taskmaster spec
         taskMasterJob.getSpec().getTemplate().getSpec().getContainers().get(0).getEnv().stream().filter(x -> x.getName().equals(TASKMASTER_INPUT)).forEach(x -> x.setValue(taskMasterInputAsJSON));
+        //place callback URL as ENV variable in taskmaster spec
+        if (task.getCallbackUrl() != null) {
+            taskMasterJob.getSpec().getTemplate().getSpec().getContainers().get(0).addEnvItem(new V1EnvVar().name(TASKMASTER_CALLBACK_URL).value(task.getCallbackUrl()));
+        }
         return taskMasterJob;
     }
 
