@@ -152,6 +152,8 @@ public class TesKubernetesConverter {
         container.setWorkingDir(executor.getWorkdir());
         Optional.ofNullable(resources).map(TesResources::getCpuCores).ifPresent(cpuCores -> container.getResources().putRequestsItem(RESOURCE_CPU_KEY, new QuantityFormatter().parse(cpuCores.toString())));
         Optional.ofNullable(resources).map(TesResources::getRamGb).ifPresent(ramGb -> container.getResources().putRequestsItem(RESOURCE_MEM_KEY, new QuantityFormatter().parse(ramGb.toString() + RESOURCE_MEM_UNIT)));
+        Optional.ofNullable(resources).map(TesResources::getCpuCores).ifPresent(cpuCores -> container.getResources().putLimitsItem(RESOURCE_CPU_KEY, new QuantityFormatter().parse(cpuCores.toString())));
+        Optional.ofNullable(resources).map(TesResources::getRamGb).ifPresent(ramGb -> container.getResources().putLimitsItem(RESOURCE_MEM_KEY, new QuantityFormatter().parse(ramGb.toString() + RESOURCE_MEM_UNIT)));
 
         return job;
     }
