@@ -118,9 +118,12 @@ public class KubernetesClientWrapper {
                 }
             }
         return toGB(returnValue);
+        } catch (KubernetesException k8sexc) {
+		logger.error("KubernetesException: ", k8sexc);
+		logger.error("KubernetesException: "+k8sexc.getApiException().getResponseBody());
         } catch (Exception exc) {
             logger.error("ERROR in minimumRamGb: ", exc);
-        }
+	}
         return 0.0;
     }
 
