@@ -94,7 +94,7 @@ public class TesKubernetesConverter {
                 mapToObj(i -> this.fromTesExecutorToK8sJob(taskMasterJob.getMetadata().getName(), task.getName(), task.getExecutors().get(i), i, task.getResources(), user)).
                 collect(Collectors.toList());
         Map<String, Object> taskMasterInput = new HashMap<>();
-       try {
+        try {
             //converting original inputs, outputs, volumes and disk size back again to JSON (will be part of taskMaster's input parameter)
             //Jackson - for TES objects
             List<TesInput> inputs = task.getInputs() == null ? new ArrayList<>() : task.getInputs();
