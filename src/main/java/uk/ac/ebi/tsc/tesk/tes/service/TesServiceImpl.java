@@ -72,10 +72,6 @@ public class TesServiceImpl implements TesService {
                 if (!e.isObjectNameDuplicated() || ++attemptsNo >= JOB_CREATE_ATTEMPTS_NO) {
                     throw e;
                 }
-            } catch (IllegalArgumentException iaexc) {
-                logger.error("ERROR IllegalArgumentException in createTask");
-                logger.error("TASK: "+task.toString());
-                throw iaexc;
             } catch (Exception exc) {
                 logger.error("ERROR: In createTask", exc);
                 logger.error(exc.getMessage());
