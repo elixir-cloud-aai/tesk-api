@@ -9,6 +9,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito.*;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -28,6 +29,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_GROUPNAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERID_KEY;
+import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 
 @RunWith(SpringRunner.class)
 @TestPropertySource(

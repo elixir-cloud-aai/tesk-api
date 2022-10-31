@@ -110,14 +110,7 @@ public class TesKubernetesConverter {
             //TODO throw
         }
         taskMasterInput.put(TASKMASTER_INPUT_EXEC_KEY, executorsAsJobs);
-        String taskMasterInputAsJSON;
-	try {
-          taskMasterInputAsJSON = this.gson.toJson(taskMasterInput);
-        } catch (IllegalArgumentException iaexc) {
-          logger.error("Converting TASK to Json failed: ", iaexc);
-          logger.error("taskMasterInput: "+ taskMasterInput.toString());
-          throw iaexc;
-        }
+        String taskMasterInputAsJSON = this.gson.toJson(taskMasterInput);
         //placing taskmaster's parameter (JSONed map of: inputs, outputs, volumes, executors (as jobs) into ENV variable in taskmaster spec
         taskMasterJob.getSpec().getTemplate().getSpec().getContainers().get(0).getEnv().stream().filter(x -> x.getName().equals(TASKMASTER_INPUT)).forEach(x -> x.setValue(taskMasterInputAsJSON));
         return taskMasterJob;
