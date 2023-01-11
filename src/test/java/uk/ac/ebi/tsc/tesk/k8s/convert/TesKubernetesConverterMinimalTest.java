@@ -21,6 +21,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
@@ -58,6 +59,7 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CA
 @JsonTest
 @TestPropertySource(locations = {"classpath:application.properties"})
 @EnableConfigurationProperties(TaskmasterEnvProperties.class)
+@ContextConfiguration(classes = {io.kubernetes.client.openapi.apis.CoreV1Api.class})
 public class TesKubernetesConverterMinimalTest {
 
     @MockBean
