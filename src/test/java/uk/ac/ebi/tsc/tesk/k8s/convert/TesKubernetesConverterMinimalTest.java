@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
@@ -21,6 +22,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
@@ -62,6 +64,9 @@ public class TesKubernetesConverterMinimalTest {
 
     @MockBean
     private JobNameGenerator jobNameGenerator;
+
+    @MockBean
+    private CoreV1Api coreApi;
 
     private TrsToolClient trsToolClient;
 
