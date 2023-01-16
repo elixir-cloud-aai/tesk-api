@@ -71,7 +71,6 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CA
                 "tesk.api.k8s.namespace = test-namespace"
         })
 @EnableConfigurationProperties(TaskmasterEnvProperties.class)
-@ContextConfiguration(classes = {io.kubernetes.client.openapi.apis.CoreV1Api.class})
 public class TesKubernetesConverterTest {
     @MockBean
     private CoreV1Api coreApi;
