@@ -22,10 +22,15 @@ public class Constants {
     public static final String TASKMASTER_INPUT = "JSON_INPUT";
 
     /**
+     * ENV var that stores the callback URL
+     */
+    public static final String TASKMASTER_CALLBACK_URL = "CALLBACK_URL";
+
+    /**
      * Key in JSON taskmaster input, which holds list of executors
      */
     public static final String TASKMASTER_INPUT_EXEC_KEY = "executors";
-
+    
     /**
      *
      */

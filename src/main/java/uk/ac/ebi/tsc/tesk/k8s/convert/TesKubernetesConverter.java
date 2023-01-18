@@ -113,6 +113,10 @@ public class TesKubernetesConverter {
         String taskMasterInputAsJSON = this.gson.toJson(taskMasterInput);
         //placing taskmaster's parameter (JSONed map of: inputs, outputs, volumes, executors (as jobs) into ENV variable in taskmaster spec
         taskMasterJob.getSpec().getTemplate().getSpec().getContainers().get(0).getEnv().stream().filter(x -> x.getName().equals(TASKMASTER_INPUT)).forEach(x -> x.setValue(taskMasterInputAsJSON));
+        //place callback URL as ENV variable in taskmaster spec
+        if (task.getCallbackUrl() != null) {
+            taskMasterJob.getSpec().getTemplate().getSpec().getContainers().get(0).addEnvItem(new V1EnvVar().name(TASKMASTER_CALLBACK_URL).value(task.getCallbackUrl()));
+        }
         return taskMasterJob;
     }
 
