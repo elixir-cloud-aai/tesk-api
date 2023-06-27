@@ -105,11 +105,11 @@
             <version>${kubernetes.client-java.version}</version>
         </dependency>
         <!--Guava-->
-        <!--dependency>
+        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>${guava.version}</version>
-        </dependency-->
+        </dependency>
         <dependency>
             <groupId>javax.validation</groupId>
             <artifactId>validation-api</artifactId>
