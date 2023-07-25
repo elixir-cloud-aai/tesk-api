@@ -28,7 +28,6 @@ import java.util.List;
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
-@EnableSwagger2
 @Profile("auth")
 public class SwaggerConfigAuth {
 

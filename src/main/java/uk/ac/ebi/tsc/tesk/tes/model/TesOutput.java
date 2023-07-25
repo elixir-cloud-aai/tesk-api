@@ -2,20 +2,18 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-
+import uk.ac.ebi.tsc.tesk.tes.model.TesFileType;
 import javax.validation.Valid;
 import javax.validation.constraints.*;
-
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_MESSAGE;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
 
 /**
  * Output describes Task output files.
  */
 @ApiModel(description = "Output describes Task output files.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2023-07-25T15:44:45.116897+02:00[Europe/Prague]")
 public class TesOutput   {
   @JsonProperty("name")
   private String name;
@@ -83,7 +81,7 @@ public class TesOutput   {
   */
   @ApiModelProperty(required = true, value = "URL for the file to be copied by the TES server after the task is complete. For Example:  - `s3://my-object-store/file1`  - `gs://my-bucket/file2`  - `file:///path/to/my/file`")
   @NotNull
-  @NotBlank
+
 
   public String getUrl() {
     return url;
@@ -102,10 +100,10 @@ public class TesOutput   {
    * Path of the file inside the container. Must be an absolute path.
    * @return path
   */
-  @ApiModelProperty(example = "/data/file1", required = true, value = "Path of the file inside the container. Must be an absolute path.")
+  @ApiModelProperty(required = true, value = "Path of the file inside the container. Must be an absolute path.")
   @NotNull
-  @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
-  @NotBlank
+
+
   public String getPath() {
     return path;
   }

@@ -15,7 +15,7 @@ import javax.validation.constraints.*;
  * GA4GH service
  */
 @ApiModel(description = "GA4GH service")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-04-12T17:49:13.631+01:00[Europe/London]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2023-07-25T15:44:45.116897+02:00[Europe/Prague]")
 public class Service   {
   @JsonProperty("id")
   private String id;

@@ -2,10 +2,12 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.ArrayList;
 import java.util.List;
+import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import javax.validation.Valid;
 import javax.validation.constraints.*;
 
@@ -13,7 +15,7 @@ import javax.validation.constraints.*;
  * ListTasksResponse describes a response from the ListTasks endpoint.
  */
 @ApiModel(description = "ListTasksResponse describes a response from the ListTasks endpoint.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2023-07-25T15:44:45.116897+02:00[Europe/Prague]")
 public class TesListTasksResponse   {
   @JsonProperty("tasks")
   @Valid

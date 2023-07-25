@@ -2,16 +2,17 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-
+import javax.validation.Valid;
 import javax.validation.constraints.*;
 
 /**
  * OutputFileLog describes a single output file. This describes file details after the task has completed successfully, for logging purposes.
  */
 @ApiModel(description = "OutputFileLog describes a single output file. This describes file details after the task has completed successfully, for logging purposes.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2023-07-25T15:44:45.116897+02:00[Europe/Prague]")
 public class TesOutputFileLog   {
   @JsonProperty("url")
   private String url;
@@ -31,7 +32,7 @@ public class TesOutputFileLog   {
    * URL of the file in storage, e.g. s3://bucket/file.txt
    * @return url
   */
-  @ApiModelProperty(example="s3://bucket/file.txt", required = true, value = "URL of the file in storage, e.g. s3://bucket/file.txt")
+  @ApiModelProperty(required = true, value = "URL of the file in storage, e.g. s3://bucket/file.txt")
   @NotNull
 
 
@@ -52,7 +53,7 @@ public class TesOutputFileLog   {
    * Path of the file inside the container. Must be an absolute path.
    * @return path
   */
-  @ApiModelProperty(example="/data/file1", required = true, value = "Path of the file inside the container. Must be an absolute path.")
+  @ApiModelProperty(required = true, value = "Path of the file inside the container. Must be an absolute path.")
   @NotNull
 
 

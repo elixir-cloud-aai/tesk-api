@@ -4,14 +4,17 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-
+import uk.ac.ebi.tsc.tesk.tes.model.ServiceType;
+import uk.ac.ebi.tsc.tesk.tes.model.TesServiceTypeAllOf;
+import javax.validation.Valid;
 import javax.validation.constraints.*;
 
 /**
  * TesServiceType
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2023-07-25T15:44:45.116897+02:00[Europe/Prague]")
 public class TesServiceType   {
   @JsonProperty("group")
   private String group;
