@@ -2,22 +2,18 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import org.hibernate.validator.constraints.ScriptAssert;
-
+import uk.ac.ebi.tsc.tesk.tes.model.TesFileType;
 import javax.validation.Valid;
 import javax.validation.constraints.*;
-
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_MESSAGE;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
 
 /**
  * Input describes Task input files.
  */
 @ApiModel(description = "Input describes Task input files.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
-@ScriptAssert(lang = "javascript", script = "(_this.url != null && (_this.url.trim().length) > 0) || (_this.content != null && _this.content.length > 0)", message = "URL or content required")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2023-07-25T15:44:45.116897+02:00[Europe/Prague]")
 public class TesInput   {
   @JsonProperty("name")
   private String name;
@@ -108,8 +104,8 @@ public class TesInput   {
   */
   @ApiModelProperty(example = "/data/file1", required = true, value = "Path of the file inside the container. Must be an absolute path.")
   @NotNull
-  @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
-  @NotBlank
+
+
   public String getPath() {
     return path;
   }

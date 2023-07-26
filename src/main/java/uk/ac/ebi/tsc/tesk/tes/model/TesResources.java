@@ -2,17 +2,19 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.ArrayList;
 import java.util.List;
 import javax.validation.Valid;
+import javax.validation.constraints.*;
 
 /**
  * Resources describes the resources requested by a task.
  */
-@ApiModel(description = "Resources describes the resources requested by a task.", value="tesResources")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@ApiModel(description = "Resources describes the resources requested by a task.")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2023-07-25T15:44:45.116897+02:00[Europe/Prague]")
 public class TesResources   {
   @JsonProperty("cpu_cores")
   private Long cpuCores;
@@ -127,7 +129,7 @@ public class TesResources   {
    * Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.
    * @return zones
   */
-  @ApiModelProperty(example = "[\"us-west-1\"]", value = "Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.")
+  @ApiModelProperty(example = "us-west-1", value = "Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.")
 
 
   public List<String> getZones() {

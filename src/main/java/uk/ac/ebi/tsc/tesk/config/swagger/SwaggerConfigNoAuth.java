@@ -16,7 +16,6 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2;
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
-@EnableSwagger2
 @Profile("noauth")
 public class SwaggerConfigNoAuth {
     @Bean

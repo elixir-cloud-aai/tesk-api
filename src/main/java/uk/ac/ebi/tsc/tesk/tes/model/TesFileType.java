@@ -1,6 +1,9 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
+import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonValue;
+import javax.validation.Valid;
+import javax.validation.constraints.*;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 
@@ -36,9 +39,7 @@ public enum TesFileType {
         return b;
       }
     }
-    //throw new IllegalArgumentException("Unexpected value '" + value + "'");
-    //Backwards compatibility: need to return null for illegal state
-    return null;
+    throw new IllegalArgumentException("Unexpected value '" + value + "'");
   }
 }
 
