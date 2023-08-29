@@ -6,7 +6,13 @@
 package uk.ac.ebi.tsc.tesk.tes.api;
 
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
-import io.swagger.annotations.*;
+//import io.swagger.annotations.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+//import  io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +23,7 @@ import org.springframework.web.context.request.NativeWebRequest;
 import java.util.Optional;
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 @Validated
-@Api(value = "service-info", description = "the service-info API")
+@Tag(name = "service-info", description = "the service-info API")
 public interface ServiceInfoApi {
 
     default Optional<NativeWebRequest> getRequest() {
@@ -30,9 +36,9 @@ public interface ServiceInfoApi {
      *
      * @return  (status code 200)
      */
-    @ApiOperation(value = "GetServiceInfo", nickname = "getServiceInfo", notes = "Provides information about the service, this structure is based on the standardized GA4GH service info structure. In addition, this endpoint will also provide information about customized storage endpoints offered by the TES server.", response = TesServiceInfo.class, tags={ "TaskService", })
+    @Operation(summary = "GetServiceInfo", description = "Provides information about the service, this structure is based on the standardized GA4GH service info structure. In addition, this endpoint will also provide information about customized storage endpoints offered by the TES server.", responses = "TesServiceInfo.class", tags={ "TaskService", })
     @ApiResponses(value = { 
-        @ApiResponse(code = 200, message = "", response = TesServiceInfo.class) })
+        @ApiResponse(responseCode = "200", description = "") })
     @GetMapping(
         value = "/service-info",
         produces = { "application/json" }

@@ -5,13 +5,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import javax.validation.Valid;
 import javax.validation.constraints.*;
 
 /**
  * Organization providing the service
  */
-@ApiModel(description = "Organization providing the service")
+@Schema(description = "Organization providing the service")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-04-12T17:49:13.631+01:00[Europe/London]")
 public class ServiceOrganization   {
   @JsonProperty("name")
@@ -29,7 +32,7 @@ public class ServiceOrganization   {
    * Name of the organization responsible for the service
    * @return name
   */
-  @ApiModelProperty(example = "My organization", required = true, value = "Name of the organization responsible for the service")
+  @Schema(example = "My organization", required = true, description = "Name of the organization responsible for the service")
   @NotNull
 
 
@@ -50,7 +53,7 @@ public class ServiceOrganization   {
    * URL of the website of the organization (RFC 3986 format)
    * @return url
   */
-  @ApiModelProperty(example = "https://example.com", required = true, value = "URL of the website of the organization (RFC 3986 format)")
+  @Schema(example = "https://example.com", required = true, description = "URL of the website of the organization (RFC 3986 format)")
   @NotNull
 
 

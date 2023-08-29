@@ -4,6 +4,8 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import org.hibernate.validator.constraints.ScriptAssert;
 
 import javax.validation.Valid;
@@ -15,7 +17,7 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
 /**
  * Input describes Task input files.
  */
-@ApiModel(description = "Input describes Task input files.")
+@Schema(description = "Input describes Task input files.")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 @ScriptAssert(lang = "javascript", script = "(_this.url != null && (_this.url.trim().length) > 0) || (_this.content != null && _this.content.length > 0)", message = "URL or content required")
 public class TesInput   {
@@ -46,7 +48,7 @@ public class TesInput   {
    * Get name
    * @return name
   */
-  @ApiModelProperty(value = "")
+  @Schema(description = "")
 
 
   public String getName() {
@@ -66,7 +68,7 @@ public class TesInput   {
    * Get description
    * @return description
   */
-  @ApiModelProperty(value = "")
+  @Schema(description = "")
 
 
   public String getDescription() {
@@ -86,7 +88,7 @@ public class TesInput   {
    * REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file
    * @return url
   */
-  @ApiModelProperty(example = "s3://my-object-store/file1", value = "REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file")
+  @Schema(example = "s3://my-object-store/file1", description = "REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file")
 
 
   public String getUrl() {
@@ -106,7 +108,7 @@ public class TesInput   {
    * Path of the file inside the container. Must be an absolute path.
    * @return path
   */
-  @ApiModelProperty(example = "/data/file1", required = true, value = "Path of the file inside the container. Must be an absolute path.")
+  @Schema(example = "/data/file1", required = true, description = "Path of the file inside the container. Must be an absolute path.")
   @NotNull
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
   @NotBlank
@@ -127,7 +129,7 @@ public class TesInput   {
    * Get type
    * @return type
   */
-  @ApiModelProperty(required = true, value = "")
+  @Schema(required = true, description = "")
   @NotNull
 
   @Valid
@@ -149,7 +151,7 @@ public class TesInput   {
    * File content literal.  Implementations should support a minimum of 128 KiB in this field and may define their own maximum.  UTF-8 encoded  If content is not empty, \"url\" must be ignored.
    * @return content
   */
-  @ApiModelProperty(value = "File content literal.  Implementations should support a minimum of 128 KiB in this field and may define their own maximum.  UTF-8 encoded  If content is not empty, \"url\" must be ignored.")
+  @Schema(description = "File content literal.  Implementations should support a minimum of 128 KiB in this field and may define their own maximum.  UTF-8 encoded  If content is not empty, \"url\" must be ignored.")
 
 
   public String getContent() {

@@ -4,6 +4,9 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,7 +17,7 @@ import javax.validation.constraints.*;
 /**
  * TaskLog describes logging information related to a Task.
  */
-@ApiModel(description = "TaskLog describes logging information related to a Task.")
+@Schema(description = "TaskLog describes logging information related to a Task.")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesTaskLog   {
   @JsonProperty("logs")
@@ -57,7 +60,7 @@ public class TesTaskLog   {
    * Logs for each executor
    * @return logs
   */
-  @ApiModelProperty(required = true, value = "Logs for each executor")
+  @Schema(required = true, description = "Logs for each executor")
   @NotNull
 
   @Valid
@@ -87,7 +90,7 @@ public class TesTaskLog   {
    * Arbitrary logging metadata included by the implementation.
    * @return metadata
   */
-  @ApiModelProperty(example = "{\"host\":\"worker-001\",\"slurmm_id\":123456}", value = "Arbitrary logging metadata included by the implementation.")
+  @Schema(example = "{\"host\":\"worker-001\",\"slurmm_id\":123456}", description = "Arbitrary logging metadata included by the implementation.")
 
 
   public Map<String, String> getMetadata() {
@@ -107,7 +110,7 @@ public class TesTaskLog   {
    * When the task started, in RFC 3339 format.
    * @return startTime
   */
-  @ApiModelProperty(example = "2020-10-02T10:00:00-05:00", value = "When the task started, in RFC 3339 format.")
+  @Schema(example = "2020-10-02T10:00:00-05:00", description = "When the task started, in RFC 3339 format.")
 
 
   public String getStartTime() {
@@ -127,7 +130,7 @@ public class TesTaskLog   {
    * When the task ended, in RFC 3339 format.
    * @return endTime
   */
-  @ApiModelProperty(example = "2020-10-02T11:00:00-05:00", value = "When the task ended, in RFC 3339 format.")
+  @Schema(example = "2020-10-02T11:00:00-05:00", description = "When the task ended, in RFC 3339 format.")
 
 
   public String getEndTime() {
@@ -155,7 +158,7 @@ public class TesTaskLog   {
    * Information about all output files. Directory outputs are flattened into separate items.
    * @return outputs
   */
-  @ApiModelProperty(required = true, value = "Information about all output files. Directory outputs are flattened into separate items.")
+  @Schema(required = true, description = "Information about all output files. Directory outputs are flattened into separate items.")
   @NotNull
 
   @Valid
@@ -185,7 +188,7 @@ public class TesTaskLog   {
    * System logs are any logs the system decides are relevant, which are not tied directly to an Executor process. Content is implementation specific: format, size, etc.  System logs may be collected here to provide convenient access.  For example, the system may include the name of the host where the task is executing, an error message that caused a SYSTEM_ERROR state (e.g. disk is full), etc.  System logs are only included in the FULL task view.
    * @return systemLogs
   */
-  @ApiModelProperty(value = "System logs are any logs the system decides are relevant, which are not tied directly to an Executor process. Content is implementation specific: format, size, etc.  System logs may be collected here to provide convenient access.  For example, the system may include the name of the host where the task is executing, an error message that caused a SYSTEM_ERROR state (e.g. disk is full), etc.  System logs are only included in the FULL task view.")
+  @Schema(description = "System logs are any logs the system decides are relevant, which are not tied directly to an Executor process. Content is implementation specific: format, size, etc.  System logs may be collected here to provide convenient access.  For example, the system may include the name of the host where the task is executing, an error message that caused a SYSTEM_ERROR state (e.g. disk is full), etc.  System logs are only included in the FULL task view.")
 
 
   public List<String> getSystemLogs() {

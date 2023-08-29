@@ -5,12 +5,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import javax.validation.constraints.*;
 
 /**
  * CreateTaskResponse describes a response from the CreateTask endpoint. It will include the task ID that can be used to look up the status of the job.
  */
-@ApiModel(description = "CreateTaskResponse describes a response from the CreateTask endpoint. It will include the task ID that can be used to look up the status of the job.")
+@Schema(description = "CreateTaskResponse describes a response from the CreateTask endpoint. It will include the task ID that can be used to look up the status of the job.")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesCreateTaskResponse   {
   @JsonProperty("id")
@@ -25,7 +28,7 @@ public class TesCreateTaskResponse   {
    * Task identifier assigned by the server.
    * @return id
   */
-  @ApiModelProperty(required = true, value = "Task identifier assigned by the server.", example="task-e69c5b95")
+  @Schema(required = true, description = "Task identifier assigned by the server.", example="task-e69c5b95")
   @NotNull
 
 

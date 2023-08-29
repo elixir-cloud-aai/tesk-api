@@ -3,6 +3,9 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModelProperty;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.ArrayList;
 import java.util.List;
 import javax.validation.Valid;
@@ -36,7 +39,7 @@ public class TesServiceInfoAllOf   {
    * Lists some, but not necessarily all, storage locations supported by the service.
    * @return storage
   */
-  @ApiModelProperty(example = "[\"file:///path/to/local/funnel-storage\",\"s3://ohsu-compbio-funnel/storage\"]", value = "Lists some, but not necessarily all, storage locations supported by the service.")
+  @Schema(example = "[\"file:///path/to/local/funnel-storage\",\"s3://ohsu-compbio-funnel/storage\"]", description = "Lists some, but not necessarily all, storage locations supported by the service.")
 
 
   public List<String> getStorage() {
@@ -56,7 +59,7 @@ public class TesServiceInfoAllOf   {
    * Get type
    * @return type
   */
-  @ApiModelProperty(value = "")
+  @Schema(description = "")
 
   @Valid
 

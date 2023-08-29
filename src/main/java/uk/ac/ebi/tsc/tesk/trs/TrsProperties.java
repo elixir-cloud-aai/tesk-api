@@ -1,8 +1,10 @@
 package uk.ac.ebi.tsc.tesk.trs;
 
 import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import lombok.Getter;
+
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * @author aniewielska
@@ -12,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "tesk.api.trs")
 @Data
 public class TrsProperties {
-    private String uriPattern;
-    private String urlPattern;
+    @Getter private String uriPattern;
+    @Getter private String urlPattern;
 }
 

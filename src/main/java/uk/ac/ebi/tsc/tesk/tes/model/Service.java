@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.OffsetDateTime;
 import uk.ac.ebi.tsc.tesk.tes.model.ServiceOrganization;
 import uk.ac.ebi.tsc.tesk.tes.model.ServiceType;
@@ -14,7 +16,7 @@ import javax.validation.constraints.*;
 /**
  * GA4GH service
  */
-@ApiModel(description = "GA4GH service")
+@Schema(description = "GA4GH service")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-04-12T17:49:13.631+01:00[Europe/London]")
 public class Service   {
   @JsonProperty("id")
@@ -61,7 +63,7 @@ public class Service   {
    * Unique ID of this service. Reverse domain name notation is recommended, though not required. The identifier should attempt to be globally unique so it can be used in downstream aggregator services e.g. Service Registry.
    * @return id
   */
-  @ApiModelProperty(example = "org.ga4gh.myservice", required = true, value = "Unique ID of this service. Reverse domain name notation is recommended, though not required. The identifier should attempt to be globally unique so it can be used in downstream aggregator services e.g. Service Registry.")
+  @Schema(example = "org.ga4gh.myservice", required = true, description = "Unique ID of this service. Reverse domain name notation is recommended, though not required. The identifier should attempt to be globally unique so it can be used in downstream aggregator services e.g. Service Registry.")
   @NotNull
 
 
@@ -82,7 +84,7 @@ public class Service   {
    * Name of this service. Should be human readable.
    * @return name
   */
-  @ApiModelProperty(example = "My project", required = true, value = "Name of this service. Should be human readable.")
+  @Schema(example = "My project", required = true, description = "Name of this service. Should be human readable.")
   @NotNull
 
 
@@ -103,7 +105,7 @@ public class Service   {
    * Get type
    * @return type
   */
-  @ApiModelProperty(required = true, value = "")
+  @Schema(required = true, description = "")
   @NotNull
 
   @Valid
@@ -125,7 +127,7 @@ public class Service   {
    * Description of the service. Should be human readable and provide information about the service.
    * @return description
   */
-  @ApiModelProperty(example = "This service provides...", value = "Description of the service. Should be human readable and provide information about the service.")
+  @Schema(example = "This service provides...", description = "Description of the service. Should be human readable and provide information about the service.")
 
 
   public String getDescription() {
@@ -145,7 +147,7 @@ public class Service   {
    * Get organization
    * @return organization
   */
-  @ApiModelProperty(required = true, value = "")
+  @Schema(required = true, description = "")
   @NotNull
 
   @Valid
@@ -167,7 +169,7 @@ public class Service   {
    * URL of the contact for the provider of this service, e.g. a link to a contact form (RFC 3986 format), or an email (RFC 2368 format).
    * @return contactUrl
   */
-  @ApiModelProperty(example = "mailto:support@example.com", value = "URL of the contact for the provider of this service, e.g. a link to a contact form (RFC 3986 format), or an email (RFC 2368 format).")
+  @Schema(example = "mailto:support@example.com", description = "URL of the contact for the provider of this service, e.g. a link to a contact form (RFC 3986 format), or an email (RFC 2368 format).")
 
 
   public String getContactUrl() {
@@ -187,7 +189,7 @@ public class Service   {
    * URL of the documentation of this service (RFC 3986 format). This should help someone learn how to use your service, including any specifics required to access data, e.g. authentication.
    * @return documentationUrl
   */
-  @ApiModelProperty(example = "https://docs.myservice.example.com", value = "URL of the documentation of this service (RFC 3986 format). This should help someone learn how to use your service, including any specifics required to access data, e.g. authentication.")
+  @Schema(example = "https://docs.myservice.example.com", description = "URL of the documentation of this service (RFC 3986 format). This should help someone learn how to use your service, including any specifics required to access data, e.g. authentication.")
 
 
   public String getDocumentationUrl() {
@@ -207,7 +209,7 @@ public class Service   {
    * Timestamp describing when the service was first deployed and available (RFC 3339 format)
    * @return createdAt
   */
-  @ApiModelProperty(example = "2019-06-04T12:58:19Z", value = "Timestamp describing when the service was first deployed and available (RFC 3339 format)")
+  @Schema(example = "2019-06-04T12:58:19Z", description = "Timestamp describing when the service was first deployed and available (RFC 3339 format)")
 
   @Valid
 
@@ -228,7 +230,7 @@ public class Service   {
    * Timestamp describing when the service was last updated (RFC 3339 format)
    * @return updatedAt
   */
-  @ApiModelProperty(example = "2019-06-04T12:58:19Z", value = "Timestamp describing when the service was last updated (RFC 3339 format)")
+  @Schema(example = "2019-06-04T12:58:19Z", description = "Timestamp describing when the service was last updated (RFC 3339 format)")
 
   @Valid
 
@@ -249,7 +251,7 @@ public class Service   {
    * Environment the service is running in. Use this to distinguish between production, development and testing/staging deployments. Suggested values are prod, test, dev, staging. However this is advised and not enforced.
    * @return environment
   */
-  @ApiModelProperty(example = "test", value = "Environment the service is running in. Use this to distinguish between production, development and testing/staging deployments. Suggested values are prod, test, dev, staging. However this is advised and not enforced.")
+  @Schema(example = "test", description = "Environment the service is running in. Use this to distinguish between production, development and testing/staging deployments. Suggested values are prod, test, dev, staging. However this is advised and not enforced.")
 
 
   public String getEnvironment() {
@@ -269,7 +271,7 @@ public class Service   {
    * Version of the service being described. Semantic versioning is recommended, but other identifiers, such as dates or commit hashes, are also allowed. The version should be changed whenever the service is updated.
    * @return version
   */
-  @ApiModelProperty(example = "1.0.0", required = true, value = "Version of the service being described. Semantic versioning is recommended, but other identifiers, such as dates or commit hashes, are also allowed. The version should be changed whenever the service is updated.")
+  @Schema(example = "1.0.0", required = true, description = "Version of the service being described. Semantic versioning is recommended, but other identifiers, such as dates or commit hashes, are also allowed. The version should be changed whenever the service is updated.")
   @NotNull
 
 

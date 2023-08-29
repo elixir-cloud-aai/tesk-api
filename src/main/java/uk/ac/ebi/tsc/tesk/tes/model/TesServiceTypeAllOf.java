@@ -6,6 +6,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.swagger.annotations.ApiModelProperty;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import javax.validation.constraints.*;
 
 /**
@@ -58,7 +60,7 @@ public class TesServiceTypeAllOf   {
    * Get artifact
    * @return artifact
   */
-  @ApiModelProperty(example = "tes", required = true, value = "")
+  @Schema(example = "tes", required = true, description = "")
   @NotNull
 
 

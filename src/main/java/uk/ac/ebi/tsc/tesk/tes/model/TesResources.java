@@ -4,6 +4,9 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.ArrayList;
 import java.util.List;
 import javax.validation.Valid;
@@ -11,7 +14,7 @@ import javax.validation.Valid;
 /**
  * Resources describes the resources requested by a task.
  */
-@ApiModel(description = "Resources describes the resources requested by a task.", value="tesResources")
+@Schema(description = "Resources describes the resources requested by a task.", name="tesResources")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesResources   {
   @JsonProperty("cpu_cores")
@@ -39,7 +42,7 @@ public class TesResources   {
    * Requested number of CPUs
    * @return cpuCores
   */
-  @ApiModelProperty(example = "4", value = "Requested number of CPUs")
+  @Schema(example = "4", description = "Requested number of CPUs")
 
 
   public Long getCpuCores() {
@@ -59,7 +62,7 @@ public class TesResources   {
    * Define if the task is allowed to run on preemptible compute instances, for example, AWS Spot. This option may have no effect when utilized on some backends that don't have the concept of preemptible jobs.
    * @return preemptible
   */
-  @ApiModelProperty(example = "false", value = "Define if the task is allowed to run on preemptible compute instances, for example, AWS Spot. This option may have no effect when utilized on some backends that don't have the concept of preemptible jobs.")
+  @Schema(example = "false", description = "Define if the task is allowed to run on preemptible compute instances, for example, AWS Spot. This option may have no effect when utilized on some backends that don't have the concept of preemptible jobs.")
 
 
   public Boolean getPreemptible() {
@@ -79,7 +82,7 @@ public class TesResources   {
    * Requested RAM required in gigabytes (GB)
    * @return ramGb
   */
-  @ApiModelProperty(example = "8", value = "Requested RAM required in gigabytes (GB)")
+  @Schema(example = "8", description = "Requested RAM required in gigabytes (GB)")
 
 
   public Double getRamGb() {
@@ -99,7 +102,7 @@ public class TesResources   {
    * Requested disk size in gigabytes (GB)
    * @return diskGb
   */
-  @ApiModelProperty(example = "40", value = "Requested disk size in gigabytes (GB)")
+  @Schema(example = "40", description = "Requested disk size in gigabytes (GB)")
 
 
   public Double getDiskGb() {
@@ -127,7 +130,7 @@ public class TesResources   {
    * Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.
    * @return zones
   */
-  @ApiModelProperty(example = "[\"us-west-1\"]", value = "Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.")
+  @Schema(example = "[\"us-west-1\"]", description = "Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.")
 
 
   public List<String> getZones() {

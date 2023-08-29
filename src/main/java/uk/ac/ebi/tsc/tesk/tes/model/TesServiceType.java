@@ -6,6 +6,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.swagger.annotations.ApiModelProperty;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import io.swagger.v3.oas.annotations.Operation;
 import javax.validation.constraints.*;
 
 /**
@@ -64,7 +67,7 @@ public class TesServiceType   {
    * Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).
    * @return group
   */
-  @ApiModelProperty(example = "org.ga4gh", required = true, value = "Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).")
+  @Schema(example = "org.ga4gh", required = true, description = "Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).")
   @NotNull
 
 
@@ -85,7 +88,7 @@ public class TesServiceType   {
    * Get artifact
    * @return artifact
   */
-  @ApiModelProperty(example = "tes", required = true, value = "")
+  @Schema(example = "tes", required = true, description = "")
   @NotNull
 
 
@@ -106,7 +109,7 @@ public class TesServiceType   {
    * Version of the API or specification. GA4GH specifications use semantic versioning.
    * @return version
   */
-  @ApiModelProperty(example = "1.0.0", required = true, value = "Version of the API or specification. GA4GH specifications use semantic versioning.")
+  @Schema(example = "1.0.0", required = true, description = "Version of the API or specification. GA4GH specifications use semantic versioning.")
   @NotNull
 
 
