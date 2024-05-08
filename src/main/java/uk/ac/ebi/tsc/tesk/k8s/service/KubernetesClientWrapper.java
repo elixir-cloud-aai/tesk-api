@@ -11,6 +11,8 @@ import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1LimitRangeList;
 import io.kubernetes.client.openapi.models.V1LimitRange;
 import io.kubernetes.client.openapi.models.V1LimitRangeItem;
+import io.kubernetes.client.openapi.models.V1Secret;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -30,8 +32,14 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.*;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.*;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
@@ -61,6 +69,37 @@ public class KubernetesClientWrapper {
         this.namespace = namespace;
     }
 
+    public V1Secret createDockerRegistrySecret(String jobName, String registryAddress, String username, String password) {
+        String secretName = jobName; // The secret name matches the job name
+        V1Secret secret = new V1Secret();
+        secret.setApiVersion("v1");
+        secret.setKind("Secret");
+        // Setting secret metadata with the given name and namespace
+        secret.setMetadata(new V1ObjectMeta().name(secretName).namespace(this.namespace));
+
+        // Creating Docker config in JSON format
+        String auth = Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
+        String dockerConfigJson = String.format("{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"auth\":\"%s\"}}}", registryAddress, username, password, auth);
+
+        Map<String, String> data = new HashMap<>();
+        // Storing the Docker config JSON
+        data.put(".dockerconfigjson", Base64.getEncoder().encodeToString(dockerConfigJson.getBytes()));
+
+        // Using setStringData instead of setData to automatically handle base64 encoding
+        secret.setStringData(data);
+        // Setting the type to dockerconfigjson which is required for Docker registry secrets
+        secret.setType("kubernetes.io/dockerconfigjson");
+
+        try {
+            // Attempting to create the secret in the specified namespace
+            return this.coreApi.createNamespacedSecret(this.namespace, secret, null, null, null);
+        } catch (ApiException e) {
+            logger.error("Error creating Docker registry secret: " + e.getResponseBody(), e);
+            // Proper way to rethrow the exception as KubernetesException with the message from ApiException
+            throw KubernetesException.fromApiException(e);
+        }
+    }    
+    
     public V1Job createJob(V1Job job) {
         try {
             return this.batchApi.createNamespacedJob(namespace, job, null, null, null);
