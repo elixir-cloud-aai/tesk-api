@@ -142,7 +142,7 @@ public class TesExecutor   {
    * Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/tmp/stdout.log\" } ```
    * @return stdout
   */
-  @ApiModelProperty(example = "/data/outfile", value = "Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/tmp/stdout.log\" } ```")
+  @ApiModelProperty(example = "/data/outfile", value = "Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/data/outfile\" } ```")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
 
   public String getStdout() {
