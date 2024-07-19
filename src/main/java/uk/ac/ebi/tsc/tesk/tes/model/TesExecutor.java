@@ -52,7 +52,7 @@ public class TesExecutor   {
    * Name of the container image. The string will be passed as the image argument to the containerization run command. Examples:    - `ubuntu`    - `quay.io/aptible/ubuntu`    - `gcr.io/my-org/my-image`    - `myregistryhost:5000/fedora/httpd:version1.0`
    * @return image
   */
-  @ApiModelProperty(example = "ubuntu:20.04", required = true, value = "Name of the container image. The string will be passed as the image argument to the containerization run command. Examples:    - `ubuntu`    - `quay.io/aptible/ubuntu`    - `gcr.io/my-org/my-image`    - `myregistryhost:5000/fedora/httpd:version1.0`")
+  @ApiModelProperty(example = "ubuntu:22.04", required = true, value = "Name of the container image. The string will be passed as the image argument to the containerization run command. Examples:    - `ubuntu`    - `quay.io/aptible/ubuntu`    - `gcr.io/my-org/my-image`    - `myregistryhost:5000/fedora/httpd:version1.0`")
   @NotNull
   @NotBlank
 
@@ -81,7 +81,7 @@ public class TesExecutor   {
    * A sequence of program arguments to execute, where the first argument is the program to execute (i.e. argv). Example: ``` {   \"command\" : [\"/bin/md5\", \"/data/file1\"] } ```
    * @return command
   */
-  @ApiModelProperty(example = "[\"/bin/md5\",\"/data/file1\"]", required = true, value = "A sequence of program arguments to execute, where the first argument is the program to execute (i.e. argv). Example: ``` {   \"command\" : [\"/bin/md5\", \"/data/file1\"] } ```")
+  @ApiModelProperty(example = "[\"/bin/md5sum\",\"/data/file1\"]", required = true, value = "A sequence of program arguments to execute, where the first argument is the program to execute (i.e. argv). Example: ``` {   \"command\" : [\"/bin/md5sum\", \"/data/file1\"] } ```")
   @NotNull
   @NotEmpty
 
@@ -142,7 +142,7 @@ public class TesExecutor   {
    * Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/tmp/stdout.log\" } ```
    * @return stdout
   */
-  @ApiModelProperty(example = "/tmp/stdout.log", value = "Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/tmp/stdout.log\" } ```")
+  @ApiModelProperty(example = "/data/outfile", value = "Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/tmp/stdout.log\" } ```")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
 
   public String getStdout() {

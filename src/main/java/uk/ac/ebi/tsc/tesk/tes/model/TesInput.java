@@ -86,7 +86,7 @@ public class TesInput   {
    * REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file
    * @return url
   */
-  @ApiModelProperty(example = "s3://my-object-store/file1", value = "REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file")
+  @ApiModelProperty(example = "s3://<CHANGE_THIS>/file1", value = "REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file")
 
 
   public String getUrl() {

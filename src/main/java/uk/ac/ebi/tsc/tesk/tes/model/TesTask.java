@@ -161,7 +161,7 @@ public class TesTask   {
    * Input files that will be used by the task. Inputs will be downloaded and mounted into the executor container as defined by the task request document.
    * @return inputs
   */
-  @ApiModelProperty(example = "[{\"url\":\"s3://my-object-store/file1\",\"path\":\"/data/file1\"}]", value = "Input files that will be used by the task. Inputs will be downloaded and mounted into the executor container as defined by the task request document.")
+  @ApiModelProperty(example = "[{\"url\":\"s3://<CHANGE_THIS>/file1\",\"path\":\"/data/file1\"}]", value = "Input files that will be used by the task. Inputs will be downloaded and mounted into the executor container as defined by the task request document.")
 
   @Valid
 
@@ -190,7 +190,7 @@ public class TesTask   {
    * Output files. Outputs will be uploaded from the executor container to long-term storage.
    * @return outputs
   */
-  @ApiModelProperty(example = "[{\"path\":\"/data/outfile\",\"url\":\"s3://my-object-store/outfile-1\",\"type\":\"FILE\"}]", value = "Output files. Outputs will be uploaded from the executor container to long-term storage.")
+  @ApiModelProperty(example = "[{\"path\":\"/data/outfile\",\"url\":\"s3://<CHANGE_THIS>/outfile-1\",\"type\":\"FILE\"}]", value = "Output files. Outputs will be uploaded from the executor container to long-term storage.")
 
   @Valid
 
