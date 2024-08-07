@@ -257,7 +257,7 @@ public class TesKubernetesConverterTest {
 
         taskMasterInputJson.extractingJsonPathNumberValue("resources.disk_gb").isEqualTo(100.0);
 
-        //taskMasterInputJson.isEqualToJson(new ClassPathResource("fromTesToK8s/taskmaster_param.json"), JSONCompareMode.NON_EXTENSIBLE);
+        taskMasterInputJson.isEqualToJson(new ClassPathResource("fromTesToK8s/taskmaster_param.json"), JSONCompareMode.NON_EXTENSIBLE);
 
     }
 
