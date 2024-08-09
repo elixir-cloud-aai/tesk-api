@@ -99,7 +99,7 @@ public class TesResources   {
    * Requested disk size in gigabytes (GB)
    * @return diskGb
   */
-  @ApiModelProperty(example = "40", value = "Requested disk size in gigabytes (GB)")
+  @ApiModelProperty(example = "1", value = "Requested disk size in gigabytes (GB)")
 
 
   public Double getDiskGb() {
