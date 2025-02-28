@@ -2,10 +2,12 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.validation.Valid;
 
 /**
@@ -13,6 +15,7 @@ import javax.validation.Valid;
  */
 @ApiModel(description = "Resources describes the resources requested by a task.", value="tesResources")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class TesResources   {
   @JsonProperty("cpu_cores")
   private Long cpuCores;
@@ -29,6 +32,12 @@ public class TesResources   {
   @JsonProperty("zones")
   @Valid
   private List<String> zones = null;
+
+  @JsonProperty("backend_parameters")
+  private Map<String, String> backendParameters = null;
+
+  @JsonProperty("backend_parameters_strict")
+  private Boolean backendParametersStrict = false;
 
   public TesResources cpuCores(Long cpuCores) {
     this.cpuCores = cpuCores;
