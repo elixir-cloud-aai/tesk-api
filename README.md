@@ -88,6 +88,24 @@ To build the image (the `Dockerfile` builds the application from source, so noth
 
 The [CI workflow](.github/workflows/ci.yml) runs these on pull requests and pushes to `master`, starts the image in both profiles and scans it for known vulnerabilities. The job `CI passed` sums up all the others.
 
+### Releasing
+Pushing a signed, annotated version tag runs the [release workflow](.github/workflows/release.yml), which publishes the image to Docker Hub as `elixircloud/tesk-api`:
+
+Tag | Image tags | Example
+---|---|---
+`vX.Y.Z` | `X.Y.Z`, and `latest` if it is the highest release on `master` | `v1.2.0` publishes `1.2.0`
+`vX.Y.ZrcN` (also `aN`, `bN`) | `X.Y.ZrcN` only | `v1.2.0rc1` publishes `1.2.0rc1`
+
+The commit must be on `master`, CI must have passed for its push, and the version in `pom.xml` must be `X.Y.Z` (also for the pre-releases of `X.Y.Z`), so set that in a pull request first. `latest` goes by tags, so if a release fails, follow it with a higher version. Pushes to `master` publish no image. Publishing waits for an approval in the `release` environment. Images are signed with Sigstore and carry provenance attestations.
+
+After the push, the workflow makes one `POST /repositories/{id}/builds` to [Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade), which notifies the deployments that subscribed to upgrades, also for pre-releases, if they subscribed to those. This needs Pubgrade's publish mode ([#33](https://github.com/elixir-cloud-aai/Pubgrade/issues/33)) and these settings of the `pubgrade` environment of this repository, which should only allow version tags and needs no reviewer; without them, the step does nothing:
+
+Setting | Kind | Meaning
+---|---|---
+`PUBGRADE_URL` | Variable | Base URL of the Pubgrade API, with `https://`
+`PUBGRADE_REPOSITORY_ID` | Variable | The identifier from registering this repository in Pubgrade
+`PUBGRADE_TOKEN` | Secret | The access token from registering this repository in Pubgrade
+
 ### Generating new API version stub
 The current version of TES specification (v1.0) is linked as a [submodule](/tes). In case of the specification upgrade, the submodule needs to be updated. Then you need to run
 
