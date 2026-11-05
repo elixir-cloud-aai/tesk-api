@@ -1,4 +1,65 @@
-# Vulnerabilities accepted in the Docker image, which the scans in CI ignore:
-# each with a reason (`statement`) and an expiry date (`expired_at`).
+# Vulnerabilities accepted in the Docker image, which the scans in CI (shared
+# action `scan-image` of `elixir-cloud-aai/.github`) ignore: each with the
+# reason (`statement`) and an expiry date (`expired_at`), after which Trivy
+# reports it again, so that the decision is reviewed. Entries are limited to
+# the affected package versions (`purls`), so that other packages with the same
+# vulnerability are still reported.
+#
+# All of these are fixed only in Spring Boot 3 / Spring Framework 6 and later
+# (or, for snakeyaml, in the 2.x line, which the Kubernetes client can't use),
+# while `pom.xml` has the last open source releases of the Spring Boot 2.7 line.
+#
 # See https://trivy.dev/latest/docs/configuration/filtering/#trivyignoreyaml
-vulnerabilities: []
+vulnerabilities:
+  - id: CVE-2025-22235
+    purls: ["pkg:maven/org.springframework.boot/spring-boot@2.7.18"]
+    statement: Concerns Actuator endpoint matchers; the app has no Actuator
+    expired_at: 2027-01-31
+  - id: CVE-2026-40973
+    purls: ["pkg:maven/org.springframework.boot/spring-boot@2.7.18"]
+    statement: Needs persistent servlet sessions and a local attacker; the app doesn't enable them
+    expired_at: 2027-01-31
+  - id: CVE-2025-22228
+    purls: ["pkg:maven/org.springframework.security/spring-security-crypto@5.7.14"]
+    statement: Concerns BCryptPasswordEncoder; the app has no passwords (OIDC tokens only)
+    expired_at: 2027-01-31
+  - id: CVE-2026-22732
+    purls: ["pkg:maven/org.springframework.security/spring-security-web@5.7.14"]
+    statement: Concerns response headers specified through Spring Security; the app specifies none
+    expired_at: 2027-01-31
+  - id: CVE-2025-41249
+    purls: ["pkg:maven/org.springframework/spring-core@5.3.39"]
+    statement: Concerns security annotations on methods of generic super types; those of the app are on the non-generic TesService
+    expired_at: 2027-01-31
+  - id: CVE-2026-41850
+    purls: ["pkg:maven/org.springframework/spring-expression@5.3.39"]
+    statement: Needs user-supplied expressions; the app only evaluates its own constant ones
+    expired_at: 2027-01-31
+  - id: CVE-2016-1000027
+    purls: ["pkg:maven/org.springframework/spring-web@5.3.39"]
+    statement: Concerns HttpInvoker; the app doesn't use it
+    expired_at: 2027-01-31
+  - id: CVE-2024-38816
+    purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
+    statement: Concerns static resources served through functional routes; the app has none
+    expired_at: 2027-01-31
+  - id: CVE-2024-38819
+    purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
+    statement: Concerns static resources served through functional routes; the app has none
+    expired_at: 2027-01-31
+  - id: CVE-2026-41845
+    purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
+    statement: Concerns JavaScriptUtils; the app doesn't use it
+    expired_at: 2027-01-31
+  - id: CVE-2026-41842
+    purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
+    statement: Denial of service when resolving static resources, of which the app only has the Swagger UI (public, also with the auth profile); no code execution or data access
+    expired_at: 2027-01-31
+  - id: CVE-2026-47884
+    purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
+    statement: Concerns XsltView; the app has no views
+    expired_at: 2027-01-31
+  - id: CVE-2022-1471
+    purls: ["pkg:maven/org.yaml/snakeyaml@1.33"]
+    statement: Needs YAML from an attacker; the app only reads files and ConfigMaps of the deployer
+    expired_at: 2027-01-31

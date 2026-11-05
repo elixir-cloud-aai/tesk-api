@@ -33,7 +33,7 @@ import java.util.Map;
  */
 public class CustomAuthenticationEntryPoint extends OAuth2AuthenticationEntryPoint {
 
-    private WebResponseExceptionTranslator exceptionTranslator = new DefaultWebResponseExceptionTranslator();
+    private WebResponseExceptionTranslator<OAuth2Exception> exceptionTranslator = new DefaultWebResponseExceptionTranslator();
     private HandlerExceptionResolver handlerExceptionResolver = new DefaultHandlerExceptionResolver();
     private DefaultOAuth2ExceptionRenderer exceptionRenderer = new DefaultOAuth2ExceptionRenderer();
     private final ErrorAttributes errorAttributes;
@@ -50,14 +50,14 @@ public class CustomAuthenticationEntryPoint extends OAuth2AuthenticationEntryPoi
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
             throws IOException, ServletException {
         try {
-            ResponseEntity<OAuth2Exception> result = exceptionTranslator.translate(authException);
-            result = enhanceResponse(result, authException);
+            ResponseEntity<?> result = enhanceResponse(exceptionTranslator.translate(authException), authException);
+            OAuth2Exception oauth2Exception = (OAuth2Exception) result.getBody();
             WebUtils.exposeErrorRequestAttributes(request, authException, null);
             request.setAttribute(WebUtils.ERROR_STATUS_CODE_ATTRIBUTE, result.getStatusCode().value());
             Map<String, Object> errorBody = errorAttributes.getErrorAttributes(new ServletWebRequest(request),
                 ErrorAttributeOptions.defaults().including(ErrorAttributeOptions.Include.MESSAGE));
-            errorBody.put(OAuth2Exception.ERROR, result.getBody().getOAuth2ErrorCode());
-            errorBody.put(OAuth2Exception.DESCRIPTION, result.getBody().getMessage());
+            errorBody.put(OAuth2Exception.ERROR, oauth2Exception.getOAuth2ErrorCode());
+            errorBody.put(OAuth2Exception.DESCRIPTION, oauth2Exception.getMessage());
             ResponseEntity<Map<String, Object>> newResult = new ResponseEntity<>(errorBody, result.getHeaders(), result.getStatusCode());
             exceptionRenderer.handleHttpEntityResponse(newResult, new ServletWebRequest(request, response));
             response.flushBuffer();
