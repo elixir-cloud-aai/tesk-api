@@ -1,0 +1,198 @@
+# Everything that must pass on pull requests and pushes to `master`: the pull
+# request title, lint, build and test (unit and integration tests), start the
+# image in both profiles, and scan the image for known vulnerabilities. The
+# gate `passed` ("CI passed") is the only required check. No `paths:` filters,
+# so that the gate always reports; skip jobs with `if:` instead (and allow the
+# skip in the gate). Runs also when a pull request is edited, so that the title
+# check follows the title; all jobs run then, as a run that skipped the tests
+# would report "CI passed" for the commit. CI publishes nothing
+
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [master]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs of a pull request; runs for pushes get their own
+# group, so that queued runs for successive pushes are not dropped. Runs for
+# edits that leave the title unchanged (e.g., of the description, also by bots)
+# share a group of their own, so that they cancel each other but not the run
+# for the pull request's commit
+concurrency:
+  group: >-
+    ${{ github.workflow }}-${{
+      github.event_name == 'push' && github.sha ||
+      github.event.action == 'edited' && !github.event.changes.title &&
+        format('{0}-edited', github.ref) ||
+      github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  # Pull request titles become the commit messages on `master` (squash
+  # merges): Conventional Commits, at most 50 characters (shared action of
+  # elixir-cloud-aai/.github, pinned to the commit of a release). Skipped on
+  # pushes and for Dependabot, whose titles can't be configured to pass, unless
+  # someone else edits the title
+  title:
+    name: PR title
+    if: >-
+      github.event_name == 'pull_request' && (
+        github.event.pull_request.user.login != 'dependabot[bot]' ||
+        github.event.changes.title &&
+        github.event.sender.login != 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check PR title
+        uses: elixir-cloud-aai/.github/actions/pr-title@743e82d290a53768454999e413756a924e383259 # v1.0.0
+
+  # The repository has no Java linter yet; only the workflows are linted
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Lint workflows
+        run: |
+          docker run --rm --volume "${PWD}:/repo" --workdir /repo \
+            rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
+            -color
+
+  # Unit tests (Surefire) and integration tests (Failsafe, with the Kubernetes
+  # API and the OIDC provider mocked), on the Java version of `pom.xml` and the
+  # `Dockerfile`
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Java
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "8"
+          cache: maven
+      - name: Build and run tests
+        run: ./mvnw -B clean verify
+      # Upload errors don't fail the job, so that the coverage service can't
+      # block a merge or a release
+      - name: Submit report to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./target/site/jacoco/jacoco.xml,./target/site/jacoco-it/jacoco.xml
+          fail_ci_if_error: false
+
+  # Starts the image as built by the `Dockerfile`, without a cluster: it answers
+  # without Kubernetes as far as these requests go
+  smoke:
+    name: Smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build image
+        run: docker build --tag tesk-api:smoke .
+      - name: Check responses
+        run: |
+          base=http://localhost:8080/ga4gh/tes/v1
+          # Starts the image with the given arguments of `docker run`, and
+          # waits until it answers
+          start() {
+            docker run --detach --name smoke --publish 8080:8080 "$@" tesk-api:smoke
+            for _ in $(seq 1 60); do
+              if curl --silent --output /dev/null "${base}/service-info"; then
+                return 0
+              fi
+              sleep 2
+            done
+            docker logs smoke
+            echo "::error::App did not start"
+            return 1
+          }
+          stop() {
+            docker rm --force smoke > /dev/null
+          }
+          # Checks the status of a request
+          check() {
+            local path="$1" expected="$2" actual
+            actual="$(curl --silent --output /dev/null --write-out '%{http_code}' "${base}${path}")"
+            if [[ "${actual}" != "${expected}" ]]; then
+              docker logs smoke
+              echo "::error::GET ${path}: status ${actual}, expected ${expected}"
+              return 1
+            fi
+          }
+          start
+          check /service-info 200
+          curl --silent --fail "${base}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'
+          stop
+          start --env SPRING_PROFILES_ACTIVE=auth
+          check /service-info 200
+          check /tasks 401
+          stop
+
+  # Scans the image with Trivy (shared action
+  # `elixir-cloud-aai/.github/actions/scan-image`). The findings that have a
+  # fix are uploaded to code scanning (not for pull requests from forks, whose
+  # token cannot write them)
+  scan:
+    name: Scan image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build image
+        run: docker build --tag docker.io/elixircloud/tesk-api:scan .
+      - name: Scan image
+        uses: elixir-cloud-aai/.github/actions/scan-image@743e82d290a53768454999e413756a924e383259 # v1.0.0
+        with:
+          image: docker.io/elixircloud/tesk-api:scan
+          category: image
+          upload: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          # Reports only, for now: the dependency update comes next, and
+          # switches this to the default (fail on fixable critical and high
+          # findings). The action needs `.trivyignore.yaml` to exist
+          fail: "false"
+
+  # The only required check: passes if every other job passed, or was skipped
+  # where that is intended. Any other result (failure, cancelled, or an
+  # unintended skip) fails it. Add every new job to `needs`
+  passed:
+    name: CI passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs: [title, lint, test, smoke, scan]
+    permissions: {}
+    steps:
+      - name: Check results of all jobs
+        uses: elixir-cloud-aai/.github/actions/gate@743e82d290a53768454999e413756a924e383259 # v1.0.0
+        with:
+          needs: ${{ toJSON(needs) }}
+          # `title` is skipped on purpose on pushes and for Dependabot
+          allow-skipped: title
