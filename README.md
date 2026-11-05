@@ -73,6 +73,7 @@ The meaning of chosen environment variables:
  `TESK_API_TASKMASTER_EXECUTOR_SECRET_NAME` | A name of a secret that (if variable not empty) will be mounted to each executor as a volume. The secret can contain multiple files.
  `TESK_API_TASKMASTER_EXECUTOR_SECRET_MOUNT_PATH` | A path, where a secret named `TESK_API_TASKMASTER_EXECUTOR_SECRET_NAME` will be mounted. Defaults to `/secret`. 
  `SPRING_PROFILES_ACTIVE` | (default) `noauth` - authN/Z switched off. `auth` - authN/Z switched on.
+ `TESK_API_SERVICE_INFO_PUBLIC` | With the `auth` profile: if `true` (default), `GET` and `HEAD /service-info` answer without a token; if `false`, they need a valid token (no group membership). No effect with the `noauth` profile, where all endpoints are open. See [Authentication and Authorisation](auth.md#public-endpoints).
  `TESK_API_AUTHORISATION_*` | A set of env variables configuring authorisation using Elixir group membership
  `TESK_API_SWAGGER_OAUTH_*` | A set of env variables configuring OAuth2/OIDC client built in Swagger UI
  

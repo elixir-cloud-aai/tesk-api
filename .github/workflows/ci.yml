@@ -149,6 +149,9 @@ jobs:
           check /service-info 200
           check /tasks 401
           stop
+          start --env SPRING_PROFILES_ACTIVE=auth --env TESK_API_SERVICE_INFO_PUBLIC=false
+          check /service-info 401
+          stop
 
   # Scans the image with Trivy (shared action
   # `elixir-cloud-aai/.github/actions/scan-image`). The findings that have a
