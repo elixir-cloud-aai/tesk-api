@@ -9,8 +9,9 @@
 # in `README.md`.
 #
 # `push` and `publish` each need approval in the `release` environment (required
-# reviewer). Re-running all jobs builds, scans, signs and tags a new digest;
-# re-running failed jobs reuses the digest already pushed.
+# reviewer). Re-running failed jobs reuses the digest already pushed. Re-running
+# all jobs builds a new digest, which `publish` refuses if `X.Y.Z` already
+# points to another one: published versions never change.
 
 name: Release
 
@@ -195,6 +196,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: release
+    # One release at a time, so that `latest` is decided and written in one go
+    concurrency:
+      group: ${{ github.workflow }}-publish
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write # Sigstore signing certificates
@@ -238,14 +243,21 @@ jobs:
         run: cosign sign --yes "${IMAGE_NAME}@${DIGEST}"
       # `X.Y.Z` and, for the highest stable release, `latest` point to the
       # scanned and signed digest. Decided last, from freshly fetched tags, so
-      # that neither a re-run of an older release nor a concurrent release
-      # moves `latest` back; only tags on `master` count
+      # that a re-run of an older release doesn't move `latest` back; only tags
+      # on `master` count
       - name: Tag image
         run: |
           git fetch --quiet --force --tags origin \
               "+refs/heads/master:refs/remotes/origin/master"
           highest="$(git tag --merged origin/master --list 'v*' \
               | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+          # A published version never moves to another digest
+          if existing="$(docker buildx imagetools inspect "${IMAGE_NAME}:${VERSION}" \
+              --format '{{ json .Manifest }}' 2> /dev/null | jq -r .digest)" \
+              && [[ -n "${existing}" && "${existing}" != "${DIGEST}" ]]; then
+              echo "::error::${IMAGE_NAME}:${VERSION} already exists with digest ${existing}"
+              exit 1
+          fi
           tags=("${IMAGE_NAME}:${VERSION}")
           if [[ "v${VERSION}" == "${highest}" ]]; then
               tags+=("${IMAGE_NAME}:latest")
