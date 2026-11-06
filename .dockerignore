@@ -1,0 +1,22 @@
+# Only send the files needed for the build to the build context
+*
+!.mvn/
+!mvnw
+!pom.xml
+!src/
+
+# Local secrets (e.g., `.env`, `.env.local`) must never reach the build, also
+# not within the included paths
+**/.env*
+# Other common names of secret files
+**/*.env
+**/*.pem
+**/*.key
+**/id_rsa*
+**/id_ed25519*
+**/id_ecdsa*
+**/*.p12
+**/*.pfx
+**/*.jks
+**/.git-credentials
+**/kubeconfig*

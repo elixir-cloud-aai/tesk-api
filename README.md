@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/EMBL-EBI-TSI/tesk-api.svg?branch=master)](https://travis-ci.com/EMBL-EBI-TSI/tesk-api) [![codecov](https://codecov.io/gh/EMBL-EBI-TSI/tesk-api/branch/master/graph/badge.svg)](https://codecov.io/gh/EMBL-EBI-TSI/tesk-api)
+[![CI](https://github.com/elixir-cloud-aai/tesk-api/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/elixir-cloud-aai/tesk-api/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/elixir-cloud-aai/tesk-api/branch/dev/graph/badge.svg)](https://codecov.io/gh/elixir-cloud-aai/tesk-api)
 # TESK API
 
 The API part of the TESK project. For a general overview of the project, please visit [TESK core project page](https://github.com/EMBL-EBI-TSI/TESK)
@@ -77,6 +77,17 @@ The meaning of chosen environment variables:
  `TESK_API_SWAGGER_OAUTH_*` | A set of env variables configuring OAuth2/OIDC client built in Swagger UI
  
  
+### Building and testing
+TESK API builds and runs on Java 8. To build it and run the unit and integration tests (the Kubernetes API and the OIDC provider are mocked, so no cluster is needed):
+
+```./mvnw clean verify```
+
+To build the image (the `Dockerfile` builds the application from source, so nothing needs to be built first):
+
+```docker build -t tesk-api .```
+
+The [CI workflow](.github/workflows/ci.yml) runs these on pull requests and pushes to `dev`, starts the image in both profiles and scans it for known vulnerabilities. On pushes to `dev`, it publishes the scanned and signed image as `<org>/tesk-api:dev` (and `sha-<commit>`), where `<org>` is the variable `DOCKERHUB_ORG` (by default `elixircloud`); this needs the secrets `DOCKERHUB_LOGIN` and `DOCKERHUB_TOKEN` in the environment `dev-images`, which only allows branch `dev`. The job `CI passed` sums up all the others. The [scan workflow](.github/workflows/scan.yml) scans the image of the latest release weekly.
+
 ### Generating new API version stub
 The current version of TES specification (v1.0) is linked as a [submodule](/tes). In case of the specification upgrade, the submodule needs to be updated. Then you need to run
 
