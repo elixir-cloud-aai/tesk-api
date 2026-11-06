@@ -88,6 +88,29 @@ To build the image (the `Dockerfile` builds the application from source, so noth
 
 The [CI workflow](.github/workflows/ci.yml) runs these on pull requests and pushes to `dev`, starts the image in both profiles and scans it for known vulnerabilities. On pushes to `dev`, it publishes the scanned and signed image as `<org>/tesk-api:dev` (and `sha-<commit>`), where `<org>` is the variable `DOCKERHUB_ORG` (by default `elixircloud`); this needs the secrets `DOCKERHUB_LOGIN` and `DOCKERHUB_TOKEN` in the environment `dev-images`, which only allows branch `dev`. The job `CI passed` sums up all the others. The [scan workflow](.github/workflows/scan.yml) scans the image of the latest release weekly.
 
+### Releasing
+Pushing a signed, annotated version tag runs the [release workflow](.github/workflows/release.yml), which publishes the image to Docker Hub as `<org>/tesk-api` (`<org>` as for CI above):
+
+Tag | Image tags | Example
+---|---|---
+`vX.Y.Z` | `X.Y.Z`, and `latest` if it is the highest release on `main` | `v1.2.0` publishes `1.2.0`
+`vX.Y.ZrcN` (also `aN`, `bN`) | `X.Y.ZrcN` only | `v1.2.0rc1` publishes `1.2.0rc1`
+
+Pull requests go to `dev`; for a release, `main` is moved forward to a commit of `dev`. The commit must be on `main`, CI must have passed for its push to `dev`, and the versions must match the tag, so set them in a pull request first:
+
+- `pom.xml`: `X.Y.Z`, also for the pre-releases of `X.Y.Z` (e.g., `1.2.0` for `v1.2.0rc1`);
+- `CITATION.cff`: the tag without `v` (e.g., `1.2.0rc1` for `v1.2.0rc1`), with `date-released`.
+
+ `latest` goes by tags, so if a release fails, follow it with a higher version. Only admins can create release tags, and nobody can move or delete them (tag rulesets). Publishing waits for an approval in the `release` environment. Images are signed with Sigstore and carry provenance attestations.
+
+After publishing, the workflow makes one `POST /repositories/{id}/builds` to [Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade), which notifies the deployments that subscribed to upgrades, also for pre-releases, if they subscribed to those. This needs Pubgrade's publish mode ([#33](https://github.com/elixir-cloud-aai/Pubgrade/issues/33)) and these settings of the `pubgrade` environment of this repository, which should only allow version tags and needs no reviewer; without them, the step does nothing:
+
+Setting | Kind | Meaning
+---|---|---
+`PUBGRADE_URL` | Variable | Base URL of the Pubgrade API, with `https://`
+`PUBGRADE_REPOSITORY_ID` | Variable | The identifier from registering this repository in Pubgrade
+`PUBGRADE_TOKEN` | Secret | The access token from registering this repository in Pubgrade
+
 ### Generating new API version stub
 The current version of TES specification (v1.0) is linked as a [submodule](/tes). In case of the specification upgrade, the submodule needs to be updated. Then you need to run
 
