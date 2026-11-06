@@ -241,9 +241,7 @@ jobs:
   # have a fix are uploaded to code scanning (only in this repository, and not
   # for pull requests from forks, whose token cannot write them). The release
   # workflow scans the release image the same way, and `latest` is scanned
-  # weekly (`scan.yml`). The job fails on critical and high vulnerabilities
-  # that have a fix. Accepted findings are listed, with a reason and an
-  # expiry date, in `.trivyignore.yaml`
+  # weekly (`scan.yml`)
   scan:
     name: Scan image
     # `push` is skipped (by its own `if:` only, as it needs no other job)
@@ -285,6 +283,10 @@ jobs:
           image: ${{ steps.image.outputs.image }}
           category: image
           upload: ${{ github.repository_owner == 'elixir-cloud-aai' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
+          # Reports only, for now: the dependency update comes next, and
+          # switches this to the default (fail on fixable critical and high
+          # findings). The action needs `.trivyignore.yaml` to exist
+          fail: "false"
 
   # Attests the build provenance of the scanned digest (GitHub artifact
   # attestation, also pushed to the registry), signs it with Sigstore keyless
