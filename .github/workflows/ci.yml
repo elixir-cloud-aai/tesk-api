@@ -1,22 +1,40 @@
-# Everything that must pass on pull requests and pushes to `master`: the pull
+# Everything that must pass on pull requests and pushes to `dev`: the pull
 # request title, lint, build and test (unit and integration tests), start the
-# image in both profiles, and scan the image for known vulnerabilities. The
-# gate `passed` ("CI passed") is the only required check. No `paths:` filters,
-# so that the gate always reports; skip jobs with `if:` instead (and allow the
-# skip in the gate). Runs also when a pull request is edited, so that the title
-# check follows the title; all jobs run then, as a run that skipped the tests
-# would report "CI passed" for the commit. CI publishes nothing
+# image in both profiles, scan the image for known vulnerabilities, and, on
+# pushes, push the image by digest (with SBOM and provenance attestations),
+# scan exactly that digest, then attest, sign (Sigstore) and tag it `dev` and
+# `sha-<commit>`. Forks, which have none of the secrets, run the same checks
+# without these side effects and without uploads to code scanning (as for pull
+# requests from forks), unless they set the repository variable
+# `DOCKERHUB_ORG` to publish to their own organization.
+# `github.repository_owner == 'elixir-cloud-aai'` marks runs of the upstream
+# repository. The gate `passed` ("CI passed") is the only required check.
+# No `paths:` filters, so that the gate always reports; skip jobs with `if:`
+# instead (and allow the skip in the gate). Runs also when a pull request is
+# edited, so that the title check follows the title; all jobs run then, as a
+# run that skipped the tests would report "CI passed" for the commit
 
 name: CI
 on:
   push:
-    branches: [master]
+    branches: [dev]
   pull_request:
     types: [opened, synchronize, reopened, edited]
-    branches: [master]
+    branches: [dev]
 
 permissions:
   contents: read
+
+# Fully qualified (`docker.io/`), as the attestation needs it. The Docker Hub
+# organization is the variable `DOCKERHUB_ORG` (by default `elixircloud`), as
+# in `release.yml` and `scan.yml`, so that the scan job, which has no secrets,
+# scans the image that is published
+env:
+  IMAGE_NAME: docker.io/${{ vars.DOCKERHUB_ORG || 'elixircloud' }}/tesk-api
+  # "true" if this run publishes the image: pushes to this repository, or to
+  # a fork that sets `DOCKERHUB_ORG` (and the Docker Hub secrets). Jobs' `if:`
+  # can't read `env`, so `push` and `publish` repeat the expression
+  PUBLISH: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
 
 # Cancel superseded runs of a pull request; runs for pushes get their own
 # group, so that queued runs for successive pushes are not dropped. Runs for
@@ -34,7 +52,7 @@ concurrency:
 
 jobs:
 
-  # Pull request titles become the commit messages on `master` (squash
+  # Pull request titles become the commit messages on `dev` (squash
   # merges): Conventional Commits, at most 50 characters (shared action of
   # elixir-cloud-aai/.github, pinned to the commit of a release). Skipped on
   # pushes and for Dependabot, whose titles can't be configured to pass, unless
@@ -68,6 +86,17 @@ jobs:
           docker run --rm --volume "${PWD}:/repo" --workdir /repo \
             rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
             -color
+      # `push` and `publish` repeat the expression of `PUBLISH` in their `if:`
+      # (jobs' `if:` can't read `env`): all three must stay the same
+      - name: Check publish conditions
+        run: |
+          expr="$(yq '.env.PUBLISH' .github/workflows/ci.yml)"
+          for job in push publish; do
+            if [[ "$(yq ".jobs.${job}.if" .github/workflows/ci.yml)" != "${expr}" ]]; then
+              echo "::error::The if: of job '${job}' differs from env.PUBLISH"
+              exit 1
+            fi
+          done
 
   # Unit tests (Surefire) and integration tests (Failsafe, with the Kubernetes
   # API and the OIDC provider mocked), on the Java version of `pom.xml` and the
@@ -89,14 +118,16 @@ jobs:
           cache: maven
       - name: Build and run tests
         run: ./mvnw -B clean verify
-      # Upload errors don't fail the job, so that the coverage service can't
-      # block a merge or a release
+      # Upload errors fail pushes to this repository only (and so block the
+      # `dev` image), because forks, pull requests from forks and Dependabot
+      # get no access to the Codecov token
       - name: Submit report to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./target/site/jacoco/jacoco.xml,./target/site/jacoco-it/jacoco.xml
-          fail_ci_if_error: false
+          fail_ci_if_error: ${{ github.event_name == 'push' && github.repository_owner == 'elixir-cloud-aai' }}
+          verbose: true
 
   # Starts the image as built by the `Dockerfile`, without a cluster: it answers
   # without Kubernetes as far as these requests go
@@ -150,14 +181,72 @@ jobs:
           check /tasks 401
           stop
 
+  # On pushes that publish (`PUBLISH`), builds the image once and pushes it
+  # by digest only (untagged, with SBOM
+  # and provenance attestations), for `scan` to scan and `publish` to sign and
+  # tag. Digests of runs that fail are never signed or tagged, but stay on
+  # Docker Hub, untagged
+  push:
+    name: Push image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The same expression as `PUBLISH` (checked in `lint`)
+    if: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
+    # Docker Hub secrets; the environment only allows branch `dev`
+    environment: dev-images
+    permissions:
+      contents: read
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # OCI labels with the commit and source; the tags are set by `publish`,
+      # after the scan
+      - name: Generate image labels
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          tags: type=raw,value=dev
+      - name: Log in to Docker Hub
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_LOGIN }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push image by digest
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.meta.outputs.labels }}
+
   # Scans the image with Trivy (shared action
-  # `elixir-cloud-aai/.github/actions/scan-image`). The findings that have a
-  # fix are uploaded to code scanning (not for pull requests from forks, whose
-  # token cannot write them), and the job fails on critical and high
-  # vulnerabilities that have a fix. Accepted findings are listed, with a
-  # reason and an expiry date, in `.trivyignore.yaml`
+  # `elixir-cloud-aai/.github/actions/scan-image`): a local build where
+  # `PUBLISH` is "false" (pull requests, forks), otherwise exactly the digest
+  # pushed by `push` (`<image>@<digest>`; public, so pulling it needs no
+  # login), in a job without credentials or signing permissions, as the Trivy
+  # action resolves the Trivy binary from a mutable tag. The findings that
+  # have a fix are uploaded to code scanning (only in this repository, and not
+  # for pull requests from forks, whose token cannot write them). The release
+  # workflow scans the release image the same way, and `latest` is scanned
+  # weekly (`scan.yml`). The job fails on critical and high vulnerabilities
+  # that have a fix. Accepted findings are listed, with a reason and an
+  # expiry date, in `.trivyignore.yaml`
   scan:
     name: Scan image
+    # `push` is skipped (by its own `if:` only, as it needs no other job)
+    # where `PUBLISH` is "false"; a failed or cancelled push skips the scan
+    needs: push
+    if: ${{ !cancelled() && contains(fromJSON('["success", "skipped"]'), needs.push.result) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -168,29 +257,138 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Named as the pushed image, so that code scanning matches the findings
+      # of both
       - name: Build image
-        run: docker build --tag docker.io/elixircloud/tesk-api:scan .
+        if: ${{ env.PUBLISH != 'true' }}
+        run: docker build --tag "${IMAGE_NAME}:scan" .
+      - name: Determine image
+        id: image
+        env:
+          DIGEST: ${{ needs.push.outputs.digest }}
+        run: |
+          if [[ "${PUBLISH}" != "true" ]]; then
+            echo "image=${IMAGE_NAME}:scan" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Invalid image digest '${DIGEST}'"
+            exit 1
+          fi
+          echo "image=${IMAGE_NAME}@${DIGEST}" >> "$GITHUB_OUTPUT"
       - name: Scan image
         uses: elixir-cloud-aai/.github/actions/scan-image@743e82d290a53768454999e413756a924e383259 # v1.0.0
         with:
-          image: docker.io/elixircloud/tesk-api:scan
+          image: ${{ steps.image.outputs.image }}
           category: image
-          upload: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          upload: ${{ github.repository_owner == 'elixir-cloud-aai' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
+
+  # Attests the build provenance of the scanned digest (GitHub artifact
+  # attestation, also pushed to the registry), signs it with Sigstore keyless
+  # signing (`cosign`, via the workflow's OIDC token) and only then tags
+  # exactly that digest, so that the published image is the scanned one
+  publish:
+    name: Publish image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The same expression as `PUBLISH` (checked in `lint`)
+    if: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
+    needs: [lint, test, smoke, push, scan]
+    # Docker Hub secrets; the environment only allows branch `dev`
+    environment: dev-images
+    permissions:
+      contents: read
+      id-token: write # Sigstore signing certificates
+      attestations: write # GitHub artifact attestations
+    # Publish one image at a time, and only for the newest commit on the
+    # branch, so that an older run cannot overwrite `dev` with older code
+    concurrency:
+      group: ${{ github.workflow }}-publish-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      DIGEST: ${{ needs.push.outputs.digest }}
+    steps:
+      - name: Check that commit is still the branch head
+        id: head
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          head=$(git ls-remote "https://github.com/${REPOSITORY}.git" "${REF}" | cut -f1)
+          [ -n "${head}" ] || { echo "::error::Could not look up ${REF}"; exit 1; }
+          if [ "${head}" = "${SHA}" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Skipping publish: ${REF} has moved on to ${head}"
+          fi
+      - name: Check image digest
+        if: steps.head.outputs.current == 'true'
+        run: |
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Invalid image digest '${DIGEST}'"
+            exit 1
+          fi
+      - name: Set up Docker Buildx
+        if: steps.head.outputs.current == 'true'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to Docker Hub
+        if: steps.head.outputs.current == 'true'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_LOGIN }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Attest build provenance
+        if: steps.head.outputs.current == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ env.DIGEST }}
+          push-to-registry: true
+          # No artifact metadata storage record (needs another permission)
+          create-storage-record: false
+      - name: Install cosign
+        if: steps.head.outputs.current == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      # The signature covers the digest, and so every tag of it
+      - name: Sign image
+        if: steps.head.outputs.current == 'true'
+        run: cosign sign --yes "${IMAGE_NAME}@${DIGEST}"
+      # Tags `dev` and `sha-<commit>` (never `latest`, which is for releases)
+      # point to the scanned and signed digest: a single source is copied as
+      # is
+      - name: Tag image
+        if: steps.head.outputs.current == 'true'
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          for tag in "${IMAGE_NAME}:dev" "${IMAGE_NAME}:sha-${SHA}"; do
+            docker buildx imagetools create --tag "${tag}" "${IMAGE_NAME}@${DIGEST}"
+            actual="$(docker buildx imagetools inspect "${tag}" \
+              --format '{{ json .Manifest }}' | jq -r .digest)"
+            if [[ "${actual}" != "${DIGEST}" ]]; then
+              echo "::error::${tag} points to ${actual}, expected ${DIGEST}"
+              exit 1
+            fi
+          done
 
   # The only required check: passes if every other job passed, or was skipped
-  # where that is intended. Any other result (failure, cancelled, or an
-  # unintended skip) fails it. Add every new job to `needs`
+  # where that is intended: `title` (pushes, Dependabot), `push` and `publish`
+  # where `PUBLISH` is "false" (pull requests, and forks without
+  # `DOCKERHUB_ORG`). Any other result (failure, cancelled, or an unintended
+  # skip) fails it. Add every new job to `needs`
   passed:
     name: CI passed
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [title, lint, test, smoke, scan]
+    needs: [title, lint, test, smoke, push, scan, publish]
     permissions: {}
     steps:
       - name: Check results of all jobs
         uses: elixir-cloud-aai/.github/actions/gate@743e82d290a53768454999e413756a924e383259 # v1.0.0
         with:
           needs: ${{ toJSON(needs) }}
-          # `title` is skipped on purpose on pushes and for Dependabot
-          allow-skipped: title
+          # `title` is skipped on purpose on pushes and for Dependabot, `push`
+          # and `publish` where `PUBLISH` is "false" only
+          allow-skipped: ${{ env.PUBLISH == 'false' && 'title push publish' || 'title' }}
