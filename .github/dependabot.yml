@@ -1,0 +1,41 @@
+version: 2
+# Every entry targets `dev` (`target-branch`), which takes all pull requests
+# whatever the default branch is (`main` only moves forward to releases);
+# security updates always target the default branch, though
+updates:
+  # Dependencies in `pom.xml`. Java 8 and Spring Boot 2 stay until the move to
+  # Spring Boot 3, which needs code changes
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: dev
+    ignore:
+      - dependency-name: org.springframework.boot:*
+        update-types: ["version-update:semver-major"]
+    groups:
+      maven:
+        patterns: ["*"]
+  # Actions in the workflows, including the pins of the shared actions of
+  # `elixir-cloud-aai/.github`
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: dev
+    groups:
+      github-actions:
+        patterns: ["*"]
+  # Base images in the `Dockerfile` (tag and digest). Java 8 stays until the
+  # move to Spring Boot 3
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: dev
+    ignore:
+      - dependency-name: eclipse-temurin
+        update-types: ["version-update:semver-major"]
+    groups:
+      docker:
+        patterns: ["*"]
