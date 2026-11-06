@@ -1,15 +1,22 @@
 # Authentication and authorisation
 
-TESK API integrates with [Elixir AAI](https://www.elixir-europe.org/services/compute/aai) via [OpenID Connect](http://openid.net/connect/) protocol to authenticate and authorise requests. Authentication and authorisation are optional and can be switched off completely. When authentication is on, in order to perform any TES operation (get and/or create tasks) TESK API user will have to include a valid access token issued by Elixir AAI in the request header. To obtain such a token, a user will have to:
+TESK API integrates with [Elixir AAI](https://www.elixir-europe.org/services/compute/aai) via [OpenID Connect](http://openid.net/connect/) protocol to authenticate and authorise requests. Authentication and authorisation are optional and can be switched off completely. When authentication is on, in order to perform any operation on tasks (get and/or create tasks) TESK API user will have to include a valid access token issued by Elixir AAI in the request header. To obtain such a token, a user will have to:
 * have a valid account in Elixir AAI
 * belong to a specific Elixir group
 * have access to a registered Elixir client application, that was assigned - among others - `groupNames` scope.
 
 ## Switching on/off authentication and authorisation
-Authentication and authorisation can be globally switched on and off for TESK API using [Spring Profiles](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-profiles.html). When the default `noauth` profile is active, all endpoints are unauthenticated and all (also previously) created TES tasks are visible to any user. New tasks are labelled as created by `anonymousUser` and no team ownership is assigned to new tasks. With `auth` profile activated, all the rules described below apply. The way to activate each of the profiles is described [here](README.md#externalized-configuration).
+Authentication and authorisation can be globally switched on and off for TESK API using [Spring Profiles](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-profiles.html). When the default `noauth` profile is active, all endpoints are unauthenticated (so the setting for `GET /service-info` below has no effect) and all (also previously) created TES tasks are visible to any user. New tasks are labelled as created by `anonymousUser` and no team ownership is assigned to new tasks. With `auth` profile activated, all the rules described below apply. The way to activate each of the profiles is described [here](README.md#externalized-configuration).
 
 ## Authentication
-The TESK API acts as a Resource Server in the OIDC contract, whereas Elixir AAI plays the role of Authorization Server. All of TESK API endpoints are secured, which means that in order to reach any of the endpoints, the request has to contain a valid _access_token_ issued by Elixir AAI, placed in `authorization: Bearer` header. 
+The TESK API acts as a Resource Server in the OIDC contract, whereas Elixir AAI plays the role of Authorization Server. All of TESK API endpoints, except the [public ones](#public-endpoints), are secured, which means that in order to reach them, the request has to contain a valid _access_token_ issued by Elixir AAI, placed in `authorization: Bearer` header. 
+
+### Public endpoints
+These `GET` and `HEAD` requests need no token, also with the `auth` profile:
+* `GET /service-info` (under the base path of the TES API), so that registries and clients can see what a service offers and how to get access. This is the default. To require a valid token for it (no group membership needed), set the environment variable `TESK_API_SERVICE_INFO_PUBLIC` to `false` (in the [Helm chart](https://github.com/elixir-cloud-aai/TESK/tree/master/charts/tesk): `auth.service_info_public`, which needs TESK API 1.2.0 or later). Service info can name your organisation, contact and storage locations: check the file that `TESK_API_SERVICE_INFO_LOCATION` points to (by default [`service-info.yaml`](src/main/resources/service-info.yaml)) if that matters for your deployment.
+* The Swagger UI and the API description.
+
+A request that does carry a token has it validated on these too: with an invalid token, the answer is `HTTP 401 Unauthorized`.
 
 ### Obtaining a token
 At the moment (subject to change) TESK API does not require the access token to be obtained using any specific client (application). Also the token audience is not currently checked (it is not clear, if Elixir AAI supports defining a token audience). Therefore, a valid token has the following properties:
