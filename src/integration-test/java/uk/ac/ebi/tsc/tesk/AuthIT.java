@@ -543,7 +543,27 @@ public class AuthIT {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    public void public_serviceInfo_withValidToken_isOk() throws Exception {
+        mockElixir.givenThat(
+                WireMock.get("/")
+                        .willReturn(okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : []}")));
 
+        this.mvc.perform(get(SERVICE_INFO_URL)
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk());
+    }
+
+
+
+    @Test
+    public void public_serviceInfo_withInvalidToken_isUnauthorized() throws Exception {
+        mockElixir.givenThat(WireMock.get("/").willReturn(unauthorized()));
+
+        this.mvc.perform(get(SERVICE_INFO_URL)
+                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isUnauthorized());
+    }
 
     private void performListTask(int expectedLength) throws Exception {
         this.mvc.perform(get(TASK_URL)
