@@ -93,10 +93,10 @@ Pushing a signed, annotated version tag runs the [release workflow](.github/work
 
 Tag | Image tags | Example
 ---|---|---
-`vX.Y.Z` | `X.Y.Z`, and `latest` if it is the highest release on `master` | `v1.2.0` publishes `1.2.0`
+`vX.Y.Z` | `X.Y.Z`, and `latest` if it is the highest release on `main` | `v1.2.0` publishes `1.2.0`
 `vX.Y.ZrcN` (also `aN`, `bN`) | `X.Y.ZrcN` only | `v1.2.0rc1` publishes `1.2.0rc1`
 
-The commit must be on `master`, CI must have passed for its push, and the version in `pom.xml` must be `X.Y.Z` (also for the pre-releases of `X.Y.Z`), so set that in a pull request first. `latest` goes by tags, so if a release fails, follow it with a higher version. Pushes to `master` publish no image. Publishing waits for an approval in the `release` environment. Images are signed with Sigstore and carry provenance attestations.
+Pull requests go to `dev`; for a release, `main` is moved forward to a commit of `dev`. The commit must be on `main`, CI must have passed for its push to `dev`, and the versions in `pom.xml` and `CITATION.cff` must be `X.Y.Z` (also for the pre-releases of `X.Y.Z`; `CITATION.cff` takes the full version), so set them in a pull request first. `latest` goes by tags, so if a release fails, follow it with a higher version. Release tags can't be moved or deleted. Publishing waits for an approval in the `release` environment. Images are signed with Sigstore and carry provenance attestations.
 
 After the push, the workflow makes one `POST /repositories/{id}/builds` to [Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade), which notifies the deployments that subscribed to upgrades, also for pre-releases, if they subscribed to those. This needs Pubgrade's publish mode ([#33](https://github.com/elixir-cloud-aai/Pubgrade/issues/33)) and these settings of the `pubgrade` environment of this repository, which should only allow version tags and needs no reviewer; without them, the step does nothing:
 

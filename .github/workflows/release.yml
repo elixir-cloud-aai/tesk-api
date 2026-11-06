@@ -51,7 +51,7 @@ jobs:
         with:
           persist-credentials: false
           # Full history and all tags, to check that the release commit is on
-          # `master`
+          # `main`
           fetch-depth: 0
       # Guards against accidental releases, e.g., of unmerged commits; the
       # `release` environment's protection rules (required reviewer) are what
@@ -84,17 +84,30 @@ jobs:
               echo "::error::Tag '${TAG}' has no signature verified by GitHub (git tag -s)"
               exit 1
           fi
-          if ! git merge-base --is-ancestor HEAD origin/master; then
-              echo "::error::Release commit is not on 'master'"
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+              echo "::error::Release commit is not on 'main'"
               exit 1
           fi
           {
               echo "version=${TAG#v}"
               echo "sha=$(git rev-parse HEAD)"
           } >> "${GITHUB_OUTPUT}"
+      # Zenodo archives the release with the citation metadata of the tagged
+      # commit, so `CITATION.cff` must have the release version (set with the
+      # version in `pom.xml`, in the release-prep pull request)
+      - name: Check citation metadata
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cff="$(sed -En "s/^version:[[:space:]]*[\"']?([0-9A-Za-z.+-]+)[\"']?[[:space:]]*(#.*)?$/\1/p" CITATION.cff)"
+          if [[ "${cff}" != "${VERSION}" ]]; then
+              echo "::error::Version in CITATION.cff is '${cff}', expected '${VERSION}'"
+              exit 1
+          fi
       # The checks above don't run the tests: require a successful run of the
-      # CI workflow for a push of the release commit; runs for pull requests
-      # test merge commits, not the commit itself. Re-runs that succeeded count
+      # CI workflow for a push of the release commit (to `dev`, before it moved
+      # to `main`); runs for pull requests test merge commits, not the commit
+      # itself. Re-runs that succeeded count
       - name: Check that CI passed for the release commit
         env:
           GH_TOKEN: ${{ github.token }}
@@ -213,7 +226,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ needs.prepare.outputs.sha }}
-          # All tags and `master`, to determine the highest release
+          # All tags and `main`, to determine the highest release
           fetch-depth: 0
       - name: Check image digest
         run: |
@@ -244,12 +257,12 @@ jobs:
       # `X.Y.Z` and, for the highest stable release, `latest` point to the
       # scanned and signed digest. Decided last, from freshly fetched tags, so
       # that a re-run of an older release doesn't move `latest` back; only tags
-      # on `master` count
+      # on `main` count
       - name: Tag image
         run: |
           git fetch --quiet --force --tags origin \
-              "+refs/heads/master:refs/remotes/origin/master"
-          highest="$(git tag --merged origin/master --list 'v*' \
+              "+refs/heads/main:refs/remotes/origin/main"
+          highest="$(git tag --merged origin/main --list 'v*' \
               | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
           # A published version never moves to another digest
           if existing="$(docker buildx imagetools inspect "${IMAGE_NAME}:${VERSION}" \
