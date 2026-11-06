@@ -9,14 +9,18 @@ testing. All images are scanned for known vulnerabilities before they are
 tagged, signed with [Sigstore](https://www.sigstore.dev/) (keyless) and carry
 SBOM and build provenance attestations.
 
-To check the signature of an image, with
+To check that a release image was signed by the release workflow for a
+version tag, with
 [cosign](https://docs.sigstore.dev/cosign/system_config/installation/):
 
 ```bash
 cosign verify elixircloud/tesk-api:1.2.0 \
-  --certificate-identity-regexp '^https://github\.com/elixir-cloud-aai/tesk-api/\.github/workflows/' \
+  --certificate-identity-regexp '^https://github\.com/elixir-cloud-aai/tesk-api/\.github/workflows/release\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
+
+For `dev` images, the identity is
+`https://github.com/elixir-cloud-aai/tesk-api/.github/workflows/ci.yml@refs/heads/dev`.
 
 The image runs the application with Java 8 on [Eclipse
 Temurin](https://adoptium.net/) and listens on port 8080. `JAVA_OPTS` passes
@@ -33,10 +37,18 @@ API](configuration.md) from its values.
 TESK API talks to the Kubernetes API with the [Kubernetes Java
 client](https://github.com/kubernetes-client/java). Inside the cluster, it uses
 the service account of its pod (`spec.template.spec.serviceAccountName` of its
-deployment); outside, the `KUBECONFIG` file. Either way, it needs the rights to
-create, read, list and label jobs and pods and to read pod logs in its
-namespace (`TESK_API_K8S_NAMESPACE`); the built-in `edit` role is enough. The
-taskmaster's service account (`TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME`)
+deployment); outside, the kubeconfig file. Either way, it needs these rights in
+its namespace (`TESK_API_K8S_NAMESPACE`); the built-in `edit` role has them:
+
+Resource | Verbs | For
+--- | --- | ---
+`jobs` (`batch`) | `create`, `get`, `list`, `patch` | Taskmaster jobs: create, read, list, label as cancelled
+`pods` | `list`, `patch` | Pods of the jobs: read, label as cancelled
+`pods/log` | `get` | Logs of the taskmaster and executors
+`configmaps` | `create`, `get` | The taskmaster's input; a pod security context from a ConfigMap, if configured
+`limitranges` | `list` | Raising requested memory to the namespace's minimum (without the right, it logs an error and goes on)
+
+The taskmaster's service account (`TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME`)
 needs to manage jobs, pods and persistent volume claims.
 
 ## Running locally
@@ -49,11 +61,13 @@ a `KUBECONFIG` file for that cluster:
 ./mvnw spring-boot:run
 ```
 
-or with the image:
+or with the image, reachable from your machine only (it runs without
+authentication by default, with the rights of your kubeconfig, `KUBECONFIG` or
+`~/.kube/config`):
 
 ```bash
-docker run --rm --publish 8080:8080 \
-  --volume "${HOME}/.kube/config:/root/.kube/config:ro" \
+docker run --rm --publish 127.0.0.1:8080:8080 \
+  --volume "${KUBECONFIG:-${HOME}/.kube/config}:/root/.kube/config:ro" \
   elixircloud/tesk-api:latest
 ```
 

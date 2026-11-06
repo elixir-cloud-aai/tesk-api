@@ -8,7 +8,7 @@ Method | Path | Operation
 --- | --- | ---
 `GET` | `/service-info` | Information about the service
 `POST` | `/tasks` | Create a task
-`GET` | `/tasks` | List tasks (filter by name prefix, pages)
+`GET` | `/tasks` | List tasks (in pages; the name prefix filter is not supported yet and is ignored)
 `GET` | `/tasks/{id}` | Get a task
 `POST` | `/tasks/{id}:cancel` | Cancel a task
 
@@ -17,9 +17,9 @@ them, also with a token from its built-in OpenID Connect client (see [Access
 control](access-control.md#built-in-client)). The API description is at
 `/v2/api-docs`.
 
-With the `auth` profile, all endpoints but service info, the Swagger UI and the
-API description need a valid access token; see [Access
-control](access-control.md).
+With the `auth` profile, all endpoints need a valid access token, except the
+Swagger UI, the API description and, unless `TESK_API_SERVICE_INFO_PUBLIC` is
+`false`, service info; see [Access control](access-control.md).
 
 ## Service info
 

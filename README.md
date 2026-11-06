@@ -34,12 +34,14 @@ upgrades and development. Its sources are in [`docs/`](docs/).
 ## Quick start
 
 With [Docker](https://docs.docker.com/get-docker/) installed, and a
-Kubernetes cluster in your `KUBECONFIG` file (e.g., a local one with
-[kind](https://kind.sigs.k8s.io/)):
+Kubernetes cluster in your kubeconfig file (`KUBECONFIG`, or
+`~/.kube/config`; e.g., a local one with [kind](https://kind.sigs.k8s.io/)),
+start TESK API on your machine only (it runs without authentication by
+default, with the rights of your kubeconfig):
 
 ```bash
-docker run --rm --publish 8080:8080 \
-  --volume "${HOME}/.kube/config:/root/.kube/config:ro" \
+docker run --rm --publish 127.0.0.1:8080:8080 \
+  --volume "${KUBECONFIG:-${HOME}/.kube/config}:/root/.kube/config:ro" \
   elixircloud/tesk-api:latest
 ```
 

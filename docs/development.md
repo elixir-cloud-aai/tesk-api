@@ -43,9 +43,12 @@ The CI workflow (`.github/workflows/ci.yml`) runs on pull requests and pushes
 to `dev`: it checks the pull request title, lints the workflows, builds and
 tests TESK API (with coverage to [Codecov](https://codecov.io/gh/elixir-cloud-aai/tesk-api)),
 builds the docs strictly, starts the image in both profiles, and scans the
-image for known vulnerabilities. The scan fails on critical and high
-vulnerabilities that have a fix, except those accepted in `.trivyignore.yaml`,
-each with a reason and an expiry date. On pushes to `dev`, it publishes the
+image for known vulnerabilities. For now, the scan only reports its findings
+(to code scanning) and doesn't fail, until the dependencies are updated
+([#60](https://github.com/elixir-cloud-aai/tesk-api/issues/60)); then it fails
+on critical and high vulnerabilities that have a fix, except those accepted in
+`.trivyignore.yaml`, each with a reason and an expiry date. The release
+workflow's scan fails on them already. On pushes to `dev`, it publishes the
 scanned and signed image as `<org>/tesk-api:dev` (and `sha-<commit>`), where
 `<org>` is the variable `DOCKERHUB_ORG` (by default `elixircloud`); this needs
 the secrets `DOCKERHUB_LOGIN` and `DOCKERHUB_TOKEN` in the environment
