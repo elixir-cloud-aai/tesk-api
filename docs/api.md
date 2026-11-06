@@ -12,14 +12,23 @@ Method | Path | Operation
 `GET` | `/tasks/{id}` | Get a task
 `POST` | `/tasks/{id}:cancel` | Cancel a task
 
-The Swagger UI at the root path (`/`) lists the endpoints and lets you try
-them, also with a token from its built-in OpenID Connect client (see [Access
-control](access-control.md#built-in-client)). The API description is at
-`/v2/api-docs`.
+The API description (OpenAPI 2.0) is at `/v2/api-docs`.
 
 With the `auth` profile, all endpoints need a valid access token, except the
-Swagger UI, the API description and, unless `TESK_API_SERVICE_INFO_PUBLIC` is
-`false`, service info; see [Access control](access-control.md).
+API description, the Swagger UI (if it is on) and, unless
+`TESK_API_SERVICE_INFO_PUBLIC` is `false`, service info; see [Access
+control](access-control.md).
+
+## Swagger UI
+
+The Swagger UI lists the endpoints and lets you try them, also with a token
+from its built-in OpenID Connect client (see [Access
+control](access-control.md#built-in-client)). It is off by default; set
+`TESK_API_SWAGGER_UI_ENABLED` to `true` to serve it, with its static
+resources and its configuration (`/swagger-resources`), at
+`/swagger-ui/index.html`, to which the root path (`/`) then redirects (see
+[Configuration](configuration.md)). While it is off, these paths answer `404
+Not Found`.
 
 ## Service info
 
