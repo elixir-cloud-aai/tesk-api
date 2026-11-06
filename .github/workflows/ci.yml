@@ -1,16 +1,15 @@
 # Everything that must pass on pull requests and pushes to `dev`: the pull
 # request title, lint, build and test (unit and integration tests), build the
-# docs, start the
-# image in both profiles, scan the image for known vulnerabilities, and, on
-# pushes, push the image by digest (with SBOM and provenance attestations),
-# scan exactly that digest, then attest, sign (Sigstore) and tag it `dev` and
-# `sha-<commit>`. Forks, which have none of the secrets, run the same checks
-# without these side effects and without uploads to code scanning (as for pull
-# requests from forks), unless they set the repository variable
-# `DOCKERHUB_ORG` to publish to their own organization.
+# docs, start the image in both profiles, scan the image for known
+# vulnerabilities, and, on pushes, push the image by digest (with SBOM and
+# provenance attestations), scan exactly that digest, then attest, sign
+# (Sigstore) and tag it `dev` and `sha-<commit>`. Forks, which have none of the
+# secrets, run the same checks without these side effects and without uploads
+# to code scanning (as for pull requests from forks), unless they set the
+# repository variable `DOCKERHUB_ORG` to publish to their own organization.
 # `github.repository_owner == 'elixir-cloud-aai'` marks runs of the upstream
-# repository. The gate `passed` ("CI passed") is the only required check.
-# No `paths:` filters, so that the gate always reports; skip jobs with `if:`
+# repository. The gate `passed` ("CI passed") is the only required check. No
+# `paths:` filters, so that the gate always reports; skip jobs with `if:`
 # instead (and allow the skip in the gate). Runs also when a pull request is
 # edited, so that the title check follows the title; all jobs run then, as a
 # run that skipped the tests would report "CI passed" for the commit
