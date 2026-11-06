@@ -51,10 +51,6 @@ vulnerabilities:
     purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
     statement: Concerns JavaScriptUtils; the app doesn't use it
     expired_at: 2027-01-31
-  - id: CVE-2026-41842
-    purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
-    statement: Denial of service when resolving static resources, of which the app only has the Swagger UI (public, also with the auth profile); no code execution or data access
-    expired_at: 2027-01-31
   - id: CVE-2026-47884
     purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
     statement: Concerns XsltView; the app has no views
