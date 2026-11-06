@@ -165,13 +165,15 @@ jobs:
         run: docker build --tag tesk-api:smoke .
       - name: Check responses
         run: |
-          base=http://localhost:8080/ga4gh/tes/v1
+          host=http://localhost:8080
+          api=/ga4gh/tes/v1
           # Starts the image with the given arguments of `docker run`, and
-          # waits until it answers
+          # waits until it answers, including the API description (public in
+          # every configuration), which is built after the app has started
           start() {
             docker run --detach --name smoke --publish 8080:8080 "$@" tesk-api:smoke
             for _ in $(seq 1 60); do
-              if curl --silent --output /dev/null "${base}/service-info"; then
+              if curl --silent --fail --output /dev/null "${host}/v2/api-docs"; then
                 return 0
               fi
               sleep 2
@@ -183,10 +185,10 @@ jobs:
           stop() {
             docker rm --force smoke > /dev/null
           }
-          # Checks the status of a request
+          # Checks the status of a request (path from the host)
           check() {
             local path="$1" expected="$2" actual
-            actual="$(curl --silent --output /dev/null --write-out '%{http_code}' "${base}${path}")"
+            actual="$(curl --silent --output /dev/null --write-out '%{http_code}' "${host}${path}")"
             if [[ "${actual}" != "${expected}" ]]; then
               docker logs smoke
               echo "::error::GET ${path}: status ${actual}, expected ${expected}"
@@ -194,15 +196,21 @@ jobs:
             fi
           }
           start
-          check /service-info 200
-          curl --silent --fail "${base}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'
+          check "${api}/service-info" 200
+          curl --silent --fail "${host}${api}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'
+          # The Swagger UI is off by default; the API description is not
+          check /swagger-ui/index.html 404
+          check /v2/api-docs 200
           stop
           start --env SPRING_PROFILES_ACTIVE=auth
-          check /service-info 200
-          check /tasks 401
+          check "${api}/service-info" 200
+          check "${api}/tasks" 401
           stop
           start --env SPRING_PROFILES_ACTIVE=auth --env TESK_API_SERVICE_INFO_PUBLIC=false
-          check /service-info 401
+          check "${api}/service-info" 401
+          stop
+          start --env TESK_API_SWAGGER_UI_ENABLED=true
+          check /swagger-ui/index.html 200
           stop
 
   # On pushes that publish (`PUBLISH`), builds the image once and pushes it
