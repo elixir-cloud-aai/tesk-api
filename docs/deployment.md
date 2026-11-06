@@ -71,8 +71,10 @@ docker run --rm --publish 127.0.0.1:8080:8080 \
   elixircloud/tesk-api:latest
 ```
 
-Then open the Swagger UI at <http://localhost:8080>. Without a cluster, the
-API still starts and answers `GET /service-info`; requests for tasks fail.
+Then try `curl http://localhost:8080/ga4gh/tes/v1/service-info`. Without a
+cluster, the API still starts and answers `GET /service-info`; requests for
+tasks fail. For the Swagger UI at <http://localhost:8080>, add `--env
+TESK_API_SWAGGER_UI_ENABLED=true` (see [API](api.md#swagger-ui)).
 
 ## Access control
 

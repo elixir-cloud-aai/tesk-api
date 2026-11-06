@@ -30,6 +30,7 @@ Environment variable | Meaning
 `TESK_API_SERVICE_INFO_PUBLIC` | With the `auth` profile: `true` (default) lets `GET` and `HEAD /service-info` answer without a token; `false` makes them need a valid token (no group membership). No effect with `noauth`, where all endpoints are open. Since 1.2.0.
 `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` | User info endpoint of the OpenID Connect provider, which validates tokens; see [Access control](access-control.md#token-validation). Default: ELIXIR AAI.
 `TESK_API_AUTHORISATION_*` | Authorisation by group membership; see [Access control](access-control.md#configuration).
+`TESK_API_SWAGGER_UI_ENABLED` | `true`: serves the [Swagger UI](api.md#swagger-ui) at `/swagger-ui/index.html` (the root path `/` redirects there) with its static resources. `false` (default): serves neither. The API description (`/v2/api-docs`) is served either way. Since 1.2.0; before, the Swagger UI was always on.
 `TESK_API_SWAGGER_OAUTH_*` | The OpenID Connect client of the Swagger UI; see [Access control](access-control.md#built-in-client).
 
 ## Service info
