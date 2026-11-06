@@ -1,4 +1,4 @@
-# Authentication and authorisation
+# Access control
 
 TESK API integrates with [Elixir AAI](https://www.elixir-europe.org/services/compute/aai) via [OpenID Connect](http://openid.net/connect/) protocol to authenticate and authorise requests. Authentication and authorisation are optional and can be switched off completely. When authentication is on, in order to perform any operation on tasks (get and/or create tasks) TESK API user will have to include a valid access token issued by Elixir AAI in the request header. To obtain such a token, a user will have to:
 * have a valid account in Elixir AAI
@@ -6,14 +6,14 @@ TESK API integrates with [Elixir AAI](https://www.elixir-europe.org/services/com
 * have access to a registered Elixir client application, that was assigned - among others - `groupNames` scope.
 
 ## Switching on/off authentication and authorisation
-Authentication and authorisation can be globally switched on and off for TESK API using [Spring Profiles](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-profiles.html). When the default `noauth` profile is active, all endpoints are unauthenticated (so the setting for `GET /service-info` below has no effect) and all (also previously) created TES tasks are visible to any user. New tasks are labelled as created by `anonymousUser` and no team ownership is assigned to new tasks. With `auth` profile activated, all the rules described below apply. The way to activate each of the profiles is described [here](README.md#externalized-configuration).
+Authentication and authorisation can be globally switched on and off for TESK API using [Spring Profiles](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-profiles.html). When the default `noauth` profile is active, all endpoints are unauthenticated (so the setting for `GET /service-info` below has no effect) and all (also previously) created TES tasks are visible to any user. New tasks are labelled as created by `anonymousUser` and no team ownership is assigned to new tasks. With `auth` profile activated, all the rules described below apply. Set the profile with `SPRING_PROFILES_ACTIVE` (see [Configuration](configuration.md#settings)).
 
 ## Authentication
 The TESK API acts as a Resource Server in the OIDC contract, whereas Elixir AAI plays the role of Authorization Server. All of TESK API endpoints, except the [public ones](#public-endpoints), are secured, which means that in order to reach them, the request has to contain a valid _access_token_ issued by Elixir AAI, placed in `authorization: Bearer` header. 
 
 ### Public endpoints
 These `GET` and `HEAD` requests need no token, also with the `auth` profile:
-* `GET /service-info` (under the base path of the TES API), so that registries and clients can see what a service offers and how to get access. This is the default. To require a valid token for it (no group membership needed), set the environment variable `TESK_API_SERVICE_INFO_PUBLIC` to `false` (in the [Helm chart](https://github.com/elixir-cloud-aai/TESK/tree/master/charts/tesk): `auth.service_info_public`, which needs TESK API 1.2.0 or later). Service info can name your organisation, contact and storage locations: check the file that `TESK_API_SERVICE_INFO_LOCATION` points to (by default [`service-info.yaml`](src/main/resources/service-info.yaml)) if that matters for your deployment.
+* `GET /service-info` (under the base path of the TES API), so that registries and clients can see what a service offers and how to get access. This is the default. To require a valid token for it (no group membership needed), set the environment variable `TESK_API_SERVICE_INFO_PUBLIC` to `false` (in the [Helm chart of TESK](https://github.com/elixir-cloud-aai/TESK): `auth.service_info_public`, which needs TESK API 1.2.0 or later). Service info can name your organisation, contact and storage locations: check the file that `TESK_API_SERVICE_INFO_LOCATION` points to (by default the built-in [`service-info.yaml`](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/resources/service-info.yaml); see [Configuration](configuration.md#service-info)) if that matters for your deployment.
 * The Swagger UI and the API description.
 
 A request that does carry a token has it validated on these too: with an invalid token, the answer is `HTTP 401 Unauthorized`.
@@ -26,7 +26,7 @@ At the moment (subject to change) TESK API does not require the access token to 
 * Obtained by a user using any OIDC Flow
 * Obtained by a user using a client, that was granted `groupNames` scope (see [Authorisation](#authorisation))
 * Containing any audience
-* If Elixir AAI introduces groups-clients binding (presenting only those group names to clients, that where mentioned during client registration - currently each client receives all groups, as long as it has the scope `groupNames`), the token will have to be obtained using a client, which can receive those groups that are needed during Authorisation (see [below](#Authorisation))
+* If Elixir AAI introduces groups-clients binding (presenting only those group names to clients, that where mentioned during client registration - currently each client receives all groups, as long as it has the scope `groupNames`), the token will have to be obtained using a client, which can receive those groups that are needed during Authorisation (see [below](#authorisation))
 
 #### Built-in client
 A valid token can be obtained using an OIDC client built in Swagger UI at the TESK API homepage. In order to use the client, it has to be configured, by placing Client ID - registered at Elixir AAI with Implicit Grant - in the API environment variable `TESK_API_SWAGGER_OAUTH_CLIENT_ID` (authorisation code grant also possible, but discouraged). Unless groups-clients relationship is introduced, token obtained using Swagger UI from one environment can be used to make calls to API installed elsewhere.   
@@ -35,7 +35,7 @@ A valid token can be obtained using an OIDC client built in Swagger UI at the TE
 TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint. If user info is returned without error, token is considered valid. Invalid token or lack of thereof in `authorisation: Bearer` header will result in `HTTP 401 Unauthorized` error. 
 
 ### Integrating with a different OIDC provider
-We have not tested TESK API integration with a different OIDC provider than Elixir AAI, but since standard Spring OAuth library is used, it should be possible (just point [`security.oauth2.resource.user-info-uri`](#application.properties) to a proper URL), provided that the other Authorization Server provides information about the user in the same format that Elixir does. Otherwise changes to [GroupNamesSecurityExtractor](src/main/java/uk/ac/ebi/tsc/tesk/config/security/GroupNamesSecurityExtractor.java) and [ElixirPrincipalExtractor](src/main/java/uk/ac/ebi/tsc/tesk/config/security/ElixirPrincipalExtractor.java) will be necessary.
+We have not tested TESK API integration with a different OIDC provider than Elixir AAI, but since standard Spring OAuth library is used, it should be possible (just point `security.oauth2.resource.user-info-uri`, or `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`, to a proper URL), provided that the other Authorization Server provides information about the user in the same format that Elixir does. Otherwise changes to [GroupNamesSecurityExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/GroupNamesSecurityExtractor.java) and [ElixirPrincipalExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/ElixirPrincipalExtractor.java) will be necessary.
 
 ## Authorisation
 TESK API uses Elixir AAI group membership to authorise users. Elixir recognises group managers and members, but only includes information about the latter in `user_info` endpoint response. Therefore a nested structure of groups is used by us to reflect different roles of users.
@@ -78,7 +78,7 @@ List tasks | User can list those task that are visible to him (as for `Get a tas
 * User '123' with groups `GA4GH:G4GH-CAP:EBI:TEST` and `GA4GH:G4GH-CAP:EBI:SDO:ADMIN`, gets a task list. Success. List contains all tasks created for team TEST by user 123 and also all tasks created for team SDO by all users.
 
 ### Configuration
-Parts of Elixir groups 'authorisation framework' - particularly base group name, environment subgroup name and ADMIN subgroup name - are configurable in [the same way](README.md#externalized-configuration) that is used throughout TESK API.
+Parts of Elixir groups 'authorisation framework' - particularly base group name, environment subgroup name and ADMIN subgroup name - are configurable in [the same way](configuration.md) as all settings of TESK API.
 
 Environment variable | Meaning | Default
 ------------ |---|--

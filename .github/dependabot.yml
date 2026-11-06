@@ -39,3 +39,12 @@ updates:
     groups:
       docker:
         patterns: ["*"]
+  # Dependencies of the docs (`docs/requirements.txt`)
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: monthly
+    target-branch: dev
+    groups:
+      docs-dependencies:
+        patterns: ["*"]
