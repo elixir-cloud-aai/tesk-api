@@ -12,6 +12,6 @@ contactUrl: https://github.com/EMBL-EBI-TSI/TESK/issues
 documentationUrl: https://github.com/EMBL-EBI-TSI/TESK
 createdAt: 2021-04-06
 environment: dev
-version: 1.0
+version: 1.2.0
 storage:
 - ftp://ftp-private.ebi.ac.uk
