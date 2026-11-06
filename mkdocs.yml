@@ -6,6 +6,8 @@ site_name: TESK API
 site_description: >-
   API server of TESK, the GA4GH Task Execution Service on Kubernetes, by
   ELIXIR On-Cloud
+# The section of the TESK documentation that includes these pages
+site_url: https://tesk.readthedocs.io/en/latest/tesk-api/
 repo_url: https://github.com/elixir-cloud-aai/tesk-api
 repo_name: elixir-cloud-aai/tesk-api
 edit_uri: edit/dev/docs/
