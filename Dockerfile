@@ -10,6 +10,12 @@ RUN ./mvnw -B -Dmaven.test.skip=true package \
     && cp target/tesk-*.jar /app.jar
 
 FROM eclipse-temurin:8-jre@sha256:377fe8e36a4b1530d9d52020069367ef44313fa891a82ae102b1016a6a3a72f5
+# The pinned base image has a vulnerable apt (CVE-2026-109518; fixed by
+# 3.2.1ubuntu0.1 in the Ubuntu security updates); can go once Dependabot moves
+# the base image to a build with the fix
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends --only-upgrade apt libapt-pkg7.0 && \
+    rm -rf /var/lib/apt/lists/*
 VOLUME /tmp
 COPY --from=build /app.jar /app.jar
 EXPOSE 8080
