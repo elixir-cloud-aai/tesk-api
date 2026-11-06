@@ -180,6 +180,9 @@ jobs:
           check /service-info 200
           check /tasks 401
           stop
+          start --env SPRING_PROFILES_ACTIVE=auth --env TESK_API_SERVICE_INFO_PUBLIC=false
+          check /service-info 401
+          stop
 
   # On pushes that publish (`PUBLISH`), builds the image once and pushes it
   # by digest only (untagged, with SBOM
