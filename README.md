@@ -45,8 +45,9 @@ docker run --rm --publish 127.0.0.1:8080:8080 \
   elixircloud/tesk-api:latest
 ```
 
-The API is then served at `http://localhost:8080/ga4gh/tes/v1/`, with a
-Swagger UI at [http://localhost:8080](http://localhost:8080):
+The API is then served at `http://localhost:8080/ga4gh/tes/v1/` (add `--env
+TESK_API_SWAGGER_UI_ENABLED=true` for a Swagger UI at
+[http://localhost:8080](http://localhost:8080)):
 
 ```bash
 curl http://localhost:8080/ga4gh/tes/v1/service-info

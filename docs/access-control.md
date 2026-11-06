@@ -14,7 +14,7 @@ The TESK API acts as a Resource Server in the OIDC contract, whereas Elixir AAI 
 ### Public endpoints
 These `GET` and `HEAD` requests need no token, also with the `auth` profile:
 * `GET /service-info` (under the base path of the TES API), so that registries and clients can see what a service offers and how to get access. This is the default. To require a valid token for it (no group membership needed), set the environment variable `TESK_API_SERVICE_INFO_PUBLIC` to `false` (in the [Helm chart of TESK](https://github.com/elixir-cloud-aai/TESK): `auth.service_info_public`, which needs TESK API 1.2.0 or later). Service info can name your organisation, contact and storage locations: check the file that `TESK_API_SERVICE_INFO_LOCATION` points to (by default the built-in [`service-info.yaml`](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/resources/service-info.yaml); see [Configuration](configuration.md#service-info)) if that matters for your deployment.
-* The Swagger UI and the API description.
+* The API description, and the Swagger UI if it is on (`TESK_API_SWAGGER_UI_ENABLED`; see [API](api.md#swagger-ui)).
 
 A request that does carry a token has it validated on these too: with an invalid token, the answer is `HTTP 401 Unauthorized`.
 
@@ -29,7 +29,7 @@ At the moment (subject to change) TESK API does not require the access token to 
 * If Elixir AAI introduces groups-clients binding (presenting only those group names to clients, that where mentioned during client registration - currently each client receives all groups, as long as it has the scope `groupNames`), the token will have to be obtained using a client, which can receive those groups that are needed during Authorisation (see [below](#authorisation))
 
 #### Built-in client
-A valid token can be obtained using an OIDC client built in Swagger UI at the TESK API homepage. In order to use the client, it has to be configured, by placing Client ID - registered at Elixir AAI with Implicit Grant - in the API environment variable `TESK_API_SWAGGER_OAUTH_CLIENT_ID` (authorisation code grant also possible, but discouraged). Unless groups-clients relationship is introduced, token obtained using Swagger UI from one environment can be used to make calls to API installed elsewhere.   
+A valid token can be obtained using an OIDC client built in Swagger UI at the TESK API homepage, if the Swagger UI is on (`TESK_API_SWAGGER_UI_ENABLED` set to `true`; it is off by default). In order to use the client, it has to be configured, by placing Client ID - registered at Elixir AAI with Implicit Grant - in the API environment variable `TESK_API_SWAGGER_OAUTH_CLIENT_ID` (authorisation code grant also possible, but discouraged). Unless groups-clients relationship is introduced, token obtained using Swagger UI from one environment can be used to make calls to API installed elsewhere.   
 
 ### Token validation
 TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint. If user info is returned without error, token is considered valid. Invalid token or lack of thereof in `authorisation: Bearer` header will result in `HTTP 401 Unauthorized` error. 
