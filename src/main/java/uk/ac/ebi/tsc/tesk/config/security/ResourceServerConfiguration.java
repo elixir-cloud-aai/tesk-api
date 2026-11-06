@@ -42,26 +42,32 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
     private final AuthorisationProperties authorisationProperties;
     private final String[] ALLOWED_URLS = {"/", "/v2/api-docs", "/configuration/ui", "/swagger-resources/**", "/configuration/**", "/swagger-ui/**", "/webjars/**"};
     private final String baseUrl;
+    private final boolean serviceInfoPublic;
 
     public ResourceServerConfiguration(ErrorAttributes errorAttributes, HttpMessageConverters messageConverters,
                                        AuthorisationProperties authorisationProperties,
-                                       @Value("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}") String baseUrl) {
+                                       @Value("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}") String baseUrl,
+                                       @Value("${tesk.api.service-info.public:true}") boolean serviceInfoPublic) {
 
         this.errorAttributes = errorAttributes;
         this.messageConverters = messageConverters;
         this.authorisationProperties = authorisationProperties;
         this.baseUrl = baseUrl;
+        this.serviceInfoPublic = serviceInfoPublic;
     }
 
 
     /**
-     * We leave the sensible defaults only letting swagger UI requests in
+     * We leave the sensible defaults only letting swagger UI requests in, and service info unless a token
+     * is required for it (tesk.api.service-info.public)
      */
     @Override
     public void configure(HttpSecurity http) throws Exception {
         List<String> allowedUrls = new ArrayList<>();
         allowedUrls.addAll(Arrays.asList(ALLOWED_URLS));
-        allowedUrls.add(baseUrl + "/service-info");
+        if (serviceInfoPublic) {
+            allowedUrls.add(baseUrl + "/service-info");
+        }
         String[] allowedUrlsArray = allowedUrls.toArray(new String[0]);
         http
                 .authorizeRequests()
