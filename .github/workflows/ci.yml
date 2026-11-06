@@ -1,15 +1,15 @@
 # Everything that must pass on pull requests and pushes to `dev`: the pull
-# request title, lint, build and test (unit and integration tests), start the
-# image in both profiles, scan the image for known vulnerabilities, and, on
-# pushes, push the image by digest (with SBOM and provenance attestations),
-# scan exactly that digest, then attest, sign (Sigstore) and tag it `dev` and
-# `sha-<commit>`. Forks, which have none of the secrets, run the same checks
-# without these side effects and without uploads to code scanning (as for pull
-# requests from forks), unless they set the repository variable
-# `DOCKERHUB_ORG` to publish to their own organization.
+# request title, lint, build and test (unit and integration tests), build the
+# docs, start the image in both profiles, scan the image for known
+# vulnerabilities, and, on pushes, push the image by digest (with SBOM and
+# provenance attestations), scan exactly that digest, then attest, sign
+# (Sigstore) and tag it `dev` and `sha-<commit>`. Forks, which have none of the
+# secrets, run the same checks without these side effects and without uploads
+# to code scanning (as for pull requests from forks), unless they set the
+# repository variable `DOCKERHUB_ORG` to publish to their own organization.
 # `github.repository_owner == 'elixir-cloud-aai'` marks runs of the upstream
-# repository. The gate `passed` ("CI passed") is the only required check.
-# No `paths:` filters, so that the gate always reports; skip jobs with `if:`
+# repository. The gate `passed` ("CI passed") is the only required check. No
+# `paths:` filters, so that the gate always reports; skip jobs with `if:`
 # instead (and allow the skip in the gate). Runs also when a pull request is
 # edited, so that the title check follows the title; all jobs run then, as a
 # run that skipped the tests would report "CI passed" for the commit
@@ -129,6 +129,27 @@ jobs:
           fail_ci_if_error: ${{ github.event_name == 'push' && github.repository_owner == 'elixir-cloud-aai' }}
           verbose: true
 
+  # Builds these docs (`docs/`, `mkdocs.yml`) strictly: fails on warnings,
+  # e.g. of broken links and anchors. They are published as part of the TESK
+  # documentation, which includes `docs/`, not from here
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: python -m pip install --requirement docs/requirements.txt
+      - name: Build documentation
+        run: mkdocs build --strict
+
   # Starts the image as built by the `Dockerfile`, without a cluster: it answers
   # without Kubernetes as far as these requests go
   smoke:
@@ -179,6 +200,9 @@ jobs:
           start --env SPRING_PROFILES_ACTIVE=auth
           check /service-info 200
           check /tasks 401
+          stop
+          start --env SPRING_PROFILES_ACTIVE=auth --env TESK_API_SERVICE_INFO_PUBLIC=false
+          check /service-info 401
           stop
 
   # On pushes that publish (`PUBLISH`), builds the image once and pushes it
@@ -293,7 +317,7 @@ jobs:
     timeout-minutes: 30
     # The same expression as `PUBLISH` (checked in `lint`)
     if: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
-    needs: [lint, test, smoke, push, scan]
+    needs: [lint, test, docs, smoke, push, scan]
     # Docker Hub secrets; the environment only allows branch `dev`
     environment: dev-images
     permissions:
@@ -382,7 +406,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [title, lint, test, smoke, push, scan, publish]
+    needs: [title, lint, test, docs, smoke, push, scan, publish]
     permissions: {}
     steps:
       - name: Check results of all jobs

@@ -1,0 +1,81 @@
+# Deployment
+
+## Image
+
+Releases are published to Docker Hub as `elixircloud/tesk-api:X.Y.Z`, and the
+highest release also as `latest`. Each push to the `dev` branch publishes
+`elixircloud/tesk-api:dev` and `elixircloud/tesk-api:sha-<commit>`, for
+testing. All images are scanned for known vulnerabilities before they are
+tagged, signed with [Sigstore](https://www.sigstore.dev/) (keyless) and carry
+SBOM and build provenance attestations.
+
+To check that a release image was signed by the release workflow for a
+version tag, with
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/):
+
+```bash
+cosign verify elixircloud/tesk-api:1.2.0 \
+  --certificate-identity-regexp '^https://github\.com/elixir-cloud-aai/tesk-api/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+For `dev` images, the identity is
+`https://github.com/elixir-cloud-aai/tesk-api/.github/workflows/ci.yml@refs/heads/dev`.
+
+The image runs the application with Java 8 on [Eclipse
+Temurin](https://adoptium.net/) and listens on port 8080. `JAVA_OPTS` passes
+options to the JVM.
+
+## Kubernetes
+
+TESK API runs in the Kubernetes cluster whose jobs it manages, deployed with
+the Helm chart of [TESK](https://github.com/elixir-cloud-aai/TESK), which also
+deploys the taskmaster's settings, the service account and the ingress. See the
+TESK documentation for the installation; the chart sets the [settings of TESK
+API](configuration.md) from its values.
+
+TESK API talks to the Kubernetes API with the [Kubernetes Java
+client](https://github.com/kubernetes-client/java). Inside the cluster, it uses
+the service account of its pod (`spec.template.spec.serviceAccountName` of its
+deployment); outside, the kubeconfig file. Either way, it needs these rights in
+its namespace (`TESK_API_K8S_NAMESPACE`); the built-in `edit` role has them:
+
+Resource | Verbs | For
+--- | --- | ---
+`jobs` (`batch`) | `create`, `get`, `list`, `patch` | Taskmaster jobs: create, read, list, label as cancelled
+`pods` | `list`, `patch` | Pods of the jobs: read, label as cancelled
+`pods/log` | `get` | Logs of the taskmaster and executors
+`configmaps` | `create`, `get` | The taskmaster's input; a pod security context from a ConfigMap, if configured
+`limitranges` | `list` | Raising requested memory to the namespace's minimum (without the right, it logs an error and goes on)
+
+The taskmaster's service account (`TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME`)
+needs to manage jobs, pods and persistent volume claims.
+
+## Running locally
+
+To run TESK API outside of Kubernetes, e.g. against a local cluster such as
+[kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/), with Java 8 and
+a `KUBECONFIG` file for that cluster:
+
+```bash
+./mvnw spring-boot:run
+```
+
+or with the image, reachable from your machine only (it runs without
+authentication by default, with the rights of your kubeconfig, `KUBECONFIG` or
+`~/.kube/config`):
+
+```bash
+docker run --rm --publish 127.0.0.1:8080:8080 \
+  --volume "${KUBECONFIG:-${HOME}/.kube/config}:/root/.kube/config:ro" \
+  elixircloud/tesk-api:latest
+```
+
+Then open the Swagger UI at <http://localhost:8080>. Without a cluster, the
+API still starts and answers `GET /service-info`; requests for tasks fail.
+
+## Access control
+
+By default (`noauth` profile), TESK API needs no token, and every user sees
+all tasks. For deployments that others can reach, switch on the `auth`
+profile; see [Access control](access-control.md).

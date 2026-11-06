@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it using the metadata from this file.
+  Authors are listed by the number of lines they committed, then by the
+  number of their commits; equal contributors, if any, are listed
+  alphabetically by family name and marked with an asterisk (*) after their
+  family names.
+title: TESK API
+abstract: >-
+  TESK API is the API server of TESK, an implementation of the GA4GH Task
+  Execution Service (TES) API on Kubernetes: it accepts TES tasks, runs each
+  of them as a Kubernetes job of the TESK taskmaster, and reports their
+  state and logs from the Kubernetes jobs and pods. It is built with Spring
+  Boot and deployed with the Helm chart of TESK.
+type: software
+authors:
+  - given-names: Ania
+    family-names: Niewielska
+    affiliation: >-
+      European Molecular Biology Laboratory, European Bioinformatics
+      Institute (EMBL-EBI), Hinxton, United Kingdom
+  - given-names: Alexander
+    family-names: Kanitz
+    orcid: "https://orcid.org/0000-0002-3468-0652"
+    affiliation: >-
+      Biozentrum, University of Basel, Basel, Switzerland; SIB Swiss Institute
+      of Bioinformatics, Lausanne, Switzerland
+  - given-names: Alvaro
+    family-names: Gonzalez
+    affiliation: CSC – IT Center for Science, Espoo, Finland
+  - given-names: Lukáš
+    family-names: Hejtmánek
+  - given-names: Susheel
+    family-names: Varma
+  - given-names: Kostis
+    family-names: Zagganas
+  - given-names: Tristan
+    family-names: Perard
+  - given-names: Erik
+    family-names: van den Bergh
+repository-code: "https://github.com/elixir-cloud-aai/tesk-api"
+url: "https://tesk.readthedocs.io/"
+keywords:
+  - GA4GH
+  - Task Execution Service
+  - TES
+  - Kubernetes
+  - REST API
+  - Spring Boot
+license: Apache-2.0
+version: "1.2.0"
+date-released: "2026-11-06"
