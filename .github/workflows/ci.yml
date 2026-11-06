@@ -2,12 +2,17 @@
 # request title, lint, build and test (unit and integration tests), start the
 # image in both profiles, scan the image for known vulnerabilities, and, on
 # pushes, push the image by digest (with SBOM and provenance attestations),
-# scan exactly that digest, then attest, sign (Sigstore) and tag it `dev`. The
-# gate `passed` ("CI passed") is the only required check. No `paths:` filters,
-# so that the gate always reports; skip jobs with `if:` instead (and allow the
-# skip in the gate). Runs also when a pull request is edited, so that the title
-# check follows the title; all jobs run then, as a run that skipped the tests
-# would report "CI passed" for the commit
+# scan exactly that digest, then attest, sign (Sigstore) and tag it `dev` and
+# `sha-<commit>`. Forks, which have none of the secrets, run the same checks
+# without these side effects and without uploads to code scanning (as for pull
+# requests from forks), unless they set the repository variable
+# `DOCKERHUB_ORG` to publish to their own organization.
+# `github.repository_owner == 'elixir-cloud-aai'` marks runs of the upstream
+# repository. The gate `passed` ("CI passed") is the only required check.
+# No `paths:` filters, so that the gate always reports; skip jobs with `if:`
+# instead (and allow the skip in the gate). Runs also when a pull request is
+# edited, so that the title check follows the title; all jobs run then, as a
+# run that skipped the tests would report "CI passed" for the commit
 
 name: CI
 on:
@@ -26,6 +31,10 @@ permissions:
 # scans the image that is published
 env:
   IMAGE_NAME: docker.io/${{ vars.DOCKERHUB_ORG || 'elixircloud' }}/tesk-api
+  # "true" if this run publishes the image: pushes to this repository, or to
+  # a fork that sets `DOCKERHUB_ORG` (and the Docker Hub secrets). Jobs' `if:`
+  # can't read `env`, so `push` and `publish` repeat the expression
+  PUBLISH: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
 
 # Cancel superseded runs of a pull request; runs for pushes get their own
 # group, so that queued runs for successive pushes are not dropped. Runs for
@@ -98,14 +107,15 @@ jobs:
           cache: maven
       - name: Build and run tests
         run: ./mvnw -B clean verify
-      # Upload errors fail pushes only, so that the coverage service can't
-      # block a pull request
+      # Upload errors fail pushes to this repository only (and so block the
+      # `dev` image), because forks, pull requests from forks and Dependabot
+      # get no access to the Codecov token
       - name: Submit report to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./target/site/jacoco/jacoco.xml,./target/site/jacoco-it/jacoco.xml
-          fail_ci_if_error: ${{ github.event_name == 'push' }}
+          fail_ci_if_error: ${{ github.event_name == 'push' && github.repository_owner == 'elixir-cloud-aai' }}
           verbose: true
 
   # Starts the image as built by the `Dockerfile`, without a cluster: it answers
@@ -160,7 +170,8 @@ jobs:
           check /tasks 401
           stop
 
-  # Builds the image once and pushes it by digest only (untagged, with SBOM
+  # On pushes that publish (`PUBLISH`), builds the image once and pushes it
+  # by digest only (untagged, with SBOM
   # and provenance attestations), for `scan` to scan and `publish` to sign and
   # tag. Digests of runs that fail are never signed or tagged, but stay on
   # Docker Hub, untagged
@@ -168,7 +179,8 @@ jobs:
     name: Push image
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: ${{ github.event_name == 'push' }}
+    # The same expression as `PUBLISH`
+    if: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
     # Docker Hub secrets; the environment only allows branch `dev`
     environment: dev-images
     permissions:
@@ -207,18 +219,21 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   # Scans the image with Trivy (shared action
-  # `elixir-cloud-aai/.github/actions/scan-image`): for pull requests a local
-  # build, for pushes exactly the digest pushed by `push` (`<image>@<digest>`;
-  # public, so pulling it needs no login), in a job without credentials or
-  # signing permissions. The findings that have a fix are uploaded to code
-  # scanning (not for pull requests from forks, whose token cannot write
-  # them). The release workflow scans the release image the same way, and
-  # `latest` is scanned weekly (`scan.yml`)
+  # `elixir-cloud-aai/.github/actions/scan-image`): a local build where
+  # `PUBLISH` is "false" (pull requests, forks), otherwise exactly the digest
+  # pushed by `push` (`<image>@<digest>`; public, so pulling it needs no
+  # login), in a job without credentials or signing permissions, as the Trivy
+  # action resolves the Trivy binary from a mutable tag. The findings that
+  # have a fix are uploaded to code scanning (only in this repository, and not
+  # for pull requests from forks, whose token cannot write them). The release
+  # workflow scans the release image the same way, and `latest` is scanned
+  # weekly (`scan.yml`)
   scan:
     name: Scan image
-    # For pull requests, `push` is skipped
+    # `push` is skipped (by its own `if:` only, as it needs no other job)
+    # where `PUBLISH` is "false"; a failed or cancelled push skips the scan
     needs: push
-    if: ${{ !cancelled() && (github.event_name == 'pull_request' || needs.push.result == 'success') }}
+    if: ${{ !cancelled() && contains(fromJSON('["success", "skipped"]'), needs.push.result) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -232,15 +247,14 @@ jobs:
       # Named as the pushed image, so that code scanning matches the findings
       # of both
       - name: Build image
-        if: ${{ github.event_name != 'push' }}
+        if: ${{ env.PUBLISH != 'true' }}
         run: docker build --tag "${IMAGE_NAME}:scan" .
       - name: Determine image
         id: image
         env:
-          EVENT_NAME: ${{ github.event_name }}
           DIGEST: ${{ needs.push.outputs.digest }}
         run: |
-          if [[ "${EVENT_NAME}" != "push" ]]; then
+          if [[ "${PUBLISH}" != "true" ]]; then
             echo "image=${IMAGE_NAME}:scan" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -254,7 +268,7 @@ jobs:
         with:
           image: ${{ steps.image.outputs.image }}
           category: image
-          upload: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          upload: ${{ github.repository_owner == 'elixir-cloud-aai' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
           # Reports only, for now: the dependency update comes next, and
           # switches this to the default (fail on fixable critical and high
           # findings). The action needs `.trivyignore.yaml` to exist
@@ -268,7 +282,8 @@ jobs:
     name: Publish image
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: ${{ github.event_name == 'push' }}
+    # The same expression as `PUBLISH`
+    if: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
     needs: [lint, test, smoke, push, scan]
     # Docker Hub secrets; the environment only allows branch `dev`
     environment: dev-images
@@ -349,9 +364,10 @@ jobs:
           done
 
   # The only required check: passes if every other job passed, or was skipped
-  # where that is intended: `push` and `publish` on pull requests (they run on
-  # pushes only). Any other result (failure, cancelled, or an unintended skip)
-  # fails it. Add every new job to `needs`
+  # where that is intended: `title` (pushes, Dependabot), `push` and `publish`
+  # where `PUBLISH` is "false" (pull requests, and forks without
+  # `DOCKERHUB_ORG`). Any other result (failure, cancelled, or an unintended
+  # skip) fails it. Add every new job to `needs`
   passed:
     name: CI passed
     runs-on: ubuntu-latest
@@ -365,5 +381,5 @@ jobs:
         with:
           needs: ${{ toJSON(needs) }}
           # `title` is skipped on purpose on pushes and for Dependabot, `push`
-          # and `publish` on pull requests only
-          allow-skipped: ${{ github.event_name == 'pull_request' && 'title push publish' || 'title' }}
+          # and `publish` where `PUBLISH` is "false" only
+          allow-skipped: ${{ env.PUBLISH == 'false' && 'title push publish' || 'title' }}
