@@ -16,9 +16,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static uk.ac.ebi.tsc.tesk.SwaggerUiPaths.API_DOCS;
-import static uk.ac.ebi.tsc.tesk.SwaggerUiPaths.HOME;
-import static uk.ac.ebi.tsc.tesk.SwaggerUiPaths.UI_AND_STATIC_RESOURCES;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.API_DOCS_URL;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.HOME_URL;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.SWAGGER_UI_URLS;
 
 /**
  * With authentication on and the default settings, the Swagger UI and its static resources are not found (not
@@ -46,17 +46,17 @@ public class SwaggerUiAuthIT {
 
     @Test
     public void uiAndStaticResourcesWithoutToken_areNotFound() throws Exception {
-        for (String path : UI_AND_STATIC_RESOURCES) {
+        for (String path : SWAGGER_UI_URLS) {
             this.mvc.perform(get(path))
                     .andExpect(status().isNotFound());
         }
-        this.mvc.perform(get(HOME))
+        this.mvc.perform(get(HOME_URL))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     public void apiDocsWithoutToken_isOk() throws Exception {
-        this.mvc.perform(get(API_DOCS))
+        this.mvc.perform(get(API_DOCS_URL))
                 .andExpect(status().isOk());
     }
 }

@@ -25,9 +25,10 @@ The Swagger UI lists the endpoints and lets you try them, also with a token
 from its built-in OpenID Connect client (see [Access
 control](access-control.md#built-in-client)). It is off by default; set
 `TESK_API_SWAGGER_UI_ENABLED` to `true` to serve it, with its static
-resources, at `/swagger-ui/index.html`, to which the root path (`/`) then
-redirects (see [Configuration](configuration.md)). While it is off, these
-paths answer `404 Not Found`.
+resources and its configuration (`/swagger-resources`), at
+`/swagger-ui/index.html`, to which the root path (`/`) then redirects (see
+[Configuration](configuration.md)). While it is off, these paths answer `404
+Not Found`.
 
 ## Service info
 

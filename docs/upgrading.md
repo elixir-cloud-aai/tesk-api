@@ -6,12 +6,15 @@ From 1.1.0, only deployments that use the Swagger UI have to change their
 configuration. What's new:
 
 - **Swagger UI off by default.** TESK API no longer serves the Swagger UI and
-  its static resources unless `TESK_API_SWAGGER_UI_ENABLED` is `true`; the
-  root path (`/`) then redirects to it as before. While it is off, these
-  paths and `/` answer `404 Not Found`. The API description
-  (`/v2/api-docs`) is served either way. If you or your users rely on the
-  Swagger UI, e.g. for its built-in OpenID Connect client, set the variable in
-  your deployment (see [API](api.md#swagger-ui)).
+  its static resources and configuration (`/swagger-resources`) unless
+  `TESK_API_SWAGGER_UI_ENABLED` is `true`; the root path (`/`) then redirects
+  to it as before. While it is off, these paths and `/` answer `404 Not
+  Found`. The API description (`/v2/api-docs`) is served either way. If you or
+  your users rely on the Swagger UI, e.g. for its built-in OpenID Connect
+  client, set the variable in your deployment (see [API](api.md#swagger-ui));
+  the Helm chart of TESK has no value for it yet. Turning it on serves the
+  Swagger UI and its static resources publicly, also with the `auth` profile:
+  turn it on only where it is needed.
 - **Service info setting.** `TESK_API_SERVICE_INFO_PUBLIC` (`true` by
   default) keeps `GET` and `HEAD /service-info` public with the `auth`
   profile, as before; set it to `false` to require a valid token for them (see

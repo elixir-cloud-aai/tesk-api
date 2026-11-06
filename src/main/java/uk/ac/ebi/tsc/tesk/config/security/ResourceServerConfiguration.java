@@ -40,6 +40,7 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
     private final ErrorAttributes errorAttributes;
     private final HttpMessageConverters messageConverters;
     private final AuthorisationProperties authorisationProperties;
+    // The API description, and the Swagger UI paths, which are only mapped (else 404) with tesk.api.swagger-ui.enabled
     private final String[] ALLOWED_URLS = {"/", "/v2/api-docs", "/configuration/ui", "/swagger-resources/**", "/configuration/**", "/swagger-ui/**", "/webjars/**"};
     private final String baseUrl;
     private final boolean serviceInfoPublic;

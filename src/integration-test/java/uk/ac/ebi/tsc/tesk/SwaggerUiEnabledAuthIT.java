@@ -16,7 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static uk.ac.ebi.tsc.tesk.SwaggerUiPaths.UI_AND_STATIC_RESOURCES;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.SWAGGER_UI_URLS;
 
 /**
  * With authentication on and {@code tesk.api.swagger-ui.enabled=true}, the Swagger UI and its static resources need
@@ -45,7 +45,7 @@ public class SwaggerUiEnabledAuthIT {
 
     @Test
     public void uiAndStaticResourcesWithoutToken_areOk() throws Exception {
-        for (String path : UI_AND_STATIC_RESOURCES) {
+        for (String path : SWAGGER_UI_URLS) {
             this.mvc.perform(get(path))
                     .andExpect(status().isOk());
         }

@@ -199,7 +199,10 @@ jobs:
           check "${api}/service-info" 200
           curl --silent --fail "${host}${api}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'
           # The Swagger UI is off by default; the API description is not
+          check / 404
           check /swagger-ui/index.html 404
+          check /webjars/springfox-swagger-ui/index.html 404
+          check /swagger-resources 404
           check /v2/api-docs 200
           stop
           start --env SPRING_PROFILES_ACTIVE=auth
@@ -211,6 +214,7 @@ jobs:
           stop
           start --env TESK_API_SWAGGER_UI_ENABLED=true
           check /swagger-ui/index.html 200
+          check /swagger-resources 200
           stop
 
   # On pushes that publish (`PUBLISH`), builds the image once and pushes it
