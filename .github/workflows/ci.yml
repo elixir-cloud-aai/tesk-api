@@ -86,6 +86,17 @@ jobs:
           docker run --rm --volume "${PWD}:/repo" --workdir /repo \
             rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
             -color
+      # `push` and `publish` repeat the expression of `PUBLISH` in their `if:`
+      # (jobs' `if:` can't read `env`): all three must stay the same
+      - name: Check publish conditions
+        run: |
+          expr="$(yq '.env.PUBLISH' .github/workflows/ci.yml)"
+          for job in push publish; do
+            if [[ "$(yq ".jobs.${job}.if" .github/workflows/ci.yml)" != "${expr}" ]]; then
+              echo "::error::The if: of job '${job}' differs from env.PUBLISH"
+              exit 1
+            fi
+          done
 
   # Unit tests (Surefire) and integration tests (Failsafe, with the Kubernetes
   # API and the OIDC provider mocked), on the Java version of `pom.xml` and the
@@ -179,7 +190,7 @@ jobs:
     name: Push image
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # The same expression as `PUBLISH`
+    # The same expression as `PUBLISH` (checked in `lint`)
     if: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
     # Docker Hub secrets; the environment only allows branch `dev`
     environment: dev-images
@@ -282,7 +293,7 @@ jobs:
     name: Publish image
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # The same expression as `PUBLISH`
+    # The same expression as `PUBLISH` (checked in `lint`)
     if: ${{ github.event_name == 'push' && (github.repository_owner == 'elixir-cloud-aai' || vars.DOCKERHUB_ORG != '') }}
     needs: [lint, test, smoke, push, scan]
     # Docker Hub secrets; the environment only allows branch `dev`
