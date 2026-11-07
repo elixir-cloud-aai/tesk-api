@@ -29,10 +29,12 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
+import static org.mockito.Mockito.verify;
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(TasksApiController.class)
@@ -180,6 +182,21 @@ public class TasksApiControllerTest {
         }
 
 
+    }
+
+    /**
+     * The TES specification answers a cancellation with an empty object ({@code {}}), not an empty body
+     * (issue #37)
+     */
+    @Test
+    public void cancelTask_returnsEmptyObject() throws Exception {
+        this.mvc.perform(post(TASK_URL + "/{id}:cancel", "task-123")
+                .header("Authorization", "Bearer BAR")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{}", true));
+        verify(this.tesService).cancelTask("task-123");
     }
 
 }

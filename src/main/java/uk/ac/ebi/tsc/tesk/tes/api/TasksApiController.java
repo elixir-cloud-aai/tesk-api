@@ -18,6 +18,7 @@ import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 
 import javax.validation.Valid;
+import java.util.Collections;
 
 @javax.annotation.Generated(value = "io.swagger.codegen.languages.SpringCodegen", date = "2017-11-07T14:45:12.993Z")
 
@@ -32,7 +33,8 @@ public class TasksApiController implements TasksApi {
         //getTask - for authZ purposes (cancellation only possible for the same tasks, a user can actually see
         this.tesService.getTask(id, TaskView.MINIMAL, getUser());
         this.tesService.cancelTask(id);
-        return new ResponseEntity<Object>(HttpStatus.OK);
+        //the specification's CancelTaskResponse is an empty object
+        return new ResponseEntity<>(Collections.emptyMap(), HttpStatus.OK);
     }
 
     public ResponseEntity<TesCreateTaskResponse> createTask(@ApiParam(value = "", required = true) @Valid @RequestBody TesTask body) {
