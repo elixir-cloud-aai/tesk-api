@@ -68,6 +68,20 @@ public class KubernetesClientWrapper {
         }
     }
 
+    /**
+     * Deletes a job with its pods, in the background (Kubernetes deletes the pods after the job).
+     *
+     * @param name - name of the job
+     */
+    public void deleteJob(String name) {
+        try {
+            this.batchApi.deleteNamespacedJob(
+                    name, namespace, null, null, null, null, PROPAGATION_POLICY_BACKGROUND, null);
+        } catch (ApiException e) {
+            throw KubernetesException.fromApiException(e);
+        }
+    }
+
     public V1ConfigMap createConfigMap(V1ConfigMap map) {
         try {
             return this.coreApi.createNamespacedConfigMap(namespace, map, null, null, null);
@@ -76,15 +90,24 @@ public class KubernetesClientWrapper {
         }
     }
 
+    /**
+     * Reads the taskmaster's job of a task.
+     *
+     * @param taskId - TES task ID (==taskmaster's job name)
+     * @return the taskmaster's job
+     * @throws TaskNotFoundException if there is no such job, it isn't a taskmaster's job, or
+     *     Kubernetes is deleting it (e.g. after its TTL)
+     */
     public V1Job readTaskmasterJob(String taskId) {
         try {
             V1Job job = this.batchApi.readNamespacedJob(taskId, namespace, null, null, null);
-            if (job.getMetadata().getLabels().entrySet().stream()
-                    .anyMatch(
-                            entry ->
-                                    LABEL_JOBTYPE_KEY.equals(entry.getKey())
-                                            && LABEL_JOBTYPE_VALUE_TASKM.equals(
-                                                    entry.getValue()))) {
+            if (!isBeingDeleted(job)
+                    && job.getMetadata().getLabels().entrySet().stream()
+                            .anyMatch(
+                                    entry ->
+                                            LABEL_JOBTYPE_KEY.equals(entry.getKey())
+                                                    && LABEL_JOBTYPE_VALUE_TASKM.equals(
+                                                            entry.getValue()))) {
                 return job;
             }
         } catch (ApiException e) {
@@ -207,6 +230,12 @@ public class KubernetesClientWrapper {
             }
             throw e;
         }
+        // jobs that Kubernetes is deleting (e.g. after their TTL) are gone, as for
+        // readTaskmasterJob
+        result.setItems(
+                result.getItems().stream()
+                        .filter(job -> !isBeingDeleted(job))
+                        .collect(Collectors.toList()));
         if (user.isMemberInNonManagedGroups()) {
             // if there are groups, where user is a manager and other groups, where user is only a
             // member
@@ -229,6 +258,14 @@ public class KubernetesClientWrapper {
             result.setItems(filteredJobList);
         }
         return result;
+    }
+
+    /**
+     * Whether Kubernetes is deleting the object: it set a deletion timestamp, and waits for
+     * finalizers or the deletion of dependents (foreground deletion) before it removes the object.
+     */
+    private static boolean isBeingDeleted(V1Job job) {
+        return job.getMetadata() != null && job.getMetadata().getDeletionTimestamp() != null;
     }
 
     /**

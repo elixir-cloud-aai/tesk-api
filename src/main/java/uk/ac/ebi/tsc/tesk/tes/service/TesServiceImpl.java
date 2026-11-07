@@ -3,10 +3,13 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_JOB_TYPE;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_VERSION;
 
 import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobList;
+import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1PodList;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,9 +72,8 @@ public class TesServiceImpl implements TesService {
                 V1Job taskMasterJob = this.converter.fromTesTaskToK8sJob(task, user);
                 V1ConfigMap taskMasterConfigMap =
                         this.converter.fromTesTaskToK8sConfigMap(task, user, taskMasterJob);
-                V1ConfigMap createdConfigMap =
-                        this.kubernetesClientWrapper.createConfigMap(taskMasterConfigMap);
                 V1Job createdJob = this.kubernetesClientWrapper.createJob(taskMasterJob);
+                this.createOwnedConfigMap(taskMasterConfigMap, createdJob);
                 return this.converter.fromK8sJobToTesCreateTaskResponse(createdJob);
             } catch (KubernetesException e) {
                 // in case of job name collision retry converting task to job (with new generated
@@ -84,6 +86,41 @@ public class TesServiceImpl implements TesService {
                 logger.error(exc.getMessage());
                 throw exc;
             }
+        }
+    }
+
+    /**
+     * Creates the taskmaster's ConfigMap, owned by its job, so that Kubernetes deletes the
+     * ConfigMap with the job (e.g. after the job's TTL). The job's UID is known only once the job
+     * exists, so the job is created first; its pod waits until the ConfigMap it mounts exists. If
+     * the ConfigMap can't be created, the job is deleted, so that its pod doesn't wait forever, and
+     * the ConfigMap's error is passed on (a name collision then creates the task again).
+     *
+     * <p>The owner reference doesn't set {@code blockOwnerDeletion}, which would need the right to
+     * update the job's finalizers.
+     */
+    private void createOwnedConfigMap(V1ConfigMap configMap, V1Job job) {
+        configMap
+                .getMetadata()
+                .addOwnerReferencesItem(
+                        new V1OwnerReference()
+                                .apiVersion(K8S_BATCH_API_VERSION)
+                                .kind(K8S_BATCH_API_JOB_TYPE)
+                                .name(job.getMetadata().getName())
+                                .uid(job.getMetadata().getUid()));
+        try {
+            this.kubernetesClientWrapper.createConfigMap(configMap);
+        } catch (RuntimeException e) {
+            try {
+                this.kubernetesClientWrapper.deleteJob(job.getMetadata().getName());
+            } catch (RuntimeException deleteError) {
+                logger.error(
+                        "Deleting job {} without its ConfigMap failed",
+                        job.getMetadata().getName(),
+                        deleteError);
+                e.addSuppressed(deleteError);
+            }
+            throw e;
         }
     }
 

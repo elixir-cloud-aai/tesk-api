@@ -114,6 +114,68 @@ public class KubernetesClientWrapperTest {
         wrapper.readTaskmasterJob("123");
     }
 
+    /** A taskmaster job that Kubernetes is deleting (e.g. after its TTL) is gone (issue #117) */
+    @Test(expected = TaskNotFoundException.class)
+    public void readTaskmasterJob_beingDeleted() throws Exception {
+        V1Job job =
+                new V1Job()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name("123")
+                                        .deletionTimestamp(new DateTime())
+                                        .putLabelsItem("job-type", "taskmaster"));
+        given(batchApi.readNamespacedJob("123", "test-namespace", null, null, null))
+                .willReturn(job);
+        wrapper.readTaskmasterJob("123");
+    }
+
+    /** Taskmaster jobs that Kubernetes is deleting aren't listed (issue #117) */
+    @Test
+    public void listAllTaskmasterJobsForUser_skipsJobsBeingDeleted() throws ApiException {
+        V1Job kept = new V1Job().metadata(new V1ObjectMeta().name("kept"));
+        V1Job deleted =
+                new V1Job()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name("deleted")
+                                        .deletionTimestamp(new DateTime()));
+        given(
+                        batchApi.listNamespacedJob(
+                                any(), isNull(), isNull(), isNull(), isNull(), any(), isNull(),
+                                isNull(), isNull(), isNull(), isNull()))
+                .willReturn(
+                        new V1JobList()
+                                .metadata(new V1ListMeta()._continue("next"))
+                                .items(Arrays.asList(deleted, kept)));
+        V1JobList result =
+                wrapper.listAllTaskmasterJobsForUser(null, null, User.builder("123").build());
+        assertThat(result.getItems(), is(Arrays.asList(kept)));
+        assertThat(result.getMetadata().getContinue(), is("next"));
+    }
+
+    /** A job is deleted with its pods, in the background */
+    @Test
+    public void deleteJob() throws ApiException {
+        wrapper.deleteJob("123");
+        Mockito.verify(batchApi)
+                .deleteNamespacedJob(
+                        eq("123"),
+                        eq("test-namespace"),
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        eq("Background"),
+                        isNull());
+    }
+
+    @Test(expected = KubernetesException.class)
+    public void deleteJob_fails() throws ApiException {
+        given(batchApi.deleteNamespacedJob(any(), any(), any(), any(), any(), any(), any(), any()))
+                .willThrow(new ApiException(HttpStatus.FORBIDDEN.value(), "forbidden"));
+        wrapper.deleteJob("123");
+    }
+
     @Test
     public void listAllTaskmasterJobsForUser_any() throws ApiException {
 

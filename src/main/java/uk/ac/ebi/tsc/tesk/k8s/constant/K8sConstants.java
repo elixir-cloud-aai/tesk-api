@@ -27,6 +27,9 @@ public class K8sConstants {
 
     public static final String JOB_RESTART_POLICY = "Never";
 
+    /** Deletion of an object's dependents (e.g. a job's pods) after the object */
+    public static final String PROPAGATION_POLICY_BACKGROUND = "Background";
+
     /** Executor CPU resource label */
     public static final String RESOURCE_CPU_KEY = "cpu";
     /** Executor memory resource label */
