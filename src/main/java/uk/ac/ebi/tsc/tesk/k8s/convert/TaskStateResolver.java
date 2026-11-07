@@ -1,0 +1,147 @@
+package uk.ac.ebi.tsc.tesk.k8s.convert;
+
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobCondition;
+import io.kubernetes.client.openapi.models.V1JobStatus;
+import io.kubernetes.client.openapi.models.V1Pod;
+import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
+import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
+import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
+import uk.ac.ebi.tsc.tesk.tes.model.TesState;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
+
+/**
+ * Derives a TES task's state from the Kubernetes jobs of the task: the
+ * taskmaster's job, the executors' jobs and the outputs filer's job.
+ * <p>
+ * In this order, the first rule that applies gives the state:
+ * <ol>
+ * <li>The taskmaster's job is labelled as cancelled: {@code CANCELED}.</li>
+ * <li>An executor's job failed: {@code EXECUTOR_ERROR}.</li>
+ * <li>The taskmaster's job or the outputs filer's job failed: {@code SYSTEM_ERROR}.</li>
+ * <li>The taskmaster's job completed: {@code COMPLETE} if the jobs of all
+ * the task's executors exist and completed, {@code SYSTEM_ERROR} otherwise.</li>
+ * <li>A pod of the taskmaster is pending: {@code QUEUED}.</li>
+ * <li>The taskmaster's job is active: {@code INITIALIZING} before the first
+ * executor's job exists, {@code QUEUED} while a pod of the last executor's job
+ * is pending, {@code RUNNING} otherwise.</li>
+ * <li>Otherwise: {@code SYSTEM_ERROR}.</li>
+ * </ol>
+ * A job failed if Kubernetes set its condition {@code Failed} or
+ * {@code FailureTarget} (Kubernetes 1.31+). Jobs without these conditions
+ * (older clusters) failed if they have failed pods and none that succeeded,
+ * once the taskmaster's job has ended (before, the job may still retry).
+ * A job completed if it has a pod that succeeded.
+ */
+public final class TaskStateResolver {
+
+    /**
+     * Job conditions that mark a failed job, when their status is "True".
+     */
+    static final Set<String> FAILED_CONDITIONS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("Failed", "FailureTarget")));
+
+    private TaskStateResolver() {
+    }
+
+    /**
+     * Derives the state of a task.
+     *
+     * @param task              the task's jobs and their pods
+     * @param expectedExecutors the number of executors of the task, or
+     *                          {@code null} if unknown; then the executor
+     *                          jobs that exist count as all executors
+     * @return the TES state of the task
+     */
+    public static TesState resolve(Task task, Integer expectedExecutors) {
+        Job taskmaster = task.getTaskmaster();
+        V1Job taskmasterJob = taskmaster.getJob();
+        if (isCancelled(taskmasterJob)) return TesState.CANCELED;
+
+        boolean taskmasterCompleted = hasSucceeded(taskmasterJob);
+        boolean taskmasterFailed = !taskmasterCompleted
+                && (hasFailedCondition(taskmasterJob)
+                || (hasFailedPods(taskmasterJob) && !isActive(taskmasterJob)));
+        boolean taskmasterEnded = taskmasterCompleted || taskmasterFailed;
+
+        List<Job> executors = task.getExecutors();
+        if (executors.stream().anyMatch(executor -> hasFailed(executor.getJob(), taskmasterEnded))) {
+            return TesState.EXECUTOR_ERROR;
+        }
+        if (taskmasterFailed) return TesState.SYSTEM_ERROR;
+        Optional<Job> outputFiler = task.getOutputFiler();
+        if (outputFiler.isPresent() && hasFailed(outputFiler.get().getJob(), taskmasterEnded)) {
+            return TesState.SYSTEM_ERROR;
+        }
+        if (taskmasterCompleted) {
+            int expected = expectedExecutors != null ? expectedExecutors : executors.size();
+            boolean allCompleted = expected > 0 && executors.size() == expected
+                    && executors.stream().allMatch(executor -> hasSucceeded(executor.getJob()));
+            return allCompleted ? TesState.COMPLETE : TesState.SYSTEM_ERROR;
+        }
+        if (hasPendingPod(taskmaster)) return TesState.QUEUED;
+        if (isActive(taskmasterJob)) {
+            if (executors.isEmpty()) return TesState.INITIALIZING;
+            // Each executor's pod can wait as pending, so the task can go
+            // from RUNNING back to QUEUED
+            if (hasPendingPod(executors.get(executors.size() - 1))) return TesState.QUEUED;
+            return TesState.RUNNING;
+        }
+        return TesState.SYSTEM_ERROR;
+    }
+
+    private static boolean isCancelled(V1Job job) {
+        return Optional.ofNullable(job.getMetadata().getLabels())
+                .map(labels -> LABEL_TASKSTATE_VALUE_CANC.equals(labels.get(LABEL_TASKSTATE_KEY)))
+                .orElse(false);
+    }
+
+    /**
+     * Whether a job failed: by its conditions, or, once the taskmaster's job
+     * has ended, by its failed pods.
+     */
+    private static boolean hasFailed(V1Job job, boolean taskmasterEnded) {
+        if (hasSucceeded(job)) return false;
+        return hasFailedCondition(job) || (taskmasterEnded && hasFailedPods(job));
+    }
+
+    private static boolean hasFailedCondition(V1Job job) {
+        List<V1JobCondition> conditions = Optional.ofNullable(job.getStatus())
+                .map(V1JobStatus::getConditions).orElse(Collections.emptyList());
+        return conditions.stream().anyMatch(condition ->
+                FAILED_CONDITIONS.contains(condition.getType()) && "True".equals(condition.getStatus()));
+    }
+
+    private static boolean hasSucceeded(V1Job job) {
+        return count(job, V1JobStatus::getSucceeded) > 0;
+    }
+
+    private static boolean hasFailedPods(V1Job job) {
+        return count(job, V1JobStatus::getFailed) > 0;
+    }
+
+    private static boolean isActive(V1Job job) {
+        return count(job, V1JobStatus::getActive) > 0;
+    }
+
+    private static int count(V1Job job, java.util.function.Function<V1JobStatus, Integer> counter) {
+        return Optional.ofNullable(job.getStatus()).map(counter).orElse(0);
+    }
+
+    private static boolean hasPendingPod(Job job) {
+        String pending = K8sConstants.PodPhase.PENDING.getCode();
+        for (V1Pod pod : job.getPods()) {
+            if (pod.getStatus() != null && pending.equals(pod.getStatus().getPhase())) return true;
+        }
+        return false;
+    }
+}
