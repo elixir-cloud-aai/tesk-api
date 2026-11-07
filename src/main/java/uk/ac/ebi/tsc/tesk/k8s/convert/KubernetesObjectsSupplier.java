@@ -169,7 +169,11 @@ public class KubernetesObjectsSupplier {
                 apiVersion(K8S_BATCH_API_VERSION).kind(K8S_BATCH_API_JOB_TYPE).
                 metadata(new V1ObjectMeta().
                         putLabelsItem(LABEL_JOBTYPE_KEY, LABEL_JOBTYPE_VALUE_EXEC)).
+                // A failed executor isn't retried, so that its state and logs
+                // are those of its only run; the taskmaster's environment
+                // variable EXECUTOR_BACKOFF_LIMIT overrides this
                 spec(new V1JobSpec().
+                        backoffLimit(0).
                         template(new V1PodTemplateSpec().
                                 metadata(new V1ObjectMeta()).
                                 spec(podSpec)));

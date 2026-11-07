@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 
@@ -52,8 +53,6 @@ public class TesKubernetesConverter {
     private final Gson gson;
 
     private final TrsToolClient trsClient;
-
-    private enum JOB_STATUS {ACTIVE, SUCCEEDED, FAILED}
 
     private static final DateTimeFormatter DATE_FORMATTER = ISODateTimeFormat.dateTime().withZoneUTC();
 
@@ -210,66 +209,39 @@ public class TesKubernetesConverter {
     }
 
     /**
-     * Resolver of K8s V1JobStatus object.
-     * Tests if job is in a given state
-     *
-     * @param testedObject  - V1JobStatus of a job
-     * @param testObjective - status to be checked against
-     * @return - if Job is in the given status
-     */
-    private boolean isJobInStatus(V1JobStatus testedObject, JOB_STATUS testObjective) {
-        Integer noOfPodsInState = null;
-        switch (testObjective) {
-            case ACTIVE:
-                noOfPodsInState = testedObject.getActive();
-                break;
-            case SUCCEEDED:
-                noOfPodsInState = testedObject.getSucceeded();
-                break;
-            case FAILED:
-                if (Optional.ofNullable(testedObject.getSucceeded()).map(no -> no > 0).orElse(false)) {
-                    //if there are any successful - the job has not FAILED
-                    return false;
-                }
-                noOfPodsInState = testedObject.getFailed();
-                break;
-        }
-        return Optional.ofNullable(noOfPodsInState).map(no -> no > 0).orElse(false);
-    }
-
-    /**
-     * Derives TES task's status from task's object graph (packed into {@link Task} object)
-     * Uses status of taskmaster's and executor's jobs and taskmaster's and executor's pods
+     * Derives TES task's status from task's object graph (packed into {@link Task} object):
+     * the taskmaster's, executors' and outputs filer's jobs and their pods (see {@link TaskStateResolver}).
+     * The number of the task's executors comes from the task stored with the taskmaster's job.
      *
      * @param taskmasterWithExecutors - taskMaster's  full object graph
      * @return TES task status
      */
     public TesState extractStateFromK8sJobs(Task taskmasterWithExecutors) {
-        V1Job taskMasterJob = taskmasterWithExecutors.getTaskmaster().getJob();
-        Optional<Job> lastExecutor = taskmasterWithExecutors.getLastExecutor();
-        Optional<Job> outputFiler = taskmasterWithExecutors.getOutputFiler();
-        boolean taskMasterCancelled = LABEL_TASKSTATE_VALUE_CANC.equals(taskMasterJob.getMetadata().getLabels().get(LABEL_TASKSTATE_KEY));
-        boolean taskMasterRunning = this.isJobInStatus(taskMasterJob.getStatus(), JOB_STATUS.ACTIVE);
-        boolean taskMasterCompleted = this.isJobInStatus(taskMasterJob.getStatus(), JOB_STATUS.SUCCEEDED);
-        boolean executorPresent = lastExecutor.isPresent();
-        boolean lastExecutorFailed = executorPresent && this.isJobInStatus(lastExecutor.get().getJob().getStatus(), JOB_STATUS.FAILED);
-        boolean lastExecutorCompleted = executorPresent && this.isJobInStatus(lastExecutor.get().getJob().getStatus(), JOB_STATUS.SUCCEEDED);
-        boolean outputFilerFailed = outputFiler.isPresent() && this.isJobInStatus(outputFiler.get().getJob().getStatus(), JOB_STATUS.FAILED);
-        String pending = K8sConstants.PodPhase.PENDING.getCode();
-        boolean taskMasterPending = taskmasterWithExecutors.getTaskmaster().getPods().stream().anyMatch(pod -> pending.equals(pod.getStatus().getPhase()));
-        boolean lastExecutorPending = executorPresent && lastExecutor.get().getPods().stream().anyMatch(pod -> pending.equals(pod.getStatus().getPhase()));
+        //the stored task is read only if needed: once the taskmaster's job completed
+        return TaskStateResolver.resolve(taskmasterWithExecutors,
+                () -> this.extractExecutorCount(taskmasterWithExecutors.getTaskmaster().getJob()));
+    }
 
-        if (taskMasterCancelled) return TesState.CANCELED;
-        if (taskMasterCompleted && outputFilerFailed) return TesState.SYSTEM_ERROR;
-        if (taskMasterCompleted && lastExecutorCompleted) return TesState.COMPLETE;
-        if (taskMasterCompleted && lastExecutorFailed) return TesState.EXECUTOR_ERROR;
-        if (taskMasterPending) return TesState.QUEUED;
-        if (taskMasterRunning && !executorPresent) return TesState.INITIALIZING;
-        //each executor job's pod can wait for execution as Pending
-        // --> Job status can change from Queued to Running and back again to Queued, if more than one executor.
-        if (lastExecutorPending) return TesState.QUEUED;
-        if (taskMasterRunning) return TesState.RUNNING;
-        return TesState.SYSTEM_ERROR;
+    /**
+     * Reads the number of the task's executors from the task stored with the taskmaster's job
+     * (annotation {@code json-input}).
+     *
+     * @param taskMasterJob - taskmaster's job
+     * @return the number of executors, or null if the task isn't stored or can't be read
+     */
+    Integer extractExecutorCount(V1Job taskMasterJob) {
+        String inputJson = Optional.ofNullable(taskMasterJob.getMetadata().getAnnotations())
+                .map(ann -> ann.get(ANN_JSON_INPUT_KEY)).orElse(null);
+        if (inputJson == null) return null;
+        try {
+            //readTree gives null or a missing node for empty input, depending on the Jackson version
+            JsonNode executors = Optional.ofNullable(this.objectMapper.readTree(inputJson))
+                    .map(tree -> tree.get("executors")).orElse(null);
+            return executors != null && executors.isArray() ? executors.size() : null;
+        } catch (IOException ex) {
+            logger.info("Reading the executors of task {} from JSON failed; {}", taskMasterJob.getMetadata().getName(), ex.getMessage());
+            return null;
+        }
     }
 
     /**

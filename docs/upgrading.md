@@ -4,6 +4,36 @@
 
 Changes since 1.2.0 that clients or deployments may notice:
 
+- **Task states from all jobs.** The state of a task comes from all its jobs
+  (see [Getting tasks](index.md#getting-tasks)). An executor's job that
+  failed, whichever executor it is, gives `EXECUTOR_ERROR`, also with the
+  job condition `FailureTarget` (Kubernetes 1.31 and later). A task is
+  `COMPLETE` only if the jobs of all its executors completed; if one is
+  missing, the task is `SYSTEM_ERROR`. Before, the state came from the last
+  executor job that existed, so that a task whose last executor's job was
+  deleted could be `COMPLETE`.
+- **Executors aren't retried.** Executor jobs get `backoffLimit: 0` (before:
+  Kubernetes' default of 6 retries), unless the taskmaster's environment sets
+  `EXECUTOR_BACKOFF_LIMIT`. TESK's Helm chart sets it from
+  `tesk.executorRetries` (2 by default), so chart deployments keep that
+  limit; set it to 0 for single runs.
+- **Cancelling ended tasks.** `POST /tasks/{id}:cancel` reads all jobs of
+  the task, as `GET` does, so a task whose executor failed while the
+  taskmaster still runs can't be cancelled any more (`400 Bad Request`).
+- **Upgrade order.** Upgrade TESK API first, then the taskmaster
+  ([tesk-core](https://github.com/elixir-cloud-aai/tesk-core)) to the release
+  that keeps failed jobs (not released yet; see
+  [tesk-core#98](https://github.com/elixir-cloud-aai/tesk-core/issues/98)).
+  Tasks running during the upgrade keep the taskmaster they were started
+  with. While only one of them is upgraded:
+    - This TESK API with an older taskmaster reports a task whose last
+      executor's job the taskmaster deleted (because its pod couldn't pull
+      its image) as `SYSTEM_ERROR`, instead of `COMPLETE`.
+    - An older TESK API with the newer taskmaster reports a failed executor
+      as `EXECUTOR_ERROR`. For a few seconds after Kubernetes sets
+      `FailureTarget`, before it counts the failed pod, the older TESK API
+      can report `QUEUED` or `SYSTEM_ERROR`; clients that take
+      `SYSTEM_ERROR` as final keep it.
 - **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty
