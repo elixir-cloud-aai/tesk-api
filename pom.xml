@@ -408,8 +408,25 @@
                             <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/api/ApiUtil.java</exclude>
                             <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/api/ServiceInfoApi.java</exclude>
                             <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/api/TasksApi.java</exclude>
-                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/Service*.java</exclude>
-                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/Tes*.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/Service.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/ServiceOrganization.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/ServiceType.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesCreateTaskResponse.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesExecutor.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesExecutorLog.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesFileType.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesInput.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesListTasksResponse.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesOutput.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesOutputFileLog.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesResources.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesServiceInfo.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesServiceInfoAllOf.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesServiceType.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesServiceTypeAllOf.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesState.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesTask.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesTaskLog.java</exclude>
                         </excludes>
                         <googleJavaFormat>
                             <version>1.7</version>

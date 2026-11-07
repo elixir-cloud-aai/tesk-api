@@ -16,7 +16,7 @@
          the Spotless excludes in pom.xml -->
     <module name="SuppressionSingleFilter">
         <property name="files"
-                  value="src[\\/]main[\\/]java[\\/]uk[\\/]ac[\\/]ebi[\\/]tsc[\\/]tesk[\\/]tes[\\/](api[\\/](ApiUtil|ServiceInfoApi|TasksApi)|model[\\/](Service|Tes)[^\\/]*)\.java$"/>
+                  value="src[\\/]main[\\/]java[\\/]uk[\\/]ac[\\/]ebi[\\/]tsc[\\/]tesk[\\/]tes[\\/](api[\\/](ApiUtil|ServiceInfoApi|TasksApi)|model[\\/](Service|ServiceOrganization|ServiceType|TesCreateTaskResponse|TesExecutor|TesExecutorLog|TesFileType|TesInput|TesListTasksResponse|TesOutput|TesOutputFileLog|TesResources|TesServiceInfo|TesServiceInfoAllOf|TesServiceType|TesServiceTypeAllOf|TesState|TesTask|TesTaskLog))\.java$"/>
         <property name="checks" value="."/>
     </module>
     <module name="TreeWalker">
