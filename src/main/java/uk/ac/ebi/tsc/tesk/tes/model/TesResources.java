@@ -60,7 +60,12 @@ public class TesResources   {
   }
 
   public void setCpuCores(BigDecimal cpuCores) {
+    //more than 3 decimals: trailing zeros don't count (0.5000 is 0.5)
+    if (cpuCores != null && cpuCores.scale() > 3) {
+      cpuCores = cpuCores.stripTrailingZeros();
+    }
     //whole numbers given with an exponent (e.g. 1e3) are kept without it, so that they are written as integers
+    //(only for numbers that @Digits accepts, so that huge exponents aren't written out)
     this.cpuCores = cpuCores != null && cpuCores.scale() < 0 && cpuCores.precision() - cpuCores.scale() <= 7
         ? cpuCores.setScale(0) : cpuCores;
   }

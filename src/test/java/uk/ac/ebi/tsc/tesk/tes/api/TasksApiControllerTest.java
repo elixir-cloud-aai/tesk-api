@@ -248,4 +248,16 @@ public class TasksApiControllerTest {
         }
     }
 
+    /**
+     * Trailing zeros don't count as decimals
+     */
+    @Test
+    public void createTask_valid_cpuCoresTrailingZeros() throws Exception {
+        this.mvc.perform(post(TASK_URL)
+                .header("Authorization", "Bearer BAR")
+                .content(getFileContentFromResources("valid_tasks/cpu_cores_0_5000.json"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk());
+    }
+
 }
