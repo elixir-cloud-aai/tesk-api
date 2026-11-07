@@ -64,9 +64,13 @@ public class TesResources   {
     if (cpuCores != null && cpuCores.scale() > 3) {
       cpuCores = cpuCores.stripTrailingZeros();
     }
+    //numbers of 1e10 and more are refused here: @Digits can't measure exponents near the int range (overflow)
+    if (cpuCores != null && cpuCores.scale() < -9) {
+      throw new IllegalArgumentException("cpu_cores is out of range");
+    }
     //whole numbers given with an exponent (e.g. 1e3) are kept without it, so that they are written as integers
     //(only for numbers that @Digits accepts, so that huge exponents aren't written out)
-    this.cpuCores = cpuCores != null && cpuCores.scale() < 0 && cpuCores.precision() - cpuCores.scale() <= 7
+    this.cpuCores = cpuCores != null && cpuCores.scale() < 0 && (long) cpuCores.precision() - cpuCores.scale() <= 7
         ? cpuCores.setScale(0) : cpuCores;
   }
 

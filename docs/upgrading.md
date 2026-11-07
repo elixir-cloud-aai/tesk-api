@@ -12,9 +12,9 @@ Changes since 1.2.0 that clients or deployments may notice:
   up to 3 decimals, e.g. `0.5`, up to `999999.999` (see
   [API](api.md#resources)). Before, the decimal part was dropped silently, so
   that `0.5` set no CPU at all (`0`). Whole numbers up to `999999` work as
-  before; other numbers are refused with `400 Bad Request`. The API
-  description (`/v2/api-docs`) now gives `cpu_cores` as a number instead of an
-  integer.
+  before; numbers with more digits or decimals are refused with `400 Bad
+  Request`. The API description (`/v2/api-docs`) now gives `cpu_cores` as a
+  number instead of an integer.
 
 ## To 1.2.0
 

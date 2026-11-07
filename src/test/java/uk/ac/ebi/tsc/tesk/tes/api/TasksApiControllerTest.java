@@ -237,14 +237,15 @@ public class TasksApiControllerTest {
     @Test
     public void createTask_invalid_cpuCores() throws Exception {
         String[] files = new String[]{"cpu_cores_1e1000000000.json", "cpu_cores_1e_10.json",
-                "cpu_cores_0_0005.json", "cpu_cores_1000000.json"};
+                "cpu_cores_0_0005.json", "cpu_cores_1000000.json", "cpu_cores_1e2147483647.json"};
         for (String file : files) {
+            //refused by the validation (messages) or, beyond the range of BigDecimal's scale, when read (message)
             this.mvc.perform(post(TASK_URL)
                     .header("Authorization", "Bearer BAR")
                     .content(getFileContentFromResources("invalid_tasks/resources/" + file))
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)).andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.messages[0]", containsString("resources.cpuCores")));
+                    .andExpect(content().string(containsString("cpu")));
         }
     }
 
