@@ -33,11 +33,19 @@ stay integers, also if given with an exponent (`1e3` is returned as `1000`).
 ## Executor logs
 
 With the views `BASIC` and `FULL`, a task's `logs[0].logs` has one entry per
-executor whose Kubernetes job exists, in the order of the executors; executors
-that haven't started yet, or that never ran because the task ended or was
-cancelled before, have no entry. Each entry has the executor's start and end
-time and, with `FULL`, its standard output (`stdout`; `""` until there is
-any).
+executor whose Kubernetes job exists, in the order of the executors. An
+executor whose job hasn't been created yet, or never will be because the task
+ended or was cancelled before, has no entry; an executor whose job exists but
+whose pod is still pending has one.
+
+- `start_time` and `end_time` are the start and completion times of the
+  executor's Kubernetes job. Each is left out until Kubernetes has recorded
+  it, and `start_time` can be earlier than the moment the executor's
+  container started, e.g. while its pod waits for a node or an image.
+- `stdout` is `""` with `BASIC`. With `FULL`, it is the log of the executor's
+  pod: what the container wrote to its standard output and standard error,
+  as Kubernetes keeps it. Streams that the executor redirects to files
+  (`stdout` and `stderr` of the TES executor) aren't in it.
 
 `exit_code` is left out until the executor's container has terminated, e.g.
 while the executor is queued or running, or if its pod was removed before it
