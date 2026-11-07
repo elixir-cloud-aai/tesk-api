@@ -406,6 +406,8 @@ public class TesKubernetesConverter {
                         .orElse("");
         try {
             task = this.objectMapper.readValue(inputJson, TesTask.class);
+            // logs sent with the task aren't TESK's: its own log must be the only one
+            task.setLogs(null);
             if (nullifyInputContent && task.getInputs() != null) {
                 task.getInputs().forEach(input -> input.setContent(null));
             }

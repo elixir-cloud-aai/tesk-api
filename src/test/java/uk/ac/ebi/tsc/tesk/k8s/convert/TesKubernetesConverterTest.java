@@ -477,6 +477,24 @@ public class TesKubernetesConverterTest {
         assertThat(outputTask, is(expectedTask));
     }
 
+    /** Logs sent by the client with the task are dropped: the only task log is TESK's own. */
+    @Test
+    public void fromK8sToTask_ignoresStoredLogs() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        Map<String, String> annotations =
+                taskBuilder.getTask().getTaskmaster().getJob().getMetadata().getAnnotations();
+        String inputJson = annotations.get("json-input");
+        annotations.put(
+                "json-input",
+                inputJson.replaceFirst(
+                        "\\{",
+                        "{\"logs\":[{\"logs\":[],\"outputs\":[{\"url\":\"u\",\"path\":\"p\","
+                                + "\"size_bytes\":\"1\"}]}],"));
+        TesTask expectedTask = this.prepareBaseExpectedTask();
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
+        assertThat(outputTask, is(expectedTask));
+    }
+
     @Test
     public void fromK8sToTask_cancelled() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider();

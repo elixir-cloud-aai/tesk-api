@@ -38,6 +38,12 @@ Changes since 1.2.0 that clients or deployments may notice:
   `logs[0].outputs` is an empty array (`[]`), as the TES specification
   requires the field; before, it was left out. TESK API still doesn't list
   the uploaded files (see [Output file logs](api.md#output-file-logs)).
+  `logs` sent with a new task are ignored. Before, they came back in front
+  of TESK's own log: `BASIC` and `FULL` showed them as `logs[0]`, the access
+  check of `GET /tasks/{id}` read the user and group from them (so the
+  creator of a task could show it to other users or hide it from the
+  managers of its group), and a task whose sent log had no `metadata`
+  failed with `500`.
 - **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty

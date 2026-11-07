@@ -147,7 +147,9 @@ public class NoAuthIT {
         this.mvc
                 .perform(get(TASK_URL + "?view=FULL").header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(4));
+                .andExpect(jsonPath("$.tasks.length()").value(4))
+                .andExpect(jsonPath("$.tasks[0].logs[0].outputs").isArray())
+                .andExpect(jsonPath("$.tasks[0].logs[0].outputs").isEmpty());
     }
 
     @Test
