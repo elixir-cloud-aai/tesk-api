@@ -13,6 +13,18 @@ updates:
     ignore:
       - dependency-name: org.springframework.boot:*
         update-types: ["version-update:semver-major"]
+      # Held back until the move to Spring Boot 3 (#66): the next major
+      # versions of these need Java 11 or 17, or Spring Framework 6 or 7
+      # (#91). Remove these rules with #66
+      - dependency-name: io.kubernetes:client-java
+        update-types: ["version-update:semver-major"]
+      - dependency-name: org.springframework.security:*
+        update-types: ["version-update:semver-major"]
+      - dependency-name: com.github.tomakehurst:wiremock
+        update-types: ["version-update:semver-major"]
+      # Java 11 and Maven 3.9.6 from 7.0
+      - dependency-name: org.openapitools:openapi-generator-maven-plugin
+        versions: [">= 7"]
     groups:
       maven:
         patterns: ["*"]
