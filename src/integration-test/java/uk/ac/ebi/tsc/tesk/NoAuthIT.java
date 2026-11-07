@@ -91,13 +91,16 @@ public class NoAuthIT {
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        // the ConfigMap is checked in a dry run, then created, owned by the created job
+        // the ConfigMap is checked in a dry run (with a placeholder owner), then created, owned by
+        // the created job
         mockKubernetes.verify(
                 1,
                 WireMock.postRequestedFor(
                                 WireMock.urlEqualTo(
                                         "/api/v1/namespaces/default/configmaps?dryRun=All"))
-                        .withRequestBody(matchingJsonPath("$.metadata.ownerReferences", absent())));
+                        .withRequestBody(
+                                matchingJsonPath(
+                                        "$.metadata.ownerReferences[?(@.kind == 'Job')]")));
         mockKubernetes.verify(
                 1,
                 WireMock.postRequestedFor(

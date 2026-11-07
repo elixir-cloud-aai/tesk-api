@@ -97,9 +97,10 @@ Changes since 1.2.0 that clients or deployments may notice:
   and `delete` on `configmaps` where the admission plugin
   `OwnerReferencesPermissionEnforcement` is on (e.g. on OpenShift). If you
   give TESK API its own role, add them before you upgrade: without `delete`
-  on `configmaps` there, no task can be created; without `delete` on `jobs`,
-  a job whose ConfigMap failed stays behind, shows up as a `QUEUED` task,
-  and its pod waits for the ConfigMap until you delete the job. Tasks whose
+  on `configmaps` there, no task can be created (the request fails before
+  the job is created); without `delete` on `jobs`, a job whose ConfigMap
+  failed stays behind (see [Failures when creating a
+  task](index.md#failures-when-creating-a-task)). Tasks whose
   job Kubernetes is deleting (it has a deletion timestamp) are gone: `GET
   /tasks/{id}` answers `404 Not Found` and `GET /tasks` leaves them out (see
   [Deleting tasks](index.md#deleting-tasks)); before, they could show up as

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -17,6 +18,8 @@ import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -166,6 +169,39 @@ class TesServiceImplCreateTest {
 
         verify(this.client, never()).createJob(any(V1Job.class));
         verify(this.client, never()).deleteJob(anyString());
+    }
+
+    /**
+     * The dry run has an owner reference to the job, with a placeholder UID, so that Kubernetes
+     * checks the right to set it (admission plugin OwnerReferencesPermissionEnforcement) before the
+     * job exists.
+     */
+    @Test
+    void checkedConfigMapHasPlaceholderOwner() {
+        this.converts("task-1");
+        List<V1OwnerReference> checkedOwners = new ArrayList<>();
+        doAnswer(
+                        invocation -> {
+                            checkedOwners.addAll(
+                                    invocation
+                                            .<V1ConfigMap>getArgument(0)
+                                            .getMetadata()
+                                            .getOwnerReferences());
+                            return null;
+                        })
+                .when(this.client)
+                .checkConfigMap(any(V1ConfigMap.class));
+
+        this.service.createTask(this.task, USER);
+
+        assertThat(checkedOwners)
+                .singleElement()
+                .satisfies(
+                        owner -> {
+                            assertThat(owner.getKind()).isEqualTo("Job");
+                            assertThat(owner.getName()).isEqualTo("task-1");
+                            assertThat(owner.getUid()).isNotEmpty().isNotEqualTo("uid-task-1");
+                        });
     }
 
     /**

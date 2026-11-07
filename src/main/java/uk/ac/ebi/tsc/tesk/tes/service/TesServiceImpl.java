@@ -12,8 +12,10 @@ import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1PodList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,8 +74,10 @@ public class TesServiceImpl implements TesService {
                 V1Job taskMasterJob = this.converter.fromTesTaskToK8sJob(task, user);
                 V1ConfigMap taskMasterConfigMap =
                         this.converter.fromTesTaskToK8sConfigMap(task, user, taskMasterJob);
-                // fails before the job exists, e.g. for a ConfigMap that is too large or a name
-                // that is taken
+                // fails before the job exists, e.g. for a ConfigMap that is too large, a name that
+                // is taken, or no right to set the owner: the dry run has an owner reference with
+                // a placeholder UID, which Kubernetes doesn't store
+                setOwner(taskMasterConfigMap, taskMasterJob, UUID.randomUUID().toString());
                 this.kubernetesClientWrapper.checkConfigMap(taskMasterConfigMap);
                 V1Job createdJob = this.kubernetesClientWrapper.createJob(taskMasterJob);
                 this.createOwnedConfigMap(taskMasterConfigMap, createdJob);
@@ -92,6 +96,19 @@ public class TesServiceImpl implements TesService {
         }
     }
 
+    /** Makes the job, with the given UID, the only owner of the ConfigMap. */
+    private static void setOwner(V1ConfigMap configMap, V1Job job, String uid) {
+        configMap
+                .getMetadata()
+                .setOwnerReferences(
+                        Collections.singletonList(
+                                new V1OwnerReference()
+                                        .apiVersion(K8S_BATCH_API_VERSION)
+                                        .kind(K8S_BATCH_API_JOB_TYPE)
+                                        .name(job.getMetadata().getName())
+                                        .uid(uid)));
+    }
+
     /**
      * Creates the taskmaster's ConfigMap, owned by its job, so that Kubernetes deletes the
      * ConfigMap with the job (e.g. after the job's TTL). The job's UID is known only once the job
@@ -105,14 +122,7 @@ public class TesServiceImpl implements TesService {
      * update the job's finalizers.
      */
     private void createOwnedConfigMap(V1ConfigMap configMap, V1Job job) {
-        configMap
-                .getMetadata()
-                .addOwnerReferencesItem(
-                        new V1OwnerReference()
-                                .apiVersion(K8S_BATCH_API_VERSION)
-                                .kind(K8S_BATCH_API_JOB_TYPE)
-                                .name(job.getMetadata().getName())
-                                .uid(job.getMetadata().getUid()));
+        setOwner(configMap, job, job.getMetadata().getUid());
         try {
             this.kubernetesClientWrapper.createConfigMap(configMap);
         } catch (RuntimeException e) {
@@ -122,8 +132,10 @@ public class TesServiceImpl implements TesService {
                 // the job stays: no retry, which could leave more jobs behind, or let this one
                 // run with another task's ConfigMap of the same name
                 logger.error(
-                        "Deleting job {} without its ConfigMap failed",
+                        "Creating the ConfigMap of job {} failed ({}), and deleting the job"
+                                + " failed, too",
                         job.getMetadata().getName(),
+                        e.getMessage(),
                         deleteError);
                 deleteError.addSuppressed(e);
                 throw deleteError;
