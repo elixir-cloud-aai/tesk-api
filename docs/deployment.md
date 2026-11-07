@@ -30,7 +30,8 @@ OpenShift, which assigns one per project. The app writes only to `/tmp`, so
 the root file system can be read-only if `/tmp` is a writable volume. Outside
 a cluster, it reads the kubeconfig file from `KUBECONFIG` or
 `/home/tesk/.kube/config`; `--user "$(id -u):0"` in the example below lets it
-read a kubeconfig that only your user may read.
+read a kubeconfig that only your user may read. With rootless Docker, where
+your files belong to UID 0 in the container, use `--user 0:0` instead.
 
 ## Kubernetes
 
