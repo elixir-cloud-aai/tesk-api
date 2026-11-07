@@ -463,7 +463,10 @@ public class KubernetesClientWrapperTest {
     }
 
     private void assertInvalidPageToken(int code) throws ApiException {
-        this.listJobsFails("secret-token", code, "continue key secret-token is not valid");
+        this.listJobsFails(
+                "secret-token",
+                code,
+                "{\"kind\":\"Status\",\"message\":\"continue key is not valid: secret-token\"}");
         try {
             wrapper.listAllTaskmasterJobsForUser("secret-token", null, User.builder("123").build());
             fail("InvalidPageTokenException expected");
@@ -480,6 +483,16 @@ public class KubernetesClientWrapperTest {
         wrapper.listAllTaskmasterJobsForUser(null, null, User.builder("123").build());
     }
 
+    /** A 400 of Kubernetes that isn't about the continue token stays a server error */
+    @Test(expected = KubernetesException.class)
+    public void listAllTaskmasterJobsForUser_otherBadRequestWithPageToken() throws ApiException {
+        this.listJobsFails(
+                "token",
+                HttpStatus.BAD_REQUEST.value(),
+                "{\"kind\":\"Status\",\"message\":\"unable to parse requirement\"}");
+        wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
+    }
+
     /** Other errors of Kubernetes stay server errors, also with a page token */
     @Test(expected = KubernetesException.class)
     public void listAllTaskmasterJobsForUser_serverErrorWithPageToken() throws ApiException {
@@ -487,8 +500,12 @@ public class KubernetesClientWrapperTest {
         wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
     }
 
-    /** Lets Kubernetes answer the list request with the page token (or none) with an error */
-    private void listJobsFails(String pageToken, int code, String message) throws ApiException {
+    /**
+     * Lets Kubernetes answer the list request with the page token (or none) with an error and the
+     * response body (a Status object)
+     */
+    private void listJobsFails(String pageToken, int code, String responseBody)
+            throws ApiException {
         given(
                         batchApi.listNamespacedJob(
                                 any(),
@@ -502,6 +519,6 @@ public class KubernetesClientWrapperTest {
                                 isNull(),
                                 isNull(),
                                 isNull()))
-                .willThrow(new ApiException(code, message));
+                .willThrow(new ApiException("", code, null, responseBody));
     }
 }

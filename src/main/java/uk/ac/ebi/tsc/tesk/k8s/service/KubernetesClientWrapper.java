@@ -16,6 +16,7 @@ import io.kubernetes.client.openapi.models.V1LimitRangeList;
 import io.kubernetes.client.openapi.models.V1PodList;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
@@ -232,12 +233,19 @@ public class KubernetesClientWrapper {
 
     /**
      * Whether Kubernetes refused a list request's continue token: 410 Gone if it expired (etcd
-     * compacted the revision), 400 Bad Request if it is malformed. Only called if the request
-     * carried a token, as the other parameters (namespace, label selector) come from TESK API.
+     * compacted the revision; the request sets no resource version, so nothing else can expire), or
+     * 400 Bad Request if it is malformed, which the message of the Status says ("continue key is
+     * not valid"). Other 400s, e.g. for a label selector, stay server errors. Only called if the
+     * request carried a token.
      */
     private static boolean isInvalidContinueToken(ApiException e) {
-        return e.getCode() == HttpStatus.GONE.value()
-                || e.getCode() == HttpStatus.BAD_REQUEST.value();
+        if (e.getCode() == HttpStatus.GONE.value()) {
+            return true;
+        }
+        String body = e.getResponseBody();
+        return e.getCode() == HttpStatus.BAD_REQUEST.value()
+                && body != null
+                && body.toLowerCase(Locale.ROOT).contains("continue");
     }
 
     public V1JobList listSingleTaskExecutorJobs(String taskId) {

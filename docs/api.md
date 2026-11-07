@@ -45,11 +45,11 @@ doesn't forbid this: keep requesting pages until `next_page_token` is left
 out, not until a page is shorter than `page_size`.
 
 An expired or malformed `page_token` (one that Kubernetes refuses with
-`410 Gone` or `400 Bad Request`) is refused with `400 Bad Request`; the
-message names `page_token`, but not its value. Start again without
-`page_token`. Other errors of Kubernetes, also for forged tokens that it
-can't tell apart from its own failures, still give `500 Internal Server
-Error`.
+`410 Gone`, or with `400 Bad Request` because of the continue token) is
+refused with `400 Bad Request`; the message names `page_token`, but not
+its value. Start again without `page_token`. Other errors of Kubernetes,
+also for forged tokens that it can't tell apart from its own failures, still
+give `500 Internal Server Error`.
 
 ## Resources
 
