@@ -34,7 +34,6 @@ Changes since 1.2.0 that clients or deployments may notice:
       `FailureTarget`, before it counts the failed pod, the older TESK API
       can report `QUEUED` or `SYSTEM_ERROR`; clients that take
       `SYSTEM_ERROR` as final keep it.
-
 - **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty

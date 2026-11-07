@@ -102,12 +102,16 @@ the task becomes `EXECUTOR_ERROR`, also if the executor's command didn't
 fail. The taskmaster's own job keeps Kubernetes' default retries: a
 taskmaster that is restarted, e.g. after its pod was evicted, continues with
 the jobs that already exist. Between its retries, the task is reported as
-`SYSTEM_ERROR`.
+`SYSTEM_ERROR`, also while an executor's pod is pending.
 
 ### Cancelling a task
 
 To cancel a task, TESK API labels the taskmaster's job and pod as cancelled.
 The job's label gives the task the state `CANCELED`. A task that has ended,
-by the rules above, can't be cancelled (`400 Bad Request`). The pod's label reaches
-the taskmaster through the Downward API; when the taskmaster sees it, it stops
-the running executor and ends.
+by the rules above, can't be cancelled (`400 Bad Request`). The pod's label
+reaches the taskmaster through the Downward API; when the taskmaster sees it,
+it stops the running executor and ends.
+
+TESK API checks the state before it labels the job. If the task ends in
+between, for example because an executor fails at that moment, the label
+still wins and the task stays `CANCELED`.
