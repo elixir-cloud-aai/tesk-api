@@ -189,8 +189,9 @@ public class TesKubernetesConverter {
             executor.getEnv().forEach((key, value) -> container.addEnvItem(new V1EnvVar().name(key).value(value)));
         }
         container.setWorkingDir(executor.getWorkdir());
-        Optional.ofNullable(resources).map(TesResources::getCpuCores).ifPresent(cpuCores -> container.getResources().putLimitsItem(RESOURCE_CPU_KEY, new QuantityFormatter().parse(cpuCores.toPlainString())));
-        Optional.ofNullable(resources).map(TesResources::getCpuCores).ifPresent(cpuCores -> container.getResources().putRequestsItem(RESOURCE_CPU_KEY, new QuantityFormatter().parse(cpuCores.toPlainString())));
+        //CPU cores (validated: at most 6 integer digits and 3 decimals) as both the request and the limit
+        Optional.ofNullable(resources).map(TesResources::getCpuCores).map(cpuCores -> new QuantityFormatter().parse(cpuCores.toPlainString()))
+                .ifPresent(cpu -> container.getResources().putLimitsItem(RESOURCE_CPU_KEY, cpu).putRequestsItem(RESOURCE_CPU_KEY, cpu));
 	// Limit number of decimals to 6
 	Optional.ofNullable(resources).map(TesResources::getRamGb).ifPresent(ramGb -> container.getResources().putRequestsItem(RESOURCE_MEM_KEY, new QuantityFormatter().parse(String.format("%.6f",ramGb)+RESOURCE_MEM_UNIT)));
 

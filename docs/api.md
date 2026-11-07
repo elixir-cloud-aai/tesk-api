@@ -14,19 +14,20 @@ Method | Path | Operation
 
 The API description (OpenAPI 2.0) is at `/v2/api-docs`.
 
-## Resources
-
-`resources.cpu_cores` of a task sets both the CPU request and the CPU limit of
-each executor's container. The TES specification defines it as an integer;
-TESK API also accepts decimal numbers, e.g. `0.5` for half a core (requested
-from Kubernetes as `500m`). It returns the number as it was given, so whole
-numbers stay integers. Kubernetes counts CPU in steps of a thousandth of a
-core (`1m`), and rounds smaller fractions up.
-
 With the `auth` profile, all endpoints need a valid access token, except the
 API description, the Swagger UI (if it is on) and, unless
 `TESK_API_SERVICE_INFO_PUBLIC` is `false`, service info; see [Access
 control](access-control.md).
+
+## Resources
+
+`resources.cpu_cores` of a task sets both the CPU request and the CPU limit of
+each executor's container. The TES specification defines it as an integer;
+TESK API also accepts decimal numbers with up to 3 decimals (Kubernetes counts
+CPU in thousandths of a core), e.g. `0.5` for half a core (requested from
+Kubernetes as `500m`), up to `999999.999`. Other numbers are refused with
+`400 Bad Request`. TESK API returns the number as it was given; whole numbers
+stay integers, also if given with an exponent (`1e3` is returned as `1000`).
 
 ## Swagger UI
 

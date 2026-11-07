@@ -1,0 +1,9 @@
+{
+  "executors": [
+    {
+      "image": "ubuntu",
+      "command": ["echo", "hello world"]
+    }
+  ],
+  "resources": {"cpu_cores": 1e1000000000}
+}

@@ -436,16 +436,29 @@ public class TesKubernetesConverterTest {
     }
 
     /**
-     * CPU cores are written back as given: whole numbers stay integers, as the TES specification defines them
+     * Whole numbers of CPU cores are written back as integers, as the TES specification defines them, also when
+     * given with an exponent; decimal numbers as given
      */
     @Test
-    public void cpuCores_roundTrip() throws IOException {
-        for (String cpuCores : new String[]{"4", "0.5", "1.25"}) {
-            TesResources resources = this.objectMapper.readValue("{\"cpu_cores\": " + cpuCores + "}", TesResources.class);
-            new JsonContentAssert(this.getClass(), this.objectMapper.writeValueAsString(resources))
-                    .isEqualToJson("{\"cpu_cores\": " + cpuCores + "}", JSONCompareMode.STRICT);
-            assertThat(this.objectMapper.writeValueAsString(resources), org.hamcrest.Matchers.containsString("\"cpu_cores\" : " + cpuCores));
-        }
+    public void cpuCores_wholeNumbersStayIntegers() throws IOException {
+        assertThat(writtenCpuCores("4").isIntegralNumber(), is(true));
+        assertThat(writtenCpuCores("4").asText(), is("4"));
+        assertThat(writtenCpuCores("1e3").isIntegralNumber(), is(true));
+        assertThat(writtenCpuCores("1e3").asText(), is("1000"));
+    }
+
+    @Test
+    public void cpuCores_decimalsAsGiven() throws IOException {
+        assertThat(writtenCpuCores("0.5").decimalValue(), is(new java.math.BigDecimal("0.5")));
+        assertThat(writtenCpuCores("1.25").decimalValue(), is(new java.math.BigDecimal("1.25")));
+    }
+
+    /**
+     * Reads {@code cpu_cores} into the model and returns the value as written back
+     */
+    private com.fasterxml.jackson.databind.JsonNode writtenCpuCores(String cpuCores) throws IOException {
+        TesResources resources = this.objectMapper.readValue("{\"cpu_cores\": " + cpuCores + "}", TesResources.class);
+        return this.objectMapper.readTree(this.objectMapper.writeValueAsString(resources)).get("cpu_cores");
     }
 
 }

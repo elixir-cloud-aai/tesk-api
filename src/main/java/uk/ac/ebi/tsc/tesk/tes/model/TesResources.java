@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.validation.Valid;
+import javax.validation.constraints.Digits;
 
 /**
  * Resources describes the resources requested by a task.
@@ -41,7 +42,7 @@ public class TesResources   {
   private Boolean backendParametersStrict = false;
 
   public TesResources cpuCores(BigDecimal cpuCores) {
-    this.cpuCores = cpuCores;
+    setCpuCores(cpuCores);
     return this;
   }
 
@@ -51,14 +52,17 @@ public class TesResources   {
    * @return cpuCores
   */
   @ApiModelProperty(example = "4", value = "Requested number of CPUs (TESK also accepts decimal numbers, e.g. 0.5)")
-
+  //at most 999999.999: Kubernetes counts CPU in steps of 1m; bounds the number before it is converted
+  @Digits(integer = 6, fraction = 3)
 
   public BigDecimal getCpuCores() {
     return cpuCores;
   }
 
   public void setCpuCores(BigDecimal cpuCores) {
-    this.cpuCores = cpuCores;
+    //whole numbers given with an exponent (e.g. 1e3) are kept without it, so that they are written as integers
+    this.cpuCores = cpuCores != null && cpuCores.scale() < 0 && cpuCores.precision() - cpuCores.scale() <= 7
+        ? cpuCores.setScale(0) : cpuCores;
   }
 
   public TesResources preemptible(Boolean preemptible) {
