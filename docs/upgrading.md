@@ -54,7 +54,9 @@ Changes since 1.2.0 that clients or deployments may notice:
   malformed `page_token` is refused with `400 Bad Request` instead of `500
   Internal Server Error`, with a message that names the parameter but not
   its value. Clients that page with more than 2048 tasks need to lower
-  `page_size`.
+  `page_size`. A request parameter of the wrong type (e.g. `page_size=abc`)
+  is refused, as before, with `400 Bad Request`, but its message now names
+  the parameter instead of repeating the value.
 - **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty
