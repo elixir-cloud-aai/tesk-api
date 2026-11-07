@@ -84,7 +84,9 @@ public class KubernetesClientWrapper {
 
     /**
      * Checks that Kubernetes would create the ConfigMap, by creating it in a dry run: Kubernetes
-     * validates and admits it (e.g. its size, the rights, a taken name), but doesn't store it.
+     * validates and admits it (e.g. its size, the rights, a taken name), but doesn't store it. If
+     * an admission webhook for ConfigMaps doesn't support dry runs, Kubernetes refuses every dry
+     * run; the check is then skipped (with a warning), so that tasks can still be created.
      *
      * @param map - the ConfigMap
      * @throws KubernetesException if Kubernetes would refuse it
@@ -93,8 +95,25 @@ public class KubernetesClientWrapper {
         try {
             this.coreApi.createNamespacedConfigMap(namespace, map, null, DRY_RUN_ALL, null);
         } catch (ApiException e) {
+            if (isDryRunUnsupported(e)) {
+                logger.warn(
+                        "Skipped the dry run of a task's ConfigMap: an admission webhook doesn't"
+                                + " support dry runs");
+                return;
+            }
             throw KubernetesException.fromApiException(e);
         }
+    }
+
+    /**
+     * Whether Kubernetes refused a dry run because an admission webhook doesn't support dry runs:
+     * 400 Bad Request, with the message "admission webhook ... does not support dry run".
+     */
+    private static boolean isDryRunUnsupported(ApiException e) {
+        String body = e.getResponseBody();
+        return e.getCode() == HttpStatus.BAD_REQUEST.value()
+                && body != null
+                && body.contains("does not support dry run");
     }
 
     public V1ConfigMap createConfigMap(V1ConfigMap map) {

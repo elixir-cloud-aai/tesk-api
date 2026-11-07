@@ -69,6 +69,40 @@ public class KubernetesClientWrapperTest {
         wrapper.checkConfigMap(new V1ConfigMap());
     }
 
+    /**
+     * An admission webhook that doesn't support dry runs makes Kubernetes refuse every dry run
+     * (400): the check is skipped, so that tasks can still be created
+     */
+    @Test
+    public void checkConfigMap_webhookWithoutDryRun() throws ApiException {
+        given(coreApi.createNamespacedConfigMap(any(), any(), any(), any(), any()))
+                .willThrow(
+                        new ApiException(
+                                "",
+                                400,
+                                null,
+                                "{\"kind\":\"Status\",\"message\":\"admission webhook"
+                                        + " \\\"policy.example.org\\\" does not support dry"
+                                        + " run\",\"reason\":\"BadRequest\",\"code\":400}"));
+        wrapper.checkConfigMap(new V1ConfigMap());
+    }
+
+    /** A 400 of the dry run without a Status to tell the cause isn't skipped */
+    @Test(expected = KubernetesException.class)
+    public void checkConfigMap_badRequestWithoutBody() throws ApiException {
+        given(coreApi.createNamespacedConfigMap(any(), any(), any(), any(), any()))
+                .willThrow(new ApiException("", 400, null, null));
+        wrapper.checkConfigMap(new V1ConfigMap());
+    }
+
+    /** Other 400s of the dry run aren't skipped */
+    @Test(expected = KubernetesException.class)
+    public void checkConfigMap_otherBadRequest() throws ApiException {
+        given(coreApi.createNamespacedConfigMap(any(), any(), any(), any(), any()))
+                .willThrow(new ApiException("", 400, null, "{\"message\":\"invalid\"}"));
+        wrapper.checkConfigMap(new V1ConfigMap());
+    }
+
     @Test
     public void createJob() throws ApiException {
         V1Job inJob = new V1Job().metadata(new V1ObjectMeta().name("test job"));

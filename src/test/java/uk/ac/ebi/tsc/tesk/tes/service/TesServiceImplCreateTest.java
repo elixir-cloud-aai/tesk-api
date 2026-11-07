@@ -137,19 +137,20 @@ class TesServiceImplCreateTest {
 
     /**
      * If deleting the job fails too, the task isn't created again, also after a name collision (the
-     * job could run with another task's ConfigMap): the delete's error is passed on, with the
-     * ConfigMap's error suppressed.
+     * job could run with another task's ConfigMap), also if the delete's error is a 409 itself: the
+     * error has the delete's error as its cause and the ConfigMap's error suppressed.
      */
     @Test
     void failedDeleteStopsRetries() {
         this.converts("task-1");
         KubernetesException conflict = kubernetesError(HttpStatus.CONFLICT);
-        KubernetesException deleteError = kubernetesError(HttpStatus.FORBIDDEN);
+        KubernetesException deleteError = kubernetesError(HttpStatus.CONFLICT);
         when(this.client.createConfigMap(any(V1ConfigMap.class))).thenThrow(conflict);
         doThrow(deleteError).when(this.client).deleteJob("task-1");
 
         assertThatThrownBy(() -> this.service.createTask(this.task, USER))
-                .isSameAs(deleteError)
+                .isNotInstanceOf(KubernetesException.class)
+                .hasCause(deleteError)
                 .hasSuppressedException(conflict);
 
         verify(this.client, times(1)).createJob(any(V1Job.class));

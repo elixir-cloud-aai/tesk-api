@@ -115,8 +115,9 @@ public class TesServiceImpl implements TesService {
      * exists, so the job is created first (after a dry run of the ConfigMap); its pod waits until
      * the ConfigMap it mounts exists. If the ConfigMap can't be created, the job is deleted, so
      * that its pod doesn't wait forever, and the ConfigMap's error is passed on (a name collision
-     * then creates the task again). If the job can't be deleted either, the delete's error is
-     * passed on instead, so that the task isn't created again.
+     * then creates the task again). If the job can't be deleted either, an error that isn't a
+     * {@link KubernetesException} is passed on instead (cause: the delete's error), so that the
+     * task isn't created again.
      *
      * <p>The owner reference doesn't set {@code blockOwnerDeletion}, which would need the right to
      * update the job's finalizers.
@@ -137,8 +138,15 @@ public class TesServiceImpl implements TesService {
                         job.getMetadata().getName(),
                         e.getMessage(),
                         deleteError);
-                deleteError.addSuppressed(e);
-                throw deleteError;
+                // not a KubernetesException, so that a 409 of the delete isn't taken for a name
+                // collision, which would create the task again
+                IllegalStateException error =
+                        new IllegalStateException(
+                                "Creating the ConfigMap of a task failed, and deleting its job"
+                                        + " failed, too",
+                                deleteError);
+                error.addSuppressed(e);
+                throw error;
             }
             throw e;
         }

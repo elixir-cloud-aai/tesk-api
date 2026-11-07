@@ -68,7 +68,9 @@ Before it creates the job, TESK API checks the ConfigMap in a dry run, with
 an owner reference to the job that has a placeholder UID: a ConfigMap that
 Kubernetes refuses (e.g. one above Kubernetes' limit of 1 MiB, or one whose
 owner TESK API may not set) fails the request before anything is created,
-and a name that is taken is replaced by a new one. If the ConfigMap can't be
+and a name that is taken is replaced by a new one. If an admission webhook
+for ConfigMaps doesn't support dry runs, Kubernetes refuses every dry run;
+TESK API then logs a warning and skips the check. If the ConfigMap can't be
 created after the job all the same, TESK API deletes the job again (if the name was taken in between,
 it then tries again with a new name). If that deletion fails too, TESK API
 logs both errors and fails the request (`500 Internal Server Error`) without
