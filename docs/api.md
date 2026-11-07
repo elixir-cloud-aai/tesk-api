@@ -53,6 +53,16 @@ ended (as on cancellation). This deviates from the TES specification, which
 requires `exit_code` in every executor log: clients must accept executor logs
 without it.
 
+## Output file logs
+
+With the views `BASIC` and `FULL`, a task's `logs[0].outputs` is always an
+empty array (`[]`), also after the outputs filer has uploaded the task's
+outputs. The TES specification requires the field, with one entry per output
+file (directory outputs flattened into their files), but the outputs filer
+runs as a separate Kubernetes job and has no way to report the files it
+wrote back to TESK API. Clients that need the uploaded files must look them
+up at the outputs' `url`s.
+
 ## Swagger UI
 
 The Swagger UI lists the endpoints and lets you try them, also with a token

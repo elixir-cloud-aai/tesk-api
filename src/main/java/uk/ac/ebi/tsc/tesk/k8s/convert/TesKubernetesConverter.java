@@ -420,6 +420,8 @@ public class TesKubernetesConverter {
         task.setCreationTime(DATE_FORMATTER.print(taskMasterJobMetadata.getCreationTimestamp()));
         TesTaskLog log = new TesTaskLog();
         task.addLogsItem(log);
+        // TES requires outputs; TESK doesn't learn which files the outputs filer wrote
+        log.setOutputs(new ArrayList<>());
         log.putMetadataItem("USER_ID", taskMasterJobMetadata.getLabels().get(LABEL_USERID_KEY));
         if (taskMasterJobMetadata.getLabels().containsKey(LABEL_GROUPNAME_KEY)) {
             log.putMetadataItem(

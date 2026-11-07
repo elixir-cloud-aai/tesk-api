@@ -96,8 +96,17 @@ public class NoAuthIT {
         MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
 
         this.mvc.perform(get(TASK_URL + "/{id}", "task-123")).andExpect(status().isOk());
-        this.mvc.perform(get(TASK_URL + "/{id}?view=BASIC", "task-123")).andExpect(status().isOk());
-        this.mvc.perform(get(TASK_URL + "/{id}?view=FULL", "task-123")).andExpect(status().isOk());
+        // logs[].outputs is required by TES: an empty array, as TESK doesn't report output files
+        this.mvc
+                .perform(get(TASK_URL + "/{id}?view=BASIC", "task-123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logs[0].outputs").isArray())
+                .andExpect(jsonPath("$.logs[0].outputs").isEmpty());
+        this.mvc
+                .perform(get(TASK_URL + "/{id}?view=FULL", "task-123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logs[0].outputs").isArray())
+                .andExpect(jsonPath("$.logs[0].outputs").isEmpty());
     }
 
     @Test
@@ -132,7 +141,9 @@ public class NoAuthIT {
         this.mvc
                 .perform(get(TASK_URL + "?view=BASIC").header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(4));
+                .andExpect(jsonPath("$.tasks.length()").value(4))
+                .andExpect(jsonPath("$.tasks[0].logs[0].outputs").isArray())
+                .andExpect(jsonPath("$.tasks[0].logs[0].outputs").isEmpty());
         this.mvc
                 .perform(get(TASK_URL + "?view=FULL").header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
