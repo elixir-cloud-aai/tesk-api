@@ -30,6 +30,21 @@ Kubernetes as `500m`), up to `999999.999`; trailing zeros don't count
 `400 Bad Request`; negative numbers and `0` are not checked. TESK API returns the number as it was given; whole numbers
 stay integers, also if given with an exponent (`1e3` is returned as `1000`).
 
+## Executor logs
+
+With the views `BASIC` and `FULL`, a task's `logs[0].logs` has one entry per
+executor whose Kubernetes job exists, in the order of the executors; executors
+that haven't started yet, or that never ran because the task ended or was
+cancelled before, have no entry. Each entry has the executor's start and end
+time and, with `FULL`, its standard output (`stdout`; `""` until there is
+any).
+
+`exit_code` is left out until the executor's container has terminated, e.g.
+while the executor is queued or running, or if its pod was removed before it
+ended (as on cancellation). This deviates from the TES specification, which
+requires `exit_code` in every executor log: clients must accept executor logs
+without it.
+
 ## Swagger UI
 
 The Swagger UI lists the endpoints and lets you try them, also with a token
