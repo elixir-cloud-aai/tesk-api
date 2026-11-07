@@ -150,6 +150,18 @@ public class NoAuthIT {
                 .andExpect(jsonPath("$.tasks.length()").value(4))
                 .andExpect(jsonPath("$.tasks[0].logs[0].outputs").isArray())
                 .andExpect(jsonPath("$.tasks[0].logs[0].outputs").isEmpty());
+        // only task-124 has a name
+        this.mvc
+                .perform(
+                        get(TASK_URL + "?name_prefix=align&view=BASIC")
+                                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(1))
+                .andExpect(jsonPath("$.tasks[0].id").value("task-124"));
+        this.mvc
+                .perform(get(TASK_URL + "?name_prefix=call").header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(0));
     }
 
     @Test

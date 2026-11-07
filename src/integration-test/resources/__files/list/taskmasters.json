@@ -27,6 +27,9 @@
           "creator-user-id": "124",
           "job-type": "taskmaster"
         },
+        "annotations": {
+          "tes-task-name": "align-reads"
+        },
         "name": "task-124"
       },
       "spec": {

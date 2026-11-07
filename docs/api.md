@@ -8,7 +8,7 @@ Method | Path | Operation
 --- | --- | ---
 `GET` | `/service-info` | Information about the service
 `POST` | `/tasks` | Create a task
-`GET` | `/tasks` | List tasks (in pages; the name prefix filter is not supported yet and is ignored)
+`GET` | `/tasks` | List tasks (in pages, optionally only those whose names start with a prefix; see [Listing tasks](#listing-tasks))
 `GET` | `/tasks/{id}` | Get a task
 `POST` | `/tasks/{id}:cancel` | Cancel a task (answers with an empty object, `{}`)
 
@@ -18,6 +18,32 @@ With the `auth` profile, all endpoints need a valid access token, except the
 API description, the Swagger UI (if it is on) and, unless
 `TESK_API_SERVICE_INFO_PUBLIC` is `false`, service info; see [Access
 control](access-control.md).
+
+## Listing tasks
+
+`GET /tasks` lists the tasks that the user may see, in the order in which
+Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
+(the default), `BASIC` and `FULL`.
+
+- `page_size` sets how many tasks TESK API reads from Kubernetes for one
+  page; without it, it reads all of them at once. `next_page_token` is the
+  continue token of Kubernetes; pass it as `page_token` to get the next page.
+  It is left out on the last page. Kubernetes accepts it for a limited time
+  only (by default about 5 minutes, until etcd compacts its history).
+- `name_prefix` lists only the tasks whose names start with it
+  (case-sensitive); tasks without a name are left out. An empty `name_prefix`
+  filters nothing.
+
+The task names aren't Kubernetes labels, so Kubernetes can't select them:
+TESK API filters each page after reading it. Pages can therefore be shorter
+than `page_size`, even empty, while `next_page_token` is still set; the same
+happens already to users who manage some of their groups and are only
+members of others, whose pages TESK API filters, too. The TES specification
+doesn't forbid this: keep requesting pages until `next_page_token` is left
+out, not until a page is shorter than `page_size`.
+
+An expired or invalid `page_token` currently fails with `500 Internal Server
+Error`; start again without `page_token`.
 
 ## Resources
 

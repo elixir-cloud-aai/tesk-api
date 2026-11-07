@@ -45,12 +45,13 @@ public interface TesService {
      * executors, all pods), combines them together into valid {@link Task} objects and converts to
      * result with means of the converter.
      *
-     * @param namePrefix - Unsupported
-     * @param pageSize - Unsupported, in future releases should enable list chunking
-     * @param pageToken - Unsupported, in future releases should enable list chunking
+     * @param namePrefix - only tasks whose names start with it (case-sensitive); all tasks if null
+     *     or empty
+     * @param pageSize - maximum number of taskmaster jobs read for the page; all if null
+     * @param pageToken - continue token of Kubernetes, from the previous page's next_page_token
      * @param view - one of {@link TaskView} values, decides on how much detail is put in each
      *     resulting task
-     * @return - resulting list of tasks plus paging token (when supported)
+     * @return - the page of tasks, with the continue token of the next page, if there is one
      */
     @PreAuthorize("#user.teskAdmin OR #user.manager OR #user.member")
     TesListTasksResponse listTasks(
