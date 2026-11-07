@@ -5,7 +5,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Home redirection to swagger api documentation, only if the Swagger UI is on ({@code tesk.api.swagger-ui.enabled})
+ * Home redirection to swagger api documentation, only if the Swagger UI is on ({@code
+ * tesk.api.swagger-ui.enabled})
  */
 @Controller
 @ConditionalOnProperty(name = "tesk.api.swagger-ui.enabled", havingValue = "true")

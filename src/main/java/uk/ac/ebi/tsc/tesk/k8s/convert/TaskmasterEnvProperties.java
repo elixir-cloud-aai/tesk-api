@@ -1,11 +1,10 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Properties affecting taskmaster's job template
@@ -15,48 +14,32 @@ import java.util.Map;
 @Configuration
 @ConfigurationProperties(prefix = "tesk.api.taskmaster")
 public class TaskmasterEnvProperties {
-    /**
-     * Taskmaster image name
-     */
+    /** Taskmaster image name */
     private String imageName;
-    /**
-     * Taskmaster image version
-     */
+    /** Taskmaster image version */
     private String imageVersion;
 
-    /**
-     * Filer image name
-     */
+    /** Filer image name */
     private String filerImageName;
 
-    /**
-     * Filer image version
-     */
+    /** Filer image version */
     private String filerImageVersion;
-    /**
-     * Test FTP account settings
-     */
+    /** Test FTP account settings */
     private Ftp ftp;
 
-    /**
-     * Service Account name for taskmaster
-     */
+    /** Service Account name for taskmaster */
     private String serviceAccountName;
 
     /**
-     * If verbose (debug) mode of taskmaster is on
-     * (it passes additional flag to taskmaster and sets image pull policy to Always)
+     * If verbose (debug) mode of taskmaster is on (it passes additional flag to taskmaster and sets
+     * image pull policy to Always)
      */
     private boolean debug;
 
     private ExecutorSecret executorSecret;
 
-
-    /**
-     * Environment variables, that will be passed to taskmaster
-     */
+    /** Environment variables, that will be passed to taskmaster */
     private Map<String, String> environment = new HashMap<>();
-
 
     public Ftp getFtp() {
         return ftp;
@@ -127,30 +110,23 @@ public class TaskmasterEnvProperties {
     }
 
     public boolean isFTPEnabled() {
-        if (this.getFtp() == null)
-            return false;
+        if (this.getFtp() == null) return false;
         return this.getFtp().enabled;
     };
 
     public boolean isExecutorSecretEnabled() {
-        if (this.getExecutorSecret() == null)
-            return false;
+        if (this.getExecutorSecret() == null) return false;
         return this.getExecutorSecret().enabled;
     };
 
-    /**
-     * Test FTP account settings
-     */
+    /** Test FTP account settings */
     public static class Ftp {
 
-
-        /**
-         * Name of the secret with FTP acoount credentials
-         */
+        /** Name of the secret with FTP acoount credentials */
         private String secretName;
         /**
-         * If FTP account enabled (based on non-emptiness of secretName)
-         * Does not check the existence of real secret via API
+         * If FTP account enabled (based on non-emptiness of secretName) Does not check the
+         * existence of real secret via API
          */
         private boolean enabled;
 
@@ -164,18 +140,17 @@ public class TaskmasterEnvProperties {
                 this.enabled = true;
             }
         }
-
     }
+
     public static class ExecutorSecret {
 
         /**
-         * Name of a secret that will be mounted as volume to each executor. The same name will be used for the secret and the volume
+         * Name of a secret that will be mounted as volume to each executor. The same name will be
+         * used for the secret and the volume
          */
         private String name;
 
-        /**
-         * The path where the secret will be mounted to executors
-         */
+        /** The path where the secret will be mounted to executors */
         private String mountPath;
 
         private boolean enabled;
@@ -198,7 +173,5 @@ public class TaskmasterEnvProperties {
         public void setMountPath(String mountPath) {
             this.mountPath = mountPath;
         }
-
-
     }
 }

@@ -4,17 +4,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-
 import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.FixedAuthoritiesExtractor;
 
 /**
  * Custom authorities extractor, that looks for groups element and transforms it into authorities.
- * Heavily inspired by {@link org.springframework.boot.autoconfigure.security.oauth2.resource.FixedAuthoritiesExtractor}
+ * Heavily inspired by {@link
+ * org.springframework.boot.autoconfigure.security.oauth2.resource.FixedAuthoritiesExtractor}
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
@@ -24,6 +23,7 @@ public class GroupNamesSecurityExtractor implements AuthoritiesExtractor {
         this.authoritiesClaim = authoritiesClaim;
         this.groupPrefix = groupPrefix;
     }
+
     private final String authoritiesClaim;
     private final String groupPrefix;
 
@@ -55,7 +55,5 @@ public class GroupNamesSecurityExtractor implements AuthoritiesExtractor {
             authorities.add(object);
         }
         return StringUtils.collectionToCommaDelimitedString(authorities);
-
     }
-
 }

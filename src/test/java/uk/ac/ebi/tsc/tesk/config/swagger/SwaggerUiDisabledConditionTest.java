@@ -1,17 +1,17 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
-import org.junit.Test;
-import org.springframework.context.annotation.ConditionContext;
-import org.springframework.mock.env.MockEnvironment;
-
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.junit.Test;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.mock.env.MockEnvironment;
+
 /**
- * The setting {@code tesk.api.swagger-ui.enabled} takes only {@code true} or {@code false}, so that the Swagger UI,
- * its static resources and its configuration are either all served or none of them
+ * The setting {@code tesk.api.swagger-ui.enabled} takes only {@code true} or {@code false}, so that
+ * the Swagger UI, its static resources and its configuration are either all served or none of them
  */
 public class SwaggerUiDisabledConditionTest {
 

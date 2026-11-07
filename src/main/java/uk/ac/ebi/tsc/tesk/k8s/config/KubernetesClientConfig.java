@@ -5,16 +5,13 @@ import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.auth.ApiKeyAuth;
 import io.kubernetes.client.util.Config;
+import java.io.IOException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-import java.io.IOException;
-
-/**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- */
+/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
 @Configuration
 public class KubernetesClientConfig {
 
@@ -23,7 +20,6 @@ public class KubernetesClientConfig {
     public ApiClient kubernetesApiClient() throws IOException {
 
         return Config.defaultClient();
-
     }
 
     @Bean
@@ -31,7 +27,6 @@ public class KubernetesClientConfig {
     public BatchV1Api batchApi(ApiClient apiClient) {
 
         return new BatchV1Api(apiClient);
-
     }
 
     @Bean
@@ -39,7 +34,6 @@ public class KubernetesClientConfig {
     public CoreV1Api coreApi(ApiClient apiClient) {
 
         return new CoreV1Api(apiClient);
-
     }
 
     /**
@@ -51,32 +45,26 @@ public class KubernetesClientConfig {
 
         ApiClient defaultClient = Config.defaultClient();
         return new ApiClientWithMergePatching(defaultClient);
-
     }
 
-    /**
-     * Separate object to perform merge-patching of Jobs
-     */
+    /** Separate object to perform merge-patching of Jobs */
     @Bean(name = "patchBatchApi")
     public BatchV1Api patchBatchApi(@Qualifier("patchApiClient") ApiClient patchApiClient) {
 
         return new BatchV1Api(patchApiClient);
-
     }
 
-    /**
-     * Separate object to perform merge-patching of JPods
-     */
+    /** Separate object to perform merge-patching of JPods */
     @Bean(name = "patchCoreApi")
     public CoreV1Api patchCoreApi(@Qualifier("patchApiClient") ApiClient patchApiClient) {
 
         return new CoreV1Api(patchApiClient);
-
     }
 
     /**
-     * This client should in theory work exactly as the original one, just always use application/merge-patch header
-     * Accepts auto-configured instance as parameter of a constructor and - hopefully - initializes accordingly
+     * This client should in theory work exactly as the original one, just always use
+     * application/merge-patch header Accepts auto-configured instance as parameter of a constructor
+     * and - hopefully - initializes accordingly
      */
     private static class ApiClientWithMergePatching extends ApiClient {
 
@@ -91,5 +79,4 @@ public class KubernetesClientConfig {
             return "application/merge-patch+json";
         }
     }
-
 }

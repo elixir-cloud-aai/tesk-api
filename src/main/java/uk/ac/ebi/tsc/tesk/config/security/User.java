@@ -1,24 +1,22 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.util.StringUtils;
-import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
-
 import java.io.Serializable;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.util.StringUtils;
+import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 
 /**
  * POJO for auhenticated user's data
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
-
 public class User implements Serializable, UserDetails, Principal {
 
     private static final long serialVersionUID = 1L;
@@ -29,30 +27,28 @@ public class User implements Serializable, UserDetails, Principal {
     private String givenName;
     private String familyName;
     private String email;
-    /**
-     * Full list of elixir group full names, to which the user belongs
-     */
+    /** Full list of elixir group full names, to which the user belongs */
     private Set<String> allGroups;
-    /**
-     * Is the user a TESK installation admin (belongs to a group with that meaning)
-     */
+    /** Is the user a TESK installation admin (belongs to a group with that meaning) */
     private boolean teskAdmin = false;
 
     /**
-     * List of 'organisational' groups, to which the user belongs (last part of Elixir group names only
-     * (see {@link ElixirPrincipalExtractor} to see, how that information is retrieved from allGroups)
-     * TES task will be 'owned' by one of the groups, to which the creating user belongs (or by no group, if the user does not belong to any)
+     * List of 'organisational' groups, to which the user belongs (last part of Elixir group names
+     * only (see {@link ElixirPrincipalExtractor} to see, how that information is retrieved from
+     * allGroups) TES task will be 'owned' by one of the groups, to which the creating user belongs
+     * (or by no group, if the user does not belong to any)
      */
     private Set<String> teskMemberedGroups;
 
     /**
-     * List of 'organisational' groups, where the user is an admin (see {@link ElixirPrincipalExtractor} to see, how that information is retrieved from allGroups)
-     * TES task will be 'owned' by one of the groups, to which the creating user belongs (or by no group, if the user does not belong to any)
+     * List of 'organisational' groups, where the user is an admin (see {@link
+     * ElixirPrincipalExtractor} to see, how that information is retrieved from allGroups) TES task
+     * will be 'owned' by one of the groups, to which the creating user belongs (or by no group, if
+     * the user does not belong to any)
      */
     private Set<String> teskManagedGroups;
 
-    public User() {
-    }
+    public User() {}
 
     public String getName() {
         return name;
@@ -71,8 +67,7 @@ public class User implements Serializable, UserDetails, Principal {
     }
 
     public String getAnyGroup() {
-        if (!isMember())
-            return null;
+        if (!isMember()) return null;
         return teskMemberedGroups.iterator().next();
     }
 
@@ -107,7 +102,10 @@ public class User implements Serializable, UserDetails, Principal {
         }
         if (isMember() || isManager()) {
             StringBuilder sb = new StringBuilder();
-            sb.append(Constants.LABEL_GROUPNAME_KEY).append(" in (").append(StringUtils.collectionToCommaDelimitedString(allTeskGroups)).append(")");
+            sb.append(Constants.LABEL_GROUPNAME_KEY)
+                    .append(" in (")
+                    .append(StringUtils.collectionToCommaDelimitedString(allTeskGroups))
+                    .append(")");
             if (!isManager()) {
                 sb.append(",").append(Constants.LABEL_USERID_KEY).append("=").append(getUsername());
             }
@@ -116,8 +114,17 @@ public class User implements Serializable, UserDetails, Principal {
         return null;
     }
 
-    User(String userId, String preferredUsername, String name, String givenName, String familyName, String email,
-         Set<String> allGroups, Set<String> teskMemberedGroups, Set<String> teskManagedGroups, boolean teskAdmin) {
+    User(
+            String userId,
+            String preferredUsername,
+            String name,
+            String givenName,
+            String familyName,
+            String email,
+            Set<String> allGroups,
+            Set<String> teskMemberedGroups,
+            Set<String> teskManagedGroups,
+            boolean teskAdmin) {
         this.userId = userId;
         this.preferredUsername = preferredUsername;
         this.name = name;
@@ -132,7 +139,8 @@ public class User implements Serializable, UserDetails, Principal {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return AuthorityUtils.createAuthorityList(StringUtils.collectionToCommaDelimitedString(this.allGroups));
+        return AuthorityUtils.createAuthorityList(
+                StringUtils.collectionToCommaDelimitedString(this.allGroups));
     }
 
     @Override
@@ -171,18 +179,37 @@ public class User implements Serializable, UserDetails, Principal {
 
     @Override
     public String toString() {
-        return "User{" +
-                "userId='" + userId + '\'' +
-                ", preferredUsername='" + preferredUsername + '\'' +
-                ", name='" + name + '\'' +
-                ", givenName='" + givenName + '\'' +
-                ", familyName='" + familyName + '\'' +
-                ", email='" + email + '\'' +
-                ", allGroups=(" + StringUtils.collectionToCommaDelimitedString(allGroups) + ")" +
-                ", memberedGroups=(" + StringUtils.collectionToCommaDelimitedString(teskMemberedGroups) + ")" +
-                ", managedGroups=(" + StringUtils.collectionToCommaDelimitedString(teskManagedGroups) + ")" +
-                ", iasAdmin=" + isTeskAdmin() +
-                "}";
+        return "User{"
+                + "userId='"
+                + userId
+                + '\''
+                + ", preferredUsername='"
+                + preferredUsername
+                + '\''
+                + ", name='"
+                + name
+                + '\''
+                + ", givenName='"
+                + givenName
+                + '\''
+                + ", familyName='"
+                + familyName
+                + '\''
+                + ", email='"
+                + email
+                + '\''
+                + ", allGroups=("
+                + StringUtils.collectionToCommaDelimitedString(allGroups)
+                + ")"
+                + ", memberedGroups=("
+                + StringUtils.collectionToCommaDelimitedString(teskMemberedGroups)
+                + ")"
+                + ", managedGroups=("
+                + StringUtils.collectionToCommaDelimitedString(teskManagedGroups)
+                + ")"
+                + ", iasAdmin="
+                + isTeskAdmin()
+                + "}";
     }
 
     @Override
@@ -194,16 +221,23 @@ public class User implements Serializable, UserDetails, Principal {
 
         if (teskAdmin != user.teskAdmin) return false;
         if (userId != null ? !userId.equals(user.userId) : user.userId != null) return false;
-        if (preferredUsername != null ? !preferredUsername.equals(user.preferredUsername) : user.preferredUsername != null)
-            return false;
+        if (preferredUsername != null
+                ? !preferredUsername.equals(user.preferredUsername)
+                : user.preferredUsername != null) return false;
         if (name != null ? !name.equals(user.name) : user.name != null) return false;
-        if (givenName != null ? !givenName.equals(user.givenName) : user.givenName != null) return false;
-        if (familyName != null ? !familyName.equals(user.familyName) : user.familyName != null) return false;
-        if (email != null ? !email.equals(user.email) : user.email != null) return false;
-        if (allGroups != null ? !allGroups.equals(user.allGroups) : user.allGroups != null) return false;
-        if (teskMemberedGroups != null ? !teskMemberedGroups.equals(user.teskMemberedGroups) : user.teskMemberedGroups != null)
+        if (givenName != null ? !givenName.equals(user.givenName) : user.givenName != null)
             return false;
-        return teskManagedGroups != null ? teskManagedGroups.equals(user.teskManagedGroups) : user.teskManagedGroups == null;
+        if (familyName != null ? !familyName.equals(user.familyName) : user.familyName != null)
+            return false;
+        if (email != null ? !email.equals(user.email) : user.email != null) return false;
+        if (allGroups != null ? !allGroups.equals(user.allGroups) : user.allGroups != null)
+            return false;
+        if (teskMemberedGroups != null
+                ? !teskMemberedGroups.equals(user.teskMemberedGroups)
+                : user.teskMemberedGroups != null) return false;
+        return teskManagedGroups != null
+                ? teskManagedGroups.equals(user.teskManagedGroups)
+                : user.teskManagedGroups == null;
     }
 
     @Override
@@ -237,7 +271,6 @@ public class User implements Serializable, UserDetails, Principal {
             this.userId = userId;
             this.teskMemberedGroups = new HashSet<>();
         }
-
 
         public UserBuilder preferredUsername(String preferredUsername) {
             this.preferredUsername = preferredUsername;
@@ -288,11 +321,17 @@ public class User implements Serializable, UserDetails, Principal {
         }
 
         public User build() {
-            return new User(userId, preferredUsername, name, givenName, familyName, email,
-                    allGroups, teskMemberedGroups, teskManagedGroups, teskAdmin);
+            return new User(
+                    userId,
+                    preferredUsername,
+                    name,
+                    givenName,
+                    familyName,
+                    email,
+                    allGroups,
+                    teskMemberedGroups,
+                    teskManagedGroups,
+                    teskAdmin);
         }
     }
-
 }
-
-

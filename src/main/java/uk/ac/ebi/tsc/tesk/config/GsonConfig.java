@@ -5,12 +5,9 @@ import io.kubernetes.client.openapi.JSON;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- */
+/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
 @Configuration
 public class GsonConfig {
-
 
     @Bean
     Gson gson() {

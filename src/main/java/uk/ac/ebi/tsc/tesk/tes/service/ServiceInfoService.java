@@ -1,5 +1,9 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
+import java.io.InputStream;
+import java.time.ZoneOffset;
+import java.util.Date;
+import javax.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -13,16 +17,10 @@ import org.yaml.snakeyaml.nodes.NodeId;
 import org.yaml.snakeyaml.nodes.Tag;
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
 
-import javax.annotation.PostConstruct;
-import java.io.InputStream;
-import java.time.ZoneOffset;
-import java.util.Date;
-
 /**
  * @author aniewielska
  * @since 03/06/2020
  */
-
 @Service
 @Slf4j
 public class ServiceInfoService {
@@ -61,7 +59,7 @@ public class ServiceInfoService {
         return serviceInfo;
     }
 
-    //https://bitbucket.org/asomov/snakeyaml/wiki/Howto#markdown-header-how-to-parse-jodatime
+    // https://bitbucket.org/asomov/snakeyaml/wiki/Howto#markdown-header-how-to-parse-jodatime
     class OffsetDateTimePropertyConstructor extends Constructor {
         public OffsetDateTimePropertyConstructor() {
             yamlClassConstructors.put(NodeId.scalar, new TimeStampConstruct());
@@ -70,17 +68,15 @@ public class ServiceInfoService {
         class TimeStampConstruct extends Constructor.ConstructScalar {
             @Override
             public Object construct(Node nnode) {
-                //a change here - Tag != String
+                // a change here - Tag != String
                 if (nnode.getTag().toString().equals("tag:yaml.org,2002:timestamp")) {
                     Construct dateConstructor = yamlConstructors.get(Tag.TIMESTAMP);
                     Date date = (Date) dateConstructor.construct(nnode);
-                    return date.toInstant()
-                            .atOffset(ZoneOffset.UTC);
+                    return date.toInstant().atOffset(ZoneOffset.UTC);
                 } else {
                     return super.construct(nnode);
                 }
             }
-
         }
     }
 }

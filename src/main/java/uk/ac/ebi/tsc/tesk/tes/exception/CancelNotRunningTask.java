@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class CancelNotRunningTask extends RuntimeException {
     private static final String message = "Job with ID=%s has no pods in RUNNING status.";
+
     public CancelNotRunningTask(String taskId) {
         super(String.format(message, taskId));
     }

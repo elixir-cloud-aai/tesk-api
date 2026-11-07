@@ -1,12 +1,11 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
-import org.apache.commons.lang3.StringUtils;
-import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
+import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
 
 /**
  * Wraps list of executor's command, so that:
@@ -21,7 +20,8 @@ import java.util.regex.Pattern;
  */
 public class ExecutorCommandWrapper {
 
-    private static final Pattern SPECIAL_CHARS = Pattern.compile("[ !\"#$&'()*;<>?\\[\\\\`{|~\\t\\n]");
+    private static final Pattern SPECIAL_CHARS =
+            Pattern.compile("[ !\"#$&'()*;<>?\\[\\\\`{|~\\t\\n]");
     private final TesExecutor executor;
 
     public ExecutorCommandWrapper(TesExecutor executor) {
@@ -30,7 +30,9 @@ public class ExecutorCommandWrapper {
 
     public List<String> getCommandsWithStreamRedirects() {
         List<String> result = new ArrayList<>();
-        if (StringUtils.isEmpty(executor.getStdin()) && StringUtils.isEmpty(executor.getStdout()) && StringUtils.isEmpty(executor.getStderr())) {
+        if (StringUtils.isEmpty(executor.getStdin())
+                && StringUtils.isEmpty(executor.getStdout())
+                && StringUtils.isEmpty(executor.getStderr())) {
             return executor.getCommand();
         }
         result.add("/bin/sh");

@@ -1,16 +1,15 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert.data;
 
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import org.junit.Test;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.collection.IsEmptyCollection.empty;
 import static org.junit.Assert.assertThat;
+
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import org.junit.Test;
 
 public class TaskTest {
 

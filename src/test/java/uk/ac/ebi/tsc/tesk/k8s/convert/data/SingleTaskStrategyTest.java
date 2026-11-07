@@ -1,13 +1,13 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert.data;
 
-import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import org.junit.Test;
-
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
+
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import org.junit.Test;
 
 public class SingleTaskStrategyTest {
 
@@ -57,5 +57,4 @@ public class SingleTaskStrategyTest {
         assertSame(taskMaker.getTask().getOutputFiler().get(), output);
         assertThat(taskMaker.getTask().getOutputFiler().get().getJobName(), is("anything2"));
     }
-
 }

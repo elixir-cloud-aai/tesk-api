@@ -1,15 +1,15 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
-import org.junit.Test;
-
-import java.util.Optional;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Optional;
+import org.junit.Test;
+
 /**
- * The deprecated client secret setting is ignored; a warning says so, without the secret, if it is set.
+ * The deprecated client secret setting is ignored; a warning says so, without the secret, if it is
+ * set.
  */
 public class DeprecatedClientSecretWarningTest {
 

@@ -1,6 +1,8 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
@@ -18,15 +20,11 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 /**
- * This class (specifically the @EnableResourceServer annotation)
- * + 2 dependencies: spring-boot-starter-security + spring-security-oauth2-autoconfigure
- * + security.oauth2.resource.user-info-uri property (which points to user info endpoint of the authorisation server)
- * switch on protection of (all minus Swagger) the endpoints via OAuth2 token
+ * This class (specifically the @EnableResourceServer annotation) + 2 dependencies:
+ * spring-boot-starter-security + spring-security-oauth2-autoconfigure +
+ * security.oauth2.resource.user-info-uri property (which points to user info endpoint of the
+ * authorisation server) switch on protection of (all minus Swagger) the endpoints via OAuth2 token
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
@@ -36,19 +34,29 @@ import java.util.List;
 @Profile("auth")
 public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter {
 
-
     private final ErrorAttributes errorAttributes;
     private final HttpMessageConverters messageConverters;
     private final AuthorisationProperties authorisationProperties;
-    // The API description, and the Swagger UI paths, which are only mapped (else 404) with tesk.api.swagger-ui.enabled
-    private final String[] ALLOWED_URLS = {"/", "/v2/api-docs", "/configuration/ui", "/swagger-resources/**", "/configuration/**", "/swagger-ui/**", "/webjars/**"};
+    // The API description, and the Swagger UI paths, which are only mapped (else 404) with
+    // tesk.api.swagger-ui.enabled
+    private final String[] ALLOWED_URLS = {
+        "/",
+        "/v2/api-docs",
+        "/configuration/ui",
+        "/swagger-resources/**",
+        "/configuration/**",
+        "/swagger-ui/**",
+        "/webjars/**"
+    };
     private final String baseUrl;
     private final boolean serviceInfoPublic;
 
-    public ResourceServerConfiguration(ErrorAttributes errorAttributes, HttpMessageConverters messageConverters,
-                                       AuthorisationProperties authorisationProperties,
-                                       @Value("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}") String baseUrl,
-                                       @Value("${tesk.api.service-info.public:true}") boolean serviceInfoPublic) {
+    public ResourceServerConfiguration(
+            ErrorAttributes errorAttributes,
+            HttpMessageConverters messageConverters,
+            AuthorisationProperties authorisationProperties,
+            @Value("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}") String baseUrl,
+            @Value("${tesk.api.service-info.public:true}") boolean serviceInfoPublic) {
 
         this.errorAttributes = errorAttributes;
         this.messageConverters = messageConverters;
@@ -57,10 +65,9 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
         this.serviceInfoPublic = serviceInfoPublic;
     }
 
-
     /**
-     * We leave the sensible defaults only letting swagger UI requests in, and service info unless a token
-     * is required for it (tesk.api.service-info.public)
+     * We leave the sensible defaults only letting swagger UI requests in, and service info unless a
+     * token is required for it (tesk.api.service-info.public)
      */
     @Override
     public void configure(HttpSecurity http) throws Exception {
@@ -70,41 +77,40 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
             allowedUrls.add(baseUrl + "/service-info");
         }
         String[] allowedUrlsArray = allowedUrls.toArray(new String[0]);
-        http
-                .authorizeRequests()
-                .antMatchers(HttpMethod.GET, allowedUrlsArray).permitAll()
-                .antMatchers(HttpMethod.HEAD, allowedUrlsArray).permitAll()
-                .anyRequest().authenticated();
+        http.authorizeRequests()
+                .antMatchers(HttpMethod.GET, allowedUrlsArray)
+                .permitAll()
+                .antMatchers(HttpMethod.HEAD, allowedUrlsArray)
+                .permitAll()
+                .anyRequest()
+                .authenticated();
     }
 
     /**
-     * Sets a custom entryPoint that returns json in our usual error format with the use of standard Boot's errorAttributes and
-     * autoconfigured messageConverters (specifically with autoconfigured objectMapper for JacksonConverter)
+     * Sets a custom entryPoint that returns json in our usual error format with the use of standard
+     * Boot's errorAttributes and autoconfigured messageConverters (specifically with autoconfigured
+     * objectMapper for JacksonConverter)
      */
     @Override
     public void configure(ResourceServerSecurityConfigurer resources) {
-        resources.authenticationEntryPoint(new CustomAuthenticationEntryPoint(errorAttributes, messageConverters));
+        resources.authenticationEntryPoint(
+                new CustomAuthenticationEntryPoint(errorAttributes, messageConverters));
     }
 
-    /**
-     * Magic, that changes default role prefix from ROLE_ to (...)elixir:
-     */
+    /** Magic, that changes default role prefix from ROLE_ to (...)elixir: */
     @Bean
     public GrantedAuthorityDefaults grantedAuthorityDefaults() {
         return new GrantedAuthorityDefaults(this.authorisationProperties.getGroupPrefix());
     }
 
-    /**
-     * Custom authorities extractor (we use Elixir roles as authorities)
-     */
+    /** Custom authorities extractor (we use Elixir roles as authorities) */
     @Bean
     public AuthoritiesExtractor authoritiesExtractor() {
-        return new GroupNamesSecurityExtractor(authorisationProperties.getGroupsClaim(), authorisationProperties.getGroupPrefix());
+        return new GroupNamesSecurityExtractor(
+                authorisationProperties.getGroupsClaim(), authorisationProperties.getGroupPrefix());
     }
 
-    /**
-     * Custom principal extractor (we use the whole userinfo response object as Principal
-     */
+    /** Custom principal extractor (we use the whole userinfo response object as Principal */
     @Bean
     public PrincipalExtractor principalExtractor() {
         return new ElixirPrincipalExtractor(authoritiesExtractor(), authorisationProperties);
@@ -112,11 +118,9 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
 
     /**
      * Switches off default in memory user store containing one user with auto-generated password
-     *
      */
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> null;
     }
-
 }

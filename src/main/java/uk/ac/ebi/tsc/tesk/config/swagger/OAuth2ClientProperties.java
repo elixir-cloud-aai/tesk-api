@@ -1,17 +1,16 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import javax.annotation.PostConstruct;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 import org.springframework.context.annotation.Configuration;
-
-import javax.annotation.PostConstruct;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * Properties for SwaggerUI acting as OAuth2 client
@@ -24,35 +23,21 @@ public class OAuth2ClientProperties {
 
     private static final Logger logger = LoggerFactory.getLogger(OAuth2ClientProperties.class);
 
-    /**
-     * Authorisation server authorisation endpoint
-     */
+    /** Authorisation server authorisation endpoint */
     private String authorizationEndpoint;
 
-    /**
-     * Authorisation server token endpoint
-     */
+    /** Authorisation server token endpoint */
     private String tokenEndpoint;
-    /**
-     * OAuth2 Client ID
-     */
+    /** OAuth2 Client ID */
     private String clientId;
 
-    /**
-     * OAuth2 Client Secret; deprecated and ignored: the Swagger UI is a public client
-     */
-    @Deprecated
-    private String clientSecret;
+    /** OAuth2 Client Secret; deprecated and ignored: the Swagger UI is a public client */
+    @Deprecated private String clientSecret;
 
-    /**
-     * List of Scopes, a client will request (a list of entries: scope name: description)
-     */
+    /** List of Scopes, a client will request (a list of entries: scope name: description) */
     private List<String> scopes;
-    /**
-     * Whether implicit (true) or auth code flow (false)
-     */
+    /** Whether implicit (true) or auth code flow (false) */
     private Boolean implicit;
-
 
     public String getAuthorizationEndpoint() {
         return authorizationEndpoint;
@@ -79,7 +64,8 @@ public class OAuth2ClientProperties {
     }
 
     @Deprecated
-    @DeprecatedConfigurationProperty(reason = "The Swagger UI is a public client and gets no client secret")
+    @DeprecatedConfigurationProperty(
+            reason = "The Swagger UI is a public client and gets no client secret")
     public String getClientSecret() {
         return clientSecret;
     }
@@ -92,11 +78,11 @@ public class OAuth2ClientProperties {
     public List<String> getScopes() {
         return scopes;
     }
+
     public Map<String, String> getScopesAsMap() {
         Map<String, String> map = new LinkedHashMap<>();
-        if (scopes == null)
-            return map;
-        for (String scope: scopes) {
+        if (scopes == null) return map;
+        for (String scope : scopes) {
             String[] pair = StringUtils.split(scope, ":");
             map.put(pair[0], pair[1]);
         }
@@ -115,25 +101,22 @@ public class OAuth2ClientProperties {
         this.implicit = implicit;
     }
 
-    /**
-     * Warns about the deprecated client secret setting, which is ignored, with any profile.
-     */
+    /** Warns about the deprecated client secret setting, which is ignored, with any profile. */
     @PostConstruct
     @SuppressWarnings("deprecation")
     public void warnAboutClientSecret() {
         deprecatedClientSecretWarning(this).ifPresent(logger::warn);
     }
 
-    /**
-     * The warning about the deprecated client secret setting, if it is set; without the secret.
-     */
+    /** The warning about the deprecated client secret setting, if it is set; without the secret. */
     @SuppressWarnings("deprecation")
     static Optional<String> deprecatedClientSecretWarning(OAuth2ClientProperties properties) {
         if (properties.getClientSecret() == null || properties.getClientSecret().trim().isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of("TESK_API_SWAGGER_OAUTH_CLIENT_SECRET (tesk.api.swagger-oauth.client-secret) is deprecated "
-                + "and ignored: the Swagger UI is a public client. Remove the setting, and rotate the secret at your "
-                + "identity provider if the Swagger UI was on.");
+        return Optional.of(
+                "TESK_API_SWAGGER_OAUTH_CLIENT_SECRET (tesk.api.swagger-oauth.client-secret) is deprecated "
+                        + "and ignored: the Swagger UI is a public client. Remove the setting, and rotate the secret at your "
+                        + "identity provider if the Swagger UI was on.");
     }
 }
