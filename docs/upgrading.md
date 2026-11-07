@@ -8,6 +8,13 @@ Changes since 1.2.0 that clients or deployments may notice:
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty
   body. Clients that checked for an empty body need to accept `{}`.
+- **Non-root image.** The image runs as the user `tesk` (UID 1000, group 0)
+  instead of `root`, with the home directory `/home/tesk` (see
+  [Deployment](deployment.md#image)). The Helm chart of TESK already runs it
+  as UID 1000 with its security context. If you run the image yourself with a
+  kubeconfig file, mount it to `/home/tesk/.kube/config` instead of
+  `/root/.kube/config` (or set `KUBECONFIG`); if you mount other files, make
+  sure that UID 1000 or group 0 can read them.
 
 ## To 1.2.0
 
