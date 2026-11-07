@@ -54,10 +54,17 @@ class TesServiceImplCancelTest {
         V1Pod taskmasterPod = new V1Pod().metadata(new V1ObjectMeta().name(TASK + "-pod")
                 .putLabelsItem("job-name", TASK)).status(new V1PodStatus().phase("Running"));
         when(this.client.readTaskmasterJob(TASK)).thenReturn(taskmaster);
+        V1Pod executorPod = new V1Pod().metadata(new V1ObjectMeta().name(TASK + "-ex-00-pod")
+                .putLabelsItem("job-name", TASK + "-ex-00")).status(new V1PodStatus().phase("Running"));
         when(this.client.listSingleJobPods(any(V1Job.class))).thenAnswer(invocation -> {
             V1Job job = invocation.getArgument(0);
-            return TASK.equals(job.getMetadata().getName())
-                    ? new V1PodList().addItemsItem(taskmasterPod) : new V1PodList().items(Collections.emptyList());
+            if (TASK.equals(job.getMetadata().getName())) {
+                return new V1PodList().addItemsItem(taskmasterPod);
+            }
+            if ((TASK + "-ex-00").equals(job.getMetadata().getName())) {
+                return new V1PodList().addItemsItem(executorPod);
+            }
+            return new V1PodList().items(Collections.emptyList());
         });
         when(this.client.getSingleTaskOutputFilerJob(TASK)).thenReturn(Optional.empty());
     }
@@ -87,13 +94,19 @@ class TesServiceImplCancelTest {
     }
 
     /**
-     * A running task is cancelled: its taskmaster's job and running pod are labelled.
+     * A running task is cancelled: its taskmaster's job and running pod are labelled, not the executor's pod.
      */
     @Test
     void runningTaskIsCancelled() {
-        when(this.client.listSingleTaskExecutorJobs(TASK)).thenReturn(new V1JobList().items(Collections.emptyList()));
+        V1Job executor = new V1Job().metadata(new V1ObjectMeta().name(TASK + "-ex-00")
+                .putLabelsItem(LABEL_JOBTYPE_KEY, LABEL_JOBTYPE_VALUE_EXEC)
+                .putLabelsItem(LABEL_TESTASK_ID_KEY, TASK))
+                .spec(selector(TASK + "-ex-00"))
+                .status(new V1JobStatus().active(1));
+        when(this.client.listSingleTaskExecutorJobs(TASK)).thenReturn(new V1JobList().addItemsItem(executor));
         this.service.cancelTask(TASK);
         verify(this.client).labelJobAsCancelled(TASK);
         verify(this.client).labelPodAsCancelled(TASK + "-pod");
+        verify(this.client, never()).labelPodAsCancelled(TASK + "-ex-00-pod");
     }
 }
