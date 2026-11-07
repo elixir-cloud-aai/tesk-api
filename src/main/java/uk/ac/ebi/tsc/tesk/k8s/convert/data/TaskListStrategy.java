@@ -9,8 +9,6 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_FILER_SUF;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Tool aimed at building Kubernetes object structure of a list of tasks,
  * by passing to it results of Kubernetes batch method calls.
  * All taskmaster jobs with unique names passed to it will get stored.
@@ -18,9 +16,14 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
  * (filtering done by taskmaster's name and corresponding executor's label).
  * Pods must be added, when all jobs have already been added.
  * Thus, correct order of calls:
- * 1) taskmasters by {@link TaskBuilder#addJobList(List)}
- * 2) executors and outputFilers by {@link TaskBuilder#addJobList(List)}
- * 3) pods by {@link TaskBuilder#addPodList(List)}
+ *
+ * <ol>
+ *   <li>taskmasters by {@link TaskBuilder#addJobList(List)}
+ *   <li>executors and outputFilers by {@link TaskBuilder#addJobList(List)}
+ *   <li>pods by {@link TaskBuilder#addPodList(List)}
+ * </ol>
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class TaskListStrategy implements BuildStrategy {
 

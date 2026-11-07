@@ -8,9 +8,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Properties affecting taskmaster's job template
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
 @ConfigurationProperties(prefix = "tesk.api.taskmaster")

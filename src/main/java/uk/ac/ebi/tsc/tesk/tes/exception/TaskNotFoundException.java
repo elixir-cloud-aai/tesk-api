@@ -4,9 +4,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- *
  * 404 - for getTask
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @ResponseStatus(HttpStatus.NOT_FOUND)
 public class TaskNotFoundException extends RuntimeException {

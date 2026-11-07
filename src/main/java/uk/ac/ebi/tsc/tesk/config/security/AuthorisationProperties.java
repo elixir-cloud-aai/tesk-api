@@ -4,9 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Configuration of group based authorisation
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
 @ConfigurationProperties(prefix = "tesk.api.authorisation")

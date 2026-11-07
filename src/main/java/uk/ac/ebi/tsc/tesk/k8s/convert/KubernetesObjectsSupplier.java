@@ -20,9 +20,9 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.*;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.*;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Templates for tasmaster's and executor's job object.
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
 public class KubernetesObjectsSupplier {

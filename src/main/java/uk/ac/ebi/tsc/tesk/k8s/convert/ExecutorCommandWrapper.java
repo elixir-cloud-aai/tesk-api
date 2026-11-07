@@ -10,10 +10,14 @@ import java.util.regex.Pattern;
 
 /**
  * Wraps list of executor's command, so that:
- * - if any of executor's stdin/stdout/stderr params is set, the command runs in shell
- * - Each part of the original command (single command/argument) that contained shell special chars is surrounded by single quotes,
- *   plus single quote inside such string are replaced with '"'"' sequence
- * - stdin, stdout, stderr streams are redirected to paths according to executors params
+ *
+ * <ul>
+ *   <li>if any of executor's stdin/stdout/stderr params is set, the command runs in shell
+ *   <li>Each part of the original command (single command/argument) that contained shell special
+ *       chars is surrounded by single quotes, plus single quote inside such string are replaced
+ *       with '"'"' sequence
+ *   <li>stdin, stdout, stderr streams are redirected to paths according to executors params
+ * </ul>
  */
 public class ExecutorCommandWrapper {
 

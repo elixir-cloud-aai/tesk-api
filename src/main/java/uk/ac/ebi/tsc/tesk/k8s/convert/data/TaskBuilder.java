@@ -12,8 +12,6 @@ import java.util.Map;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.*;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Part of the toolset aimed at building Kubernetes object structure of a task or a list of tasks,
  * by gradually adding to it objects returned by calls to Kubernetes API (jobs and pods).
  * This class takes care of matching jobs with corresponding pods and holds a flat collection (mapped by name)
@@ -21,6 +19,8 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.*;
  * Accepts a BuildStrategy {@link BuildStrategy}, which implementing classes are responsible of creating,
  * storing and maintaining the actual {@link Task} object or {@link Task} object's list
  * by implementing {@link BuildStrategy#addTaskMasterJob(Job)} and {@link BuildStrategy#addExecutorJob(Job)}}.
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class TaskBuilder {
 

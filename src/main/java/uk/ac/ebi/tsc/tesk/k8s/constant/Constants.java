@@ -10,9 +10,9 @@ import io.kubernetes.client.custom.V1Patch;
 import java.util.EnumSet;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * TESK implementation specific constants
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class Constants {
 

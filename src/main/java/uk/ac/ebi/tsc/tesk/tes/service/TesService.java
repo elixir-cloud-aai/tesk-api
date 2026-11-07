@@ -10,11 +10,11 @@ import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Implementation of controller endpoints.
  * Orchestrates all kubernetes client calls (via wrapper)
  * and converting inputs and outputs with the help of the converter.
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public interface TesService {
     /**

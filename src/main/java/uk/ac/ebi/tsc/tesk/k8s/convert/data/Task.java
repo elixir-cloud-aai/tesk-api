@@ -11,11 +11,11 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_EXEC_NO_LENGTH;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_EXEC_PREFIX;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * A composite that represents Kubernetes object's graph of a single TES task:
  * taskmaster job with its pods
  * and executor jobs with its pods
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class Task {
     /**

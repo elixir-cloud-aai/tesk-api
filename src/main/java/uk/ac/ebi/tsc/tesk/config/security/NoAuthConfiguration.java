@@ -8,10 +8,10 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.core.userdetails.UserDetailsService;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Switches off spring security for all requests
  * making all requests anonymous
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 
 @Configuration

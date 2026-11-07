@@ -25,11 +25,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- *
  * Entrypoint for OAuth Errors. Inspired by {@link OAuth2AuthenticationEntryPoint} - sadly needed some repetition.
  * Adds more data to response body object, to conform to ErrorAttributes format plus uses externally supllied messageConverters
  * (Autoconfigured HttpMessageConverters from context are used - {@link ResourceServerConfiguration}
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class CustomAuthenticationEntryPoint extends OAuth2AuthenticationEntryPoint {
 

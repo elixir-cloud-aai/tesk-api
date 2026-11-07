@@ -14,9 +14,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- *
  * Properties for SwaggerUI acting as OAuth2 client
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
 @ConfigurationProperties(prefix = "tesk.api.swagger-oauth")

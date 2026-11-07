@@ -24,11 +24,11 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Implementation of controller endpoints.
  * Orchestrates all kubernetes client calls (via wrapper)
  * and converting inputs and outputs with the help of the converter.
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Service
 public class TesServiceImpl implements TesService {

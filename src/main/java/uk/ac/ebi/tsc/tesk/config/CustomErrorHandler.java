@@ -27,14 +27,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  * Custom Error Handler:
- * 1) created mainly to bypass default Spring Boot error controller {@link BasicErrorController} in order
- * to avoid generating html error page for browser requests
- * (always tries to return JSON instead)
- * 2) uses default Spring Boot's ErrorAttributes, customizing output for MethodArgumentNotValidException
- * 3) overrides ResponseEntityExceptionHandler {@link ResponseEntityExceptionHandler} to
- * return sensible HTTP status codes for Spring internal exceptions
+ *
+ * <ol>
+ *   <li>created mainly to bypass default Spring Boot error controller {@link BasicErrorController}
+ *       in order to avoid generating html error page for browser requests (always tries to return
+ *       JSON instead)
+ *   <li>uses default Spring Boot's ErrorAttributes, customizing output for
+ *       MethodArgumentNotValidException
+ *   <li>overrides ResponseEntityExceptionHandler {@link ResponseEntityExceptionHandler} to return
+ *       sensible HTTP status codes for Spring internal exceptions
+ * </ol>
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @ControllerAdvice
 public class CustomErrorHandler extends ResponseEntityExceptionHandler {

@@ -14,8 +14,9 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  * POJO for auhenticated user's data
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 
 public class User implements Serializable, UserDetails, Principal {

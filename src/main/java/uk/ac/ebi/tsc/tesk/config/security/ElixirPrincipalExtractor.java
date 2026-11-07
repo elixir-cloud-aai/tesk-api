@@ -13,9 +13,9 @@ import java.util.stream.Collectors;
 
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Custom principal extractor (puts all of the info from userinfo to custom {@link User} object)
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class ElixirPrincipalExtractor implements PrincipalExtractor {
 

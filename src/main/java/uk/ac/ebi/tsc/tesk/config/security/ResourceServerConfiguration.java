@@ -23,12 +23,12 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * This class (specifically the @EnableResourceServer annotation)
  * + 2 dependencies: spring-boot-starter-security + spring-security-oauth2-autoconfigure
  * + security.oauth2.resource.user-info-uri property (which points to user info endpoint of the authorisation server)
  * switch on protection of (all minus Swagger) the endpoints via OAuth2 token
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
 @EnableResourceServer

@@ -30,10 +30,10 @@ import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Integration testing of switched off security
  * Kubernetes API is WireMocked
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest

@@ -30,10 +30,10 @@ import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Integration testing of security (authentication and authorisation using OIDC and Elixir groups)
  * Kubernetes API and OIDC userInfo endpoint are WireMocked
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest

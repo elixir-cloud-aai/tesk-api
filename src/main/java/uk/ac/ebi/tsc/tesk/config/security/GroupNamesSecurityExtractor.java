@@ -13,10 +13,10 @@ import org.springframework.util.StringUtils;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.FixedAuthoritiesExtractor;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Custom authorities extractor, that looks for groups element and transforms it into authorities.
- * Heavily inspired by {@link FixedAuthoritiesExtractor)
+ * Heavily inspired by {@link org.springframework.boot.autoconfigure.security.oauth2.resource.FixedAuthoritiesExtractor}
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class GroupNamesSecurityExtractor implements AuthoritiesExtractor {
 

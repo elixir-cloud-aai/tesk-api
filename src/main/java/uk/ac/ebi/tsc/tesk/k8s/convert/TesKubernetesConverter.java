@@ -35,9 +35,9 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.*;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.*;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * Conversion of TES objects to and from Kubernetes Objects
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Component
 public class TesKubernetesConverter {
@@ -198,8 +198,8 @@ public class TesKubernetesConverter {
     }
 
     /**
-     * Retrieves TesCreateTaskResponse from K8s job
-     * At the moment - only wraps job's name/task's id
+     * Retrieves TesCreateTaskResponse from K8s job. At the moment it only wraps job's name/task's
+     * id.
      *
      * @param job - K8s taskMaster job
      * @return - TesCreateTaskResponse wrapping task ID

@@ -7,10 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
  * A container for a single Kubernetes job object (can be both a taskmaster and an executor)
  * and its list of worker pods (Kubernetes Pod objects)
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class Job {
     /**
