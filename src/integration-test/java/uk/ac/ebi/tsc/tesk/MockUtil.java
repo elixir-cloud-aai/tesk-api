@@ -36,6 +36,28 @@ class MockUtil {
                         .willReturn(ok("hello executor!")));
     }
 
+    /**
+     * Lets task-123 be a task of the user {@code userId} without a group (replaces the taskmaster
+     * of {@link #mockGetTaskKubernetesResponses}, as WireMock prefers the stub added last)
+     */
+    static void mockUngroupedTaskKubernetesResponses(WireMockRule mockKubernetes, String userId) {
+        mockGetTaskKubernetesResponses(mockKubernetes);
+        mockKubernetes.givenThat(
+                WireMock.get("/apis/batch/v1/namespaces/default/jobs/task-123")
+                        .willReturn(
+                                aResponse()
+                                        .withHeader("Content-Type", "application/json")
+                                        .withBody(
+                                                "{\"metadata\": {\"labels\": {\"creator-user-id\": \""
+                                                        + userId
+                                                        + "\", \"job-type\": \"taskmaster\"},"
+                                                        + " \"name\": \"task-123\"},"
+                                                        + " \"spec\": {\"selector\": {\"matchLabels\":"
+                                                        + " {\"controller-uid\":"
+                                                        + " \"24a0504a-4a2b-11e8-a06f-fa163ecf0042\"}}},"
+                                                        + " \"status\": {\"succeeded\": 1}}")));
+    }
+
     static void mockListTaskKubernetesResponses(WireMockRule mockKubernetes) {
         mockKubernetes.givenThat(
                 WireMock.get(

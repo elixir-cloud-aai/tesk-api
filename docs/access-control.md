@@ -2,7 +2,7 @@
 
 TESK API integrates with [Elixir AAI](https://www.elixir-europe.org/services/compute/aai) via [OpenID Connect](http://openid.net/connect/) protocol to authenticate and authorise requests. Authentication and authorisation are optional and can be switched off completely. When authentication is on, in order to perform any operation on tasks (get and/or create tasks) TESK API user will have to include a valid access token issued by Elixir AAI in the request header. To obtain such a token, a user will have to:
 * have a valid account in Elixir AAI
-* belong to a specific Elixir group
+* belong to a specific Elixir group (or, with [authorisation without groups](#authorisation-without-groups) on, have one of the configured values in a claim)
 * have access to a registered Elixir client application, that was assigned - among others - `groupNames` scope.
 
 ## Switching on/off authentication and authorisation
@@ -38,7 +38,7 @@ TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each 
 We have not tested TESK API integration with a different OIDC provider than Elixir AAI, but since standard Spring OAuth library is used, it should be possible (just point `security.oauth2.resource.user-info-uri`, or `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`, to a proper URL), provided that the other Authorization Server provides information about the user in the same format that Elixir does. Otherwise changes to [GroupNamesSecurityExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/GroupNamesSecurityExtractor.java) and [ElixirPrincipalExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/ElixirPrincipalExtractor.java) will be necessary.
 
 ## Authorisation
-TESK API uses Elixir AAI group membership to authorise users. Elixir recognises group managers and members, but only includes information about the latter in `user_info` endpoint response. Therefore a nested structure of groups is used by us to reflect different roles of users.
+TESK API uses Elixir AAI group membership to authorise users (and optionally a claim, see [Authorisation without groups](#authorisation-without-groups)). Elixir recognises group managers and members, but only includes information about the latter in `user_info` endpoint response. Therefore a nested structure of groups is used by us to reflect different roles of users.
 ### Group structure
 Group level | Example (from our own environments) | Meaning | Multiplicity
 ------------ |---| -------------|---
@@ -113,8 +113,15 @@ Group rules are unchanged and come first: a team member, team admin or super
 admin keeps the rights described [above](#endpoint-permissions), whether or
 not they have the claim. Super admins (the Super Admin Group) see all tasks,
 including those of claim users; team admins don't see them, as they belong to
-no team. A team member who loses the membership but has the claim sees only
-their tasks without a team.
+no team.
+
+Listing follows the group rules first, too: a user who is a team member or
+team admin and has the claim lists the tasks of their teams, but not their
+own tasks without a team, although they may still get and cancel these by
+ID. This happens to tasks that a user created with the claim only before
+joining a team, and to tasks of team admins who aren't team members (these
+are created without a team). A team member who loses the membership but has
+the claim lists only their tasks without a team.
 
 ### Security implications
 
@@ -132,6 +139,6 @@ their tasks without a team.
   value revoked at the provider takes effect at the next request. Tasks that
   are already running keep running.
 * Users are identified by `sub` (with `@` replaced by `_`), as for group
-  members. The tasks of a claim user are labelled with it; Kubernetes allows
-  label values of up to 63 characters, so longer subjects can't create
-  tasks.
+  members: tasks are labelled with it. As for all users, Kubernetes allows
+  label values of up to 63 characters, so users with longer subjects can't
+  create tasks.

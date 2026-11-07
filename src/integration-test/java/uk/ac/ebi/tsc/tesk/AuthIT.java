@@ -681,6 +681,19 @@ public class AuthIT {
         this.mvc
                 .perform(get(TASK_URL).header("Authorization", "Bearer BAR"))
                 .andExpect(status().isForbidden());
+
+        // nor get or cancel the own task without a group
+        MockUtil.mockUngroupedTaskKubernetesResponses(this.mockKubernetes, "123");
+        this.mvc
+                .perform(get(TASK_URL + "/{id}", "task-123").header("Authorization", "Bearer BAR"))
+                .andExpect(status().isForbidden());
+        this.mvc
+                .perform(
+                        post(TASK_URL + "/{id}:cancel", "task-123")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON)
+                                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

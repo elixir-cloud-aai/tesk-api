@@ -120,22 +120,25 @@ public class ClaimAuthIT {
                         .header("Authorization", "Bearer BAR"));
     }
 
-    /** Lets task-123 be a task of the user {@code userId} without a group */
     private void mockUngroupedTask(String userId) {
-        MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
-        // replaces the taskmaster of MockUtil (WireMock prefers the stub added last)
+        MockUtil.mockUngroupedTaskKubernetesResponses(this.mockKubernetes, userId);
+    }
+
+    private void mockCreateTask(String groupLabel) {
         mockKubernetes.givenThat(
-                WireMock.get("/apis/batch/v1/namespaces/default/jobs/task-123")
-                        .willReturn(
-                                okJson(
-                                        "{\"metadata\": {\"labels\": {\"creator-user-id\": \""
-                                                + userId
-                                                + "\", \"job-type\": \"taskmaster\"},"
-                                                + " \"name\": \"task-123\"},"
-                                                + " \"spec\": {\"selector\": {\"matchLabels\":"
-                                                + " {\"controller-uid\":"
-                                                + " \"24a0504a-4a2b-11e8-a06f-fa163ecf0042\"}}},"
-                                                + " \"status\": {\"succeeded\": 1}}")));
+                WireMock.post("/apis/batch/v1/namespaces/default/jobs")
+                        .withRequestBody(
+                                groupLabel == null
+                                        ? matchingJsonPath(
+                                                "$.metadata.labels['creator-group-name']", absent())
+                                        : matchingJsonPath(
+                                                "$.metadata.labels[?(@.creator-group-name == '"
+                                                        + groupLabel
+                                                        + "')]"))
+                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
+        mockKubernetes.givenThat(
+                WireMock.post("/api/v1/namespaces/default/configmaps")
+                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
     }
 
     @Test
@@ -297,6 +300,78 @@ public class ClaimAuthIT {
     @Test
     public void claimUser_cancelOwnTask() throws Exception {
         userInfo("user@example.org", "https://refeds.org/assurance/IAP/medium");
+        mockUngroupedTask("user_example.org");
+
+        cancelTask()
+                .andExpect(status().isBadRequest())
+                .andExpect(
+                        jsonPath("$.message")
+                                .value("Job with ID=task-123 has no pods in RUNNING status."));
+    }
+
+    /** Group members with the claim create tasks for their group, as without it */
+    @Test
+    public void memberWithClaim_createTask() throws Exception {
+        userInfo(
+                "123",
+                "https://refeds.org/assurance/IAP/medium",
+                "GA4GH:GA4GH-CAP:EBI",
+                "GA4GH:GA4GH-CAP:EBI:TEST");
+        mockCreateTask("TEST");
+
+        createTask("fromTesToK8s_minimal/task.json").andExpect(status().isOk());
+    }
+
+    /** A claim user who is a member of the chosen group may create tasks for it */
+    @Test
+    public void memberWithClaim_createTask_forOwnGroup() throws Exception {
+        userInfo(
+                "123",
+                "https://refeds.org/assurance/IAP/medium",
+                "GA4GH:GA4GH-CAP:EBI",
+                "GA4GH:GA4GH-CAP:EBI:ABC");
+        mockCreateTask("ABC");
+        // the full task asks for memory, so the limits are read
+        mockKubernetes.givenThat(
+                WireMock.get("/api/v1/namespaces/default/limitranges")
+                        .willReturn(okJson("{\"metadata\":{\"name\":\"core-resource-limits\"}}")));
+
+        createTask("fromTesToK8s/task.json").andExpect(status().isOk());
+    }
+
+    /** Super admins create tasks without a group, with or without the claim */
+    @Test
+    public void superAdmin_createTask() throws Exception {
+        for (String assurance : new String[] {null, "https://refeds.org/assurance/IAP/medium"}) {
+            userInfo("123", assurance, "GA4GH:GA4GH-CAP:EBI", "GA4GH:GA4GH-CAP:EBI:ADMIN");
+            mockCreateTask(null);
+
+            createTask("fromTesToK8s_minimal/task.json").andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    public void claimWrongValue_getOwnTask() throws Exception {
+        userInfo("user@example.org", "https://refeds.org/assurance/IAP/low");
+        mockUngroupedTask("user_example.org");
+
+        getTask().andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void claimAbsentOrWrong_cancelOwnTask() throws Exception {
+        for (String assurance : new String[] {null, "https://refeds.org/assurance/IAP/low"}) {
+            userInfo("user@example.org", assurance);
+            mockUngroupedTask("user_example.org");
+
+            cancelTask().andExpect(status().isForbidden());
+        }
+    }
+
+    /** Super admins may cancel tasks of claim users (it isn't running, hence 400) */
+    @Test
+    public void superAdmin_cancelUngroupedTask() throws Exception {
+        userInfo("123", null, "GA4GH:GA4GH-CAP:EBI", "GA4GH:GA4GH-CAP:EBI:ADMIN");
         mockUngroupedTask("user_example.org");
 
         cancelTask()

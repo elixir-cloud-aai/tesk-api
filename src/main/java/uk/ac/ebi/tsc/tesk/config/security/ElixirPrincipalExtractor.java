@@ -1,10 +1,7 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -14,7 +11,6 @@ import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.PrincipalExtractor;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -55,6 +51,7 @@ public class ElixirPrincipalExtractor implements PrincipalExtractor {
             Set<String> values =
                     Optional.ofNullable(claim.getValues()).orElse(Collections.emptyList()).stream()
                             .filter(StringUtils::hasText)
+                            .map(String::trim)
                             .collect(Collectors.toSet());
             if (!StringUtils.hasText(claim.getName()) || values.isEmpty()) {
                 // fail at startup rather than authorising nobody, or (with a blank value) anybody
@@ -72,22 +69,18 @@ public class ElixirPrincipalExtractor implements PrincipalExtractor {
     }
 
     /**
-     * Whether the user info has one of the required values in the claim (a string, or a list or
-     * array of them), compared exactly; always false if the setting is off
+     * Whether the user info has one of the required values in the claim (a string, or a list of
+     * them, as JSON gives them), compared exactly; always false if the setting is off
      */
     private boolean isClaimAuthorised(Map<String, Object> map) {
         if (this.claimName == null) {
             return false;
         }
         Object claim = map.get(this.claimName);
-        List<Object> values;
-        if (claim instanceof Collection) {
-            values = new ArrayList<>((Collection<?>) claim);
-        } else if (ObjectUtils.isArray(claim)) {
-            values = Arrays.asList(ObjectUtils.toObjectArray(claim));
-        } else {
-            values = Collections.singletonList(claim);
-        }
+        Collection<?> values =
+                claim instanceof Collection
+                        ? (Collection<?>) claim
+                        : Collections.singletonList(claim);
         return values.stream()
                 .anyMatch(value -> value instanceof String && this.claimValues.contains(value));
     }

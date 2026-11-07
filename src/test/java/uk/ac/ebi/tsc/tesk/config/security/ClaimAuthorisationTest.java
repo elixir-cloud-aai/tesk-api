@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.config.security;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -107,6 +108,43 @@ public class ClaimAuthorisationTest {
     @Test(expected = IllegalStateException.class)
     public void enabled_onlyBlankValues() {
         extract(properties(true, CLAIM, ""), MEDIUM);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void enabled_nullValues() {
+        AuthorisationProperties properties = properties(true, CLAIM);
+        properties.getClaim().setValues(null);
+        extract(properties, MEDIUM);
+    }
+
+    /** Configured values are trimmed, the claim's values aren't */
+    @Test
+    public void enabled_trimmedValues() {
+        assertTrue(
+                extract(properties(true, CLAIM, " " + MEDIUM + " "), MEDIUM).isClaimAuthorised());
+        assertFalse(extract(properties(true, CLAIM, MEDIUM), " " + MEDIUM).isClaimAuthorised());
+    }
+
+    /** Values of other types than strings never match */
+    @Test
+    public void enabled_nonStringValues() {
+        assertFalse(extract(properties(true, CLAIM, "1"), 1).isClaimAuthorised());
+        assertFalse(
+                extract(properties(true, CLAIM, "true"), Arrays.asList(true, 1))
+                        .isClaimAuthorised());
+    }
+
+    /** Users differ by the claim, also in their hash code and text */
+    @Test
+    public void equalsHashCodeToString() {
+        User user = User.builder("123").claimAuthorised(true).build();
+        User same = User.builder("123").claimAuthorised(true).build();
+        User other = User.builder("123").claimAuthorised(false).build();
+        assertEquals(user, same);
+        assertEquals(user.hashCode(), same.hashCode());
+        assertNotEquals(user, other);
+        assertNotEquals(user.hashCode(), other.hashCode());
+        assertTrue(user.toString().contains("claimAuthorised=true"));
     }
 
     /** A user authorised by the claim only sees the own tasks without a group */
