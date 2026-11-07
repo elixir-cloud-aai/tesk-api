@@ -3,7 +3,9 @@ package uk.ac.ebi.tsc.tesk.config;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.servlet.RequestDispatcher;
 import javax.servlet.http.HttpServletRequest;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.boot.autoconfigure.web.servlet.error.BasicErrorController;
 import org.springframework.boot.web.error.ErrorAttributeOptions;
 import org.springframework.boot.web.servlet.error.ErrorAttributes;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -103,6 +106,24 @@ public class CustomErrorHandler extends ResponseEntityExceptionHandler {
         responseBody.remove("errors");
         responseBody.put("messages", errors);
         return response;
+    }
+
+    /**
+     * Handles request parameters of the wrong type (e.g. {@code page_size=abc}) with a message that
+     * names the parameter, but not the value, instead of Spring's message, which repeats the value.
+     */
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(
+            TypeMismatchException ex, HttpHeaders headers, HttpStatus status, WebRequest request) {
+        if (ex instanceof MethodArgumentTypeMismatchException) {
+            request.setAttribute(
+                    RequestDispatcher.ERROR_MESSAGE,
+                    "Invalid value of parameter "
+                            + ((MethodArgumentTypeMismatchException) ex).getName()
+                            + ".",
+                    RequestAttributes.SCOPE_REQUEST);
+        }
+        return super.handleTypeMismatch(ex, headers, status, request);
     }
 
     /**

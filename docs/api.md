@@ -26,8 +26,10 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
 (the default), `BASIC` and `FULL`.
 
 - `page_size` sets how many tasks TESK API reads from Kubernetes for one
-  page; without it, it reads all of them at once. `next_page_token` is the
-  continue token of Kubernetes; pass it as `page_token` to get the next page.
+  page, from 1 to 2048; without it, it reads all of them at once. Other
+  values, also those that aren't whole numbers, are refused with
+  `400 Bad Request`. `next_page_token` is the continue token of Kubernetes;
+  pass it as `page_token` to get the next page.
   It is left out on the last page. Kubernetes accepts it for a limited time
   only (by default about 5 minutes, until etcd compacts its history).
 - `name_prefix` lists only the tasks whose names start with it
@@ -42,8 +44,12 @@ members of others, whose pages TESK API filters, too. The TES specification
 doesn't forbid this: keep requesting pages until `next_page_token` is left
 out, not until a page is shorter than `page_size`.
 
-An expired or invalid `page_token` currently fails with `500 Internal Server
-Error`; start again without `page_token`.
+An expired or malformed `page_token` (one that Kubernetes refuses with
+`410 Gone`, or with `400 Bad Request` because of the continue token) is
+refused with `400 Bad Request`; the message names `page_token`, but not
+its value. Start again without `page_token`. Other errors of Kubernetes,
+also for forged tokens that it can't tell apart from its own failures, still
+give `500 Internal Server Error`.
 
 ## Resources
 

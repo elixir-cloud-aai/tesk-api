@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageSizeException;
 import uk.ac.ebi.tsc.tesk.tes.model.*;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
@@ -26,6 +27,12 @@ import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 @RequiredArgsConstructor
 @RequestMapping("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}")
 public class TasksApiController implements TasksApi {
+
+    /**
+     * Largest page_size accepted by listTasks. The TES 1.1 API description says "less than 2048";
+     * TESK API also accepts 2048 itself (issue #114).
+     */
+    static final long MAX_PAGE_SIZE = 2048;
 
     private final TesService tesService;
 
@@ -72,7 +79,9 @@ public class TasksApiController implements TasksApi {
             @ApiParam(
                             example = "256",
                             value =
-                                    "OPTIONAL. Number of tasks to return in one page. Without it, all tasks are returned in one page. Pages can be shorter, also with name_prefix.")
+                                    "OPTIONAL. Number of tasks to return in one page, from 1 to "
+                                            + MAX_PAGE_SIZE
+                                            + ". Without it, all tasks are returned in one page. Pages can be shorter, also with name_prefix.")
                     @RequestParam(value = "page_size", required = false)
                     Long pageSize,
             @ApiParam(
@@ -88,6 +97,9 @@ public class TasksApiController implements TasksApi {
                     @RequestParam(value = "view", required = false, defaultValue = "MINIMAL")
                     String view) {
 
+        if (pageSize != null && (pageSize < 1 || pageSize > MAX_PAGE_SIZE)) {
+            throw new InvalidPageSizeException(MAX_PAGE_SIZE);
+        }
         TesListTasksResponse response =
                 this.tesService.listTasks(
                         namePrefix, pageSize, pageToken, TaskView.fromString(view), this.getUser());

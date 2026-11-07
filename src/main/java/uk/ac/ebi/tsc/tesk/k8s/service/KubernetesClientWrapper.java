@@ -16,6 +16,7 @@ import io.kubernetes.client.openapi.models.V1LimitRangeList;
 import io.kubernetes.client.openapi.models.V1PodList;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
@@ -27,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
+import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 
 /** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
@@ -195,7 +197,16 @@ public class KubernetesClientWrapper {
             // and optionally also to only those jobs, which were created bu the user
             labelSelector += "," + user.getLabelSelector();
         }
-        V1JobList result = this.listJobs(pageToken, labelSelector, itemsPerPage);
+        V1JobList result;
+        try {
+            result = this.listJobs(pageToken, labelSelector, itemsPerPage);
+        } catch (KubernetesException e) {
+            if (pageToken != null && isInvalidContinueToken(e.getApiException())) {
+                // a client error; the message names the parameter, never the token
+                throw new InvalidPageTokenException();
+            }
+            throw e;
+        }
         if (user.isMemberInNonManagedGroups()) {
             // if there are groups, where user is a manager and other groups, where user is only a
             // member
@@ -218,6 +229,23 @@ public class KubernetesClientWrapper {
             result.setItems(filteredJobList);
         }
         return result;
+    }
+
+    /**
+     * Whether Kubernetes refused a list request's continue token: 410 Gone if it expired (etcd
+     * compacted the revision; the request sets no resource version, so nothing else can expire), or
+     * 400 Bad Request if it is malformed, which the message of the Status says ("continue key is
+     * not valid"). Other 400s, e.g. for a label selector, stay server errors. Only called if the
+     * request carried a token.
+     */
+    private static boolean isInvalidContinueToken(ApiException e) {
+        if (e.getCode() == HttpStatus.GONE.value()) {
+            return true;
+        }
+        String body = e.getResponseBody();
+        return e.getCode() == HttpStatus.BAD_REQUEST.value()
+                && body != null
+                && body.toLowerCase(Locale.ROOT).contains("continue");
     }
 
     public V1JobList listSingleTaskExecutorJobs(String taskId) {

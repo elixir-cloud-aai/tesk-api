@@ -1,13 +1,17 @@
 package uk.ac.ebi.tsc.tesk.tes.api;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,8 +44,10 @@ import org.springframework.security.oauth2.provider.token.ResourceServerTokenSer
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
+import uk.ac.ebi.tsc.tesk.tes.model.TesListTasksResponse;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
@@ -293,5 +299,84 @@ public class TasksApiControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * page_size must be between 1 and 2048; other numbers, also those that would wrap around when
+     * converted to an int, are refused before Kubernetes is asked (issue #114)
+     */
+    @Test
+    public void listTasks_invalidPageSize() throws Exception {
+        String[] pageSizes = new String[] {"0", "-1", "2049", "4294967297", "9223372036854775807"};
+        for (String pageSize : pageSizes) {
+            this.mvc
+                    .perform(
+                            get(TASK_URL)
+                                    .param("page_size", pageSize)
+                                    .header("Authorization", "Bearer BAR")
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("page_size")))
+                    .andExpect(jsonPath("$.message", containsString("2048")));
+        }
+        verify(this.tesService, never()).listTasks(any(), any(), any(), any(), any());
+    }
+
+    /**
+     * Values that aren't whole numbers (or don't fit a long) are refused, too, with a message that
+     * names the parameter, not the value (issue #114)
+     */
+    @Test
+    public void listTasks_nonNumericPageSize() throws Exception {
+        String[] pageSizes = new String[] {"abc", "1.5", "99999999999999999999"};
+        for (String pageSize : pageSizes) {
+            this.mvc
+                    .perform(
+                            get(TASK_URL)
+                                    .param("page_size", pageSize)
+                                    .header("Authorization", "Bearer BAR")
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("page_size")))
+                    .andExpect(jsonPath("$.message", not(containsString(pageSize))));
+        }
+        verify(this.tesService, never()).listTasks(any(), any(), any(), any(), any());
+    }
+
+    /** The limits themselves are accepted (issue #114) */
+    @Test
+    public void listTasks_validPageSize() throws Exception {
+        given(this.tesService.listTasks(any(), any(), any(), any(), any()))
+                .willReturn(new TesListTasksResponse());
+        for (long pageSize : new long[] {1L, TasksApiController.MAX_PAGE_SIZE}) {
+            this.mvc
+                    .perform(
+                            get(TASK_URL)
+                                    .param("page_size", String.valueOf(pageSize))
+                                    .header("Authorization", "Bearer BAR")
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
+            verify(this.tesService)
+                    .listTasks(isNull(), eq(pageSize), isNull(), eq(TaskView.MINIMAL), any());
+        }
+    }
+
+    /**
+     * An expired or malformed page_token is a client error: 400 with a message that names the
+     * parameter, never its value (issue #114)
+     */
+    @Test
+    public void listTasks_invalidPageToken() throws Exception {
+        given(this.tesService.listTasks(any(), any(), eq("secret-token"), any(), any()))
+                .willThrow(new InvalidPageTokenException());
+        this.mvc
+                .perform(
+                        get(TASK_URL)
+                                .param("page_token", "secret-token")
+                                .header("Authorization", "Bearer BAR")
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("page_token")))
+                .andExpect(content().string(not(containsString("secret-token"))));
     }
 }

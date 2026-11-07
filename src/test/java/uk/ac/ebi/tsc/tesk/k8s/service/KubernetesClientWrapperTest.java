@@ -1,7 +1,10 @@
 package uk.ac.ebi.tsc.tesk.k8s.service;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_GROUPNAME_KEY;
@@ -26,6 +29,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
+import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 
 @RunWith(SpringRunner.class)
@@ -443,5 +448,85 @@ public class KubernetesClientWrapperTest {
                                                 .putLabelsItem(LABEL_GROUPNAME_KEY, "ABC")
                                                 .putLabelsItem(LABEL_USERID_KEY, "123"))));
         return jobList;
+    }
+
+    /** Kubernetes answers an expired continue token with 410 Gone (issue #114) */
+    @Test
+    public void listAllTaskmasterJobsForUser_expiredPageToken() throws ApiException {
+        this.assertInvalidPageToken(HttpStatus.GONE.value());
+    }
+
+    /** Kubernetes answers a malformed continue token with 400 Bad Request (issue #114) */
+    @Test
+    public void listAllTaskmasterJobsForUser_malformedPageToken() throws ApiException {
+        this.assertInvalidPageToken(HttpStatus.BAD_REQUEST.value());
+    }
+
+    private void assertInvalidPageToken(int code) throws ApiException {
+        this.listJobsFails(
+                "secret-token",
+                code,
+                "{\"kind\":\"Status\",\"message\":\"continue key is not valid: secret-token\"}");
+        try {
+            wrapper.listAllTaskmasterJobsForUser("secret-token", null, User.builder("123").build());
+            fail("InvalidPageTokenException expected");
+        } catch (InvalidPageTokenException e) {
+            assertTrue(e.getMessage().contains("page_token"));
+            assertFalse(e.getMessage().contains("secret-token"));
+        }
+    }
+
+    /** Without a page token, a 400 of Kubernetes stays a server error */
+    @Test(expected = KubernetesException.class)
+    public void listAllTaskmasterJobsForUser_badRequestWithoutPageToken() throws ApiException {
+        this.listJobsFails(null, HttpStatus.BAD_REQUEST.value(), "bad selector");
+        wrapper.listAllTaskmasterJobsForUser(null, null, User.builder("123").build());
+    }
+
+    /** A 400 of Kubernetes that isn't about the continue token stays a server error */
+    @Test(expected = KubernetesException.class)
+    public void listAllTaskmasterJobsForUser_otherBadRequestWithPageToken() throws ApiException {
+        this.listJobsFails(
+                "token",
+                HttpStatus.BAD_REQUEST.value(),
+                "{\"kind\":\"Status\",\"message\":\"unable to parse requirement\"}");
+        wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
+    }
+
+    /** A 400 of Kubernetes without a Status to tell the cause stays a server error */
+    @Test(expected = KubernetesException.class)
+    public void listAllTaskmasterJobsForUser_badRequestWithoutBodyWithPageToken()
+            throws ApiException {
+        this.listJobsFails("token", HttpStatus.BAD_REQUEST.value(), null);
+        wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
+    }
+
+    /** Other errors of Kubernetes stay server errors, also with a page token */
+    @Test(expected = KubernetesException.class)
+    public void listAllTaskmasterJobsForUser_serverErrorWithPageToken() throws ApiException {
+        this.listJobsFails("token", HttpStatus.INTERNAL_SERVER_ERROR.value(), "error");
+        wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
+    }
+
+    /**
+     * Lets Kubernetes answer the list request with the page token (or none) with an error and the
+     * response body (a Status object)
+     */
+    private void listJobsFails(String pageToken, int code, String responseBody)
+            throws ApiException {
+        given(
+                        batchApi.listNamespacedJob(
+                                any(),
+                                isNull(),
+                                isNull(),
+                                pageToken == null ? isNull() : eq(pageToken),
+                                isNull(),
+                                any(),
+                                isNull(),
+                                isNull(),
+                                isNull(),
+                                isNull(),
+                                isNull()))
+                .willThrow(new ApiException("", code, null, responseBody));
     }
 }
