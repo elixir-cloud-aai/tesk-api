@@ -16,8 +16,9 @@ checksum), and it checks the downloaded Maven distribution against
 `distributionSha256Sum` in `.mvn/wrapper/maven-wrapper.properties`; a mismatch
 stops the build.
 
-Dependabot does not update the wrapper, so the Maven version is bumped by hand.
-Change the URL and the checksum together, or every build fails:
+Dependabot updates the Maven version and the checksum of the wrapper together
+(in the `maven` group). To bump them by hand, change both, or every build
+fails:
 
 1. Download `apache-maven-<version>-bin.zip` from Maven Central and check it
    against the `.sha512` file next to it.

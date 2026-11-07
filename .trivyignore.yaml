@@ -20,11 +20,11 @@ vulnerabilities:
     statement: Needs persistent servlet sessions and a local attacker; the app doesn't enable them
     expired_at: 2027-01-31
   - id: CVE-2025-22228
-    purls: ["pkg:maven/org.springframework.security/spring-security-crypto@5.7.14"]
+    purls: ["pkg:maven/org.springframework.security/spring-security-crypto@5.7.14", "pkg:maven/org.springframework.security/spring-security-crypto@5.8.16"]
     statement: Concerns BCryptPasswordEncoder; the app has no passwords (OIDC tokens only)
     expired_at: 2027-01-31
   - id: CVE-2026-22732
-    purls: ["pkg:maven/org.springframework.security/spring-security-web@5.7.14"]
+    purls: ["pkg:maven/org.springframework.security/spring-security-web@5.7.14", "pkg:maven/org.springframework.security/spring-security-web@5.8.16"]
     statement: Concerns response headers specified through Spring Security; the app specifies none
     expired_at: 2027-01-31
   - id: CVE-2025-41249
