@@ -14,7 +14,9 @@ Changes since 1.2.0 that clients or deployments may notice:
   deleted could be `COMPLETE`.
 - **Executors aren't retried.** Executor jobs get `backoffLimit: 0` (before:
   Kubernetes' default of 6 retries), unless the taskmaster's environment sets
-  `EXECUTOR_BACKOFF_LIMIT`.
+  `EXECUTOR_BACKOFF_LIMIT`. TESK's Helm chart sets it from
+  `tesk.executorRetries` (2 by default), so chart deployments keep that
+  limit; set it to 0 for single runs.
 - **Upgrade order.** Upgrade TESK API first, then the taskmaster
   ([tesk-core](https://github.com/elixir-cloud-aai/tesk-core)) to the release
   that keeps failed jobs

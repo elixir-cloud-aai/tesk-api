@@ -94,7 +94,8 @@ exit code 0; the state doesn't depend on it.
 Executor jobs aren't retried (`backoffLimit: 0`), so that the state and logs
 of an executor are those of its only run; the taskmaster's environment
 variable `EXECUTOR_BACKOFF_LIMIT` sets another limit (see
-[Configuration](configuration.md)). The taskmaster's own job keeps
+[Configuration](configuration.md)), which also covers evicted pods. TESK's
+Helm chart sets it from `tesk.executorRetries` (2 by default). The taskmaster's own job keeps
 Kubernetes' default retries: a taskmaster that is restarted, e.g. after its
 pod was evicted, continues with the jobs that already exist.
 
