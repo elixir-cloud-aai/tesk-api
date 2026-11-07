@@ -20,7 +20,12 @@ provider are mocked with WireMock, so no cluster is needed):
 ```
 
 JaCoCo writes the coverage reports to `target/site/jacoco/` (unit tests) and
-`target/site/jacoco-it/` (integration tests).
+`target/site/jacoco-it/` (integration tests). The build fails if the unit and
+integration tests together cover less than 60% of the lines or 45% of the
+branches (`check` of `jacoco-maven-plugin` in `pom.xml`; raise the floors as
+coverage grows). Codecov (`codecov.yml`) also checks each pull request: the
+project's coverage must not drop by more than 0.5 percentage points, and the
+changed lines must be covered completely.
 
 To build the image (the `Dockerfile` builds the application from source, so
 nothing needs to be built first):
