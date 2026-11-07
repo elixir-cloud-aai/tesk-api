@@ -16,8 +16,19 @@ FROM eclipse-temurin:8-jre@sha256:377fe8e36a4b1530d9d52020069367ef44313fa891a82a
 RUN apt-get update && \
     apt-get install -y --no-install-recommends --only-upgrade apt libapt-pkg7.0 && \
     rm -rf /var/lib/apt/lists/*
+# Run as non-root user; group 0 owns the home directory, so that arbitrary
+# user IDs (e.g., on OpenShift, always in group 0) can use it too. The app
+# writes only to `/tmp`; the Kubernetes client reads `~/.kube/config` (or
+# `KUBECONFIG`) when it runs outside a cluster. The user `ubuntu` of the
+# Ubuntu base image is removed, as it has UID 1000
+ENV HOME=/home/tesk
+RUN if id ubuntu > /dev/null 2>&1; then userdel --remove ubuntu; fi && \
+    useradd --uid 1000 --gid 0 --create-home --home-dir "${HOME}" tesk && \
+    chmod -R g=u "${HOME}"
 VOLUME /tmp
 COPY --from=build /app.jar /app.jar
+WORKDIR ${HOME}
+USER 1000:0
 EXPOSE 8080
 ENV JAVA_OPTS=""
 ENTRYPOINT exec java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar /app.jar
