@@ -30,6 +30,8 @@ import uk.ac.ebi.tsc.tesk.config.GsonConfig;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
+import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
+import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
@@ -417,6 +419,46 @@ public class TesKubernetesConverterTest {
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(0);
         TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
         assertThat(state, is(TesState.SYSTEM_ERROR));
+    }
+
+    /**
+     * Decimal numbers of CPU cores (e.g. 0.5) are requested as such, not truncated to whole cores (issue #44)
+     */
+    @Test
+    public void fromTesExecutorToK8sJob_decimalCpuCores() throws IOException {
+        TesResources resources = this.objectMapper.readValue("{\"cpu_cores\": 0.5}", TesResources.class);
+        TesExecutor executor = new TesExecutor().image("alpine").addCommandItem("true");
+        V1Job job = this.converter.fromTesExecutorToK8sJob("task-123", "name", executor, 0, resources,
+                User.builder("test-user-id").build());
+        V1ResourceRequirements requirements = job.getSpec().getTemplate().getSpec().getContainers().get(0).getResources();
+        assertEquals("500m", requirements.getLimits().get("cpu").toSuffixedString());
+        assertEquals("500m", requirements.getRequests().get("cpu").toSuffixedString());
+    }
+
+    /**
+     * Whole numbers of CPU cores are written back as integers, as the TES specification defines them, also when
+     * given with an exponent; decimal numbers as given
+     */
+    @Test
+    public void cpuCores_wholeNumbersStayIntegers() throws IOException {
+        assertThat(writtenCpuCores("4").isIntegralNumber(), is(true));
+        assertThat(writtenCpuCores("4").asText(), is("4"));
+        assertThat(writtenCpuCores("1e3").isIntegralNumber(), is(true));
+        assertThat(writtenCpuCores("1e3").asText(), is("1000"));
+    }
+
+    @Test
+    public void cpuCores_decimalsAsGiven() throws IOException {
+        assertThat(writtenCpuCores("0.5").decimalValue(), is(new java.math.BigDecimal("0.5")));
+        assertThat(writtenCpuCores("1.25").decimalValue(), is(new java.math.BigDecimal("1.25")));
+    }
+
+    /**
+     * Reads {@code cpu_cores} into the model and returns the value as written back
+     */
+    private com.fasterxml.jackson.databind.JsonNode writtenCpuCores(String cpuCores) throws IOException {
+        TesResources resources = this.objectMapper.readValue("{\"cpu_cores\": " + cpuCores + "}", TesResources.class);
+        return this.objectMapper.readTree(this.objectMapper.writeValueAsString(resources)).get("cpu_cores");
     }
 
 }

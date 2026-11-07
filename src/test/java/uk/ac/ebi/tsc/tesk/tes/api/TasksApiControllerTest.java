@@ -230,4 +230,35 @@ public class TasksApiControllerTest {
         return user -> user != null && "admin".equals(user.getUsername());
     }
 
+    /**
+     * CPU cores are limited to 6 integer digits and 3 decimals (steps of 1m in Kubernetes), so that huge or tiny
+     * numbers (e.g. 1e1000000000) are refused instead of converted (issue #44)
+     */
+    @Test
+    public void createTask_invalid_cpuCores() throws Exception {
+        String[] files = new String[]{"cpu_cores_1e1000000000.json", "cpu_cores_1e_10.json",
+                "cpu_cores_0_0005.json", "cpu_cores_1000000.json", "cpu_cores_1e2147483647.json"};
+        for (String file : files) {
+            //refused by the validation (messages) or, beyond the range of BigDecimal's scale, when read (message)
+            this.mvc.perform(post(TASK_URL)
+                    .header("Authorization", "Bearer BAR")
+                    .content(getFileContentFromResources("invalid_tasks/resources/" + file))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)).andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("cpu")));
+        }
+    }
+
+    /**
+     * Trailing zeros don't count as decimals
+     */
+    @Test
+    public void createTask_valid_cpuCoresTrailingZeros() throws Exception {
+        this.mvc.perform(post(TASK_URL)
+                .header("Authorization", "Bearer BAR")
+                .content(getFileContentFromResources("valid_tasks/cpu_cores_0_5000.json"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk());
+    }
+
 }

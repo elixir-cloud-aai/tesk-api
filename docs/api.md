@@ -19,6 +19,17 @@ API description, the Swagger UI (if it is on) and, unless
 `TESK_API_SERVICE_INFO_PUBLIC` is `false`, service info; see [Access
 control](access-control.md).
 
+## Resources
+
+`resources.cpu_cores` of a task sets both the CPU request and the CPU limit of
+each executor's container. The TES specification defines it as an integer;
+TESK API also accepts decimal numbers with up to 3 decimals (Kubernetes counts
+CPU in thousandths of a core), e.g. `0.5` for half a core (requested from
+Kubernetes as `500m`), up to `999999.999`; trailing zeros don't count
+(`0.5000` is `0.5`). Numbers with more digits or decimals are refused with
+`400 Bad Request`; negative numbers and `0` are not checked. TESK API returns the number as it was given; whole numbers
+stay integers, also if given with an exponent (`1e3` is returned as `1000`).
+
 ## Swagger UI
 
 The Swagger UI lists the endpoints and lets you try them, also with a token

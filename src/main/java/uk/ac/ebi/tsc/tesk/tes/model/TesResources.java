@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -9,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.validation.Valid;
+import javax.validation.constraints.Digits;
 
 /**
  * Resources describes the resources requested by a task.
@@ -18,7 +20,7 @@ import javax.validation.Valid;
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class TesResources   {
   @JsonProperty("cpu_cores")
-  private Long cpuCores;
+  private BigDecimal cpuCores;
 
   @JsonProperty("preemptible")
   private Boolean preemptible;
@@ -39,24 +41,41 @@ public class TesResources   {
   @JsonProperty("backend_parameters_strict")
   private Boolean backendParametersStrict = false;
 
-  public TesResources cpuCores(Long cpuCores) {
-    this.cpuCores = cpuCores;
+  public TesResources cpuCores(BigDecimal cpuCores) {
+    setCpuCores(cpuCores);
     return this;
   }
 
   /**
-   * Requested number of CPUs
+   * Requested number of CPUs. The TES specification defines an integer; TESK also accepts decimal numbers
+   * (e.g. 0.5), which it requests from Kubernetes as such, and writes the number back as given
    * @return cpuCores
   */
-  @ApiModelProperty(example = "4", value = "Requested number of CPUs")
+  @ApiModelProperty(example = "4", value = "Requested number of CPUs (TESK also accepts decimal numbers, e.g. 0.5)")
+  //at most 999999.999: Kubernetes counts CPU in steps of 1m; bounds the number before it is converted
+  @Digits(integer = 6, fraction = 3)
 
-
-  public Long getCpuCores() {
+  public BigDecimal getCpuCores() {
     return cpuCores;
   }
 
-  public void setCpuCores(Long cpuCores) {
-    this.cpuCores = cpuCores;
+  public void setCpuCores(BigDecimal cpuCores) {
+    //zero in any notation (e.g. 0e10, 0.0000) is 0
+    if (cpuCores != null && cpuCores.signum() == 0) {
+      cpuCores = BigDecimal.ZERO;
+    }
+    //more than 3 decimals: trailing zeros don't count (0.5000 is 0.5)
+    if (cpuCores != null && cpuCores.scale() > 3) {
+      cpuCores = cpuCores.stripTrailingZeros();
+    }
+    //numbers of 1e10 and more are refused here: @Digits can't measure exponents near the int range (overflow)
+    if (cpuCores != null && cpuCores.scale() < -9) {
+      throw new IllegalArgumentException("cpu_cores is out of range");
+    }
+    //whole numbers given with an exponent (e.g. 1e3) are kept without it, so that they are written as integers
+    //(only for numbers that @Digits accepts, so that huge exponents aren't written out)
+    this.cpuCores = cpuCores != null && cpuCores.scale() < 0 && (long) cpuCores.precision() - cpuCores.scale() <= 7
+        ? cpuCores.setScale(0) : cpuCores;
   }
 
   public TesResources preemptible(Boolean preemptible) {
