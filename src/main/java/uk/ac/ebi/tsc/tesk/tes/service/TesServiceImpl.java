@@ -93,7 +93,14 @@ public class TesServiceImpl implements TesService {
      */
     @Override
     public TesTask getTask(String taskId, TaskView view, User user) {
+        return this.getTask(this.readTask(taskId), view, false);
+    }
 
+    /**
+     * Reads all Kubernetes objects of a single task: the taskmaster's job and pods,
+     * the executors' jobs and pods, and the outputs filer's job.
+     */
+    private Task readTask(String taskId) {
         V1Job taskMasterJob = this.kubernetesClientWrapper.readTaskmasterJob(taskId);
         V1JobList executorJobs = this.kubernetesClientWrapper.listSingleTaskExecutorJobs(taskMasterJob.getMetadata().getName());
         V1PodList taskMasterPods = this.kubernetesClientWrapper.listSingleJobPods(taskMasterJob);
@@ -104,7 +111,7 @@ public class TesServiceImpl implements TesService {
         }
         Optional<V1Job> outputFilerJob = this.kubernetesClientWrapper.getSingleTaskOutputFilerJob(taskMasterJob.getMetadata().getName());
         outputFilerJob.ifPresent(taskBuilder::addJob);
-        return this.getTask(taskBuilder.getTask(), view, false);
+        return taskBuilder.getTask();
     }
 
     /**
@@ -185,14 +192,14 @@ public class TesServiceImpl implements TesService {
      */
     @Override
     public void cancelTask(String taskId) {
-        V1Job taskMasterJob = this.kubernetesClientWrapper.readTaskmasterJob(taskId);
-        V1PodList taskMasterPods = this.kubernetesClientWrapper.listSingleJobPods(taskMasterJob);
-        TaskBuilder taskBuilder = TaskBuilder.newSingleTask().addJob(taskMasterJob).addPodList(taskMasterPods.getItems());
-        TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
+        //the state of all the task's jobs, as for getTask: a task that ended (e.g. an executor failed) isn't cancelled
+        Task task = this.readTask(taskId);
+        TesState state = this.converter.extractStateFromK8sJobs(task);
         if (COMPLETED_STATES.contains(state)) {
             throw new CancelNotRunningTask(taskId);
         }
         this.kubernetesClientWrapper.labelJobAsCancelled(taskId);
+        V1PodList taskMasterPods = new V1PodList().items(task.getTaskmaster().getPods());
         this.converter.getNameOfFirstRunningPod(taskMasterPods).ifPresent(this.kubernetesClientWrapper::labelPodAsCancelled);
     }
 

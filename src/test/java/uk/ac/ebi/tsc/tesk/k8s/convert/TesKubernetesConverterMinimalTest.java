@@ -210,7 +210,8 @@ public class TesKubernetesConverterMinimalTest {
     public void fromK8sToTask_complete() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider(true, false);
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(1);
-        taskBuilder.getTask().getLastExecutor().get().getJob().getStatus().succeeded(1);
+        //complete only when every executor completed
+        taskBuilder.getTask().getExecutors().forEach(executor -> executor.getJob().getStatus().succeeded(1));
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.COMPLETE);
         TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
@@ -221,7 +222,8 @@ public class TesKubernetesConverterMinimalTest {
     public void fromK8sToTask_list() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider(true, false);
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(1);
-        taskBuilder.getTask().getLastExecutor().get().getJob().getStatus().succeeded(1);
+        //complete only when every executor completed
+        taskBuilder.getTask().getExecutors().forEach(executor -> executor.getJob().getStatus().succeeded(1));
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.COMPLETE);
         expectedTask.setLogs(null);
@@ -263,6 +265,7 @@ public class TesKubernetesConverterMinimalTest {
     @Test
     public void fromK8sToTask_queued_executor() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider(true, true);
+        taskBuilder.getTask().getTaskmaster().getJob().getStatus().active(1);
         taskBuilder.getTask().getLastExecutor().get().getFirstPod().getStatus().setPhase(K8sConstants.PodPhase.PENDING.getCode());
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.QUEUED);
