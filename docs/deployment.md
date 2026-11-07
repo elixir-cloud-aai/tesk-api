@@ -24,7 +24,14 @@ For `dev` images, the identity is
 
 The image runs the application with Java 8 on [Eclipse
 Temurin](https://adoptium.net/) and listens on port 8080. `JAVA_OPTS` passes
-options to the JVM.
+options to the JVM. It runs as the non-root user `tesk` (UID 1000, group 0,
+home directory `/home/tesk`); any other UID in group 0 works too, as on
+OpenShift, which assigns one per project. The app writes only to `/tmp`, so
+the root file system can be read-only if `/tmp` is a writable volume. Outside
+a cluster, it reads the kubeconfig file from `KUBECONFIG` or
+`/home/tesk/.kube/config`; `--user "$(id -u):0"` in the example below lets it
+read a kubeconfig that only your user may read. With rootless Docker, where
+your files belong to UID 0 in the container, use `--user 0:0` instead.
 
 ## Kubernetes
 
@@ -66,8 +73,8 @@ authentication by default, with the rights of your kubeconfig, `KUBECONFIG` or
 `~/.kube/config`):
 
 ```bash
-docker run --rm --publish 127.0.0.1:8080:8080 \
-  --volume "${KUBECONFIG:-${HOME}/.kube/config}:/root/.kube/config:ro" \
+docker run --rm --publish 127.0.0.1:8080:8080 --user "$(id -u):0" \
+  --volume "${KUBECONFIG:-${HOME}/.kube/config}:/home/tesk/.kube/config:ro" \
   elixircloud/tesk-api:latest
 ```
 

@@ -195,6 +195,12 @@ jobs:
               return 1
             fi
           }
+          # The image runs as a non-root user (UID 1000, group 0)
+          user="$(docker image inspect --format '{{.Config.User}}' tesk-api:smoke)"
+          if [[ "${user}" != "1000:0" ]]; then
+            echo "::error::Image user is '${user}', expected '1000:0'"
+            exit 1
+          fi
           start
           check "${api}/service-info" 200
           curl --silent --fail "${host}${api}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'
@@ -212,6 +218,18 @@ jobs:
           start --env SPRING_PROFILES_ACTIVE=auth --env TESK_API_SERVICE_INFO_PUBLIC=false
           check "${api}/service-info" 401
           stop
+          # An arbitrary UID in group 0, as on OpenShift, with a read-only
+          # root file system (the app writes only to `/tmp`)
+          start --user 1000750000:0 --read-only --tmpfs /tmp
+          check "${api}/service-info" 200
+          stop
+          # ... which finds its home directory (`~/.kube/config`), writable for
+          # group 0 (with a writable root file system)
+          docker run --rm --user 1000750000:0 --entrypoint sh tesk-api:smoke \
+            -c 'test "${HOME}" = /home/tesk && test -w "${HOME}"' || {
+            echo "::error::Home directory not set up for an arbitrary UID"
+            exit 1
+          }
           start --env TESK_API_SWAGGER_UI_ENABLED=true
           check /swagger-ui/index.html 200
           check /swagger-resources 200
