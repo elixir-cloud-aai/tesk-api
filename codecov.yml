@@ -1,0 +1,15 @@
+# Codecov settings (https://docs.codecov.com/docs/codecov-yaml), for the
+# JaCoCo reports of the unit and integration tests together: the project's
+# coverage must not drop (by more than 0.5 percentage points, for noise), and
+# the changes of each pull request must be covered completely, as in the other
+# repositories of the organization. `./mvnw verify` also fails below a fixed
+# floor (`check` of `jacoco-maven-plugin` in `pom.xml`)
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 0.5%
+    patch:
+      default:
+        target: 100%
