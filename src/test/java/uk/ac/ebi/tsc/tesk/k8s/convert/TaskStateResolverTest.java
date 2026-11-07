@@ -247,6 +247,28 @@ class TaskStateResolverTest {
         assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.RUNNING);
     }
 
+    /**
+     * Conditions other than failure ones don't make a job failed.
+     */
+    @Test
+    void otherConditionsDontCount() {
+        Task task = task(false, JobState.RUNNING, JobState.RUNNING, JobState.ABSENT, JobState.ABSENT);
+        task.getExecutors().get(0).getJob().getStatus()
+                .addConditionsItem(new V1JobCondition().type("Suspended").status("True"));
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.RUNNING);
+    }
+
+    /**
+     * A pod without a status (just created) isn't pending.
+     */
+    @Test
+    void podWithoutStatusIsNotPending() {
+        Task task = task(false, JobState.RUNNING, JobState.RUNNING, JobState.ABSENT, JobState.ABSENT);
+        task.getTaskmaster().getPods().get(0).setStatus(null);
+        task.getExecutors().get(0).getPods().get(0).setStatus(null);
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.RUNNING);
+    }
+
     private static Task task(boolean cancelled, JobState taskmaster, JobState executor0, JobState executor1,
                              JobState filer) {
         Job taskmasterJob = job(TASK, taskmaster);
