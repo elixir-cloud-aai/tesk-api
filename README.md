@@ -40,7 +40,7 @@ start TESK API on your machine only (it runs without authentication by
 default, with the rights of your kubeconfig):
 
 ```bash
-docker run --rm --publish 127.0.0.1:8080:8080 \
+docker run --rm --publish 127.0.0.1:8080:8080 --user "$(id -u):0" \
   --volume "${KUBECONFIG:-${HOME}/.kube/config}:/home/tesk/.kube/config:ro" \
   elixircloud/tesk-api:latest
 ```

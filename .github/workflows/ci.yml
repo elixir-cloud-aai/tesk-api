@@ -223,6 +223,13 @@ jobs:
           start --user 1000750000:0 --read-only --tmpfs /tmp
           check "${api}/service-info" 200
           stop
+          # ... which finds its home directory (`~/.kube/config`), writable for
+          # group 0 (with a writable root file system)
+          docker run --rm --user 1000750000:0 --entrypoint sh tesk-api:smoke \
+            -c 'test "${HOME}" = /home/tesk && test -w "${HOME}"' || {
+            echo "::error::Home directory not set up for an arbitrary UID"
+            exit 1
+          }
           start --env TESK_API_SWAGGER_UI_ENABLED=true
           check /swagger-ui/index.html 200
           check /swagger-resources 200
