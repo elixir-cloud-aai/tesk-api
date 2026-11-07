@@ -22,7 +22,7 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: com.github.tomakehurst:wiremock
         update-types: ["version-update:semver-major"]
-      # Java 11 and Maven 3.9.6 from 7.0
+      # Java 11 from 7.0
       - dependency-name: org.openapitools:openapi-generator-maven-plugin
         versions: [">= 7"]
     groups:

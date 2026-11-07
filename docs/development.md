@@ -1,9 +1,10 @@
 # Development
 
 TESK API is a [Spring Boot](https://spring.io/projects/spring-boot) 2.7
-application on Java 8, built with Maven (through the wrapper `./mvnw`). The
-server stub is generated from the TES specification with the [Swagger Codegen
-Maven
+application on Java 8, built with Maven 3.9 (through the wrapper `./mvnw`,
+which downloads the version pinned in `.mvn/wrapper/maven-wrapper.properties`;
+Maven 3.9 still runs on Java 8). The server stub is generated from the TES
+specification with the [Swagger Codegen Maven
 plugin](https://github.com/swagger-api/swagger-codegen/tree/master/modules/swagger-codegen-maven-plugin),
 and the [Kubernetes Java client](https://github.com/kubernetes-client/java)
 talks to the Kubernetes API.
