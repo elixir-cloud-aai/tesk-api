@@ -1,13 +1,17 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 import org.springframework.context.annotation.Configuration;
 
+import javax.annotation.PostConstruct;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
@@ -17,6 +21,9 @@ import java.util.Map;
 @Configuration
 @ConfigurationProperties(prefix = "tesk.api.swagger-oauth")
 public class OAuth2ClientProperties {
+
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2ClientProperties.class);
+
     /**
      * Authorisation server authorisation endpoint
      */
@@ -106,5 +113,27 @@ public class OAuth2ClientProperties {
 
     public void setImplicit(Boolean implicit) {
         this.implicit = implicit;
+    }
+
+    /**
+     * Warns about the deprecated client secret setting, which is ignored, with any profile.
+     */
+    @PostConstruct
+    @SuppressWarnings("deprecation")
+    public void warnAboutClientSecret() {
+        deprecatedClientSecretWarning(this).ifPresent(logger::warn);
+    }
+
+    /**
+     * The warning about the deprecated client secret setting, if it is set; without the secret.
+     */
+    @SuppressWarnings("deprecation")
+    static Optional<String> deprecatedClientSecretWarning(OAuth2ClientProperties properties) {
+        if (properties.getClientSecret() == null || properties.getClientSecret().trim().isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of("TESK_API_SWAGGER_OAUTH_CLIENT_SECRET (tesk.api.swagger-oauth.client-secret) is deprecated "
+                + "and ignored: the Swagger UI is a public client. Remove the setting, and rotate the secret at your "
+                + "identity provider if the Swagger UI was on.");
     }
 }

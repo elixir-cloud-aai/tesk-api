@@ -1,7 +1,5 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,12 +16,10 @@ import springfox.documentation.swagger.web.SecurityConfiguration;
 import springfox.documentation.swagger.web.SecurityConfigurationBuilder;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
-import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Swagger Configuration
@@ -35,8 +31,6 @@ import java.util.Optional;
 @EnableSwagger2
 @Profile("auth")
 public class SwaggerConfigAuth {
-
-    private static final Logger logger = LoggerFactory.getLogger(SwaggerConfigAuth.class);
 
     @Autowired
     private OAuth2ClientProperties properties;
@@ -107,26 +101,6 @@ public class SwaggerConfigAuth {
                 .clientId(properties.getClientId())
                 .scopeSeparator("")
                 .build();
-    }
-
-    /**
-     * Warns about the deprecated client secret setting, which is ignored.
-     */
-    @PostConstruct
-    public void warnAboutClientSecret() {
-        deprecatedClientSecretWarning(this.properties).ifPresent(logger::warn);
-    }
-
-    /**
-     * The warning about the deprecated client secret setting, if it is set.
-     */
-    static Optional<String> deprecatedClientSecretWarning(OAuth2ClientProperties properties) {
-        if (properties.getClientSecret() == null || properties.getClientSecret().trim().isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of("TESK_API_SWAGGER_OAUTH_CLIENT_SECRET (tesk.api.swagger-oauth.client-secret) is deprecated "
-                + "and ignored: the Swagger UI is a public client. Remove the setting, and rotate the secret at your "
-                + "identity provider if the Swagger UI was on.");
     }
 
 }

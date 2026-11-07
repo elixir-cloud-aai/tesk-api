@@ -17,7 +17,7 @@ public class DeprecatedClientSecretWarningTest {
     private static Optional<String> warningFor(String clientSecret) {
         OAuth2ClientProperties properties = new OAuth2ClientProperties();
         properties.setClientSecret(clientSecret);
-        return SwaggerConfigAuth.deprecatedClientSecretWarning(properties);
+        return OAuth2ClientProperties.deprecatedClientSecretWarning(properties);
     }
 
     @Test
