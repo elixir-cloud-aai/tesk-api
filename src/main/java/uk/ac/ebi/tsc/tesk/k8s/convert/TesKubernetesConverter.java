@@ -217,8 +217,9 @@ public class TesKubernetesConverter {
      * @return TES task status
      */
     public TesState extractStateFromK8sJobs(Task taskmasterWithExecutors) {
+        //the stored task is read only if needed: once the taskmaster's job completed
         return TaskStateResolver.resolve(taskmasterWithExecutors,
-                this.extractExecutorCount(taskmasterWithExecutors.getTaskmaster().getJob()));
+                () -> this.extractExecutorCount(taskmasterWithExecutors.getTaskmaster().getJob()));
     }
 
     /**

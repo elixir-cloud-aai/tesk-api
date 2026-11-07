@@ -15,6 +15,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
@@ -22,32 +24,17 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CA
 /**
  * Derives a TES task's state from the Kubernetes jobs of the task: the
  * taskmaster's job, the executors' jobs and the outputs filer's job.
- * <p>
- * In this order, the first rule that applies gives the state:
- * <ol>
- * <li>The taskmaster's job is labelled as cancelled: {@code CANCELED}.</li>
- * <li>An executor's job failed: {@code EXECUTOR_ERROR}.</li>
- * <li>The taskmaster's job or the outputs filer's job failed: {@code SYSTEM_ERROR}.</li>
- * <li>The taskmaster's job completed: {@code COMPLETE} if the jobs of all
- * the task's executors exist and completed, {@code SYSTEM_ERROR} otherwise.</li>
- * <li>A pod of the taskmaster is pending: {@code QUEUED}.</li>
- * <li>The taskmaster's job is active: {@code INITIALIZING} before the first
- * executor's job exists, {@code QUEUED} while a pod of the last executor's job
- * is pending, {@code RUNNING} otherwise.</li>
- * <li>Otherwise: {@code SYSTEM_ERROR}.</li>
- * </ol>
- * A job failed if Kubernetes set its condition {@code Failed} or
- * {@code FailureTarget} (Kubernetes 1.31+). Jobs without these conditions
- * (older clusters) failed if they have failed pods and none that succeeded,
- * once the taskmaster's job has ended (before, the job may still retry).
- * A job completed if it has a pod that succeeded.
+ * The rules, in the order in which they apply, are documented in
+ * {@code docs/index.md} ("Getting tasks"); {@code TaskStateResolverTest}
+ * holds them as a decision table.
  */
 public final class TaskStateResolver {
 
     /**
-     * Job conditions that mark a failed job, when their status is "True".
+     * Job conditions that mark a failed job, when their status is "True";
+     * Kubernetes 1.31+ sets FailureTarget before Failed.
      */
-    static final Set<String> FAILED_CONDITIONS = Collections.unmodifiableSet(
+    private static final Set<String> FAILED_CONDITIONS = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList("Failed", "FailureTarget")));
 
     private TaskStateResolver() {
@@ -57,20 +44,22 @@ public final class TaskStateResolver {
      * Derives the state of a task.
      *
      * @param task              the task's jobs and their pods
-     * @param expectedExecutors the number of executors of the task, or
-     *                          {@code null} if unknown; then the executor
-     *                          jobs that exist count as all executors
+     * @param expectedExecutors supplies the number of executors of the task,
+     *                          or {@code null} if unknown (then the executor
+     *                          jobs that exist count as all executors); only
+     *                          called once the taskmaster's job completed
      * @return the TES state of the task
      */
-    public static TesState resolve(Task task, Integer expectedExecutors) {
+    public static TesState resolve(Task task, Supplier<Integer> expectedExecutors) {
         Job taskmaster = task.getTaskmaster();
         V1Job taskmasterJob = taskmaster.getJob();
         if (isCancelled(taskmasterJob)) return TesState.CANCELED;
 
         boolean taskmasterCompleted = hasSucceeded(taskmasterJob);
-        boolean taskmasterFailed = !taskmasterCompleted
-                && (hasFailedCondition(taskmasterJob)
-                || (hasFailedPods(taskmasterJob) && !isActive(taskmasterJob)));
+        // Only by its conditions: between retries, the taskmaster's job has
+        // failed pods and none active (such a job gives SYSTEM_ERROR below,
+        // as before, but doesn't end the task's other jobs)
+        boolean taskmasterFailed = !taskmasterCompleted && hasFailedCondition(taskmasterJob);
         boolean taskmasterEnded = taskmasterCompleted || taskmasterFailed;
 
         List<Job> executors = task.getExecutors();
@@ -83,7 +72,8 @@ public final class TaskStateResolver {
             return TesState.SYSTEM_ERROR;
         }
         if (taskmasterCompleted) {
-            int expected = expectedExecutors != null ? expectedExecutors : executors.size();
+            Integer expectedCount = expectedExecutors.get();
+            int expected = expectedCount != null ? expectedCount : executors.size();
             boolean allCompleted = expected > 0 && executors.size() == expected
                     && executors.stream().allMatch(executor -> hasSucceeded(executor.getJob()));
             return allCompleted ? TesState.COMPLETE : TesState.SYSTEM_ERROR;
@@ -93,7 +83,7 @@ public final class TaskStateResolver {
             if (executors.isEmpty()) return TesState.INITIALIZING;
             // Each executor's pod can wait as pending, so the task can go
             // from RUNNING back to QUEUED
-            if (hasPendingPod(executors.get(executors.size() - 1))) return TesState.QUEUED;
+            if (task.getLastExecutor().map(TaskStateResolver::hasPendingPod).orElse(false)) return TesState.QUEUED;
             return TesState.RUNNING;
         }
         return TesState.SYSTEM_ERROR;
@@ -133,7 +123,7 @@ public final class TaskStateResolver {
         return count(job, V1JobStatus::getActive) > 0;
     }
 
-    private static int count(V1Job job, java.util.function.Function<V1JobStatus, Integer> counter) {
+    private static int count(V1Job job, Function<V1JobStatus, Integer> counter) {
         return Optional.ofNullable(job.getStatus()).map(counter).orElse(0);
     }
 

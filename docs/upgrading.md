@@ -17,17 +17,23 @@ Changes since 1.2.0 that clients or deployments may notice:
   `EXECUTOR_BACKOFF_LIMIT`. TESK's Helm chart sets it from
   `tesk.executorRetries` (2 by default), so chart deployments keep that
   limit; set it to 0 for single runs.
+- **Cancelling ended tasks.** `POST /tasks/{id}:cancel` reads all jobs of
+  the task, as `GET` does, so a task whose executor failed while the
+  taskmaster still runs can't be cancelled any more (`400 Bad Request`).
 - **Upgrade order.** Upgrade TESK API first, then the taskmaster
   ([tesk-core](https://github.com/elixir-cloud-aai/tesk-core)) to the release
-  that keeps failed jobs
-  ([tesk-core#98](https://github.com/elixir-cloud-aai/tesk-core/issues/98)).
+  that keeps failed jobs (not released yet; see
+  [tesk-core#98](https://github.com/elixir-cloud-aai/tesk-core/issues/98)).
   Tasks running during the upgrade keep the taskmaster they were started
-  with. While only one of them is upgraded: this TESK API with an older
-  taskmaster reports a task whose last executor's job the taskmaster deleted
-  (because its pod couldn't pull its image) as `SYSTEM_ERROR`; an older TESK
-  API with the newer taskmaster reports a failed executor as
-  `EXECUTOR_ERROR`, but for a few seconds after Kubernetes sets
-  `FailureTarget`, it can report `QUEUED` or `SYSTEM_ERROR`.
+  with. While only one of them is upgraded:
+    - This TESK API with an older taskmaster reports a task whose last
+      executor's job the taskmaster deleted (because its pod couldn't pull
+      its image) as `SYSTEM_ERROR`, instead of `COMPLETE`.
+    - An older TESK API with the newer taskmaster reports a failed executor
+      as `EXECUTOR_ERROR`. For a few seconds after Kubernetes sets
+      `FailureTarget`, before it counts the failed pod, the older TESK API
+      can report `QUEUED` or `SYSTEM_ERROR`; clients that take
+      `SYSTEM_ERROR` as final keep it.
 
 - **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
   successful cancellation with an empty JSON object (`{}`, `Content-Type:

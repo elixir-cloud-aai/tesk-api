@@ -62,8 +62,9 @@ class TaskStateResolverTest {
     /** Wildcard of the decision table. */
     private static final Set<JobState> ANY = EnumSet.allOf(JobState.class);
     private static final Set<JobState> FAILING = EnumSet.of(JobState.FAILED, JobState.FAILURE_TARGET);
+    /** Taskmaster states that end the task's other jobs; failed pods alone may still be retried. */
     private static final Set<JobState> ENDED_TM = EnumSet.of(JobState.SUCCEEDED, JobState.FAILED,
-            JobState.FAILURE_TARGET, JobState.FAILED_PODS);
+            JobState.FAILURE_TARGET);
     private static final Set<JobState> TASKMASTER_STATES = EnumSet.complementOf(EnumSet.of(JobState.ABSENT));
 
     /**
@@ -71,14 +72,15 @@ class TaskStateResolverTest {
      * expected task state.
      */
     private static final class Row {
-        final Set<Boolean> cancelled;
+        /** Whether the task is labelled as cancelled; {@code null} for either. */
+        final Boolean cancelled;
         final Set<JobState> taskmaster;
         final Set<JobState> executor0;
         final Set<JobState> executor1;
         final Set<JobState> filer;
         final TesState expected;
 
-        Row(Set<Boolean> cancelled, Set<JobState> taskmaster, Set<JobState> executor0,
+        Row(Boolean cancelled, Set<JobState> taskmaster, Set<JobState> executor0,
             Set<JobState> executor1, Set<JobState> filer, TesState expected) {
             this.cancelled = cancelled;
             this.taskmaster = taskmaster;
@@ -89,13 +91,12 @@ class TaskStateResolverTest {
         }
 
         boolean matches(boolean c, JobState tm, JobState e0, JobState e1, JobState f) {
-            return cancelled.contains(c) && taskmaster.contains(tm) && executor0.contains(e0)
+            return (cancelled == null || cancelled == c) && taskmaster.contains(tm) && executor0.contains(e0)
                     && executor1.contains(e1) && filer.contains(f);
         }
     }
 
-    private static final Set<Boolean> ANY_CANCELLED = new HashSet<>(Arrays.asList(true, false));
-    private static final Set<Boolean> NOT_CANCELLED = new HashSet<>(Arrays.asList(false));
+    private static final Boolean NOT_CANCELLED = false;
 
     private static Set<JobState> of(JobState first, JobState... rest) {
         return EnumSet.of(first, rest);
@@ -106,7 +107,7 @@ class TaskStateResolverTest {
      */
     private static final List<Row> TABLE = Arrays.asList(
             // Cancelled tasks stay cancelled
-            new Row(new HashSet<>(Arrays.asList(true)), ANY, ANY, ANY, ANY, TesState.CANCELED),
+            new Row(true, ANY, ANY, ANY, ANY, TesState.CANCELED),
             // A failed executor, whichever, is an executor error
             new Row(NOT_CANCELLED, ANY, FAILING, ANY, ANY, TesState.EXECUTOR_ERROR),
             new Row(NOT_CANCELLED, ANY, ANY, FAILING, ANY, TesState.EXECUTOR_ERROR),
@@ -115,7 +116,8 @@ class TaskStateResolverTest {
                     TesState.EXECUTOR_ERROR),
             new Row(NOT_CANCELLED, ENDED_TM, ANY, of(JobState.FAILED_PODS, JobState.RETRYING), ANY,
                     TesState.EXECUTOR_ERROR),
-            // A failed taskmaster or filer is a system error
+            // A failed taskmaster or filer is a system error (a taskmaster with
+            // failed pods and none active, maybe between retries, too, as before)
             new Row(NOT_CANCELLED, of(JobState.FAILED, JobState.FAILURE_TARGET, JobState.FAILED_PODS), ANY, ANY, ANY,
                     TesState.SYSTEM_ERROR),
             new Row(NOT_CANCELLED, ANY, ANY, ANY, FAILING, TesState.SYSTEM_ERROR),
@@ -152,10 +154,13 @@ class TaskStateResolverTest {
         return combinations.stream();
     }
 
-    private static TesState expected(boolean cancelled, JobState taskmaster, JobState executor0,
-                                     JobState executor1, JobState filer) {
-        for (Row row : TABLE) {
-            if (row.matches(cancelled, taskmaster, executor0, executor1, filer)) return row.expected;
+    /**
+     * The index of the first row of the table that matches.
+     */
+    private static int matchingRow(boolean cancelled, JobState taskmaster, JobState executor0,
+                                   JobState executor1, JobState filer) {
+        for (int i = 0; i < TABLE.size(); i++) {
+            if (TABLE.get(i).matches(cancelled, taskmaster, executor0, executor1, filer)) return i;
         }
         throw new AssertionError("No row of the table matches");
     }
@@ -165,8 +170,8 @@ class TaskStateResolverTest {
     void resolvesEveryCombination(boolean cancelled, JobState taskmaster, JobState executor0,
                                   JobState executor1, JobState filer) {
         Task task = task(cancelled, taskmaster, executor0, executor1, filer);
-        assertThat(TaskStateResolver.resolve(task, 2))
-                .isEqualTo(expected(cancelled, taskmaster, executor0, executor1, filer));
+        assertThat(TaskStateResolver.resolve(task, () -> 2))
+                .isEqualTo(TABLE.get(matchingRow(cancelled, taskmaster, executor0, executor1, filer)).expected);
     }
 
     @Test
@@ -174,13 +179,8 @@ class TaskStateResolverTest {
         Set<Integer> reached = new HashSet<>();
         combinations().forEach(arguments -> {
             Object[] a = arguments.get();
-            for (int i = 0; i < TABLE.size(); i++) {
-                if (TABLE.get(i).matches((Boolean) a[0], (JobState) a[1], (JobState) a[2], (JobState) a[3],
-                        (JobState) a[4])) {
-                    reached.add(i);
-                    break;
-                }
-            }
+            reached.add(matchingRow((Boolean) a[0], (JobState) a[1], (JobState) a[2], (JobState) a[3],
+                    (JobState) a[4]));
         });
         assertThat(reached).hasSize(TABLE.size());
     }
@@ -192,7 +192,36 @@ class TaskStateResolverTest {
     @Test
     void missingLastExecutorIsNotComplete() {
         Task task = task(false, JobState.SUCCEEDED, JobState.SUCCEEDED, JobState.ABSENT, JobState.ABSENT);
-        assertThat(TaskStateResolver.resolve(task, 2)).isEqualTo(TesState.SYSTEM_ERROR);
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.SYSTEM_ERROR);
+    }
+
+    /**
+     * The first executor failed and the second one never ran: an executor error.
+     */
+    @Test
+    void failedFirstExecutorIsExecutorError() {
+        Task task = task(false, JobState.SUCCEEDED, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.EXECUTOR_ERROR);
+    }
+
+    /**
+     * All executors and the outputs filer completed: complete.
+     */
+    @Test
+    void allJobsCompletedIsComplete() {
+        Task task = task(false, JobState.SUCCEEDED, JobState.SUCCEEDED, JobState.SUCCEEDED, JobState.SUCCEEDED);
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.COMPLETE);
+    }
+
+    /**
+     * The number of executors is read only once the taskmaster's job completed.
+     */
+    @Test
+    void executorCountIsReadOnlyWhenNeeded() {
+        Task task = task(false, JobState.RUNNING, JobState.RUNNING, JobState.ABSENT, JobState.ABSENT);
+        assertThat(TaskStateResolver.resolve(task, () -> {
+            throw new AssertionError("read the number of executors");
+        })).isEqualTo(TesState.RUNNING);
     }
 
     /**
@@ -202,9 +231,9 @@ class TaskStateResolverTest {
     @Test
     void unknownExecutorCountUsesExistingJobs() {
         Task task = task(false, JobState.SUCCEEDED, JobState.SUCCEEDED, JobState.ABSENT, JobState.ABSENT);
-        assertThat(TaskStateResolver.resolve(task, null)).isEqualTo(TesState.COMPLETE);
+        assertThat(TaskStateResolver.resolve(task, () -> null)).isEqualTo(TesState.COMPLETE);
         Task none = task(false, JobState.SUCCEEDED, JobState.ABSENT, JobState.ABSENT, JobState.ABSENT);
-        assertThat(TaskStateResolver.resolve(none, null)).isEqualTo(TesState.SYSTEM_ERROR);
+        assertThat(TaskStateResolver.resolve(none, () -> null)).isEqualTo(TesState.SYSTEM_ERROR);
     }
 
     /**
@@ -215,7 +244,7 @@ class TaskStateResolverTest {
         Task task = task(false, JobState.RUNNING, JobState.RUNNING, JobState.ABSENT, JobState.ABSENT);
         task.getExecutors().get(0).getJob().getStatus()
                 .addConditionsItem(new V1JobCondition().type("FailureTarget").status("False"));
-        assertThat(TaskStateResolver.resolve(task, 2)).isEqualTo(TesState.RUNNING);
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.RUNNING);
     }
 
     private static Task task(boolean cancelled, JobState taskmaster, JobState executor0, JobState executor1,

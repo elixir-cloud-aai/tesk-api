@@ -408,6 +408,7 @@ public class TesKubernetesConverterTest {
     public void test_status_executor_queued() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
         taskBuilder.getTask().getLastExecutor().get().getPods().get(0).getStatus().phase("Pending");
+        //a pending executor counts only while the taskmaster runs
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(0).active(1);
         TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
         assertThat(state, is(TesState.QUEUED));
@@ -442,15 +443,31 @@ public class TesKubernetesConverterTest {
     }
 
     @Test
-    public void extractExecutorCount() throws IOException {
+    public void extractExecutorCount_fromStoredTask() throws IOException {
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         assertThat(this.converter.extractExecutorCount(taskmaster), is(1));
-        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, "not JSON");
-        assertNull(this.converter.extractExecutorCount(taskmaster));
-        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, "{}");
-        assertNull(this.converter.extractExecutorCount(taskmaster));
+    }
+
+    @Test
+    public void extractExecutorCount_emptyExecutors() throws IOException {
+        assertThat(this.executorCountOf("{\"executors\": []}"), is(0));
+    }
+
+    @Test
+    public void extractExecutorCount_unknown() throws IOException {
+        //not JSON, no executors, executors not a list, no stored task
+        for (String stored : new String[]{"not JSON", "{}", "{\"executors\": {}}", "{\"executors\": null}", null}) {
+            assertNull(stored, this.executorCountOf(stored));
+        }
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         taskmaster.getMetadata().setAnnotations(null);
         assertNull(this.converter.extractExecutorCount(taskmaster));
+    }
+
+    private Integer executorCountOf(String storedTask) throws IOException {
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
+        return this.converter.extractExecutorCount(taskmaster);
     }
 
     @Test
