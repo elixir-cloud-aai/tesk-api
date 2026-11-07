@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.api;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentMatcher;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -31,8 +32,9 @@ import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -206,19 +208,26 @@ public class TasksApiControllerTest {
                 .andExpect(content().json("{}", true));
         //the task is looked up for the user (authorisation) before it is cancelled
         InOrder order = inOrder(this.tesService);
-        order.verify(this.tesService).getTask(anyString(), any(TaskView.class), any(User.class));
+        order.verify(this.tesService).getTask(eq("task-123"), eq(TaskView.MINIMAL), argThat(isAdmin()));
         order.verify(this.tesService).cancelTask("task-123");
     }
 
     @Test
     public void cancelTask_notFound_doesNotCancel() throws Exception {
-        given(this.tesService.getTask(anyString(), any(TaskView.class), any(User.class)))
+        given(this.tesService.getTask(eq("task-123"), eq(TaskView.MINIMAL), argThat(isAdmin())))
                 .willThrow(new TaskNotFoundException("task-123"));
         this.mvc.perform(post(TASK_URL + "/{id}:cancel", "task-123")
                 .header("Authorization", "Bearer BAR")
                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
         verify(this.tesService, never()).cancelTask(anyString());
+    }
+
+    /**
+     * Matches the user of the test's token (see {@link ResourceServerConfiguration})
+     */
+    private static ArgumentMatcher<User> isAdmin() {
+        return user -> user != null && "admin".equals(user.getUsername());
     }
 
 }
