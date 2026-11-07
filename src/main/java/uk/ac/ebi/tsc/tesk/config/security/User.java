@@ -67,7 +67,9 @@ public class User implements Serializable, UserDetails, Principal {
     }
 
     public String getAnyGroup() {
-        if (!isMember()) return null;
+        if (!isMember()) {
+            return null;
+        }
         return teskMemberedGroups.iterator().next();
     }
 
@@ -214,27 +216,46 @@ public class User implements Serializable, UserDetails, Principal {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         User user = (User) o;
 
-        if (teskAdmin != user.teskAdmin) return false;
-        if (userId != null ? !userId.equals(user.userId) : user.userId != null) return false;
+        if (teskAdmin != user.teskAdmin) {
+            return false;
+        }
+        if (userId != null ? !userId.equals(user.userId) : user.userId != null) {
+            return false;
+        }
         if (preferredUsername != null
                 ? !preferredUsername.equals(user.preferredUsername)
-                : user.preferredUsername != null) return false;
-        if (name != null ? !name.equals(user.name) : user.name != null) return false;
-        if (givenName != null ? !givenName.equals(user.givenName) : user.givenName != null)
+                : user.preferredUsername != null) {
             return false;
-        if (familyName != null ? !familyName.equals(user.familyName) : user.familyName != null)
+        }
+        if (name != null ? !name.equals(user.name) : user.name != null) {
             return false;
-        if (email != null ? !email.equals(user.email) : user.email != null) return false;
-        if (allGroups != null ? !allGroups.equals(user.allGroups) : user.allGroups != null)
+        }
+        if (givenName != null ? !givenName.equals(user.givenName) : user.givenName != null) {
             return false;
+        }
+        if (familyName != null ? !familyName.equals(user.familyName) : user.familyName != null) {
+            return false;
+        }
+        if (email != null ? !email.equals(user.email) : user.email != null) {
+            return false;
+        }
+        if (allGroups != null ? !allGroups.equals(user.allGroups) : user.allGroups != null) {
+            return false;
+        }
         if (teskMemberedGroups != null
                 ? !teskMemberedGroups.equals(user.teskMemberedGroups)
-                : user.teskMemberedGroups != null) return false;
+                : user.teskMemberedGroups != null) {
+            return false;
+        }
         return teskManagedGroups != null
                 ? teskManagedGroups.equals(user.teskManagedGroups)
                 : user.teskManagedGroups == null;

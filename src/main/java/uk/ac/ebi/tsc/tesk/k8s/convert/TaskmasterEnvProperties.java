@@ -110,12 +110,16 @@ public class TaskmasterEnvProperties {
     }
 
     public boolean isFTPEnabled() {
-        if (this.getFtp() == null) return false;
+        if (this.getFtp() == null) {
+            return false;
+        }
         return this.getFtp().enabled;
     };
 
     public boolean isExecutorSecretEnabled() {
-        if (this.getExecutorSecret() == null) return false;
+        if (this.getExecutorSecret() == null) {
+            return false;
+        }
         return this.getExecutorSecret().enabled;
     };
 

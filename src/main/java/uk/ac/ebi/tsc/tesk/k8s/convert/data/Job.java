@@ -43,7 +43,9 @@ public class Job {
      * has no pods.
      */
     public V1Pod getFirstPod() {
-        if (!hasPods()) return null;
+        if (!hasPods()) {
+            return null;
+        }
         return this.pods.get(0);
     }
 
@@ -51,7 +53,9 @@ public class Job {
      * Returns the list of job pods in the order of addition to the list or empty list, if no pods.
      */
     public List<V1Pod> getPods() {
-        if (!hasPods()) return new ArrayList<>();
+        if (!hasPods()) {
+            return new ArrayList<>();
+        }
         return this.pods;
     }
 

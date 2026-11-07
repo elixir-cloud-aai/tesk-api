@@ -46,7 +46,9 @@ public class TaskListStrategy implements BuildStrategy {
     @Override
     public void addOutputFilerJob(Job executorJob) {
         int outputFilerSuffix = executorJob.getJobName().indexOf(JOB_NAME_FILER_SUF);
-        if (outputFilerSuffix <= -1) return;
+        if (outputFilerSuffix <= -1) {
+            return;
+        }
         String taskmasterName = executorJob.getJobName().substring(0, outputFilerSuffix);
         Task taskmaster = this.tasksById.get(taskmasterName);
         if (taskmaster != null) {

@@ -81,7 +81,9 @@ public class OAuth2ClientProperties {
 
     public Map<String, String> getScopesAsMap() {
         Map<String, String> map = new LinkedHashMap<>();
-        if (scopes == null) return map;
+        if (scopes == null) {
+            return map;
+        }
         for (String scope : scopes) {
             String[] pair = StringUtils.split(scope, ":");
             map.put(pair[0], pair[1]);

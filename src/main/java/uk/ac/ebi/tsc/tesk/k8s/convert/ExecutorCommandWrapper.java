@@ -39,13 +39,14 @@ public class ExecutorCommandWrapper {
         result.add("-c");
         StringJoiner sj = new StringJoiner(" ");
         for (String commandPart : executor.getCommand()) {
-            if (SPECIAL_CHARS.matcher(commandPart).find()) {
-                if (commandPart.contains("'")) {
-                    commandPart = commandPart.replaceAll("'", "'\"'\"'");
+            String part = commandPart;
+            if (SPECIAL_CHARS.matcher(part).find()) {
+                if (part.contains("'")) {
+                    part = part.replaceAll("'", "'\"'\"'");
                 }
-                commandPart = "'" + commandPart + "'";
+                part = "'" + part + "'";
             }
-            sj.add(commandPart);
+            sj.add(part);
         }
         if (!StringUtils.isEmpty(executor.getStdin())) {
             sj.add("<");
