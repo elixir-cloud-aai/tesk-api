@@ -27,6 +27,12 @@ public class K8sConstants {
 
     public static final String JOB_RESTART_POLICY = "Never";
 
+    /** Deletion of an object's dependents (e.g. a job's pods) after the object */
+    public static final String PROPAGATION_POLICY_BACKGROUND = "Background";
+
+    /** Dry run of a request: Kubernetes processes it in all stages, but doesn't store anything */
+    public static final String DRY_RUN_ALL = "All";
+
     /** Executor CPU resource label */
     public static final String RESOURCE_CPU_KEY = "cpu";
     /** Executor memory resource label */

@@ -68,6 +68,54 @@ public class KubernetesClientWrapper {
         }
     }
 
+    /**
+     * Deletes a job with its pods, in the background (Kubernetes deletes the pods after the job).
+     *
+     * @param name - name of the job
+     */
+    public void deleteJob(String name) {
+        try {
+            this.batchApi.deleteNamespacedJob(
+                    name, namespace, null, null, null, null, PROPAGATION_POLICY_BACKGROUND, null);
+        } catch (ApiException e) {
+            throw KubernetesException.fromApiException(e);
+        }
+    }
+
+    /**
+     * Checks that Kubernetes would create the ConfigMap, by creating it in a dry run: Kubernetes
+     * validates and admits it (e.g. its size, the rights, a taken name), but doesn't store it. If
+     * an admission webhook for ConfigMaps doesn't support dry runs, Kubernetes refuses every dry
+     * run; the check is then skipped (with a warning), so that tasks can still be created.
+     *
+     * @param map - the ConfigMap
+     * @throws KubernetesException if Kubernetes would refuse it
+     */
+    public void checkConfigMap(V1ConfigMap map) {
+        try {
+            this.coreApi.createNamespacedConfigMap(namespace, map, null, DRY_RUN_ALL, null);
+        } catch (ApiException e) {
+            if (isDryRunUnsupported(e)) {
+                logger.warn(
+                        "Skipped the dry run of a task's ConfigMap: an admission webhook doesn't"
+                                + " support dry runs");
+                return;
+            }
+            throw KubernetesException.fromApiException(e);
+        }
+    }
+
+    /**
+     * Whether Kubernetes refused a dry run because an admission webhook doesn't support dry runs:
+     * 400 Bad Request, with the message "admission webhook ... does not support dry run".
+     */
+    private static boolean isDryRunUnsupported(ApiException e) {
+        String body = e.getResponseBody();
+        return e.getCode() == HttpStatus.BAD_REQUEST.value()
+                && body != null
+                && body.contains("does not support dry run");
+    }
+
     public V1ConfigMap createConfigMap(V1ConfigMap map) {
         try {
             return this.coreApi.createNamespacedConfigMap(namespace, map, null, null, null);
@@ -76,15 +124,24 @@ public class KubernetesClientWrapper {
         }
     }
 
+    /**
+     * Reads the taskmaster's job of a task.
+     *
+     * @param taskId - TES task ID (==taskmaster's job name)
+     * @return the taskmaster's job
+     * @throws TaskNotFoundException if there is no such job, it isn't a taskmaster's job, or
+     *     Kubernetes is deleting it (e.g. after its TTL)
+     */
     public V1Job readTaskmasterJob(String taskId) {
         try {
             V1Job job = this.batchApi.readNamespacedJob(taskId, namespace, null, null, null);
-            if (job.getMetadata().getLabels().entrySet().stream()
-                    .anyMatch(
-                            entry ->
-                                    LABEL_JOBTYPE_KEY.equals(entry.getKey())
-                                            && LABEL_JOBTYPE_VALUE_TASKM.equals(
-                                                    entry.getValue()))) {
+            if (!isBeingDeleted(job)
+                    && job.getMetadata().getLabels().entrySet().stream()
+                            .anyMatch(
+                                    entry ->
+                                            LABEL_JOBTYPE_KEY.equals(entry.getKey())
+                                                    && LABEL_JOBTYPE_VALUE_TASKM.equals(
+                                                            entry.getValue()))) {
                 return job;
             }
         } catch (ApiException e) {
@@ -207,6 +264,12 @@ public class KubernetesClientWrapper {
             }
             throw e;
         }
+        // jobs that Kubernetes is deleting (e.g. after their TTL) are gone, as for
+        // readTaskmasterJob
+        result.setItems(
+                result.getItems().stream()
+                        .filter(job -> !isBeingDeleted(job))
+                        .collect(Collectors.toList()));
         if (user.isMemberInNonManagedGroups()) {
             // if there are groups, where user is a manager and other groups, where user is only a
             // member
@@ -229,6 +292,14 @@ public class KubernetesClientWrapper {
             result.setItems(filteredJobList);
         }
         return result;
+    }
+
+    /**
+     * Whether Kubernetes is deleting the job: it set a deletion timestamp, and waits for finalizers
+     * or the deletion of dependents (foreground deletion) before it removes the object.
+     */
+    private static boolean isBeingDeleted(V1Job job) {
+        return job.getMetadata().getDeletionTimestamp() != null;
     }
 
     /**

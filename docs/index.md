@@ -38,8 +38,12 @@ When TESK API gets a request to create a task, these steps follow:
 1. TESK API creates the taskmaster, a Kubernetes job (one per task) that
    processes the inputs and outputs and runs the task's executors in turn. It
    passes the taskmaster a JSON object with the task's inputs, outputs and
-   volumes (unchanged) and its executors (as Kubernetes jobs). The request
-   returns at once, with the generated task ID, without waiting for the task.
+   volumes (unchanged) and its executors (as Kubernetes jobs), in a ConfigMap
+   that the job owns (see [Deleting tasks](#deleting-tasks)). It creates the
+   job first and the ConfigMap right after it; the taskmaster's pod waits
+   until the ConfigMap exists (see [Failures when creating a
+   task](#failures-when-creating-a-task)). The request returns at once, with
+   the generated task ID, without waiting for the task.
 2. If the task has inputs, outputs or volumes, the taskmaster creates a
    persistent volume claim (PVC) for the task.
 3. The taskmaster creates the inputs filer, another Kubernetes job (one per
@@ -57,6 +61,23 @@ When TESK API gets a request to create a task, these steps follow:
 8. The outputs filer uploads the output files from the PVC to their
    destinations.
 9. The taskmaster deletes the PVC and ends.
+
+#### Failures when creating a task
+
+Before it creates the job, TESK API checks the ConfigMap in a dry run, with
+an owner reference to the job that has a placeholder UID: a ConfigMap that
+Kubernetes refuses (e.g. one above Kubernetes' limit of 1 MiB, or one whose
+owner TESK API may not set) fails the request before anything is created,
+and a name that is taken is replaced by a new one. If an admission webhook
+for ConfigMaps doesn't support dry runs, Kubernetes refuses every dry run;
+TESK API then logs a warning and skips the check. If the ConfigMap can't be
+created after the job all the same, TESK API deletes the job again (if the name was taken in between,
+it then tries again with a new name). If that deletion fails too, TESK API
+logs both errors and fails the request (`500 Internal Server Error`) without
+trying again. The job then stays behind: it is listed as a task in state
+`QUEUED` whose ID the client never got, and its pod waits for the ConfigMap
+until someone deletes the job. The same happens if the request to create the
+job fails (e.g. times out) after Kubernetes has created the job.
 
 ### Getting tasks
 
@@ -115,3 +136,25 @@ it stops the running executor and ends.
 TESK API checks the state before it labels the job. If the task ends in
 between, for example because an executor fails at that moment, the label
 still wins and the task stays `CANCELED`.
+
+### Deleting tasks
+
+A task exists as long as its taskmaster's job does: TESK has no database, so
+a task whose job was deleted is gone. `GET /tasks/{id}` answers `404 Not
+Found` for it, and `GET /tasks` doesn't list it. TESK API counts a job that
+Kubernetes is deleting (it has a deletion timestamp, e.g. while Kubernetes
+waits for the job's dependents) as deleted, too, so that a task doesn't show
+up as `SYSTEM_ERROR` while its jobs disappear. TESK API leaves these jobs out
+after Kubernetes has returned a page of taskmaster jobs, so a page can be shorter than
+`page_size`, even empty, with a `next_page_token`.
+
+Kubernetes deletes a task's objects with its taskmaster's job, through [owner
+references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/):
+the ConfigMap that TESK API creates, and the filer and executor jobs (with
+their pods) that the taskmaster creates. The taskmaster can set a TTL on its
+own job (`TASK_TTL_SECONDS`, see the taskmaster's documentation in
+[tesk-core](https://github.com/elixir-cloud-aai/tesk-core)), so that
+Kubernetes deletes finished tasks after that time; without it, tasks are kept
+until someone deletes their jobs. To delete a task by hand, delete its
+taskmaster's job with its dependents, e.g. `kubectl delete job <task ID>`
+(the default propagation policy, `background`, deletes them).
