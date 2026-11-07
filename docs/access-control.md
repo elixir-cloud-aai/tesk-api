@@ -3,7 +3,7 @@
 TESK API integrates with [Elixir AAI](https://www.elixir-europe.org/services/compute/aai) via [OpenID Connect](http://openid.net/connect/) protocol to authenticate and authorise requests. Authentication and authorisation are optional and can be switched off completely. When authentication is on, in order to perform any operation on tasks (get and/or create tasks) TESK API user will have to include a valid access token issued by Elixir AAI in the request header. To obtain such a token, a user will have to:
 * have a valid account in Elixir AAI
 * belong to a specific Elixir group (or, with [authorisation without groups](#authorisation-without-groups) on, have one of the configured values in a claim)
-* have access to a registered Elixir client application, that was assigned - among others - `groupNames` scope.
+* have access to a registered Elixir client application, that was assigned - among others - `groupNames` scope (with authorisation without groups, the scope that releases the configured claim).
 
 ## Switching on/off authentication and authorisation
 Authentication and authorisation can be globally switched on and off for TESK API using [Spring Profiles](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-profiles.html). When the default `noauth` profile is active, all endpoints are unauthenticated (so the setting for `GET /service-info` below has no effect) and all (also previously) created TES tasks are visible to any user. New tasks are labelled as created by `anonymousUser` and no team ownership is assigned to new tasks. With `auth` profile activated, all the rules described below apply. Set the profile with `SPRING_PROFILES_ACTIVE` (see [Configuration](configuration.md#settings)).
@@ -101,6 +101,11 @@ Environment variable | Meaning | Default
 
 If the setting is on without a claim name or without a non-blank value, TESK
 API doesn't start.
+
+Users get their tokens from a client that the provider must allow to release
+the claim (e.g. the scope `eduperson_entitlement` or `eduperson_assurance`);
+without it, the user info lacks the claim and every request is refused with
+`403 Forbidden`.
 
 With the setting on, a user with one of the values (a "claim user"):
 
