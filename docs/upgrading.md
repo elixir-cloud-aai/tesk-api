@@ -44,6 +44,9 @@ Changes since 1.2.0 that clients or deployments may notice:
   creator of a task could show it to other users or hide it from the
   managers of its group), and a task whose sent log had no `metadata`
   failed with `500`.
+- **Filtering tasks by name.** `GET /tasks` supports `name_prefix` (see
+  [Listing tasks](api.md#listing-tasks)); before, it was ignored. Pages
+  can be shorter than `page_size`, even empty, with a `next_page_token`.
 - **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty

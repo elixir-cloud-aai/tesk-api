@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
 
@@ -172,9 +173,14 @@ public class TesServiceImpl implements TesService {
      * executors, all pods), combines them together into valid {@link Task} objects and converts to
      * result with means of the converter.
      *
-     * @param namePrefix - Unsupported
-     * @param pageSize - Unsupported, in future releases should enable list chunking
-     * @param pageToken - Unsupported, in future releases should enable list chunking
+     * <p>Kubernetes can't select jobs by a prefix of an annotation, so the tasks are filtered by
+     * name after Kubernetes returned a page of taskmaster jobs: a page can be shorter than {@code
+     * pageSize}, even empty, while {@code next_page_token} still leads to the next page.
+     *
+     * @param namePrefix - only tasks whose names start with it (case-sensitive); all tasks if null
+     *     or empty
+     * @param pageSize - maximum number of taskmaster jobs read for the page
+     * @param pageToken - continue token of Kubernetes, from the previous page's next_page_token
      * @param view - one of {@link TaskView} values, decides on how much detail is put in each
      *     resulting task
      * @return - resulting list of tasks plus paging token (when supported)
@@ -191,9 +197,13 @@ public class TesServiceImpl implements TesService {
         V1JobList executorJobs = this.kubernetesClientWrapper.listAllTaskExecutorJobs();
         V1JobList filerJobs = this.kubernetesClientWrapper.listAllFilerJobs();
         V1PodList jobPods = this.kubernetesClientWrapper.listAllJobPods();
+        List<V1Job> matchingTaskmasterJobs =
+                taskmasterJobs.getItems().stream()
+                        .filter(job -> hasNamePrefix(job, namePrefix))
+                        .collect(Collectors.toList());
         TaskBuilder taskListBuilder =
                 TaskBuilder.newTaskList()
-                        .addJobList(taskmasterJobs.getItems())
+                        .addJobList(matchingTaskmasterJobs)
                         .addJobList(executorJobs.getItems())
                         .addJobList(filerJobs.getItems())
                         .addPodList(jobPods.getItems());
@@ -205,6 +215,22 @@ public class TesServiceImpl implements TesService {
         response.tasks(tasks).nextPageToken(taskmasterJobs.getMetadata().getContinue());
 
         return response;
+    }
+
+    /**
+     * Whether the name of a taskmaster job's task (annotation {@code tes-task-name}) starts with
+     * the prefix. Every task matches a null or empty prefix; a task without a name matches no
+     * other.
+     */
+    private static boolean hasNamePrefix(V1Job taskmasterJob, String namePrefix) {
+        if (namePrefix == null || namePrefix.isEmpty()) {
+            return true;
+        }
+        String name =
+                Optional.ofNullable(taskmasterJob.getMetadata().getAnnotations())
+                        .map(annotations -> annotations.get(ANN_TESTASK_NAME_KEY))
+                        .orElse(null);
+        return name != null && name.startsWith(namePrefix);
     }
 
     /**
