@@ -455,8 +455,8 @@ public class TesKubernetesConverterTest {
 
     @Test
     public void extractExecutorCount_unknown() throws IOException {
-        //not JSON, no executors, executors not a list, no stored task
-        for (String stored : new String[]{"not JSON", "{}", "{\"executors\": {}}", "{\"executors\": null}", null}) {
+        //not JSON, empty, a JSON value other than an object, no executors, executors not a list, no stored task
+        for (String stored : new String[]{"not JSON", "", "  ", "null", "[]", "{}", "{\"executors\": {}}", "{\"executors\": null}", null}) {
             assertNull(stored, this.executorCountOf(stored));
         }
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();

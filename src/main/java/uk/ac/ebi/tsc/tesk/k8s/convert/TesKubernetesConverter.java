@@ -234,7 +234,9 @@ public class TesKubernetesConverter {
                 .map(ann -> ann.get(ANN_JSON_INPUT_KEY)).orElse(null);
         if (inputJson == null) return null;
         try {
-            JsonNode executors = this.objectMapper.readTree(inputJson).get("executors");
+            //readTree gives null or a missing node for empty input, depending on the Jackson version
+            JsonNode executors = Optional.ofNullable(this.objectMapper.readTree(inputJson))
+                    .map(tree -> tree.get("executors")).orElse(null);
             return executors != null && executors.isArray() ? executors.size() : null;
         } catch (IOException ex) {
             logger.info("Reading the executors of task {} from JSON failed; {}", taskMasterJob.getMetadata().getName(), ex.getMessage());
