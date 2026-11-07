@@ -38,8 +38,12 @@ When TESK API gets a request to create a task, these steps follow:
 1. TESK API creates the taskmaster, a Kubernetes job (one per task) that
    processes the inputs and outputs and runs the task's executors in turn. It
    passes the taskmaster a JSON object with the task's inputs, outputs and
-   volumes (unchanged) and its executors (as Kubernetes jobs). The request
-   returns at once, with the generated task ID, without waiting for the task.
+   volumes (unchanged) and its executors (as Kubernetes jobs), in a ConfigMap
+   that it creates right after the job and that the job owns (see [Deleting
+   tasks](#deleting-tasks)); the taskmaster's pod waits until the ConfigMap
+   exists. If the ConfigMap can't be created, TESK API deletes the job again.
+   The request returns at once, with the generated task ID, without waiting
+   for the task.
 2. If the task has inputs, outputs or volumes, the taskmaster creates a
    persistent volume claim (PVC) for the task.
 3. The taskmaster creates the inputs filer, another Kubernetes job (one per
@@ -115,3 +119,23 @@ it stops the running executor and ends.
 TESK API checks the state before it labels the job. If the task ends in
 between, for example because an executor fails at that moment, the label
 still wins and the task stays `CANCELED`.
+
+### Deleting tasks
+
+A task exists as long as its taskmaster's job does: TESK has no database, so
+a task whose job was deleted is gone. `GET /tasks/{id}` answers `404 Not
+Found` for it, and `GET /tasks` doesn't list it. TESK API counts a job that
+Kubernetes is deleting (it has a deletion timestamp, e.g. while Kubernetes
+waits for the job's dependents) as deleted, too, so that a task doesn't show
+up as `SYSTEM_ERROR` while its jobs disappear.
+
+Kubernetes deletes a task's objects with its taskmaster's job, through [owner
+references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/):
+the ConfigMap that TESK API creates, and the filer and executor jobs (with
+their pods) that the taskmaster creates. The taskmaster can set a TTL on its
+own job (`TASK_TTL_SECONDS`, see the taskmaster's documentation in
+[tesk-core](https://github.com/elixir-cloud-aai/tesk-core)), so that
+Kubernetes deletes finished tasks after that time; without it, tasks are kept
+until someone deletes their jobs. To delete a task by hand, delete its
+taskmaster's job with its dependents, e.g. `kubectl delete job <task ID>`
+(the default propagation policy, `background`, deletes them).

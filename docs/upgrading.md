@@ -85,6 +85,21 @@ Changes since 1.2.0 that clients or deployments may notice:
   `KUBECONFIG`), and run it with your own UID in group 0
   (`--user "$(id -u):0"`) if only your user may read the file; if you mount
   other files, make sure that the container's user or group 0 can read them.
+- **Deleted tasks.** The taskmaster's job owns the task's ConfigMap, so that
+  Kubernetes deletes the ConfigMap with the job, e.g. after the TTL that the
+  taskmaster can set (`TASK_TTL_SECONDS` of
+  [tesk-core](https://github.com/elixir-cloud-aai/tesk-core)). TESK API now
+  creates the job first and the ConfigMap right after it; the job's pod waits
+  for the ConfigMap. If the ConfigMap can't be created, TESK API deletes the
+  job, which needs `delete` on `jobs` (see
+  [Deployment](deployment.md#kubernetes)); TESK's Helm chart already
+  grants it. Without the right, the job stays behind, its pod waits for the
+  ConfigMap forever, and the request fails as before. Tasks whose taskmaster's
+  job Kubernetes is deleting (it has a deletion timestamp) are gone: `GET
+  /tasks/{id}` answers `404 Not Found` and `GET /tasks` leaves them out (see
+  [Deleting tasks](index.md#deleting-tasks)); before, they could show up as
+  `SYSTEM_ERROR` until Kubernetes removed the job. ConfigMaps of tasks
+  created before the upgrade have no owner and stay until you delete them.
 
 ## To 1.2.0
 
