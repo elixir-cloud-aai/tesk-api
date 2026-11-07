@@ -18,8 +18,12 @@ updates:
       # (#91). Remove these rules with #66
       - dependency-name: io.kubernetes:client-java
         update-types: ["version-update:semver-major"]
+      # Also the minor versions of Spring Security: `spring-security.version` in
+      # `pom.xml` is the last release of the 5.7 line, which Spring Boot 2.7
+      # uses, and `.trivyignore.yaml` names its version (5.8 has more
+      # unfixed findings)
       - dependency-name: org.springframework.security:*
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: com.github.tomakehurst:wiremock
         update-types: ["version-update:semver-major"]
       # Java 11 from 7.0
