@@ -86,3 +86,52 @@ Environment variable | Meaning | Default
 `TESK_API_AUTHORISATION_ENV_SUBGROUP` | Name of the subgroup representing environment (aka Environment Group) | `EBI` (Full group name:  `elixir:GA4GH:GA4GH-CAP:EBI`)
 `TESK_API_AUTHORISATION_ADMIN_SUBGROUP` | Name of the subgroup representing admins (super admins or team admins) | `ADMIN` (Full group name of super-admins:  `elixir:GA4GH:GA4GH-CAP:EBI:ADMIN`)
 
+## Authorisation without groups
+
+Some OpenID Connect providers (e.g. LS Login) give no group memberships that
+fit the [group structure](#group-structure). For them, TESK API can authorise
+users by a claim of the user info instead. The setting is off by default; with
+it off, nothing changes. It needs the `auth` profile.
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHORISATION_CLAIM_ENABLED` | `true`: users with one of the values below in the claim below are authorised without groups. | `false`
+`TESK_API_AUTHORISATION_CLAIM_NAME` | Name of the claim in the user info, e.g. `eduperson_entitlement` or `eduperson_assurance`. Required if the setting is on. | none
+`TESK_API_AUTHORISATION_CLAIM_VALUES` | Comma-separated values of the claim; a user needs at least one of them. The claim can be a string or a list of strings; values are compared exactly (also in case). Required if the setting is on. | none
+
+If the setting is on without a claim name or without a non-blank value, TESK
+API doesn't start.
+
+With the setting on, a user with one of the values (a "claim user"):
+
+* may create tasks. The tasks belong to the user only, without a team: a
+  task with `tags['GROUP_NAME']` is refused (`403 Forbidden`), unless the
+  user may create tasks for that team by the group rules.
+* may list, get and cancel their own tasks without a team, and no others.
+
+Group rules are unchanged and come first: a team member, team admin or super
+admin keeps the rights described [above](#endpoint-permissions), whether or
+not they have the claim. Super admins (the Super Admin Group) see all tasks,
+including those of claim users; team admins don't see them, as they belong to
+no team. A team member who loses the membership but has the claim sees only
+their tasks without a team.
+
+### Security implications
+
+* Everyone who gets one of the values from your provider can run any
+  container image with any command on your cluster, within the resources
+  that tasks may request. Choose a claim and values that your provider sets
+  per user and that users can't set themselves, e.g. an entitlement that an
+  administrator of your community grants, or an assurance level that your
+  provider checks. A value that every account has (e.g. a low assurance
+  level, or the provider's default entitlement) opens TESK to all of its
+  users.
+* Values are compared exactly, so list every value that you accept: with
+  `eduperson_assurance`, a higher level doesn't imply a lower one.
+* TESK API reads the claim from the user info endpoint on each request, so a
+  value revoked at the provider takes effect at the next request. Tasks that
+  are already running keep running.
+* Users are identified by `sub` (with `@` replaced by `_`), as for group
+  members. The tasks of a claim user are labelled with it; Kubernetes allows
+  label values of up to 63 characters, so longer subjects can't create
+  tasks.

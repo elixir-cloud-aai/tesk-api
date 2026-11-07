@@ -68,6 +68,14 @@ Changes since 1.2.0 that clients or deployments may notice:
   before; numbers with more digits or decimals are refused with `400 Bad
   Request`. The API description (`/v2/api-docs`) now gives `cpu_cores` as a
   number instead of an integer.
+- **Authorisation without groups.** With the `auth` profile, TESK API can
+  authorise users by a claim of the user info instead of group membership
+  (`TESK_API_AUTHORISATION_CLAIM_ENABLED`, `TESK_API_AUTHORISATION_CLAIM_NAME`
+  and `TESK_API_AUTHORISATION_CLAIM_VALUES`; see [Authorisation without
+  groups](access-control.md#authorisation-without-groups)). It is off by
+  default, so nothing changes unless you turn it on; read its security
+  implications first. The Helm chart of TESK doesn't set these yet; set them
+  as environment variables of the deployment.
 - **Non-root image.** The image runs as the user `tesk` (UID 1000, group 0)
   instead of `root`, with the home directory `/home/tesk` (see
   [Deployment](deployment.md#image)). The Helm chart of TESK already runs it
