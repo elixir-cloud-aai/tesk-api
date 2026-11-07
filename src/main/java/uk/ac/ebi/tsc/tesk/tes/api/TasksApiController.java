@@ -72,7 +72,7 @@ public class TasksApiController implements TasksApi {
             @ApiParam(
                             example = "256",
                             value =
-                                    "OPTIONAL. Number of tasks to return in one page. Must be less than 2048. Without it, all tasks are returned in one page. Pages can be shorter, also with name_prefix.")
+                                    "OPTIONAL. Number of tasks to return in one page. Without it, all tasks are returned in one page. Pages can be shorter, also with name_prefix.")
                     @RequestParam(value = "page_size", required = false)
                     Long pageSize,
             @ApiParam(
