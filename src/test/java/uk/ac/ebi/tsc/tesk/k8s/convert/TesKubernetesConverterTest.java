@@ -30,6 +30,8 @@ import uk.ac.ebi.tsc.tesk.config.GsonConfig;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
+import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
+import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
@@ -417,6 +419,33 @@ public class TesKubernetesConverterTest {
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(0);
         TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
         assertThat(state, is(TesState.SYSTEM_ERROR));
+    }
+
+    /**
+     * Decimal numbers of CPU cores (e.g. 0.5) are requested as such, not truncated to whole cores (issue #44)
+     */
+    @Test
+    public void fromTesExecutorToK8sJob_decimalCpuCores() throws IOException {
+        TesResources resources = this.objectMapper.readValue("{\"cpu_cores\": 0.5}", TesResources.class);
+        TesExecutor executor = new TesExecutor().image("alpine").addCommandItem("true");
+        V1Job job = this.converter.fromTesExecutorToK8sJob("task-123", "name", executor, 0, resources,
+                User.builder("test-user-id").build());
+        V1ResourceRequirements requirements = job.getSpec().getTemplate().getSpec().getContainers().get(0).getResources();
+        assertEquals("500m", requirements.getLimits().get("cpu").toSuffixedString());
+        assertEquals("500m", requirements.getRequests().get("cpu").toSuffixedString());
+    }
+
+    /**
+     * CPU cores are written back as given: whole numbers stay integers, as the TES specification defines them
+     */
+    @Test
+    public void cpuCores_roundTrip() throws IOException {
+        for (String cpuCores : new String[]{"4", "0.5", "1.25"}) {
+            TesResources resources = this.objectMapper.readValue("{\"cpu_cores\": " + cpuCores + "}", TesResources.class);
+            new JsonContentAssert(this.getClass(), this.objectMapper.writeValueAsString(resources))
+                    .isEqualToJson("{\"cpu_cores\": " + cpuCores + "}", JSONCompareMode.STRICT);
+            assertThat(this.objectMapper.writeValueAsString(resources), org.hamcrest.Matchers.containsString("\"cpu_cores\" : " + cpuCores));
+        }
     }
 
 }

@@ -8,6 +8,11 @@ Changes since 1.2.0 that clients or deployments may notice:
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty
   body. Clients that checked for an empty body need to accept `{}`.
+- **Decimal CPU cores.** `resources.cpu_cores` accepts decimal numbers, e.g.
+  `0.5` (see [API](api.md#resources)). Before, the decimal part was dropped
+  silently, so that `0.5` set no CPU at all (`0`). Whole numbers work as
+  before. The API description (`/v2/api-docs`) now gives `cpu_cores` as a
+  number instead of an integer.
 
 ## To 1.2.0
 

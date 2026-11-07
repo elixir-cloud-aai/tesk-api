@@ -14,6 +14,15 @@ Method | Path | Operation
 
 The API description (OpenAPI 2.0) is at `/v2/api-docs`.
 
+## Resources
+
+`resources.cpu_cores` of a task sets both the CPU request and the CPU limit of
+each executor's container. The TES specification defines it as an integer;
+TESK API also accepts decimal numbers, e.g. `0.5` for half a core (requested
+from Kubernetes as `500m`). It returns the number as it was given, so whole
+numbers stay integers. Kubernetes counts CPU in steps of a thousandth of a
+core (`1m`), and rounds smaller fractions up.
+
 With the `auth` profile, all endpoints need a valid access token, except the
 API description, the Swagger UI (if it is on) and, unless
 `TESK_API_SERVICE_INFO_PUBLIC` is `false`, service info; see [Access

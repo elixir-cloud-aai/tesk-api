@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -18,7 +19,7 @@ import javax.validation.Valid;
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class TesResources   {
   @JsonProperty("cpu_cores")
-  private Long cpuCores;
+  private BigDecimal cpuCores;
 
   @JsonProperty("preemptible")
   private Boolean preemptible;
@@ -39,23 +40,24 @@ public class TesResources   {
   @JsonProperty("backend_parameters_strict")
   private Boolean backendParametersStrict = false;
 
-  public TesResources cpuCores(Long cpuCores) {
+  public TesResources cpuCores(BigDecimal cpuCores) {
     this.cpuCores = cpuCores;
     return this;
   }
 
   /**
-   * Requested number of CPUs
+   * Requested number of CPUs. The TES specification defines an integer; TESK also accepts decimal numbers
+   * (e.g. 0.5), which it requests from Kubernetes as such, and writes the number back as given
    * @return cpuCores
   */
-  @ApiModelProperty(example = "4", value = "Requested number of CPUs")
+  @ApiModelProperty(example = "4", value = "Requested number of CPUs (TESK also accepts decimal numbers, e.g. 0.5)")
 
 
-  public Long getCpuCores() {
+  public BigDecimal getCpuCores() {
     return cpuCores;
   }
 
-  public void setCpuCores(Long cpuCores) {
+  public void setCpuCores(BigDecimal cpuCores) {
     this.cpuCores = cpuCores;
   }
 
