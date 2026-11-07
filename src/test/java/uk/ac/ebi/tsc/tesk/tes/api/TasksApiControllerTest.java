@@ -1,5 +1,21 @@
 package uk.ac.ebi.tsc.tesk.tes.api;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
+
+import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentMatcher;
@@ -29,23 +45,6 @@ import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
-import java.util.List;
-
-import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
-import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
-
 @RunWith(SpringRunner.class)
 @WebMvcTest(TasksApiController.class)
 public class TasksApiControllerTest {
@@ -58,17 +57,20 @@ public class TasksApiControllerTest {
         public void configure(ResourceServerSecurityConfigurer security) {
             security.tokenServices(tokenServices());
         }
+
         ResourceServerTokenServices tokenServices() {
             return new ResourceServerTokenServices() {
 
                 @Override
-                public OAuth2Authentication loadAuthentication(String accessToken) throws AuthenticationException, InvalidTokenException {
+                public OAuth2Authentication loadAuthentication(String accessToken)
+                        throws AuthenticationException, InvalidTokenException {
                     Object principal = User.builder("admin").build();
-                    List<GrantedAuthority> authorities = AuthorityUtils.commaSeparatedStringToAuthorityList(accessToken);
-                    OAuth2Request request = new OAuth2Request(null, null, null, true, null,
-                            null, null, null, null);
-                    UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(
-                            principal, "N/A", authorities);
+                    List<GrantedAuthority> authorities =
+                            AuthorityUtils.commaSeparatedStringToAuthorityList(accessToken);
+                    OAuth2Request request =
+                            new OAuth2Request(null, null, null, true, null, null, null, null, null);
+                    UsernamePasswordAuthenticationToken token =
+                            new UsernamePasswordAuthenticationToken(principal, "N/A", authorities);
                     return new OAuth2Authentication(request, token);
                 }
 
@@ -80,135 +82,152 @@ public class TasksApiControllerTest {
         }
     }
 
+    @Autowired private MockMvc mvc;
 
-    @Autowired
-    private MockMvc mvc;
-
-    @MockBean
-    private TesService tesService;
-    @MockBean
-    ServiceInfoService serviceInfoService;
+    @MockBean private TesService tesService;
+    @MockBean ServiceInfoService serviceInfoService;
 
     @Test
     public void createTask_valid() throws Exception {
-        String[] paths = new String[]{"fromTesToK8s/task.json", "fromTesToK8s_minimal/task.json"};
+        String[] paths = new String[] {"fromTesToK8s/task.json", "fromTesToK8s_minimal/task.json"};
         for (String path : paths) {
-            this.mvc.perform(post(TASK_URL)
-                    .content(getFileContentFromResources(path))
-                    .header("Authorization", "Bearer BAR")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk());
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .content(getFileContentFromResources(path))
+                                    .header("Authorization", "Bearer BAR")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
         }
     }
 
     @Test
     public void createTask_invalid_executors() throws Exception {
-        String[][] files = new String[][]{
-                new String[]{"none.json", "executors"},
-                new String[]{"empty.json", "executors"},
-                new String[]{"no_image.json", "image"},
-                new String[]{"no_command.json", "command"},
-                new String[]{"invalid_stdin.json", "stdin"},
-        };
+        String[][] files =
+                new String[][] {
+                    new String[] {"none.json", "executors"},
+                    new String[] {"empty.json", "executors"},
+                    new String[] {"no_image.json", "image"},
+                    new String[] {"no_command.json", "command"},
+                    new String[] {"invalid_stdin.json", "stdin"},
+                };
         for (String[] file : files) {
-            this.mvc.perform(post(TASK_URL)
-                    .header("Authorization", "Bearer BAR")
-                    .content(getFileContentFromResources("invalid_tasks/executors/" + file[0]))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)).andExpect(status().is4xxClientError())
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .header("Authorization", "Bearer BAR")
+                                    .content(
+                                            getFileContentFromResources(
+                                                    "invalid_tasks/executors/" + file[0]))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().is4xxClientError())
                     .andExpect(jsonPath("$.messages[0]", containsString(file[1])));
         }
-
-
     }
 
     @Test
     public void createTask_invalid_inputs() throws Exception {
-        String[][] files = new String[][]{
-                new String[]{"no_path.json", "inputs[0].path"},
-                new String[]{"no_source.json", "URL or content required"},
-                new String[]{"wrong_type.json", "inputs[0].type"}
-        };
+        String[][] files =
+                new String[][] {
+                    new String[] {"no_path.json", "inputs[0].path"},
+                    new String[] {"no_source.json", "URL or content required"},
+                    new String[] {"wrong_type.json", "inputs[0].type"}
+                };
         for (String[] file : files) {
-            this.mvc.perform(post(TASK_URL)
-                    .header("Authorization", "Bearer BAR")
-                    .content(getFileContentFromResources("invalid_tasks/inputs/" + file[0]))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)).andExpect(status().is4xxClientError())
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .header("Authorization", "Bearer BAR")
+                                    .content(
+                                            getFileContentFromResources(
+                                                    "invalid_tasks/inputs/" + file[0]))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().is4xxClientError())
                     .andExpect(jsonPath("$.messages[0]", containsString(file[1])));
         }
-
-
     }
 
     @Test
     public void createTask_invalid_outputs() throws Exception {
-        String[][] files = new String[][]{
-                new String[]{"no_path.json", "outputs[0].path"},
-                new String[]{"no_url.json", "outputs[0].url"},
-                new String[]{"empty_type.json", "outputs[0].type"}
-        };
+        String[][] files =
+                new String[][] {
+                    new String[] {"no_path.json", "outputs[0].path"},
+                    new String[] {"no_url.json", "outputs[0].url"},
+                    new String[] {"empty_type.json", "outputs[0].type"}
+                };
         for (String[] file : files) {
-            this.mvc.perform(post(TASK_URL)
-                    .header("Authorization", "Bearer BAR")
-                    .content(getFileContentFromResources("invalid_tasks/outputs/" + file[0]))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)).andExpect(status().is4xxClientError())
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .header("Authorization", "Bearer BAR")
+                                    .content(
+                                            getFileContentFromResources(
+                                                    "invalid_tasks/outputs/" + file[0]))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().is4xxClientError())
                     .andExpect(jsonPath("$.messages[0]", containsString(file[1])));
         }
-
-
     }
 
     @Test
     public void createTask_invalid_volumes() throws Exception {
-        String[][] files = new String[][]{
-                new String[]{"wrong_volumes.json", "volumes[1]"}
-        };
+        String[][] files = new String[][] {new String[] {"wrong_volumes.json", "volumes[1]"}};
         for (String[] file : files) {
-            this.mvc.perform(post(TASK_URL)
-                    .header("Authorization", "Bearer BAR")
-                    .content(getFileContentFromResources("invalid_tasks/" + file[0]))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)).andExpect(status().is4xxClientError())
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .header("Authorization", "Bearer BAR")
+                                    .content(
+                                            getFileContentFromResources("invalid_tasks/" + file[0]))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().is4xxClientError())
                     .andExpect(jsonPath("$.messages[0]", containsString(file[1])));
         }
-
-
     }
 
     @Test
     public void createTask_invalid_unrecognized_field() throws Exception {
-        String[][] files = new String[][]{
-                new String[]{"unrecognized_field.json", "Unrecognized field \"unknown\""}
-        };
+        String[][] files =
+                new String[][] {
+                    new String[] {"unrecognized_field.json", "Unrecognized field \"unknown\""}
+                };
         for (String[] file : files) {
-            this.mvc.perform(post(TASK_URL)
-                    .header("Authorization", "Bearer BAR")
-                    .content(getFileContentFromResources("invalid_tasks/" + file[0]))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)).andExpect(status().is4xxClientError())
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .header("Authorization", "Bearer BAR")
+                                    .content(
+                                            getFileContentFromResources("invalid_tasks/" + file[0]))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().is4xxClientError())
                     .andExpect(jsonPath("$.message", containsString(file[1])));
         }
-
-
     }
 
     /**
-     * The TES specification answers a cancellation with an empty object ({@code {}}), not an empty body
-     * (issue #37)
+     * The TES specification answers a cancellation with an empty object ({@code {}}), not an empty
+     * body (issue #37)
      */
     @Test
     public void cancelTask_returnsEmptyObject() throws Exception {
-        this.mvc.perform(post(TASK_URL + "/{id}:cancel", "task-123")
-                .header("Authorization", "Bearer BAR")
-                .accept(MediaType.APPLICATION_JSON))
+        this.mvc
+                .perform(
+                        post(TASK_URL + "/{id}:cancel", "task-123")
+                                .header("Authorization", "Bearer BAR")
+                                .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{}", true));
-        //the task is looked up for the user (authorisation) before it is cancelled
+        // the task is looked up for the user (authorisation) before it is cancelled
         InOrder order = inOrder(this.tesService);
-        order.verify(this.tesService).getTask(eq("task-123"), eq(TaskView.MINIMAL), argThat(isAdmin()));
+        order.verify(this.tesService)
+                .getTask(eq("task-123"), eq(TaskView.MINIMAL), argThat(isAdmin()));
         order.verify(this.tesService).cancelTask("task-123");
     }
 
@@ -216,49 +235,63 @@ public class TasksApiControllerTest {
     public void cancelTask_notFound_doesNotCancel() throws Exception {
         given(this.tesService.getTask(eq("task-123"), eq(TaskView.MINIMAL), argThat(isAdmin())))
                 .willThrow(new TaskNotFoundException("task-123"));
-        this.mvc.perform(post(TASK_URL + "/{id}:cancel", "task-123")
-                .header("Authorization", "Bearer BAR")
-                .accept(MediaType.APPLICATION_JSON))
+        this.mvc
+                .perform(
+                        post(TASK_URL + "/{id}:cancel", "task-123")
+                                .header("Authorization", "Bearer BAR")
+                                .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
         verify(this.tesService, never()).cancelTask(anyString());
     }
 
-    /**
-     * Matches the user of the test's token (see {@link ResourceServerConfiguration})
-     */
+    /** Matches the user of the test's token (see {@link ResourceServerConfiguration}) */
     private static ArgumentMatcher<User> isAdmin() {
         return user -> user != null && "admin".equals(user.getUsername());
     }
 
     /**
-     * CPU cores are limited to 6 integer digits and 3 decimals (steps of 1m in Kubernetes), so that huge or tiny
-     * numbers (e.g. 1e1000000000) are refused instead of converted (issue #44)
+     * CPU cores are limited to 6 integer digits and 3 decimals (steps of 1m in Kubernetes), so that
+     * huge or tiny numbers (e.g. 1e1000000000) are refused instead of converted (issue #44)
      */
     @Test
     public void createTask_invalid_cpuCores() throws Exception {
-        String[] files = new String[]{"cpu_cores_1e1000000000.json", "cpu_cores_1e_10.json",
-                "cpu_cores_0_0005.json", "cpu_cores_1000000.json", "cpu_cores_1e2147483647.json"};
+        String[] files =
+                new String[] {
+                    "cpu_cores_1e1000000000.json",
+                    "cpu_cores_1e_10.json",
+                    "cpu_cores_0_0005.json",
+                    "cpu_cores_1000000.json",
+                    "cpu_cores_1e2147483647.json"
+                };
         for (String file : files) {
-            //refused by the validation (messages) or, beyond the range of BigDecimal's scale, when read (message)
-            this.mvc.perform(post(TASK_URL)
-                    .header("Authorization", "Bearer BAR")
-                    .content(getFileContentFromResources("invalid_tasks/resources/" + file))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)).andExpect(status().isBadRequest())
+            // refused by the validation (messages) or, beyond the range of BigDecimal's scale, when
+            // read (message)
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .header("Authorization", "Bearer BAR")
+                                    .content(
+                                            getFileContentFromResources(
+                                                    "invalid_tasks/resources/" + file))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isBadRequest())
                     .andExpect(content().string(containsString("cpu")));
         }
     }
 
-    /**
-     * Trailing zeros don't count as decimals
-     */
+    /** Trailing zeros don't count as decimals */
     @Test
     public void createTask_valid_cpuCoresTrailingZeros() throws Exception {
-        this.mvc.perform(post(TASK_URL)
-                .header("Authorization", "Bearer BAR")
-                .content(getFileContentFromResources("valid_tasks/cpu_cores_0_5000.json"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk());
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(
+                                        getFileContentFromResources(
+                                                "valid_tasks/cpu_cores_0_5000.json"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
     }
-
 }

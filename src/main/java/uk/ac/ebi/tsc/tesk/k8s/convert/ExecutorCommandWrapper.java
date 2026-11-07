@@ -1,23 +1,27 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
-import org.apache.commons.lang3.StringUtils;
-import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
+import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
 
 /**
  * Wraps list of executor's command, so that:
- * - if any of executor's stdin/stdout/stderr params is set, the command runs in shell
- * - Each part of the original command (single command/argument) that contained shell special chars is surrounded by single quotes,
- *   plus single quote inside such string are replaced with '"'"' sequence
- * - stdin, stdout, stderr streams are redirected to paths according to executors params
+ *
+ * <ul>
+ *   <li>if any of executor's stdin/stdout/stderr params is set, the command runs in shell
+ *   <li>Each part of the original command (single command/argument) that contained shell special
+ *       chars is surrounded by single quotes, plus single quote inside such string are replaced
+ *       with '"'"' sequence
+ *   <li>stdin, stdout, stderr streams are redirected to paths according to executors params
+ * </ul>
  */
 public class ExecutorCommandWrapper {
 
-    private static final Pattern SPECIAL_CHARS = Pattern.compile("[ !\"#$&'()*;<>?\\[\\\\`{|~\\t\\n]");
+    private static final Pattern SPECIAL_CHARS =
+            Pattern.compile("[ !\"#$&'()*;<>?\\[\\\\`{|~\\t\\n]");
     private final TesExecutor executor;
 
     public ExecutorCommandWrapper(TesExecutor executor) {
@@ -26,7 +30,9 @@ public class ExecutorCommandWrapper {
 
     public List<String> getCommandsWithStreamRedirects() {
         List<String> result = new ArrayList<>();
-        if (StringUtils.isEmpty(executor.getStdin()) && StringUtils.isEmpty(executor.getStdout()) && StringUtils.isEmpty(executor.getStderr())) {
+        if (StringUtils.isEmpty(executor.getStdin())
+                && StringUtils.isEmpty(executor.getStdout())
+                && StringUtils.isEmpty(executor.getStderr())) {
             return executor.getCommand();
         }
         result.add("/bin/sh");

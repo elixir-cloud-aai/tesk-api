@@ -15,4 +15,3 @@ public class TrsProperties {
     private String uriPattern;
     private String urlPattern;
 }
-

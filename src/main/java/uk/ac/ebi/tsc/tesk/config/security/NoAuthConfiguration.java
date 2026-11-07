@@ -8,12 +8,10 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.core.userdetails.UserDetailsService;
 
 /**
+ * Switches off spring security for all requests making all requests anonymous
+ *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
- * Switches off spring security for all requests
- * making all requests anonymous
  */
-
 @Configuration
 @Profile("noauth")
 public class NoAuthConfiguration extends WebSecurityConfigurerAdapter {
@@ -23,13 +21,10 @@ public class NoAuthConfiguration extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        http.
-                anonymous().and().
-                authorizeRequests().anyRequest().permitAll();
+        http.anonymous().and().authorizeRequests().anyRequest().permitAll();
     }
     /**
      * Switches off default in memory user store containing one user with auto-generated password
-     *
      */
     @Bean
     public UserDetailsService userDetailsService() {

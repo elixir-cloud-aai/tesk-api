@@ -5,9 +5,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * General wrapper for exception thrown by Kubernetes API
  *
- *  General wrapper for exception thrown by Kubernetes API
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
 public class KubernetesException extends RuntimeException {
@@ -22,9 +22,11 @@ public class KubernetesException extends RuntimeException {
         super(apiException.getMessage(), apiException.getCause());
         this.apiException = apiException;
     }
+
     public ApiException getApiException() {
         return this.apiException;
     }
+
     public boolean isObjectNameDuplicated() {
         return apiException.getCode() == HttpStatus.CONFLICT.value();
     }

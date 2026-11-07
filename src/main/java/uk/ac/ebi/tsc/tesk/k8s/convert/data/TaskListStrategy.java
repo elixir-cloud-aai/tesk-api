@@ -1,26 +1,27 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert.data;
 
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_FILER_SUF;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_FILER_SUF;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
-
 /**
+ * Tool aimed at building Kubernetes object structure of a list of tasks, by passing to it results
+ * of Kubernetes batch method calls. All taskmaster jobs with unique names passed to it will get
+ * stored. Only those executor jobs that match already stored taskmaster jobs will be stored
+ * (filtering done by taskmaster's name and corresponding executor's label). Pods must be added,
+ * when all jobs have already been added. Thus, correct order of calls:
+ *
+ * <ol>
+ *   <li>taskmasters by {@link TaskBuilder#addJobList(List)}
+ *   <li>executors and outputFilers by {@link TaskBuilder#addJobList(List)}
+ *   <li>pods by {@link TaskBuilder#addPodList(List)}
+ * </ol>
+ *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
- * <p>
- * Tool aimed at building Kubernetes object structure of a list of tasks,
- * by passing to it results of Kubernetes batch method calls.
- * All taskmaster jobs with unique names passed to it will get stored.
- * Only those executor jobs that match already stored taskmaster jobs will be stored
- * (filtering done by taskmaster's name and corresponding executor's label).
- * Pods must be added, when all jobs have already been added.
- * Thus, correct order of calls:
- * 1) taskmasters by {@link TaskBuilder#addJobList(List)}
- * 2) executors and outputFilers by {@link TaskBuilder#addJobList(List)}
- * 3) pods by {@link TaskBuilder#addPodList(List)}
  */
 public class TaskListStrategy implements BuildStrategy {
 
@@ -28,12 +29,14 @@ public class TaskListStrategy implements BuildStrategy {
 
     @Override
     public void addTaskMasterJob(Job taskmasterJob) {
-        this.tasksById.putIfAbsent(taskmasterJob.getJob().getMetadata().getName(), new Task(taskmasterJob));
+        this.tasksById.putIfAbsent(
+                taskmasterJob.getJob().getMetadata().getName(), new Task(taskmasterJob));
     }
 
     @Override
     public void addExecutorJob(Job executorJob) {
-        String taskmasterName = executorJob.getJob().getMetadata().getLabels().get(LABEL_TESTASK_ID_KEY);
+        String taskmasterName =
+                executorJob.getJob().getMetadata().getLabels().get(LABEL_TESTASK_ID_KEY);
         Task taskmaster = this.tasksById.get(taskmasterName);
         if (taskmaster != null) {
             taskmaster.addExecutor(executorJob);

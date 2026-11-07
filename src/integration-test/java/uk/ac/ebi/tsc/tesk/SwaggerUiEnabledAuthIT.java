@@ -1,5 +1,9 @@
 package uk.ac.ebi.tsc.tesk;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.SWAGGER_UI_URLS;
+
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
 import org.junit.Test;
@@ -14,25 +18,23 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static uk.ac.ebi.tsc.tesk.UrlConstants.SWAGGER_UI_URLS;
-
 /**
- * With authentication on and {@code tesk.api.swagger-ui.enabled=true}, the Swagger UI and its static resources need
- * no token, as the UI itself obtains the token
+ * With authentication on and {@code tesk.api.swagger-ui.enabled=true}, the Swagger UI and its
+ * static resources need no token, as the UI itself obtains the token
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(locations = {"classpath:application.properties"},
-        properties = {"security.oauth2.resource.user-info-uri = http://localhost:8090",
-                "spring.profiles.active=auth",
-                "tesk.api.swagger-ui.enabled=true"})
+@TestPropertySource(
+        locations = {"classpath:application.properties"},
+        properties = {
+            "security.oauth2.resource.user-info-uri = http://localhost:8090",
+            "spring.profiles.active=auth",
+            "tesk.api.swagger-ui.enabled=true"
+        })
 public class SwaggerUiEnabledAuthIT {
 
-    @Autowired
-    private MockMvc mvc;
+    @Autowired private MockMvc mvc;
 
     @TestConfiguration
     static class KubernetesClientMock {
@@ -46,8 +48,7 @@ public class SwaggerUiEnabledAuthIT {
     @Test
     public void uiAndStaticResourcesWithoutToken_areOk() throws Exception {
         for (String path : SWAGGER_UI_URLS) {
-            this.mvc.perform(get(path))
-                    .andExpect(status().isOk());
+            this.mvc.perform(get(path)).andExpect(status().isOk());
         }
     }
 }

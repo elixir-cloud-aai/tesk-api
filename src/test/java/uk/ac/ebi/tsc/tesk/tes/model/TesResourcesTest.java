@@ -1,16 +1,13 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
-import org.junit.Test;
-
-import java.math.BigDecimal;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
-/**
- * Normalisation of CPU cores (issue #44)
- */
+import java.math.BigDecimal;
+import org.junit.Test;
+
+/** Normalisation of CPU cores (issue #44) */
 public class TesResourcesTest {
 
     @Test
@@ -28,20 +25,24 @@ public class TesResourcesTest {
 
     @Test
     public void cpuCores_trailingZerosBeyondThreeDecimals() {
-        assertEquals("0.5", new TesResources().cpuCores(new BigDecimal("0.5000")).getCpuCores().toString());
+        assertEquals(
+                "0.5",
+                new TesResources().cpuCores(new BigDecimal("0.5000")).getCpuCores().toString());
     }
 
     @Test
     public void cpuCores_exponentOfWholeNumberRemoved() {
-        assertEquals("1000", new TesResources().cpuCores(new BigDecimal("1e3")).getCpuCores().toString());
+        assertEquals(
+                "1000",
+                new TesResources().cpuCores(new BigDecimal("1e3")).getCpuCores().toString());
     }
 
-    /**
-     * Too many digits for {@code @Digits} anyway: kept with the exponent, not written out
-     */
+    /** Too many digits for {@code @Digits} anyway: kept with the exponent, not written out */
     @Test
     public void cpuCores_largeNumberKeptWithExponent() {
-        assertEquals("1E+8", new TesResources().cpuCores(new BigDecimal("1e8")).getCpuCores().toString());
+        assertEquals(
+                "1E+8",
+                new TesResources().cpuCores(new BigDecimal("1e8")).getCpuCores().toString());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -51,8 +52,11 @@ public class TesResourcesTest {
 
     @Test
     public void cpuCores_zeroInAnyNotation() {
-        for (String zero : new String[]{"0e10", "0e-10", "0.0000"}) {
-            assertEquals(zero, "0", new TesResources().cpuCores(new BigDecimal(zero)).getCpuCores().toString());
+        for (String zero : new String[] {"0e10", "0e-10", "0.0000"}) {
+            assertEquals(
+                    zero,
+                    "0",
+                    new TesResources().cpuCores(new BigDecimal(zero)).getCpuCores().toString());
         }
     }
 }

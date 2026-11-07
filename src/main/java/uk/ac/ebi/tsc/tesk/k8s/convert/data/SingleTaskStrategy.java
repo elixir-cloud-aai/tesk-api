@@ -2,20 +2,22 @@ package uk.ac.ebi.tsc.tesk.k8s.convert.data;
 
 import com.google.common.collect.Lists;
 import io.kubernetes.client.openapi.models.V1Job;
-
 import java.util.List;
 
 /**
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * Tool aimed at building Kubernetes object structure of a single task. Job objects passed to its
+ * methods must be prefiltered and belong to a single task (the class does not perform job objects
+ * filtering itself). Pods must be added, when all jobs have already been added. Thus, correct order
+ * of calls:
  *
- * Tool aimed at building Kubernetes object structure of a single task.
- * Job objects passed to its methods must be prefiltered and belong to a single task
- * (the class does not perform job objects filtering itself).
- * Pods must be added, when all jobs have already been added.
- * Thus, correct order of calls:
- * 1) taskmaster {@link TaskBuilder#addJobList(List)} or {@link TaskBuilder#addJob(V1Job)}
- * 2) executors and outputFiler {@link TaskBuilder#addJobList(List)} or {@link TaskBuilder#addJob(V1Job)}
- * 3) pods by {@link TaskBuilder#addPodList(List)}
+ * <ol>
+ *   <li>taskmaster {@link TaskBuilder#addJobList(List)} or {@link TaskBuilder#addJob(V1Job)}
+ *   <li>executors and outputFiler {@link TaskBuilder#addJobList(List)} or {@link
+ *       TaskBuilder#addJob(V1Job)}
+ *   <li>pods by {@link TaskBuilder#addPodList(List)}
+ * </ol>
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 public class SingleTaskStrategy implements BuildStrategy {
 
@@ -32,6 +34,7 @@ public class SingleTaskStrategy implements BuildStrategy {
             task.addExecutor(executorJob);
         }
     }
+
     @Override
     public void addOutputFilerJob(Job executorJob) {
         if (task != null) {

@@ -1,5 +1,9 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,14 +20,9 @@ import springfox.documentation.swagger.web.SecurityConfiguration;
 import springfox.documentation.swagger.web.SecurityConfigurationBuilder;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
 /**
- * Swagger Configuration
- * Configures securing all endpoints with OAuth2 (swaggerUI acts as OAuh2 client)
+ * Swagger Configuration Configures securing all endpoints with OAuth2 (swaggerUI acts as OAuh2
+ * client)
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
@@ -32,8 +31,7 @@ import java.util.List;
 @Profile("auth")
 public class SwaggerConfigAuth {
 
-    @Autowired
-    private OAuth2ClientProperties properties;
+    @Autowired private OAuth2ClientProperties properties;
 
     @Bean
     public Docket api() {
@@ -54,9 +52,13 @@ public class SwaggerConfigAuth {
             LoginEndpoint loginEndpoint = new LoginEndpoint(properties.getAuthorizationEndpoint());
             grantTypes.add(new ImplicitGrant(loginEndpoint, "access_token"));
         } else {
-            //the names of the client's parameters (OAuth 2.0), not their values: the Swagger UI is a public client
-            TokenRequestEndpoint tokenRequestEndpoint = new TokenRequestEndpoint(properties.getAuthorizationEndpoint(), "client_id", "client_secret");
-            TokenEndpoint tokenEndpoint = new TokenEndpoint(properties.getTokenEndpoint(), "access_token");
+            // the names of the client's parameters (OAuth 2.0), not their values: the Swagger UI is
+            // a public client
+            TokenRequestEndpoint tokenRequestEndpoint =
+                    new TokenRequestEndpoint(
+                            properties.getAuthorizationEndpoint(), "client_id", "client_secret");
+            TokenEndpoint tokenEndpoint =
+                    new TokenEndpoint(properties.getTokenEndpoint(), "access_token");
             grantTypes.add(new AuthorizationCodeGrant(tokenRequestEndpoint, tokenEndpoint));
         }
         return grantTypes;
@@ -70,7 +72,8 @@ public class SwaggerConfigAuth {
     }
 
     private List<SecurityReference> defaultAuth() {
-        AuthorizationScope authorizationScope = new AuthorizationScope("global", "accessEverything");
+        AuthorizationScope authorizationScope =
+                new AuthorizationScope("global", "accessEverything");
         AuthorizationScope[] authorizationScopes = new AuthorizationScope[1];
         authorizationScopes[0] = authorizationScope;
         return Arrays.asList(new SecurityReference("oauth2", authorizationScopes));
@@ -78,22 +81,22 @@ public class SwaggerConfigAuth {
 
     @Bean
     SecurityScheme oauth() {
-        return new OAuthBuilder()
-                .name("oauth2")
-                .scopes(scopes())
-                .grantTypes(grantTypes())
-                .build();
+        return new OAuthBuilder().name("oauth2").scopes(scopes()).grantTypes(grantTypes()).build();
     }
 
     private List<AuthorizationScope> scopes() {
         List<AuthorizationScope> list = new ArrayList<>();
-        properties.getScopesAsMap().forEach((name, description) -> list.add(new AuthorizationScope(name, description)));
+        properties
+                .getScopesAsMap()
+                .forEach(
+                        (name, description) -> list.add(new AuthorizationScope(name, description)));
         return list;
     }
 
     /**
-     * The configuration of the Swagger UI's OAuth client, served at {@code /swagger-resources/configuration/security}.
-     * The Swagger UI runs in the browser, so it is a public client: it gets no client secret.
+     * The configuration of the Swagger UI's OAuth client, served at {@code
+     * /swagger-resources/configuration/security}. The Swagger UI runs in the browser, so it is a
+     * public client: it gets no client secret.
      */
     @Bean
     public SecurityConfiguration securityInfo() {
@@ -102,5 +105,4 @@ public class SwaggerConfigAuth {
                 .scopeSeparator("")
                 .build();
     }
-
 }

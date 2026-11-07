@@ -27,6 +27,5 @@ public class SwaggerConfigNoAuth {
                 .apis(RequestHandlerSelectors.withClassAnnotation(RequestMapping.class))
                 .paths(PathSelectors.any())
                 .build();
-
     }
 }
