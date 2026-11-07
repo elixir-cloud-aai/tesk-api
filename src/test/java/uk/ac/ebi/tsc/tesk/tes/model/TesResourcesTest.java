@@ -48,4 +48,11 @@ public class TesResourcesTest {
     public void cpuCores_hugeNumberRefused() {
         new TesResources().setCpuCores(new BigDecimal("1e10"));
     }
+
+    @Test
+    public void cpuCores_zeroInAnyNotation() {
+        for (String zero : new String[]{"0e10", "0e-10", "0.0000"}) {
+            assertEquals(zero, "0", new TesResources().cpuCores(new BigDecimal(zero)).getCpuCores().toString());
+        }
+    }
 }

@@ -60,6 +60,10 @@ public class TesResources   {
   }
 
   public void setCpuCores(BigDecimal cpuCores) {
+    //zero in any notation (e.g. 0e10, 0.0000) is 0
+    if (cpuCores != null && cpuCores.signum() == 0) {
+      cpuCores = BigDecimal.ZERO;
+    }
     //more than 3 decimals: trailing zeros don't count (0.5000 is 0.5)
     if (cpuCores != null && cpuCores.scale() > 3) {
       cpuCores = cpuCores.stripTrailingZeros();
