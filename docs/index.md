@@ -66,6 +66,38 @@ logs of the taskmaster and executor pods. It matches these objects to tasks by
 their [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
 and combines them into the TES task.
 
+The task's state comes from these jobs. In this order, the first rule that
+applies gives the state:
+
+1. The taskmaster's job is labelled as cancelled: `CANCELED`.
+2. An executor's job failed, whichever executor it is: `EXECUTOR_ERROR`.
+3. The taskmaster's job or the outputs filer's job failed: `SYSTEM_ERROR`.
+4. The taskmaster's job completed: `COMPLETE` if the jobs of all the task's
+   executors exist and completed, otherwise `SYSTEM_ERROR` (e.g., the inputs
+   filer failed, so that no executor ran, or an executor's job is missing).
+   The number of executors comes from the task stored with the taskmaster's
+   job; without it, the executor jobs that exist count as all executors.
+5. A pod of the taskmaster's job is pending: `QUEUED`.
+6. The taskmaster's job is active: `INITIALIZING` until the first executor's
+   job exists, `QUEUED` while a pod of the last executor's job is pending,
+   otherwise `RUNNING`.
+7. Otherwise: `SYSTEM_ERROR`.
+
+A job failed if Kubernetes set its condition `Failed`, or `FailureTarget`,
+which Kubernetes 1.31 and later set first. Without these conditions, a job
+with failed pods and none that succeeded counts as failed once the
+taskmaster's job has ended (until then, the job may still retry). A job
+completed if one of its pods succeeded. The taskmaster keeps the jobs that
+failed, so that their state and logs stay available, and it always ends with
+exit code 0; the state doesn't depend on it.
+
+Executor jobs aren't retried (`backoffLimit: 0`), so that the state and logs
+of an executor are those of its only run; the taskmaster's environment
+variable `EXECUTOR_BACKOFF_LIMIT` sets another limit (see
+[Configuration](configuration.md)). The taskmaster's own job keeps
+Kubernetes' default retries: a taskmaster that is restarted, e.g. after its
+pod was evicted, continues with the jobs that already exist.
+
 ### Cancelling a task
 
 To cancel a task, TESK API labels the taskmaster's job and pod as cancelled.

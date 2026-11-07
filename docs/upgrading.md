@@ -4,6 +4,29 @@
 
 Changes since 1.2.0 that clients or deployments may notice:
 
+- **Task states from all jobs.** The state of a task comes from all its jobs
+  (see [Getting tasks](index.md#getting-tasks)). An executor's job that
+  failed, whichever executor it is, gives `EXECUTOR_ERROR`, also with the
+  job condition `FailureTarget` (Kubernetes 1.31 and later). A task is
+  `COMPLETE` only if the jobs of all its executors completed; if one is
+  missing, the task is `SYSTEM_ERROR`. Before, the state came from the last
+  executor job that existed, so that a task whose last executor's job was
+  deleted could be `COMPLETE`.
+- **Executors aren't retried.** Executor jobs get `backoffLimit: 0` (before:
+  Kubernetes' default of 6 retries), unless the taskmaster's environment sets
+  `EXECUTOR_BACKOFF_LIMIT`.
+- **Upgrade order.** Upgrade TESK API first, then the taskmaster
+  ([tesk-core](https://github.com/elixir-cloud-aai/tesk-core)) to the release
+  that keeps failed jobs
+  ([tesk-core#98](https://github.com/elixir-cloud-aai/tesk-core/issues/98)).
+  Tasks running during the upgrade keep the taskmaster they were started
+  with. While only one of them is upgraded: this TESK API with an older
+  taskmaster reports a task whose last executor's job the taskmaster deleted
+  (because its pod couldn't pull its image) as `SYSTEM_ERROR`; an older TESK
+  API with the newer taskmaster reports a failed executor as
+  `EXECUTOR_ERROR`, but for a few seconds after Kubernetes sets
+  `FailureTarget`, it can report `QUEUED` or `SYSTEM_ERROR`.
+
 - **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty
