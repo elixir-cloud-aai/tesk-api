@@ -70,6 +70,16 @@ configuration. What's new:
   the Helm chart of TESK has no value for it yet. Turning it on serves the
   Swagger UI and its static resources publicly, also with the `auth` profile:
   turn it on only where it is needed.
+- **Swagger UI client secret.** The Swagger UI is a public client: TESK API
+  no longer passes it a client secret (in `/swagger-resources`), and
+  `TESK_API_SWAGGER_OAUTH_CLIENT_SECRET` is deprecated and ignored; TESK API
+  logs a warning at startup if it is set. Remove the setting, and register
+  the Swagger UI's client at your identity provider as a public client
+  (implicit grant, the default, or authorisation code without a secret; the
+  latter needs an identity provider that allows it for public clients without
+  PKCE). If a client secret was configured while the Swagger UI was on (always
+  the case before 1.2.0, with the `auth` profile), rotate that secret at your
+  identity provider.
 - **Service info setting.** `TESK_API_SERVICE_INFO_PUBLIC` (`true` by
   default) keeps `GET` and `HEAD /service-info` public with the `auth`
   profile, as before; set it to `false` to require a valid token for them (see

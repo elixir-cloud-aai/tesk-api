@@ -54,7 +54,8 @@ public class SwaggerConfigAuth {
             LoginEndpoint loginEndpoint = new LoginEndpoint(properties.getAuthorizationEndpoint());
             grantTypes.add(new ImplicitGrant(loginEndpoint, "access_token"));
         } else {
-            TokenRequestEndpoint tokenRequestEndpoint = new TokenRequestEndpoint(properties.getAuthorizationEndpoint(), properties.getClientId(), properties.getClientSecret());
+            //the names of the client's parameters (OAuth 2.0), not their values: the Swagger UI is a public client
+            TokenRequestEndpoint tokenRequestEndpoint = new TokenRequestEndpoint(properties.getAuthorizationEndpoint(), "client_id", "client_secret");
             TokenEndpoint tokenEndpoint = new TokenEndpoint(properties.getTokenEndpoint(), "access_token");
             grantTypes.add(new AuthorizationCodeGrant(tokenRequestEndpoint, tokenEndpoint));
         }
@@ -90,11 +91,14 @@ public class SwaggerConfigAuth {
         return list;
     }
 
+    /**
+     * The configuration of the Swagger UI's OAuth client, served at {@code /swagger-resources/configuration/security}.
+     * The Swagger UI runs in the browser, so it is a public client: it gets no client secret.
+     */
     @Bean
     public SecurityConfiguration securityInfo() {
         return SecurityConfigurationBuilder.builder()
                 .clientId(properties.getClientId())
-                .clientSecret(properties.getClientSecret())
                 .scopeSeparator("")
                 .build();
     }
