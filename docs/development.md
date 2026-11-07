@@ -9,6 +9,25 @@ plugin](https://github.com/swagger-api/swagger-codegen/tree/master/modules/swagg
 and the [Kubernetes Java client](https://github.com/kubernetes-client/java)
 talks to the Kubernetes API.
 
+The wrapper is the `only-script` type of the Apache Maven Wrapper, so there is
+no binary `maven-wrapper.jar` in the repository. It needs `curl` or `wget` and
+`unzip` (without `unzip` it would fetch the `.tar.gz`, which does not match the
+checksum), and it checks the downloaded Maven distribution against
+`distributionSha256Sum` in `.mvn/wrapper/maven-wrapper.properties`; a mismatch
+stops the build.
+
+Dependabot updates the Maven version and the checksum of the wrapper together
+(in the `maven` group). To bump them by hand, change both, or every build
+fails:
+
+1. Download `apache-maven-<version>-bin.zip` from Maven Central and check it
+   against the `.sha512` file next to it.
+2. Compute its SHA-256 (`sha256sum`).
+3. Put the new version in `distributionUrl` and the sum in
+   `distributionSha256Sum`. If you regenerate the scripts with
+   `./mvnw wrapper:wrapper -Dtype=only-script -Dmaven=<version>`, check that
+   `distributionSha256Sum` is still there and has the new sum.
+
 ## Building and testing
 
 To build TESK API and run the unit tests (JUnit, Surefire, in

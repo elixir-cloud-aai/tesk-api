@@ -2,6 +2,12 @@
 # that is needed. Java 8, as in `pom.xml`; the base images are pinned by digest
 # and updated by Dependabot
 FROM eclipse-temurin:8-jdk@sha256:e9255b50040337b0dec91027868dca1952ef5441bf0c8f878c5f790eaedbfea2 AS build
+# The Maven wrapper downloads the .zip of Maven and checks its SHA-256 sum
+# (`.mvn/wrapper/maven-wrapper.properties`); without `unzip` it would fetch the
+# .tar.gz instead, which the sum does not match
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends unzip && \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
