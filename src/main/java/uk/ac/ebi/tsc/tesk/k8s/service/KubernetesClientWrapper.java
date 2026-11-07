@@ -27,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
+import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 
 /** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
@@ -195,7 +196,16 @@ public class KubernetesClientWrapper {
             // and optionally also to only those jobs, which were created bu the user
             labelSelector += "," + user.getLabelSelector();
         }
-        V1JobList result = this.listJobs(pageToken, labelSelector, itemsPerPage);
+        V1JobList result;
+        try {
+            result = this.listJobs(pageToken, labelSelector, itemsPerPage);
+        } catch (KubernetesException e) {
+            if (pageToken != null && isInvalidContinueToken(e.getApiException())) {
+                // a client error; the message names the parameter, never the token
+                throw new InvalidPageTokenException();
+            }
+            throw e;
+        }
         if (user.isMemberInNonManagedGroups()) {
             // if there are groups, where user is a manager and other groups, where user is only a
             // member
@@ -218,6 +228,16 @@ public class KubernetesClientWrapper {
             result.setItems(filteredJobList);
         }
         return result;
+    }
+
+    /**
+     * Whether Kubernetes refused a list request's continue token: 410 Gone if it expired (etcd
+     * compacted the revision), 400 Bad Request if it is malformed. Only called if the request
+     * carried a token, as the other parameters (namespace, label selector) come from TESK API.
+     */
+    private static boolean isInvalidContinueToken(ApiException e) {
+        return e.getCode() == HttpStatus.GONE.value()
+                || e.getCode() == HttpStatus.BAD_REQUEST.value();
     }
 
     public V1JobList listSingleTaskExecutorJobs(String taskId) {
