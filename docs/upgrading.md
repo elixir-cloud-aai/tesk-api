@@ -1,5 +1,14 @@
 # Upgrading
 
+## To the next release
+
+Changes since 1.2.0 that clients or deployments may notice:
+
+- **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
+  successful cancellation with an empty JSON object (`{}`, `Content-Type:
+  application/json`), as the TES specification defines, instead of an empty
+  body. Clients that checked for an empty body need to accept `{}`.
+
 ## To 1.2.0
 
 From 1.1.0, only deployments that use the Swagger UI have to change their

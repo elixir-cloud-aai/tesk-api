@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.api;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -22,19 +23,26 @@ import org.springframework.security.oauth2.provider.token.ResourceServerTokenSer
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
+import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
-import static org.mockito.Mockito.verify;
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(TasksApiController.class)
@@ -196,7 +204,21 @@ public class TasksApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{}", true));
-        verify(this.tesService).cancelTask("task-123");
+        //the task is looked up for the user (authorisation) before it is cancelled
+        InOrder order = inOrder(this.tesService);
+        order.verify(this.tesService).getTask(anyString(), any(TaskView.class), any(User.class));
+        order.verify(this.tesService).cancelTask("task-123");
+    }
+
+    @Test
+    public void cancelTask_notFound_doesNotCancel() throws Exception {
+        given(this.tesService.getTask(anyString(), any(TaskView.class), any(User.class)))
+                .willThrow(new TaskNotFoundException("task-123"));
+        this.mvc.perform(post(TASK_URL + "/{id}:cancel", "task-123")
+                .header("Authorization", "Bearer BAR")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+        verify(this.tesService, never()).cancelTask(anyString());
     }
 
 }
