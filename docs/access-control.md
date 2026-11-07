@@ -2,8 +2,8 @@
 
 TESK API integrates with [Elixir AAI](https://www.elixir-europe.org/services/compute/aai) via [OpenID Connect](http://openid.net/connect/) protocol to authenticate and authorise requests. Authentication and authorisation are optional and can be switched off completely. When authentication is on, in order to perform any operation on tasks (get and/or create tasks) TESK API user will have to include a valid access token issued by Elixir AAI in the request header. To obtain such a token, a user will have to:
 * have a valid account in Elixir AAI
-* belong to a specific Elixir group
-* have access to a registered Elixir client application, that was assigned - among others - `groupNames` scope.
+* belong to a specific Elixir group (or, with [authorisation without groups](#authorisation-without-groups) on, have one of the configured values in a claim)
+* have access to a registered Elixir client application, that was assigned - among others - `groupNames` scope (with authorisation without groups, the scope that releases the configured claim).
 
 ## Switching on/off authentication and authorisation
 Authentication and authorisation can be globally switched on and off for TESK API using [Spring Profiles](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-profiles.html). When the default `noauth` profile is active, all endpoints are unauthenticated (so the setting for `GET /service-info` below has no effect) and all (also previously) created TES tasks are visible to any user. New tasks are labelled as created by `anonymousUser` and no team ownership is assigned to new tasks. With `auth` profile activated, all the rules described below apply. Set the profile with `SPRING_PROFILES_ACTIVE` (see [Configuration](configuration.md#settings)).
@@ -38,7 +38,7 @@ TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each 
 We have not tested TESK API integration with a different OIDC provider than Elixir AAI, but since standard Spring OAuth library is used, it should be possible (just point `security.oauth2.resource.user-info-uri`, or `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`, to a proper URL), provided that the other Authorization Server provides information about the user in the same format that Elixir does. Otherwise changes to [GroupNamesSecurityExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/GroupNamesSecurityExtractor.java) and [ElixirPrincipalExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/ElixirPrincipalExtractor.java) will be necessary.
 
 ## Authorisation
-TESK API uses Elixir AAI group membership to authorise users. Elixir recognises group managers and members, but only includes information about the latter in `user_info` endpoint response. Therefore a nested structure of groups is used by us to reflect different roles of users.
+TESK API uses Elixir AAI group membership to authorise users (and optionally a claim, see [Authorisation without groups](#authorisation-without-groups)). Elixir recognises group managers and members, but only includes information about the latter in `user_info` endpoint response. Therefore a nested structure of groups is used by us to reflect different roles of users.
 ### Group structure
 Group level | Example (from our own environments) | Meaning | Multiplicity
 ------------ |---| -------------|---
@@ -86,3 +86,64 @@ Environment variable | Meaning | Default
 `TESK_API_AUTHORISATION_ENV_SUBGROUP` | Name of the subgroup representing environment (aka Environment Group) | `EBI` (Full group name:  `elixir:GA4GH:GA4GH-CAP:EBI`)
 `TESK_API_AUTHORISATION_ADMIN_SUBGROUP` | Name of the subgroup representing admins (super admins or team admins) | `ADMIN` (Full group name of super-admins:  `elixir:GA4GH:GA4GH-CAP:EBI:ADMIN`)
 
+## Authorisation without groups
+
+Some OpenID Connect providers (e.g. LS Login) give no group memberships that
+fit the [group structure](#group-structure). For them, TESK API can authorise
+users by a claim of the user info instead. The setting is off by default; with
+it off, nothing changes. It needs the `auth` profile.
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHORISATION_CLAIM_ENABLED` | `true`: users with one of the values below in the claim below are authorised without groups. | `false`
+`TESK_API_AUTHORISATION_CLAIM_NAME` | Name of the claim in the user info, e.g. `eduperson_entitlement` or `eduperson_assurance`. Required if the setting is on. | none
+`TESK_API_AUTHORISATION_CLAIM_VALUES` | Comma-separated values of the claim; a user needs at least one of them. The claim can be a string or a list of strings; values are compared exactly (also in case). Required if the setting is on. | none
+
+If the setting is on without a claim name or without a non-blank value, TESK
+API doesn't start.
+
+Users get their tokens from a client that the provider must allow to release
+the claim (e.g. the scope `eduperson_entitlement` or `eduperson_assurance`);
+without it, the user info lacks the claim and every request is refused with
+`403 Forbidden`.
+
+With the setting on, a user with one of the values (a "claim user"):
+
+* may create tasks. The tasks belong to the user only, without a team: a
+  task with `tags['GROUP_NAME']` is refused (`403 Forbidden`), unless the
+  user may create tasks for that team by the group rules.
+* may list, get and cancel their own tasks without a team, and no others.
+
+Group rules are unchanged and come first: a team member, team admin or super
+admin keeps the rights described [above](#endpoint-permissions), whether or
+not they have the claim. Super admins (the Super Admin Group) see all tasks,
+including those of claim users; team admins don't see them, as they belong to
+no team.
+
+Listing follows the group rules first, too: a user who is a team member or
+team admin and has the claim lists the tasks of their teams, but not their
+own tasks without a team, although they may still get and cancel these by
+ID. This happens to tasks that a user created with the claim only before
+joining a team, and to tasks of team admins who aren't team members (these
+are created without a team). A team member who loses the membership but has
+the claim lists only their tasks without a team.
+
+### Security implications
+
+* Everyone who gets one of the values from your provider can run any
+  container image with any command on your cluster, within the resources
+  that tasks may request. Choose a claim and values that your provider sets
+  per user and that users can't set themselves, e.g. an entitlement that an
+  administrator of your community grants, or an assurance level that your
+  provider checks. A value that every account has (e.g. a low assurance
+  level, or the provider's default entitlement) opens TESK to all of its
+  users.
+* Values are compared exactly, so list every value that you accept: with
+  `eduperson_assurance`, a higher level doesn't imply a lower one.
+* TESK API reads the claim from the user info endpoint on each request, so a
+  value revoked at the provider takes effect at the next request. Tasks that
+  are already running keep running.
+* Users are identified by `sub` (with `@` replaced by `_`), as for group
+  members: tasks are labelled with it. As for all users, Kubernetes allows
+  label values of up to 63 characters, so users with longer subjects can't
+  create tasks.

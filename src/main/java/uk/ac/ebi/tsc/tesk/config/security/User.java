@@ -33,6 +33,12 @@ public class User implements Serializable, UserDetails, Principal {
     private boolean teskAdmin = false;
 
     /**
+     * Is the user authorised without groups, by a value of the claim configured in
+     * tesk.api.authorisation.claim (always false if that setting is off)
+     */
+    private boolean claimAuthorised = false;
+
+    /**
      * List of 'organisational' groups, to which the user belongs (last part of Elixir group names
      * only (see {@link ElixirPrincipalExtractor} to see, how that information is retrieved from
      * allGroups) TES task will be 'owned' by one of the groups, to which the creating user belongs
@@ -56,6 +62,10 @@ public class User implements Serializable, UserDetails, Principal {
 
     public boolean isTeskAdmin() {
         return teskAdmin;
+    }
+
+    public boolean isClaimAuthorised() {
+        return claimAuthorised;
     }
 
     public boolean isGroupMember(String groupName) {
@@ -91,6 +101,13 @@ public class User implements Serializable, UserDetails, Principal {
         return false;
     }
 
+    /**
+     * Label selector of the taskmaster jobs that the user may list, in addition to the job type:
+     * none for admins (all tasks); the groups (and, unless a manager of one, the own tasks in them)
+     * for group members and managers; the own tasks without a group for users authorised by the
+     * claim only (tesk.api.authorisation.claim). Null also for users without any of these rights,
+     * who may not list tasks at all (see {@code TesService#listTasks}).
+     */
     public String getLabelSelector() {
         Set<String> allTeskGroups = new LinkedHashSet<>();
         if (this.teskMemberedGroups != null) {
@@ -113,6 +130,15 @@ public class User implements Serializable, UserDetails, Principal {
             }
             return sb.toString();
         }
+        if (isClaimAuthorised()) {
+            // authorised without groups: only the own tasks without a group (admins returned
+            // above, so that they keep seeing all tasks)
+            return Constants.LABEL_USERID_KEY
+                    + "="
+                    + getUsername()
+                    + ",!"
+                    + Constants.LABEL_GROUPNAME_KEY;
+        }
         return null;
     }
 
@@ -126,7 +152,8 @@ public class User implements Serializable, UserDetails, Principal {
             Set<String> allGroups,
             Set<String> teskMemberedGroups,
             Set<String> teskManagedGroups,
-            boolean teskAdmin) {
+            boolean teskAdmin,
+            boolean claimAuthorised) {
         this.userId = userId;
         this.preferredUsername = preferredUsername;
         this.name = name;
@@ -137,6 +164,7 @@ public class User implements Serializable, UserDetails, Principal {
         this.teskMemberedGroups = teskMemberedGroups;
         this.teskManagedGroups = teskManagedGroups;
         this.teskAdmin = teskAdmin;
+        this.claimAuthorised = claimAuthorised;
     }
 
     @Override
@@ -211,6 +239,8 @@ public class User implements Serializable, UserDetails, Principal {
                 + ")"
                 + ", iasAdmin="
                 + isTeskAdmin()
+                + ", claimAuthorised="
+                + isClaimAuthorised()
                 + "}";
     }
 
@@ -226,6 +256,9 @@ public class User implements Serializable, UserDetails, Principal {
         User user = (User) o;
 
         if (teskAdmin != user.teskAdmin) {
+            return false;
+        }
+        if (claimAuthorised != user.claimAuthorised) {
             return false;
         }
         if (userId != null ? !userId.equals(user.userId) : user.userId != null) {
@@ -271,6 +304,7 @@ public class User implements Serializable, UserDetails, Principal {
         result = 31 * result + (email != null ? email.hashCode() : 0);
         result = 31 * result + (allGroups != null ? allGroups.hashCode() : 0);
         result = 31 * result + (teskAdmin ? 1 : 0);
+        result = 31 * result + (claimAuthorised ? 1 : 0);
         result = 31 * result + (teskMemberedGroups != null ? teskMemberedGroups.hashCode() : 0);
         result = 31 * result + (teskManagedGroups != null ? teskManagedGroups.hashCode() : 0);
         return result;
@@ -287,6 +321,7 @@ public class User implements Serializable, UserDetails, Principal {
         private Set<String> teskMemberedGroups;
         private Set<String> teskManagedGroups;
         private boolean teskAdmin = false;
+        private boolean claimAuthorised = false;
 
         UserBuilder(String userId) {
             this.userId = userId;
@@ -341,6 +376,11 @@ public class User implements Serializable, UserDetails, Principal {
             return this;
         }
 
+        public UserBuilder claimAuthorised(boolean claimAuthorised) {
+            this.claimAuthorised = claimAuthorised;
+            return this;
+        }
+
         public User build() {
             return new User(
                     userId,
@@ -352,7 +392,8 @@ public class User implements Serializable, UserDetails, Principal {
                     allGroups,
                     teskMemberedGroups,
                     teskManagedGroups,
-                    teskAdmin);
+                    teskAdmin,
+                    claimAuthorised);
         }
     }
 }

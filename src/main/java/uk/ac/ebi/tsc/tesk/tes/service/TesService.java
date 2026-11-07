@@ -18,12 +18,14 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 public interface TesService {
     /**
      * Creates new TES task, by converting input and calling create method. In case of detecting
-     * duplicated task ID, retries with new generated ID (up to a limit of retries)
+     * duplicated task ID, retries with new generated ID (up to a limit of retries). Users
+     * authorised by the claim only (tesk.api.authorisation.claim) create tasks without a group.
      */
     @PreAuthorize(
-            "hasRole(@authorisationProperties.baseGroupFull) AND"
+            "(hasRole(@authorisationProperties.baseGroupFull) AND"
                     + "(#user.member OR #user.teskAdmin) AND"
-                    + "(#task.tags?.get('GROUP_NAME') == null OR #user.isGroupMember(#task.tags['GROUP_NAME']))")
+                    + "(#task.tags?.get('GROUP_NAME') == null OR #user.isGroupMember(#task.tags['GROUP_NAME'])))"
+                    + " OR (#user.claimAuthorised AND #task.tags?.get('GROUP_NAME') == null)")
     TesCreateTaskResponse createTask(TesTask task, User user);
 
     /**
@@ -37,7 +39,8 @@ public interface TesService {
     @PostAuthorize(
             "(#user.username == returnObject.logs[0].metadata['USER_ID'] AND returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupMember(returnObject.logs[0].metadata['GROUP_NAME']))"
                     + " OR (#user.teskAdmin)"
-                    + " OR (returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupManager(returnObject.logs[0].metadata['GROUP_NAME']))")
+                    + " OR (returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupManager(returnObject.logs[0].metadata['GROUP_NAME']))"
+                    + " OR (#user.claimAuthorised AND #user.username == returnObject.logs[0].metadata['USER_ID'] AND returnObject.logs[0].metadata['GROUP_NAME'] == null)")
     TesTask getTask(String taskId, TaskView view, User user);
 
     /**
@@ -53,17 +56,20 @@ public interface TesService {
      *     resulting task
      * @return - the page of tasks, with the continue token of the next page, if there is one
      */
-    @PreAuthorize("#user.teskAdmin OR #user.manager OR #user.member")
+    @PreAuthorize("#user.teskAdmin OR #user.manager OR #user.member OR #user.claimAuthorised")
     TesListTasksResponse listTasks(
             String namePrefix, Long pageSize, String pageToken, TaskView view, User user);
 
     /**
      * Cancels a task with a given id, by setting a label to taskmaster Job and Pod object. If not
      * task with a given Id - throws TaskNotFoundException If task completed, throws
-     * CancelNotRunningTask
+     * CancelNotRunningTask. The controller gets the task for the user first, so that users can only
+     * cancel the tasks they may get.
      *
      * @param taskId - TES task ID (==taskmaster's job name)
      */
-    @PreAuthorize("hasRole(@authorisationProperties.baseGroupFull)")
+    @PreAuthorize(
+            "hasRole(@authorisationProperties.baseGroupFull)"
+                    + " OR (principal instanceof T(uk.ac.ebi.tsc.tesk.config.security.User) AND principal.claimAuthorised)")
     void cancelTask(String taskId);
 }

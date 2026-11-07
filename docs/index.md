@@ -15,7 +15,7 @@ These pages cover:
 - [API](api.md): the endpoints, service info and HTTP status codes;
 - [Configuration](configuration.md): the settings of TESK API;
 - [Access control](access-control.md): authentication with OpenID Connect and
-  authorisation by group membership;
+  authorisation by group membership (or optionally by a claim);
 - [Deployment](deployment.md): running TESK API locally and in Kubernetes;
 - [Upgrading](upgrading.md): what changes between versions;
 - [Development](development.md): building, testing and releasing.
