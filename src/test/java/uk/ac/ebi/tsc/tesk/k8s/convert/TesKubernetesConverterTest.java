@@ -408,9 +408,66 @@ public class TesKubernetesConverterTest {
     public void test_status_executor_queued() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
         taskBuilder.getTask().getLastExecutor().get().getPods().get(0).getStatus().phase("Pending");
-        taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(0);
+        //a pending executor counts only while the taskmaster runs
+        taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(0).active(1);
         TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
         assertThat(state, is(TesState.QUEUED));
+    }
+
+    /**
+     * The task has two executors, but only the first one's job exists (e.g., the second one's was deleted):
+     * the task isn't complete, whatever the state of the first executor.
+     */
+    @Test
+    public void test_status_missing_last_executor() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        Map<String, String> annotations = taskBuilder.getTask().getTaskmaster().getJob().getMetadata().getAnnotations();
+        TesTask storedTask = this.objectMapper.readValue(annotations.get(Constants.ANN_JSON_INPUT_KEY), TesTask.class);
+        storedTask.addExecutorsItem(storedTask.getExecutors().get(0));
+        annotations.put(Constants.ANN_JSON_INPUT_KEY, this.objectMapper.writeValueAsString(storedTask));
+        TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
+        assertThat(state, is(TesState.SYSTEM_ERROR));
+    }
+
+    /**
+     * Kubernetes 1.31+ marks a failing job with the condition FailureTarget before Failed.
+     */
+    @Test
+    public void test_status_executor_failure_target() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(0).active(1);
+        taskBuilder.getTask().getExecutors().get(0).getJob().getStatus().succeeded(0)
+                .addConditionsItem(new V1JobCondition().type("FailureTarget").status("True"));
+        TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
+        assertThat(state, is(TesState.EXECUTOR_ERROR));
+    }
+
+    @Test
+    public void extractExecutorCount_fromStoredTask() throws IOException {
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        assertThat(this.converter.extractExecutorCount(taskmaster), is(1));
+    }
+
+    @Test
+    public void extractExecutorCount_emptyExecutors() throws IOException {
+        assertThat(this.executorCountOf("{\"executors\": []}"), is(0));
+    }
+
+    @Test
+    public void extractExecutorCount_unknown() throws IOException {
+        //not JSON, empty, a JSON value other than an object, no executors, executors not a list, no stored task
+        for (String stored : new String[]{"not JSON", "", "  ", "null", "[]", "{}", "{\"executors\": {}}", "{\"executors\": null}", null}) {
+            assertNull(stored, this.executorCountOf(stored));
+        }
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().setAnnotations(null);
+        assertNull(this.converter.extractExecutorCount(taskmaster));
+    }
+
+    private Integer executorCountOf(String storedTask) throws IOException {
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
+        return this.converter.extractExecutorCount(taskmaster);
     }
 
     @Test

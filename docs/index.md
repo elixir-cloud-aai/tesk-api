@@ -66,9 +66,52 @@ logs of the taskmaster and executor pods. It matches these objects to tasks by
 their [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
 and combines them into the TES task.
 
+The task's state comes from these jobs. In this order, the first rule that
+applies gives the state:
+
+1. The taskmaster's job is labelled as cancelled: `CANCELED`.
+2. An executor's job failed, whichever executor it is: `EXECUTOR_ERROR`.
+3. The taskmaster's job or the outputs filer's job failed: `SYSTEM_ERROR`.
+4. The taskmaster's job completed: `COMPLETE` if the jobs of all the task's
+   executors exist and completed, otherwise `SYSTEM_ERROR` (e.g., the inputs
+   filer failed, so that no executor ran, or an executor's job is missing).
+   The number of executors comes from the task stored with the taskmaster's
+   job; without it, the executor jobs that exist count as all executors.
+5. A pod of the taskmaster's job is pending: `QUEUED`.
+6. The taskmaster's job is active: `INITIALIZING` until the first executor's
+   job exists, `QUEUED` while a pod of the last executor's job is pending,
+   otherwise `RUNNING`.
+7. Otherwise: `SYSTEM_ERROR`.
+
+A job failed if Kubernetes set its condition `Failed`, or `FailureTarget`,
+which Kubernetes 1.31 and later set first. Without these conditions, an
+executor's or the outputs filer's job with failed pods and none that
+succeeded counts as failed once the taskmaster's job has ended (until then,
+the job may still retry). A job completed if one of its pods succeeded. The
+taskmaster keeps the jobs that failed, so that their state and logs stay
+available, and it always ends with exit code 0; the state doesn't depend on
+it.
+
+Executor jobs aren't retried (`backoffLimit: 0`), so that the state and logs
+of an executor are those of its only run. The taskmaster's environment
+variable `EXECUTOR_BACKOFF_LIMIT` sets another limit (see
+[Configuration](configuration.md)); TESK's Helm chart sets it from
+`tesk.executorRetries` (2 by default). The limit also covers pods that
+Kubernetes evicts or preempts: without retries, the executor's job fails, and
+the task becomes `EXECUTOR_ERROR`, also if the executor's command didn't
+fail. The taskmaster's own job keeps Kubernetes' default retries: a
+taskmaster that is restarted, e.g. after its pod was evicted, continues with
+the jobs that already exist. Between its retries, the task is reported as
+`SYSTEM_ERROR`, also while an executor's pod is pending.
+
 ### Cancelling a task
 
 To cancel a task, TESK API labels the taskmaster's job and pod as cancelled.
-The job's label gives the task the state `CANCELED`. The pod's label reaches
-the taskmaster through the Downward API; when the taskmaster sees it, it stops
-the running executor and ends.
+The job's label gives the task the state `CANCELED`. A task that has ended,
+by the rules above, can't be cancelled (`400 Bad Request`). The pod's label
+reaches the taskmaster through the Downward API; when the taskmaster sees it,
+it stops the running executor and ends.
+
+TESK API checks the state before it labels the job. If the task ends in
+between, for example because an executor fails at that moment, the label
+still wins and the task stays `CANCELED`.

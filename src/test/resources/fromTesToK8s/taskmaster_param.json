@@ -51,6 +51,7 @@
         "name": "task-35605447-ex-00"
       },
       "spec": {
+        "backoffLimit": 0,
         "template": {
           "metadata": {
             "name": "task-35605447-ex-00"
@@ -118,6 +119,7 @@
         "name": "task-35605447-ex-01"
       },
       "spec": {
+        "backoffLimit": 0,
         "template": {
           "metadata": {
             "name": "task-35605447-ex-01"
