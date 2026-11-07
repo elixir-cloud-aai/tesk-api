@@ -1,10 +1,13 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Configuration of group based authorisation
+ * Configuration of group based authorisation, and of the optional authorisation by a claim without
+ * groups ({@link Claim})
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
@@ -31,6 +34,51 @@ public class AuthorisationProperties {
 
     /** Full name of a group representing admins of a single installation of TESK */
     private String adminGroupFull;
+
+    /** Authorisation without groups, by a claim of the user info (off by default) */
+    private final Claim claim = new Claim();
+
+    /**
+     * Authorisation without groups (issue #78): if enabled, users whose user info has one of the
+     * values in the claim may create tasks without a group, and see, get and cancel their own tasks
+     * without a group. Group members and admins keep their rights.
+     */
+    public static class Claim {
+        /** Whether the claim authorises users without groups */
+        private boolean enabled = false;
+        /** Name of the claim in the user info, e.g. eduperson_assurance */
+        private String name;
+        /** Values of the claim, one of which a user needs (compared exactly) */
+        private List<String> values = new ArrayList<>();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public List<String> getValues() {
+            return values;
+        }
+
+        public void setValues(List<String> values) {
+            this.values = values;
+        }
+    }
+
+    public Claim getClaim() {
+        return claim;
+    }
 
     public String getGroupsClaim() {
         return groupsClaim;

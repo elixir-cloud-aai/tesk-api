@@ -655,6 +655,34 @@ public class AuthIT {
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * Without tesk.api.authorisation.claim.enabled (the default), a claim doesn't authorise a user
+     * without groups (issue #78)
+     */
+    @Test
+    public void claimWithoutGroups_settingOff() throws Exception {
+
+        mockElixir.givenThat(
+                WireMock.get("/")
+                        .willReturn(
+                                okJson(
+                                        "{\"sub\" : \"123\",  \"eduperson_assurance\" : [\"https://refeds.org/assurance/IAP/medium\"]}")));
+
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .content(
+                                        getFileContentFromResources(
+                                                "fromTesToK8s_minimal/task.json"))
+                                .header("Authorization", "Bearer BAR")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden());
+        this.mvc
+                .perform(get(TASK_URL).header("Authorization", "Bearer BAR"))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     public void anybody_can_see_serviceInfo() throws Exception {
         this.mvc.perform(get(SERVICE_INFO_URL)).andExpect(status().isOk());
