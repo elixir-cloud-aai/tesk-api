@@ -86,7 +86,7 @@ public class AuthIT {
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         String path = "fromTesToK8s_minimal/task.json";
@@ -120,7 +120,7 @@ public class AuthIT {
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         String path = "fromTesToK8s_minimal/task.json";
@@ -174,7 +174,7 @@ public class AuthIT {
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         String path = "fromTesToK8s_minimal/task.json";
@@ -205,7 +205,7 @@ public class AuthIT {
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         String path = "fromTesToK8s_minimal/task.json";
@@ -239,7 +239,7 @@ public class AuthIT {
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(

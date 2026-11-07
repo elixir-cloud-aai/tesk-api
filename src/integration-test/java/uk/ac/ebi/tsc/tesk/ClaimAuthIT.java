@@ -137,7 +137,7 @@ public class ClaimAuthIT {
                                                         + "')]"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
     }
 
@@ -154,7 +154,7 @@ public class ClaimAuthIT {
                                         "$.metadata.labels[?(@.creator-user-id == 'user_example.org')]"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         createTask("fromTesToK8s_minimal/task.json").andExpect(status().isOk());
@@ -168,7 +168,7 @@ public class ClaimAuthIT {
                 WireMock.post("/apis/batch/v1/namespaces/default/jobs")
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         createTask("fromTesToK8s_minimal/task.json").andExpect(status().isOk());

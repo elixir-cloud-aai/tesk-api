@@ -72,6 +72,9 @@ public class TesServiceImpl implements TesService {
                 V1Job taskMasterJob = this.converter.fromTesTaskToK8sJob(task, user);
                 V1ConfigMap taskMasterConfigMap =
                         this.converter.fromTesTaskToK8sConfigMap(task, user, taskMasterJob);
+                // fails before the job exists, e.g. for a ConfigMap that is too large or a name
+                // that is taken
+                this.kubernetesClientWrapper.checkConfigMap(taskMasterConfigMap);
                 V1Job createdJob = this.kubernetesClientWrapper.createJob(taskMasterJob);
                 this.createOwnedConfigMap(taskMasterConfigMap, createdJob);
                 return this.converter.fromK8sJobToTesCreateTaskResponse(createdJob);
@@ -92,9 +95,11 @@ public class TesServiceImpl implements TesService {
     /**
      * Creates the taskmaster's ConfigMap, owned by its job, so that Kubernetes deletes the
      * ConfigMap with the job (e.g. after the job's TTL). The job's UID is known only once the job
-     * exists, so the job is created first; its pod waits until the ConfigMap it mounts exists. If
-     * the ConfigMap can't be created, the job is deleted, so that its pod doesn't wait forever, and
-     * the ConfigMap's error is passed on (a name collision then creates the task again).
+     * exists, so the job is created first (after a dry run of the ConfigMap); its pod waits until
+     * the ConfigMap it mounts exists. If the ConfigMap can't be created, the job is deleted, so
+     * that its pod doesn't wait forever, and the ConfigMap's error is passed on (a name collision
+     * then creates the task again). If the job can't be deleted either, the delete's error is
+     * passed on instead, so that the task isn't created again.
      *
      * <p>The owner reference doesn't set {@code blockOwnerDeletion}, which would need the right to
      * update the job's finalizers.
@@ -114,11 +119,14 @@ public class TesServiceImpl implements TesService {
             try {
                 this.kubernetesClientWrapper.deleteJob(job.getMetadata().getName());
             } catch (RuntimeException deleteError) {
+                // the job stays: no retry, which could leave more jobs behind, or let this one
+                // run with another task's ConfigMap of the same name
                 logger.error(
                         "Deleting job {} without its ConfigMap failed",
                         job.getMetadata().getName(),
                         deleteError);
-                e.addSuppressed(deleteError);
+                deleteError.addSuppressed(e);
+                throw deleteError;
             }
             throw e;
         }

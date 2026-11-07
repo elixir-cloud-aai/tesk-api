@@ -74,10 +74,12 @@ public class NoAuthIT {
                         .withRequestBody(
                                 matchingJsonPath(
                                         "$.metadata.labels[?(@.creator-user-id == 'anonymousUser')]"))
-                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
+                        .willReturn(
+                                okJson(
+                                        "{\"metadata\":{\"name\":\"task-fe99716a\",\"uid\":\"uid-1\"}}")));
 
         mockKubernetes.givenThat(
-                WireMock.post("/api/v1/namespaces/default/configmaps")
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         String path = "fromTesToK8s_minimal/task.json";
@@ -88,6 +90,23 @@ public class NoAuthIT {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+
+        // the ConfigMap is checked in a dry run, then created, owned by the created job
+        mockKubernetes.verify(
+                1,
+                WireMock.postRequestedFor(
+                                WireMock.urlEqualTo(
+                                        "/api/v1/namespaces/default/configmaps?dryRun=All"))
+                        .withRequestBody(matchingJsonPath("$.metadata.ownerReferences", absent())));
+        mockKubernetes.verify(
+                1,
+                WireMock.postRequestedFor(
+                                WireMock.urlEqualTo("/api/v1/namespaces/default/configmaps"))
+                        .withRequestBody(
+                                matchingJsonPath(
+                                        "$.metadata.ownerReferences[?(@.kind == 'Job'"
+                                                + " && @.name == 'task-fe99716a'"
+                                                + " && @.uid == 'uid-1')]")));
     }
 
     @Test

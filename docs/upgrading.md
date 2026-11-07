@@ -89,17 +89,23 @@ Changes since 1.2.0 that clients or deployments may notice:
   Kubernetes deletes the ConfigMap with the job, e.g. after the TTL that the
   taskmaster can set (`TASK_TTL_SECONDS` of
   [tesk-core](https://github.com/elixir-cloud-aai/tesk-core)). TESK API now
-  creates the job first and the ConfigMap right after it; the job's pod waits
-  for the ConfigMap. If the ConfigMap can't be created, TESK API deletes the
-  job, which needs `delete` on `jobs` (see
-  [Deployment](deployment.md#kubernetes)); TESK's Helm chart already
-  grants it. Without the right, the job stays behind, its pod waits for the
-  ConfigMap forever, and the request fails as before. Tasks whose taskmaster's
+  checks the ConfigMap in a dry run, then creates the job and the ConfigMap
+  right after it; the job's pod waits for the ConfigMap. If the ConfigMap
+  can't be created after all, TESK API deletes the job. It therefore needs
+  two more rights (see [Deployment](deployment.md#kubernetes)), which TESK's
+  Helm chart and Kubernetes' `edit` role already grant: `delete` on `jobs`,
+  and `delete` on `configmaps` where the admission plugin
+  `OwnerReferencesPermissionEnforcement` is on (e.g. on OpenShift). If you
+  give TESK API its own role, add them before you upgrade: without `delete`
+  on `configmaps` there, no task can be created; without `delete` on `jobs`,
+  a job whose ConfigMap failed stays behind, shows up as a `QUEUED` task,
+  and its pod waits for the ConfigMap until you delete the job. Tasks whose
   job Kubernetes is deleting (it has a deletion timestamp) are gone: `GET
   /tasks/{id}` answers `404 Not Found` and `GET /tasks` leaves them out (see
   [Deleting tasks](index.md#deleting-tasks)); before, they could show up as
   `SYSTEM_ERROR` until Kubernetes removed the job. ConfigMaps of tasks
-  created before the upgrade have no owner and stay until you delete them.
+  created before the upgrade have no owner and stay until you delete them
+  (e.g. those whose taskmaster's job no longer exists).
 
 ## To 1.2.0
 

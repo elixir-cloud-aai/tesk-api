@@ -52,6 +52,23 @@ public class KubernetesClientWrapperTest {
         this.wrapper = new KubernetesClientWrapper(batchApi, batchApi, coreApi, coreApi, namespace);
     }
 
+    /** A ConfigMap is checked by creating it in a dry run */
+    @Test
+    public void checkConfigMap() throws ApiException {
+        V1ConfigMap map = new V1ConfigMap().metadata(new V1ObjectMeta().name("123"));
+        wrapper.checkConfigMap(map);
+        Mockito.verify(coreApi)
+                .createNamespacedConfigMap(
+                        eq("test-namespace"), same(map), isNull(), eq("All"), isNull());
+    }
+
+    @Test(expected = KubernetesException.class)
+    public void checkConfigMap_refused() throws ApiException {
+        given(coreApi.createNamespacedConfigMap(any(), any(), any(), any(), any()))
+                .willThrow(new ApiException(422, "too large"));
+        wrapper.checkConfigMap(new V1ConfigMap());
+    }
+
     @Test
     public void createJob() throws ApiException {
         V1Job inJob = new V1Job().metadata(new V1ObjectMeta().name("test job"));

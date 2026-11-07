@@ -82,6 +82,21 @@ public class KubernetesClientWrapper {
         }
     }
 
+    /**
+     * Checks that Kubernetes would create the ConfigMap, by creating it in a dry run: Kubernetes
+     * validates and admits it (e.g. its size, the rights, a taken name), but doesn't store it.
+     *
+     * @param map - the ConfigMap
+     * @throws KubernetesException if Kubernetes would refuse it
+     */
+    public void checkConfigMap(V1ConfigMap map) {
+        try {
+            this.coreApi.createNamespacedConfigMap(namespace, map, null, DRY_RUN_ALL, null);
+        } catch (ApiException e) {
+            throw KubernetesException.fromApiException(e);
+        }
+    }
+
     public V1ConfigMap createConfigMap(V1ConfigMap map) {
         try {
             return this.coreApi.createNamespacedConfigMap(namespace, map, null, null, null);
@@ -261,8 +276,8 @@ public class KubernetesClientWrapper {
     }
 
     /**
-     * Whether Kubernetes is deleting the object: it set a deletion timestamp, and waits for
-     * finalizers or the deletion of dependents (foreground deletion) before it removes the object.
+     * Whether Kubernetes is deleting the job: it set a deletion timestamp, and waits for finalizers
+     * or the deletion of dependents (foreground deletion) before it removes the object.
      */
     private static boolean isBeingDeleted(V1Job job) {
         return job.getMetadata() != null && job.getMetadata().getDeletionTimestamp() != null;

@@ -98,6 +98,7 @@ class TesServiceImplCreateTest {
 
         assertThat(response.getId()).isEqualTo("task-1");
         InOrder order = inOrder(this.client);
+        order.verify(this.client).checkConfigMap(any(V1ConfigMap.class));
         order.verify(this.client).createJob(any(V1Job.class));
         ArgumentCaptor<V1ConfigMap> configMap = ArgumentCaptor.forClass(V1ConfigMap.class);
         order.verify(this.client).createConfigMap(configMap.capture());
@@ -131,22 +132,66 @@ class TesServiceImplCreateTest {
         verify(this.client).deleteJob("task-1");
     }
 
-    /** If deleting the job fails too, the ConfigMap's error is passed on. */
+    /**
+     * If deleting the job fails too, the task isn't created again, also after a name collision (the
+     * job could run with another task's ConfigMap): the delete's error is passed on, with the
+     * ConfigMap's error suppressed.
+     */
     @Test
-    void configMapErrorWinsOverDeleteError() {
+    void failedDeleteStopsRetries() {
         this.converts("task-1");
-        KubernetesException error = kubernetesError(HttpStatus.FORBIDDEN);
-        when(this.client.createConfigMap(any(V1ConfigMap.class))).thenThrow(error);
-        doThrow(kubernetesError(HttpStatus.INTERNAL_SERVER_ERROR))
-                .when(this.client)
-                .deleteJob("task-1");
+        KubernetesException conflict = kubernetesError(HttpStatus.CONFLICT);
+        KubernetesException deleteError = kubernetesError(HttpStatus.FORBIDDEN);
+        when(this.client.createConfigMap(any(V1ConfigMap.class))).thenThrow(conflict);
+        doThrow(deleteError).when(this.client).deleteJob("task-1");
 
-        assertThatThrownBy(() -> this.service.createTask(this.task, USER)).isSameAs(error);
+        assertThatThrownBy(() -> this.service.createTask(this.task, USER))
+                .isSameAs(deleteError)
+                .hasSuppressedException(conflict);
+
+        verify(this.client, times(1)).createJob(any(V1Job.class));
     }
 
     /**
-     * A ConfigMap whose name exists (e.g. one left behind by an older task) is a name collision:
-     * the job is deleted and the task is created again with a new name.
+     * The ConfigMap is checked (dry run) before the job is created: if Kubernetes would refuse it,
+     * e.g. because it is too large, no job is created.
+     */
+    @Test
+    void refusedConfigMapCreatesNoJob() {
+        this.converts("task-1");
+        KubernetesException error = kubernetesError(HttpStatus.UNPROCESSABLE_ENTITY);
+        doThrow(error).when(this.client).checkConfigMap(any(V1ConfigMap.class));
+
+        assertThatThrownBy(() -> this.service.createTask(this.task, USER)).isSameAs(error);
+
+        verify(this.client, never()).createJob(any(V1Job.class));
+        verify(this.client, never()).deleteJob(anyString());
+    }
+
+    /**
+     * A name taken by a ConfigMap (e.g. one left behind by an older task) is found by the check,
+     * before the job is created, and the task is created with a new name.
+     */
+    @Test
+    void checkedNameCollisionRetriesBeforeCreatingJob() {
+        this.converts("task-1");
+        when(this.converter.fromTesTaskToK8sJob(this.task, USER))
+                .thenReturn(new V1Job().metadata(new V1ObjectMeta().name("task-1")))
+                .thenReturn(new V1Job().metadata(new V1ObjectMeta().name("task-2")));
+        doThrow(kubernetesError(HttpStatus.CONFLICT))
+                .doNothing()
+                .when(this.client)
+                .checkConfigMap(any(V1ConfigMap.class));
+
+        assertThat(this.service.createTask(this.task, USER).getId()).isEqualTo("task-2");
+
+        verify(this.client, times(1)).createJob(any(V1Job.class));
+        verify(this.client, never()).deleteJob(anyString());
+    }
+
+    /**
+     * A ConfigMap whose name was taken after the check is a name collision, too: the job is deleted
+     * and the task is created again with a new name.
      */
     @Test
     void configMapNameCollisionRetriesWithNewName() {
@@ -168,6 +213,19 @@ class TesServiceImplCreateTest {
         V1OwnerReference owner =
                 configMaps.getAllValues().get(1).getMetadata().getOwnerReferences().get(0);
         assertThat(owner.getUid()).isEqualTo("uid-task-2");
+    }
+
+    /** If the job can't be created, no ConfigMap is created and nothing is deleted. */
+    @Test
+    void jobErrorCreatesNoConfigMap() {
+        this.converts("task-1");
+        KubernetesException error = kubernetesError(HttpStatus.FORBIDDEN);
+        when(this.client.createJob(any(V1Job.class))).thenThrow(error);
+
+        assertThatThrownBy(() -> this.service.createTask(this.task, USER)).isSameAs(error);
+
+        verify(this.client, never()).createConfigMap(any(V1ConfigMap.class));
+        verify(this.client, never()).deleteJob(anyString());
     }
 
     /** A job name collision retries before anything was created; no job is deleted. */

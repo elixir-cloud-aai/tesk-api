@@ -39,9 +39,17 @@ When TESK API gets a request to create a task, these steps follow:
    processes the inputs and outputs and runs the task's executors in turn. It
    passes the taskmaster a JSON object with the task's inputs, outputs and
    volumes (unchanged) and its executors (as Kubernetes jobs), in a ConfigMap
-   that it creates right after the job and that the job owns (see [Deleting
-   tasks](#deleting-tasks)); the taskmaster's pod waits until the ConfigMap
-   exists. If the ConfigMap can't be created, TESK API deletes the job again.
+   that the job owns (see [Deleting tasks](#deleting-tasks)). TESK API first
+   checks the ConfigMap in a dry run, so that a ConfigMap that Kubernetes
+   refuses (e.g. one above Kubernetes' limit of 1 MiB) fails the request
+   before anything is created, and a taken name is replaced by a new one. It
+   then creates the job and, right after it, the ConfigMap; the taskmaster's
+   pod waits until the ConfigMap exists. If the ConfigMap can't be created
+   after all, TESK API deletes the job again (if the name was taken in
+   between, it then tries again with a new name). If that deletion fails too,
+   TESK API logs it and fails the request without trying again: the job stays
+   behind, is listed as a task in state `QUEUED` whose ID the client never
+   got, and its pod waits for the ConfigMap until someone deletes the job.
    The request returns at once, with the generated task ID, without waiting
    for the task.
 2. If the task has inputs, outputs or volumes, the taskmaster creates a
@@ -127,7 +135,9 @@ a task whose job was deleted is gone. `GET /tasks/{id}` answers `404 Not
 Found` for it, and `GET /tasks` doesn't list it. TESK API counts a job that
 Kubernetes is deleting (it has a deletion timestamp, e.g. while Kubernetes
 waits for the job's dependents) as deleted, too, so that a task doesn't show
-up as `SYSTEM_ERROR` while its jobs disappear.
+up as `SYSTEM_ERROR` while its jobs disappear. They are left out after
+Kubernetes returned a page of taskmaster jobs, so a page can be shorter than
+`page_size`, even empty, with a `next_page_token`.
 
 Kubernetes deletes a task's objects with its taskmaster's job, through [owner
 references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/):
