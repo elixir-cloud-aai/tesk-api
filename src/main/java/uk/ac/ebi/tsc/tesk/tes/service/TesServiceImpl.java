@@ -8,6 +8,7 @@ import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1PodList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -183,7 +184,7 @@ public class TesServiceImpl implements TesService {
      * @param pageToken - continue token of Kubernetes, from the previous page's next_page_token
      * @param view - one of {@link TaskView} values, decides on how much detail is put in each
      *     resulting task
-     * @return - resulting list of tasks plus paging token (when supported)
+     * @return - the page of tasks, with the continue token of the next page, if there is one
      */
     @Override
     public TesListTasksResponse listTasks(
@@ -194,13 +195,18 @@ public class TesServiceImpl implements TesService {
                         pageToken,
                         Optional.ofNullable(pageSize).map(Long::intValue).orElse(null),
                         user);
-        V1JobList executorJobs = this.kubernetesClientWrapper.listAllTaskExecutorJobs();
-        V1JobList filerJobs = this.kubernetesClientWrapper.listAllFilerJobs();
-        V1PodList jobPods = this.kubernetesClientWrapper.listAllJobPods();
+        String nextPageToken = taskmasterJobs.getMetadata().getContinue();
         List<V1Job> matchingTaskmasterJobs =
                 taskmasterJobs.getItems().stream()
                         .filter(job -> hasNamePrefix(job, namePrefix))
                         .collect(Collectors.toList());
+        if (matchingTaskmasterJobs.isEmpty()) {
+            // nothing to combine: spare the lists of all executors, filers and pods
+            return new TesListTasksResponse().tasks(new ArrayList<>()).nextPageToken(nextPageToken);
+        }
+        V1JobList executorJobs = this.kubernetesClientWrapper.listAllTaskExecutorJobs();
+        V1JobList filerJobs = this.kubernetesClientWrapper.listAllFilerJobs();
+        V1PodList jobPods = this.kubernetesClientWrapper.listAllJobPods();
         TaskBuilder taskListBuilder =
                 TaskBuilder.newTaskList()
                         .addJobList(matchingTaskmasterJobs)
@@ -211,10 +217,7 @@ public class TesServiceImpl implements TesService {
                 taskListBuilder.getTaskList().stream()
                         .map(task -> this.getTask(task, view, true))
                         .collect(Collectors.toList());
-        TesListTasksResponse response = new TesListTasksResponse();
-        response.tasks(tasks).nextPageToken(taskmasterJobs.getMetadata().getContinue());
-
-        return response;
+        return new TesListTasksResponse().tasks(tasks).nextPageToken(nextPageToken);
     }
 
     /**

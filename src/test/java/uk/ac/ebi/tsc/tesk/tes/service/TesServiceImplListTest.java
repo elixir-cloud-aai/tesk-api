@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_KEY;
@@ -142,5 +144,21 @@ class TesServiceImplListTest {
                 this.service.listTasks("align", 2L, "token-2", TaskView.MINIMAL, USER);
         assertThat(ids(second)).containsExactly("task-3");
         assertThat(second.getNextPageToken()).isNull();
+    }
+
+    /**
+     * If no task of the page matches, the executor and filer jobs and the pods aren't listed: an
+     * empty page with the next page's token comes back.
+     */
+    @Test
+    void emptyFilteredPageSkipsOtherLists() {
+        this.page(null, 2, "token-2", taskmaster("task-1", "call-1"));
+        TesListTasksResponse response =
+                this.service.listTasks("align", 2L, null, TaskView.BASIC, USER);
+        assertThat(ids(response)).isEmpty();
+        assertThat(response.getNextPageToken()).isEqualTo("token-2");
+        verify(this.client, never()).listAllTaskExecutorJobs();
+        verify(this.client, never()).listAllFilerJobs();
+        verify(this.client, never()).listAllJobPods();
     }
 }

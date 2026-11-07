@@ -35,12 +35,15 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
   filters nothing.
 
 The task names aren't Kubernetes labels, so Kubernetes can't select them:
-TESK API filters each page after reading it. Like the filter for users who
-manage some of their groups and are only members of others (see [Access
-control](access-control.md)), this makes pages shorter than `page_size`,
-possibly empty, while `next_page_token` is still set. The TES specification
-allows this: keep requesting pages until `next_page_token` is left out, not
-until a page is shorter than `page_size`.
+TESK API filters each page after reading it. Pages can therefore be shorter
+than `page_size`, even empty, while `next_page_token` is still set; the same
+happens already to users who manage some of their groups and are only
+members of others, whose pages TESK API filters, too. The TES specification
+doesn't forbid this: keep requesting pages until `next_page_token` is left
+out, not until a page is shorter than `page_size`.
+
+An expired or invalid `page_token` currently fails with `500 Internal Server
+Error`; start again without `page_token`.
 
 ## Resources
 
