@@ -10,7 +10,7 @@ Method | Path | Operation
 `POST` | `/tasks` | Create a task
 `GET` | `/tasks` | List tasks (in pages; the name prefix filter is not supported yet and is ignored)
 `GET` | `/tasks/{id}` | Get a task
-`POST` | `/tasks/{id}:cancel` | Cancel a task
+`POST` | `/tasks/{id}:cancel` | Cancel a task (answers with an empty object, `{}`)
 
 The API description (OpenAPI 2.0) is at `/v2/api-docs`.
 
