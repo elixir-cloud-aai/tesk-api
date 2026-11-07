@@ -1,0 +1,5 @@
+# Commits that only reformat the code, skipped by GitHub's blame view.
+# For git blame: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format the Java code (#109)
+5ba7f6c0fe9c4d56d564ae86ae8280157fe64a00
