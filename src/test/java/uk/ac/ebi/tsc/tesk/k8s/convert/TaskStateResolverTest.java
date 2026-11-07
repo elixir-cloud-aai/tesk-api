@@ -221,7 +221,9 @@ class TaskStateResolverTest {
             JobState executor1,
             JobState filer) {
         for (int i = 0; i < TABLE.size(); i++) {
-            if (TABLE.get(i).matches(cancelled, taskmaster, executor0, executor1, filer)) return i;
+            if (TABLE.get(i).matches(cancelled, taskmaster, executor0, executor1, filer)) {
+                return i;
+            }
         }
         throw new AssertionError("No row of the table matches");
     }
@@ -379,9 +381,15 @@ class TaskStateResolverTest {
                     .putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
         }
         Task task = new Task(taskmasterJob);
-        if (executor0 != JobState.ABSENT) task.addExecutor(job(TASK + "-ex-00", executor0));
-        if (executor1 != JobState.ABSENT) task.addExecutor(job(TASK + "-ex-01", executor1));
-        if (filer != JobState.ABSENT) task.setOutputFiler(job(TASK + JOB_NAME_FILER_SUF, filer));
+        if (executor0 != JobState.ABSENT) {
+            task.addExecutor(job(TASK + "-ex-00", executor0));
+        }
+        if (executor1 != JobState.ABSENT) {
+            task.addExecutor(job(TASK + "-ex-01", executor1));
+        }
+        if (filer != JobState.ABSENT) {
+            task.setOutputFiler(job(TASK + JOB_NAME_FILER_SUF, filer));
+        }
         return task;
     }
 

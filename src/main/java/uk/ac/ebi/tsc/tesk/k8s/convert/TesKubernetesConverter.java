@@ -314,7 +314,9 @@ public class TesKubernetesConverter {
                 Optional.ofNullable(taskMasterJob.getMetadata().getAnnotations())
                         .map(ann -> ann.get(ANN_JSON_INPUT_KEY))
                         .orElse(null);
-        if (inputJson == null) return null;
+        if (inputJson == null) {
+            return null;
+        }
         try {
             // readTree gives null or a missing node for empty input, depending on the Jackson
             // version

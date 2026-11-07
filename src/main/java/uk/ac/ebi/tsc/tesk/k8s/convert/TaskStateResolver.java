@@ -49,7 +49,9 @@ public final class TaskStateResolver {
     public static TesState resolve(Task task, Supplier<Integer> expectedExecutors) {
         Job taskmaster = task.getTaskmaster();
         V1Job taskmasterJob = taskmaster.getJob();
-        if (isCancelled(taskmasterJob)) return TesState.CANCELED;
+        if (isCancelled(taskmasterJob)) {
+            return TesState.CANCELED;
+        }
 
         boolean taskmasterCompleted = hasSucceeded(taskmasterJob);
         // Only by its conditions: between retries, the taskmaster's job has
@@ -63,7 +65,9 @@ public final class TaskStateResolver {
                 .anyMatch(executor -> hasFailed(executor.getJob(), taskmasterEnded))) {
             return TesState.EXECUTOR_ERROR;
         }
-        if (taskmasterFailed) return TesState.SYSTEM_ERROR;
+        if (taskmasterFailed) {
+            return TesState.SYSTEM_ERROR;
+        }
         Optional<Job> outputFiler = task.getOutputFiler();
         if (outputFiler.isPresent() && hasFailed(outputFiler.get().getJob(), taskmasterEnded)) {
             return TesState.SYSTEM_ERROR;
@@ -78,13 +82,18 @@ public final class TaskStateResolver {
                                     .allMatch(executor -> hasSucceeded(executor.getJob()));
             return allCompleted ? TesState.COMPLETE : TesState.SYSTEM_ERROR;
         }
-        if (hasPendingPod(taskmaster)) return TesState.QUEUED;
+        if (hasPendingPod(taskmaster)) {
+            return TesState.QUEUED;
+        }
         if (isActive(taskmasterJob)) {
-            if (executors.isEmpty()) return TesState.INITIALIZING;
+            if (executors.isEmpty()) {
+                return TesState.INITIALIZING;
+            }
             // Each executor's pod can wait as pending, so the task can go
             // from RUNNING back to QUEUED
-            if (task.getLastExecutor().map(TaskStateResolver::hasPendingPod).orElse(false))
+            if (task.getLastExecutor().map(TaskStateResolver::hasPendingPod).orElse(false)) {
                 return TesState.QUEUED;
+            }
             return TesState.RUNNING;
         }
         return TesState.SYSTEM_ERROR;
@@ -101,7 +110,9 @@ public final class TaskStateResolver {
      * failed pods.
      */
     private static boolean hasFailed(V1Job job, boolean taskmasterEnded) {
-        if (hasSucceeded(job)) return false;
+        if (hasSucceeded(job)) {
+            return false;
+        }
         return hasFailedCondition(job) || (taskmasterEnded && hasFailedPods(job));
     }
 
@@ -136,7 +147,9 @@ public final class TaskStateResolver {
     private static boolean hasPendingPod(Job job) {
         String pending = K8sConstants.PodPhase.PENDING.getCode();
         for (V1Pod pod : job.getPods()) {
-            if (pod.getStatus() != null && pending.equals(pod.getStatus().getPhase())) return true;
+            if (pod.getStatus() != null && pending.equals(pod.getStatus().getPhase())) {
+                return true;
+            }
         }
         return false;
     }

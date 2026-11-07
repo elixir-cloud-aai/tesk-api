@@ -81,11 +81,14 @@ public class KubernetesClientWrapper {
                     .anyMatch(
                             entry ->
                                     LABEL_JOBTYPE_KEY.equals(entry.getKey())
-                                            && LABEL_JOBTYPE_VALUE_TASKM.equals(entry.getValue())))
+                                            && LABEL_JOBTYPE_VALUE_TASKM.equals(
+                                                    entry.getValue()))) {
                 return job;
+            }
         } catch (ApiException e) {
-            if (e.getCode() != HttpStatus.NOT_FOUND.value())
+            if (e.getCode() != HttpStatus.NOT_FOUND.value()) {
                 throw KubernetesException.fromApiException(e);
+            }
         }
         throw new TaskNotFoundException(taskId);
     }
@@ -142,14 +145,16 @@ public class KubernetesClientWrapper {
     public Double minimumRamGb() {
         try {
             BigDecimal returnValue = BigDecimal.ZERO;
-            for (V1LimitRange limit : listLimits(null, null, null).getItems())
+            for (V1LimitRange limit : listLimits(null, null, null).getItems()) {
                 for (V1LimitRangeItem item : limit.getSpec().getLimits()) {
                     if (item.getMin() != null && item.getMin().get(RESOURCE_MEM_KEY) != null) {
                         Quantity quantity = item.getMin().get(RESOURCE_MEM_KEY);
-                        if (returnValue.compareTo(quantity.getNumber()) == -1)
+                        if (returnValue.compareTo(quantity.getNumber()) == -1) {
                             returnValue = quantity.getNumber();
+                        }
                     }
                 }
+            }
             return toGB(returnValue);
         } catch (Exception exc) {
             logger.error("ERROR in minimumRamGb: ", exc);

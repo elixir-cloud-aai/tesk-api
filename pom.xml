@@ -388,6 +388,77 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Formatting (google-java-format, AOSP style) and lint (checkstyle.xml):
+                 ./mvnw spotless:apply to format, ./mvnw spotless:check checkstyle:check to check
+                 (CI job Lint). These versions are the last that run on Java 8. -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.30.0</version>
+                <configuration>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                            <include>src/integration-test/java/**/*.java</include>
+                        </includes>
+                        <excludes>
+                            <!-- Generated (src/main/java/.openapi-generator/FILES);
+                                 keep in sync with the filter in checkstyle.xml -->
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/api/ApiUtil.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/api/ServiceInfoApi.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/api/TasksApi.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/Service.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/ServiceOrganization.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/ServiceType.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesCreateTaskResponse.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesExecutor.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesExecutorLog.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesFileType.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesInput.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesListTasksResponse.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesOutput.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesOutputFileLog.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesResources.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesServiceInfo.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesServiceInfoAllOf.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesServiceType.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesServiceTypeAllOf.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesState.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesTask.java</exclude>
+                            <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesTaskLog.java</exclude>
+                        </excludes>
+                        <googleJavaFormat>
+                            <version>1.7</version>
+                            <style>AOSP</style>
+                        </googleJavaFormat>
+                        <removeUnusedImports/>
+                    </java>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.3.1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>9.3</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>checkstyle.xml</configLocation>
+                    <consoleOutput>true</consoleOutput>
+                    <failOnViolation>true</failOnViolation>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <testSourceDirectories>
+                        <testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
+                        <testSourceDirectory>${project.basedir}/src/integration-test/java</testSourceDirectory>
+                    </testSourceDirectories>
+                    <!-- Generated files are suppressed in checkstyle.xml -->
+                </configuration>
+            </plugin>
         </plugins>
     </build>
     <profiles>

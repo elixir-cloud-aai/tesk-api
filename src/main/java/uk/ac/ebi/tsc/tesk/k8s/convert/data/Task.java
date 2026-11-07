@@ -72,7 +72,9 @@ public class Task {
      * executors.
      */
     public Optional<Job> getLastExecutor() {
-        if (this.executorsByName.values().isEmpty()) return Optional.empty();
+        if (this.executorsByName.values().isEmpty()) {
+            return Optional.empty();
+        }
         List<Job> executors = this.getExecutors();
         return Optional.of(executors.get(executors.size() - 1));
     }

@@ -127,13 +127,16 @@ public class TesServiceImpl implements TesService {
     /** Common part of task's details retrieval for both single task and each of a list of tasks */
     private TesTask getTask(Task taskObjects, TaskView view, boolean isList) {
 
-        if (view == TaskView.MINIMAL)
+        if (view == TaskView.MINIMAL) {
             return this.converter.fromK8sJobsToTesTaskMinimal(taskObjects, isList);
+        }
 
         TesTask task =
                 this.converter.fromK8sJobsToTesTaskBasic(taskObjects, view == TaskView.BASIC);
 
-        if (view == TaskView.BASIC) return task;
+        if (view == TaskView.BASIC) {
+            return task;
+        }
 
         for (int i = 0; i < taskObjects.getExecutors().size(); i++) {
             Job executorJob = taskObjects.getExecutors().get(i);
