@@ -9,6 +9,15 @@ plugin](https://github.com/swagger-api/swagger-codegen/tree/master/modules/swagg
 and the [Kubernetes Java client](https://github.com/kubernetes-client/java)
 talks to the Kubernetes API.
 
+The wrapper is the `only-script` type of the Apache Maven Wrapper, so there is
+no binary `maven-wrapper.jar` in the repository, and it checks the downloaded
+Maven distribution against `distributionSha256Sum` in
+`.mvn/wrapper/maven-wrapper.properties` (a mismatch stops the build). When you
+change the Maven version, take the checksum of the new
+`apache-maven-<version>-bin.zip` from Apache (`.sha512` file next to it in
+Maven Central; compute the SHA-256 of the verified download), or run
+`./mvnw wrapper:wrapper -Dtype=only-script -Dmaven=<version>` and add the sum.
+
 ## Building and testing
 
 To build TESK API and run the unit tests (JUnit, Surefire, in
