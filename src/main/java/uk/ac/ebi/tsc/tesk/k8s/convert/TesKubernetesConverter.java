@@ -406,6 +406,8 @@ public class TesKubernetesConverter {
                         .orElse("");
         try {
             task = this.objectMapper.readValue(inputJson, TesTask.class);
+            // logs sent with the task aren't TESK's: its own log must be the only one
+            task.setLogs(null);
             if (nullifyInputContent && task.getInputs() != null) {
                 task.getInputs().forEach(input -> input.setContent(null));
             }
@@ -420,6 +422,8 @@ public class TesKubernetesConverter {
         task.setCreationTime(DATE_FORMATTER.print(taskMasterJobMetadata.getCreationTimestamp()));
         TesTaskLog log = new TesTaskLog();
         task.addLogsItem(log);
+        // TES requires outputs; TESK doesn't learn which files the outputs filer wrote
+        log.setOutputs(new ArrayList<>());
         log.putMetadataItem("USER_ID", taskMasterJobMetadata.getLabels().get(LABEL_USERID_KEY));
         if (taskMasterJobMetadata.getLabels().containsKey(LABEL_GROUPNAME_KEY)) {
             log.putMetadataItem(
