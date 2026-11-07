@@ -322,7 +322,10 @@ public class TasksApiControllerTest {
         verify(this.tesService, never()).listTasks(any(), any(), any(), any(), any());
     }
 
-    /** Values that aren't whole numbers (or don't fit a long) are refused, too (issue #114) */
+    /**
+     * Values that aren't whole numbers (or don't fit a long) are refused, too, with a message that
+     * names the parameter, not the value (issue #114)
+     */
     @Test
     public void listTasks_nonNumericPageSize() throws Exception {
         String[] pageSizes = new String[] {"abc", "1.5", "99999999999999999999"};
@@ -333,7 +336,9 @@ public class TasksApiControllerTest {
                                     .param("page_size", pageSize)
                                     .header("Authorization", "Bearer BAR")
                                     .accept(MediaType.APPLICATION_JSON))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("page_size")))
+                    .andExpect(jsonPath("$.message", not(containsString(pageSize))));
         }
         verify(this.tesService, never()).listTasks(any(), any(), any(), any(), any());
     }

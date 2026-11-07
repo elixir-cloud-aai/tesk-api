@@ -28,8 +28,11 @@ import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 @RequestMapping("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}")
 public class TasksApiController implements TasksApi {
 
-    /** Largest page_size accepted by listTasks (named in the TES 1.1 API description) */
-    public static final long MAX_PAGE_SIZE = 2048;
+    /**
+     * Largest page_size accepted by listTasks. The TES 1.1 API description says "less than 2048";
+     * TESK API also accepts 2048 itself (issue #114).
+     */
+    static final long MAX_PAGE_SIZE = 2048;
 
     private final TesService tesService;
 
@@ -76,7 +79,9 @@ public class TasksApiController implements TasksApi {
             @ApiParam(
                             example = "256",
                             value =
-                                    "OPTIONAL. Number of tasks to return in one page, from 1 to 2048. Without it, all tasks are returned in one page. Pages can be shorter, also with name_prefix.")
+                                    "OPTIONAL. Number of tasks to return in one page, from 1 to "
+                                            + MAX_PAGE_SIZE
+                                            + ". Without it, all tasks are returned in one page. Pages can be shorter, also with name_prefix.")
                     @RequestParam(value = "page_size", required = false)
                     Long pageSize,
             @ApiParam(
