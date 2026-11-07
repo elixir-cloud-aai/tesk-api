@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.config.swagger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.LinkedHashMap;
@@ -31,8 +32,9 @@ public class OAuth2ClientProperties {
     private String clientId;
 
     /**
-     * OAuth2 Client Secret
+     * OAuth2 Client Secret; deprecated and ignored: the Swagger UI is a public client
      */
+    @Deprecated
     private String clientSecret;
 
     /**
@@ -69,10 +71,13 @@ public class OAuth2ClientProperties {
         this.clientId = clientId;
     }
 
+    @Deprecated
+    @DeprecatedConfigurationProperty(reason = "The Swagger UI is a public client and gets no client secret")
     public String getClientSecret() {
         return clientSecret;
     }
 
+    @Deprecated
     public void setClientSecret(String clientSecret) {
         this.clientSecret = clientSecret;
     }
