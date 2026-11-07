@@ -47,6 +47,40 @@ coverage grows). Codecov (`codecov.yml`) also checks each pull request: the
 project's coverage must not drop by more than 0.5 percentage points, and the
 changed lines must be covered completely.
 
+## Formatting and linting
+
+The Java code is formatted with
+[google-java-format](https://github.com/google/google-java-format) in AOSP
+style (4-space indentation, lines of at most 100 characters), through the
+[Spotless](https://github.com/diffplug/spotless) Maven plugin, and linted with
+[Checkstyle](https://checkstyle.org/) (rules in `checkstyle.xml`: likely bugs
+and problematic constructs, e.g. missing braces or `equals` without
+`hashCode`; the layout is left to the formatter; wildcard imports are
+allowed). The generated files (listed in
+`src/main/java/.openapi-generator/FILES`) are excluded from both. To format
+the code, and to check it as the CI job `Lint` does (`./mvnw verify` checks
+neither):
+
+```bash
+./mvnw spotless:apply
+./mvnw spotless:check checkstyle:check
+```
+
+The plugin versions (spotless-maven-plugin 2.30.0 with google-java-format 1.7,
+Checkstyle 9.3) are the last that run on Java 8; newer ones need a newer JDK
+(the move to Spring Boot 3,
+[#66](https://github.com/elixir-cloud-aai/tesk-api/issues/66)).
+
+The commits that only reformatted the code are listed in
+`.git-blame-ignore-revs`. GitHub skips them in its blame view; for `git blame`,
+run once:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+## Building the image and the docs
+
 To build the image (the `Dockerfile` builds the application from source, so
 nothing needs to be built first):
 
@@ -65,9 +99,10 @@ python -m venv .venv
 ## Continuous integration
 
 The CI workflow (`.github/workflows/ci.yml`) runs on pull requests and pushes
-to `dev`: it checks the pull request title, lints the workflows, builds and
-tests TESK API (with coverage to [Codecov](https://codecov.io/gh/elixir-cloud-aai/tesk-api)),
-builds the docs strictly, starts the image in both profiles, and scans the
+to `dev`: it checks the pull request title, lints the workflows, checks the
+formatting and lint of the Java code, builds and tests TESK API (with
+coverage to [Codecov](https://codecov.io/gh/elixir-cloud-aai/tesk-api)), builds
+the docs strictly, starts the image in both profiles, and scans the
 image for known vulnerabilities. For now, the scan only reports its findings
 (to code scanning) and doesn't fail, until the dependencies are updated
 ([#60](https://github.com/elixir-cloud-aai/tesk-api/issues/60)); then it fails

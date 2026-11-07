@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Checks that google-java-format (Spotless) doesn't cover: likely bugs and
+  problematic constructs. Layout is left to the formatter. Wildcard imports
+  are tolerated (no AvoidStarImport): the hand-written code uses some.
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <module name="SuppressWarningsFilter"/>
+    <!-- Generated (src/main/java/.openapi-generator/FILES); only the main
+         tree, so tests in the same packages are checked; keep in sync with
+         the Spotless excludes in pom.xml -->
+    <module name="SuppressionSingleFilter">
+        <property name="files"
+                  value="src[\\/]main[\\/]java[\\/]uk[\\/]ac[\\/]ebi[\\/]tsc[\\/]tesk[\\/]tes[\\/](api[\\/](ApiUtil|ServiceInfoApi|TasksApi)|model[\\/](Service|Tes)[^\\/]*)\.java$"/>
+        <property name="checks" value="."/>
+    </module>
+    <module name="TreeWalker">
+        <module name="SuppressWarningsHolder"/>
+        <module name="RedundantImport"/>
+        <module name="UnusedImports"/>
+        <module name="IllegalImport"/>
+        <module name="EmptyStatement"/>
+        <module name="EqualsHashCode"/>
+        <module name="CovariantEquals"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="StringLiteralEquality"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="FallThrough"/>
+        <module name="OneStatementPerLine"/>
+        <module name="MultipleVariableDeclarations"/>
+        <module name="ModifiedControlVariable"/>
+        <module name="NeedBraces"/>
+        <module name="EmptyCatchBlock"/>
+        <module name="UpperEll"/>
+        <module name="ArrayTypeStyle"/>
+        <module name="MissingOverride"/>
+        <module name="PackageDeclaration"/>
+    </module>
+</module>

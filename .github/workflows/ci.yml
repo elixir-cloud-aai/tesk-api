@@ -71,7 +71,6 @@ jobs:
       - name: Check PR title
         uses: elixir-cloud-aai/.github/actions/pr-title@743e82d290a53768454999e413756a924e383259 # v1.0.0
 
-  # The repository has no Java linter yet; only the workflows are linted
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -86,6 +85,16 @@ jobs:
           docker run --rm --volume "${PWD}:/repo" --workdir /repo \
             rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
             -color
+      # Java 8, as in `test`: the plugin versions are the last that run on it.
+      # No Maven cache: it would share the key of `test` and could be saved
+      # with only the lint plugins in it
+      - name: Set up Java
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "8"
+      - name: Check Java formatting and lint
+        run: ./mvnw -B spotless:check checkstyle:check
       # `push` and `publish` repeat the expression of `PUBLISH` in their `if:`
       # (jobs' `if:` can't read `env`): all three must stay the same
       - name: Check publish conditions
