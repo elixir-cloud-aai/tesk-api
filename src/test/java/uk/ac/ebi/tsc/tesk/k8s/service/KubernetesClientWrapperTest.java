@@ -493,6 +493,14 @@ public class KubernetesClientWrapperTest {
         wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
     }
 
+    /** A 400 of Kubernetes without a Status to tell the cause stays a server error */
+    @Test(expected = KubernetesException.class)
+    public void listAllTaskmasterJobsForUser_badRequestWithoutBodyWithPageToken()
+            throws ApiException {
+        this.listJobsFails("token", HttpStatus.BAD_REQUEST.value(), null);
+        wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
+    }
+
     /** Other errors of Kubernetes stay server errors, also with a page token */
     @Test(expected = KubernetesException.class)
     public void listAllTaskmasterJobsForUser_serverErrorWithPageToken() throws ApiException {
