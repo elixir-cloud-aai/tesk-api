@@ -280,7 +280,7 @@ public class KubernetesClientWrapper {
      * or the deletion of dependents (foreground deletion) before it removes the object.
      */
     private static boolean isBeingDeleted(V1Job job) {
-        return job.getMetadata() != null && job.getMetadata().getDeletionTimestamp() != null;
+        return job.getMetadata().getDeletionTimestamp() != null;
     }
 
     /**
