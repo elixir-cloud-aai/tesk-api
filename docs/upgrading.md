@@ -45,9 +45,11 @@ configuration. What's new:
   `TESK_API_SWAGGER_OAUTH_CLIENT_SECRET` is deprecated and ignored; TESK API
   logs a warning at startup if it is set. Remove the setting, and register
   the Swagger UI's client at your identity provider as a public client
-  (implicit grant, the default, or authorisation code without a secret). If
-  you had the Swagger UI on with a client secret configured, rotate that
-  secret at your identity provider.
+  (implicit grant, the default, or authorisation code without a secret; the
+  latter needs an identity provider that allows it for public clients without
+  PKCE). If a client secret was configured while the Swagger UI was on (always
+  the case before 1.2.0, with the `auth` profile), rotate that secret at your
+  identity provider.
 - **Service info setting.** `TESK_API_SERVICE_INFO_PUBLIC` (`true` by
   default) keeps `GET` and `HEAD /service-info` public with the `auth`
   profile, as before; set it to `false` to require a valid token for them (see

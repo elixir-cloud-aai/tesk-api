@@ -44,6 +44,9 @@ public class SwaggerOAuthClientSecretTest {
                 .andExpect(content().string(not(containsString(SECRET))));
     }
 
+    /**
+     * Regression guard: the API description doesn't contain the secret either.
+     */
     @Test
     public void apiDescription_hasNoClientSecret() throws Exception {
         this.mvc.perform(get("/v2/api-docs"))

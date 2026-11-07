@@ -32,7 +32,7 @@ Environment variable | Meaning
 `TESK_API_AUTHORISATION_*` | Authorisation by group membership; see [Access control](access-control.md#configuration).
 `TESK_API_SWAGGER_UI_ENABLED` | `true`: serves the [Swagger UI](api.md#swagger-ui) at `/swagger-ui/index.html` (the root path `/` redirects there) with its static resources and its configuration (`/swagger-resources`). `false` (default): serves none of them. The API description (`/v2/api-docs`) is served either way. Other values stop the app at startup. Turning it on serves the Swagger UI and its static resources publicly, also with the `auth` profile: turn it on only where it is needed. Since 1.2.0; before, the Swagger UI was always on.
 `TESK_API_SWAGGER_OAUTH_*` | The OpenID Connect client of the Swagger UI; see [Access control](access-control.md#built-in-client).
-`TESK_API_SWAGGER_OAUTH_CLIENT_SECRET` | Deprecated since 1.2.0 and ignored: the Swagger UI is a public client and gets no client secret. TESK API logs a warning at startup if it is set. Remove it from your deployment; if the Swagger UI was on with a client secret configured, rotate that secret at your identity provider (see [Upgrading](upgrading.md#to-120)).
+`TESK_API_SWAGGER_OAUTH_CLIENT_SECRET` | Deprecated since 1.2.0 and ignored: the Swagger UI is a public client and gets no client secret. TESK API logs a warning at startup if it is set. Remove it from your deployment; if a client secret was configured while the Swagger UI was on (always the case before 1.2.0, with the `auth` profile), rotate that secret at your identity provider (see [Upgrading](upgrading.md#to-120)).
 
 ## Service info
 
