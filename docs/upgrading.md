@@ -47,6 +47,14 @@ Changes since 1.2.0 that clients or deployments may notice:
 - **Filtering tasks by name.** `GET /tasks` supports `name_prefix` (see
   [Listing tasks](api.md#listing-tasks)); before, it was ignored. Pages
   can be shorter than `page_size`, even empty, with a `next_page_token`.
+- **Paging parameters checked.** `GET /tasks` refuses a `page_size` below 1
+  or above 2048 with `400 Bad Request` (see [Listing
+  tasks](api.md#listing-tasks)); before, any number was accepted, and
+  numbers beyond the range of an `int` wrapped around. An expired or
+  malformed `page_token` is refused with `400 Bad Request` instead of `500
+  Internal Server Error`, with a message that names the parameter but not
+  its value. Clients that page with more than 2048 tasks need to lower
+  `page_size`.
 - **Task cancellation response.** `POST /tasks/{id}:cancel` answers a
   successful cancellation with an empty JSON object (`{}`, `Content-Type:
   application/json`), as the TES specification defines, instead of an empty
