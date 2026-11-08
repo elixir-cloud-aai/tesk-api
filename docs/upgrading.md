@@ -23,11 +23,20 @@ Changes since 1.2.0 that clients or deployments may notice:
     - List the old tasks with `kubectl get jobs -n <namespace> -l
       'job-type=taskmaster,creator-user-id,!creator-user-hash'`. The old
       label can't be converted exactly, because its value doesn't tell
-      whether a `_` was an `@`. Delete old tasks that are no longer needed
-      (`kubectl delete jobs -n <namespace> -l
-      'creator-user-id,!creator-user-hash'`, which removes the executors'
-      jobs too; ConfigMaps that the job doesn't own stay, see "Deleted
-      tasks" below).
+      whether a `_` was an `@`. Delete the old tasks that are no longer
+      needed by name (`kubectl delete jobs -n <namespace> <name>`).
+      `kubectl delete jobs -n <namespace> -l
+      'creator-user-id,!creator-user-hash'` deletes all old tasks at once,
+      running ones included, with their executors' jobs, which carry the
+      same label; `kubectl delete configmaps -n <namespace> -l
+      'creator-user-id,!creator-user-hash'` deletes their ConfigMaps (see
+      "Deleted tasks" below).
+    - With several replicas of TESK API, a rolling update runs old and new
+      replicas side by side for a while: each one doesn't match the tasks
+      created by the other to their creators, so creators can get `403
+      Forbidden` for their newest tasks until the update completes. Update
+      with the `Recreate` strategy to avoid that, or accept the short
+      window.
     - The taskmaster (tesk-core) doesn't read these labels: it copies the
       executors' jobs, with their labels and annotations, as TESK API
       prepares them, so it needs no change.

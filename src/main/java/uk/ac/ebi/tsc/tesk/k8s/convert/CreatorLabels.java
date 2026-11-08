@@ -1,8 +1,8 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERHASH_KEY;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERID_KEY;
 
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.nio.charset.StandardCharsets;
@@ -12,9 +12,9 @@ import java.util.Map;
 
 /**
  * The creating user of a task's Kubernetes objects: a label with a hash of the user's ID, by which
- * Kubernetes selects the user's tasks, and an annotation with the full ID, which tells whether a
- * task with the hash is the user's. User IDs (the OIDC {@code sub}) can be any string, while label
- * values are limited to 63 characters from {@code [A-Za-z0-9._-]}; annotations take any string.
+ * Kubernetes selects the user's tasks, and an annotation with the full ID, which is compared
+ * exactly. User IDs (the OIDC {@code sub}) can be any string, while label values are limited to 63
+ * characters from {@code [A-Za-z0-9._-]}; annotations take any string.
  *
  * <p>Tasks created before had only the label {@code creator-user-id}, with the ID's {@code @}
  * replaced by {@code _} ({@link #legacyValue}), an encoding that gives different IDs the same value
@@ -75,7 +75,7 @@ public final class CreatorLabels {
 
     /** The value of the old label (of objects created before the hash label), or null */
     public static String legacyCreator(V1ObjectMeta metadata) {
-        return get(metadata.getLabels(), LABEL_USERID_KEY);
+        return get(metadata.getLabels(), LABEL_LEGACY_USERID_KEY);
     }
 
     private static String get(Map<String, String> map, String key) {

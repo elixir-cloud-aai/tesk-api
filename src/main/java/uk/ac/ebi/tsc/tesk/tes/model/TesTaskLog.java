@@ -41,21 +41,6 @@ public class TesTaskLog   {
   @Valid
   private List<String> systemLogs = null;
 
-  // non-standard, internal only (not serialized): USER_ID in metadata is the value of the old label
-  // creator-user-id of a task created before the label creator-user-hash, not the full user ID
-  @JsonIgnore
-  private boolean userIdFromLegacyLabel = false;
-
-  @JsonIgnore
-  public boolean isUserIdFromLegacyLabel() {
-    return userIdFromLegacyLabel;
-  }
-
-  @JsonIgnore
-  public void setUserIdFromLegacyLabel(boolean userIdFromLegacyLabel) {
-    this.userIdFromLegacyLabel = userIdFromLegacyLabel;
-  }
-
   public TesTaskLog logs(List<TesExecutorLog> logs) {
     this.logs = logs;
     return this;
@@ -260,5 +245,22 @@ public class TesTaskLog   {
     }
     return o.toString().replace("\n", "\n    ");
   }
-}
 
+  /**
+   * Non-standard, internal only (neither serialized nor read from requests): whether USER_ID in
+   * the metadata is the value of the old label creator-user-id of a task created before the label
+   * creator-user-hash, instead of the full user ID. Added by hand; keep it when regenerating the
+   * model.
+   */
+  @JsonIgnore
+  private boolean userIdFromLegacyLabel = false;
+
+  @ApiModelProperty(hidden = true)
+  public boolean isUserIdFromLegacyLabel() {
+    return userIdFromLegacyLabel;
+  }
+
+  public void setUserIdFromLegacyLabel(boolean userIdFromLegacyLabel) {
+    this.userIdFromLegacyLabel = userIdFromLegacyLabel;
+  }
+}

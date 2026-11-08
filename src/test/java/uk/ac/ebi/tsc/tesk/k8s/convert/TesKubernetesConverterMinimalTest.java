@@ -321,7 +321,7 @@ public class TesKubernetesConverterMinimalTest {
     public void fromK8sToTask_creatorFromAnnotation() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
         V1ObjectMeta metadata = taskBuilder.getTask().getTaskmaster().getJob().getMetadata();
-        metadata.getLabels().remove(Constants.LABEL_USERID_KEY);
+        metadata.getLabels().remove(Constants.LABEL_LEGACY_USERID_KEY);
         CreatorLabels.put(metadata, "user@example.org");
         TesTask outputTask =
                 this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);

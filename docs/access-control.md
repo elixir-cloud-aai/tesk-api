@@ -113,7 +113,7 @@ label again (see [Upgrading](upgrading.md#to-the-next-release)):
 
 Environment variable | Meaning | Default
 --- | --- | ---
-`TESK_API_AUTHORISATION_LEGACY_USER_LABELS` | `true`: a task with only the old label `creator-user-id` belongs to the users whose `sub`, with `@` replaced by `_`, is the label's value. Tasks with the label `creator-user-hash` still need the exact `sub`. Users who are only team members then list the tasks of their teams through Kubernetes, and TESK API checks the creator of each; pages can be shorter. | `false`
+`TESK_API_AUTHORISATION_LEGACY_USER_LABELS` | `true`: a task with only the old label `creator-user-id` belongs to the users whose `sub`, with `@` replaced by `_`, is the label's value. Tasks with the label `creator-user-hash` still need the exact `sub`. Team members then list all tasks of their teams through Kubernetes, and users authorised by the claim only all tasks without a team; TESK API checks the creator of each, so pages can be shorter or empty, and listing reads more objects. | `false`
 
 ## Authorisation without groups
 

@@ -75,7 +75,7 @@ class MockUtil {
                 new V1ObjectMeta()
                         .name("task-123")
                         .putLabelsItem("job-type", "taskmaster")
-                        .putLabelsItem(Constants.LABEL_USERID_KEY, legacyUserLabel);
+                        .putLabelsItem(Constants.LABEL_LEGACY_USERID_KEY, legacyUserLabel);
         if (group != null) {
             metadata.putLabelsItem(Constants.LABEL_GROUPNAME_KEY, group);
         }

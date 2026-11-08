@@ -8,7 +8,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_GROUPNAME_KEY;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERID_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
@@ -520,7 +520,7 @@ public class KubernetesClientWrapperTest {
                 .metadata(
                         new V1ObjectMeta()
                                 .putLabelsItem(LABEL_GROUPNAME_KEY, group)
-                                .putLabelsItem(LABEL_USERID_KEY, legacyUserLabel));
+                                .putLabelsItem(LABEL_LEGACY_USERID_KEY, legacyUserLabel));
     }
 
     private V1JobList resultList() {

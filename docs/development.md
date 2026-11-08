@@ -173,4 +173,5 @@ This generates new versions of the model (`uk.ac.ebi.tsc.tesk.tes.model`) and
 the API stub (`uk.ac.ebi.tsc.tesk.tes.api`). The model classes carry [Bean
 Validation](https://beanvalidation.org/) annotations beyond those derived from
 the specification; restore them by hand in the generated code, and reconcile
-any other manual changes.
+any other manual changes, e.g. the internal field `userIdFromLegacyLabel` of
+`TesTaskLog` (not serialized), which the access check of a task needs.

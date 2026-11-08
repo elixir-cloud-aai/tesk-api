@@ -139,16 +139,6 @@ public class User implements Serializable, UserDetails, Principal {
         return teskManagedGroups != null && teskManagedGroups.size() > 0;
     }
 
-    public boolean isMemberInNonManagedGroups() {
-        if (!isTeskAdmin() && isMember() && isManager()) {
-            Set<String> difference = new HashSet<>();
-            difference.addAll(this.teskMemberedGroups);
-            difference.removeAll(this.teskManagedGroups);
-            return difference.size() > 0;
-        }
-        return false;
-    }
-
     /**
      * Label selector of the taskmaster jobs that the user may list, in addition to the job type:
      * none for admins (all tasks); the groups (and, unless a manager of one, the own tasks in them)

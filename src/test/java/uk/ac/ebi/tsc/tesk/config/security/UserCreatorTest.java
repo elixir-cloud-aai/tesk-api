@@ -6,8 +6,8 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERHASH_KEY;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERID_KEY;
 
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.Collections;
@@ -30,7 +30,7 @@ public class UserCreatorTest {
     }
 
     private static V1ObjectMeta legacyLabel(String value) {
-        return new V1ObjectMeta().putLabelsItem(LABEL_USERID_KEY, value);
+        return new V1ObjectMeta().putLabelsItem(LABEL_LEGACY_USERID_KEY, value);
     }
 
     private static TesTaskLog log(String userId, boolean legacy) {
@@ -108,17 +108,32 @@ public class UserCreatorTest {
     }
 
     @Test
-    public void isCreator_taskLog() {
+    public void isCreator_exactId() {
         assertTrue(user("a@b", false).isCreator(log("a@b", false)));
         assertFalse(user("a_b", false).isCreator(log("a@b", false)));
         assertFalse(user("a@b", true).isCreator(log("a_b", false)));
-        assertFalse(user("a@b", false).isCreator(log("a_b", true)));
+    }
+
+    @Test
+    public void isCreator_oldLabelWithTheSetting() {
         assertTrue(user("a@b", true).isCreator(log("a_b", true)));
+    }
+
+    @Test
+    public void isCreator_oldLabelWithoutTheSetting() {
+        assertFalse(user("a@b", false).isCreator(log("a_b", true)));
+    }
+
+    @Test
+    public void isCreator_noUserId() {
         assertFalse(user("a@b", true).isCreator(log(null, true)));
         assertFalse(user("a@b", true).isCreator(log(null, false)));
+    }
+
+    @Test
+    public void isCreator_noLogOrMetadata() {
         assertFalse(user("a@b", true).isCreator(null));
-        TesTaskLog noMetadata = new TesTaskLog();
-        assertFalse(user("a@b", true).isCreator(noMetadata));
+        assertFalse(user("a@b", true).isCreator(new TesTaskLog()));
     }
 
     @Test

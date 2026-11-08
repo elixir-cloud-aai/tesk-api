@@ -6,8 +6,8 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERHASH_KEY;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERID_KEY;
 
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.regex.Pattern;
@@ -55,7 +55,7 @@ public class CreatorLabelsTest {
         assertEquals(
                 "d159ef624ed86697b4f1f3ff086aacdd", metadata.getLabels().get(LABEL_USERHASH_KEY));
         assertEquals("user@example.org", metadata.getAnnotations().get(ANN_USERID_KEY));
-        assertFalse(metadata.getLabels().containsKey(LABEL_USERID_KEY));
+        assertFalse(metadata.getLabels().containsKey(LABEL_LEGACY_USERID_KEY));
         assertFalse(CreatorLabels.isLegacy(metadata));
         assertEquals("user@example.org", CreatorLabels.creatorId(metadata));
     }
@@ -78,7 +78,7 @@ public class CreatorLabelsTest {
 
     @Test
     public void legacy_objectsWithOnlyTheOldLabel() {
-        V1ObjectMeta metadata = new V1ObjectMeta().putLabelsItem(LABEL_USERID_KEY, "a_b");
+        V1ObjectMeta metadata = new V1ObjectMeta().putLabelsItem(LABEL_LEGACY_USERID_KEY, "a_b");
         assertTrue(CreatorLabels.isLegacy(metadata));
         assertNull(CreatorLabels.creatorId(metadata));
         assertEquals("a_b", CreatorLabels.legacyCreator(metadata));

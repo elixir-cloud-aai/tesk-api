@@ -73,9 +73,10 @@ public class Constants {
     /**
      * Key of the old label with the creating user's ID, with {@code @} replaced by {@code _}. New
      * tasks don't get it; it is read for tasks created before {@link #LABEL_USERHASH_KEY} (see
-     * {@code tesk.api.authorisation.legacy-user-labels})
+     * {@code tesk.api.authorisation.legacy-user-labels}). Same key as {@link #ANN_USERID_KEY},
+     * which is an annotation, not a label
      */
-    public static final String LABEL_USERID_KEY = "creator-user-id";
+    public static final String LABEL_LEGACY_USERID_KEY = "creator-user-id";
 
     /**
      * Key of the label with a hash of the creating user's full ID (see {@link
@@ -83,7 +84,10 @@ public class Constants {
      */
     public static final String LABEL_USERHASH_KEY = "creator-user-hash";
 
-    /** Key of the annotation with the creating user's full ID */
+    /**
+     * Key of the annotation with the creating user's full ID (same key as the old label {@link
+     * #LABEL_LEGACY_USERID_KEY})
+     */
     public static final String ANN_USERID_KEY = "creator-user-id";
 
     /** Key of the label, that holds user's group name */

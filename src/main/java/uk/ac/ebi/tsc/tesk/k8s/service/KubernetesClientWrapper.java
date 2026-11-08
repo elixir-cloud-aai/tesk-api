@@ -272,8 +272,8 @@ public class KubernetesClientWrapper {
                         .collect(Collectors.toList()));
         if (user.getLabelSelector() != null) {
             // the selector only narrows the jobs down: keep those of the groups the user manages
-            // and those the user created, by the annotation with the full ID (the hash label
-            // alone doesn't prove it, and the old label can't be selected for the user)
+            // and those the user created, comparing the annotation with the full ID exactly (the
+            // hash label only selects, and the old label can't be selected for the user)
             result.setItems(
                     result.getItems().stream()
                             .filter(
