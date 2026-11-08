@@ -6,11 +6,11 @@
 # identity (`scan`), and only then attest its build provenance, sign it
 # (Sigstore keyless signing) and tag it `X.Y.Z` (and `latest`, for the highest
 # stable release; `publish`). Tags of other releases are never touched. Finally,
-# tell Pubgrade about the image (`notify`), if it is configured. See "Releasing"
-# in `README.md`.
+# tell Pubgrade about the image (`notify`), if it is configured. See "Versioning
+# and releases" in `docs/development.md`.
 #
 # `push` and `publish` each need approval in the `release` environment (required
-# reviewer). Re-running failed jobs reuses the digest already pushed. Re-running
+# reviewer), and so does `notify` if Pubgrade is configured. Re-running failed jobs reuses the digest already pushed. Re-running
 # all jobs builds a new digest, which `publish` refuses, before attesting and
 # signing it, if `X.Y.Z` already points to another one: published versions never
 # change. Only admins can create `v*` tags, and nobody can move or delete them
@@ -306,17 +306,22 @@ jobs:
           done
 
   # One call to Pubgrade (publish mode, elixir-cloud-aai/Pubgrade#33), which
-  # notifies the subscribed deployments. Without the settings, nothing happens.
-  # No retries: a failed run says so, and re-running this job sends it again.
-  # The token is a secret of the environment `pubgrade`, which has no required
-  # reviewer (no third approval) but only allows version tags; as only admins
-  # can create those (tag ruleset), only their tags' workflows can read it
+  # notifies the subscribed deployments. No retries: a failed run says so, and
+  # re-running this job sends it again. The token is a secret of the `release`
+  # environment, like the other release credentials, so this job needs an
+  # approval there, too. The job only runs if the variable `PUBGRADE_URL` is
+  # set for the repository or the organization: variables of an environment
+  # aren't visible to a job's `if:` (it is evaluated before the job enters the
+  # environment), and a check in a step would leave every release without
+  # Pubgrade waiting for an approval that serves nothing. The step fails if the
+  # other settings are missing
   notify:
     name: Notify Pubgrade
     needs: [prepare, publish]
+    if: vars.PUBGRADE_URL != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: pubgrade
+    environment: release
     permissions: {}
     env:
       PUBGRADE_URL: ${{ vars.PUBGRADE_URL }}
@@ -328,12 +333,8 @@ jobs:
     steps:
       - name: Notify Pubgrade
         run: |
-          if [[ -z "${PUBGRADE_URL}${PUBGRADE_REPOSITORY_ID}${PUBGRADE_TOKEN}" ]]; then
-              echo "::notice::Pubgrade is not configured, so it isn't notified"
-              exit 0
-          fi
-          if [[ -z "${PUBGRADE_URL}" || -z "${PUBGRADE_REPOSITORY_ID}" || -z "${PUBGRADE_TOKEN}" ]]; then
-              echo "::error::PUBGRADE_URL, PUBGRADE_REPOSITORY_ID and PUBGRADE_TOKEN must be set together"
+          if [[ -z "${PUBGRADE_REPOSITORY_ID}" || -z "${PUBGRADE_TOKEN}" ]]; then
+              echo "::error::PUBGRADE_URL is set, but PUBGRADE_REPOSITORY_ID or PUBGRADE_TOKEN is missing"
               exit 1
           fi
           if [[ ! "${PUBGRADE_REPOSITORY_ID}" =~ ^[A-Za-z0-9_-]+$ ]]; then

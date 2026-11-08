@@ -141,24 +141,31 @@ the versions must match the tag, so set them in a pull request first:
 
 `latest` goes by tags, so if a release fails, follow it with a higher version.
 Only admins can create release tags, and nobody can move or delete them (tag
-rulesets). Publishing waits for an approval in the `release` environment. The
-image is scanned before it is tagged; images are signed with Sigstore and
-carry provenance attestations.
+rulesets). Pushing and publishing the image each wait for an approval in the
+`release` environment, which only allows version tags. The image is scanned
+before it is tagged; images are signed with Sigstore and carry provenance
+attestations.
 
 After publishing, the workflow makes one `POST /repositories/{id}/builds` to
 [Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade), which notifies the
 deployments that subscribed to upgrades, also for pre-releases, if they
 subscribed to those. This needs Pubgrade's publish mode
 ([#33](https://github.com/elixir-cloud-aai/Pubgrade/issues/33)) and these
-settings of the `pubgrade` environment of the repository, which should only
-allow version tags and needs no reviewer; without them, the step does
-nothing:
+settings:
 
-Setting | Kind | Meaning
---- | --- | ---
-`PUBGRADE_URL` | Variable | Base URL of the Pubgrade API, with `https://`
-`PUBGRADE_REPOSITORY_ID` | Variable | The identifier from registering the repository in Pubgrade
-`PUBGRADE_TOKEN` | Secret | The access token from registering the repository in Pubgrade
+Setting | Kind | Where | Meaning
+--- | --- | --- | ---
+`PUBGRADE_URL` | Variable | Repository or organization | Base URL of the Pubgrade API, with `https://`. Switches the notification on.
+`PUBGRADE_REPOSITORY_ID` | Variable | Repository, or the `release` environment | The identifier from registering the repository in Pubgrade
+`PUBGRADE_TOKEN` | Secret | The `release` environment | The access token from registering the repository in Pubgrade
+
+Without `PUBGRADE_URL`, the job `Notify Pubgrade` is skipped, so releases
+don't wait for its approval. `PUBGRADE_URL` can't be a variable of the
+`release` environment: a job's condition is evaluated before the job enters
+its environment, so it doesn't see the environment's variables. With
+`PUBGRADE_URL`, the job waits for an approval in the `release` environment,
+like pushing and publishing, and fails if one of the other settings is
+missing.
 
 ## Generating a new API stub
 
