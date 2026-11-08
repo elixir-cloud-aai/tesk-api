@@ -10,9 +10,11 @@
 # and releases" in `docs/development.md`.
 #
 # `push` and `publish` each need approval in the `release` environment (required
-# reviewer), and so does `notify` if Pubgrade is configured. Re-running failed jobs reuses the digest already pushed. Re-running
-# all jobs builds a new digest, which `publish` refuses, before attesting and
-# signing it, if `X.Y.Z` already points to another one: published versions never
+# reviewer), and so does `notify` if Pubgrade is configured.
+#
+# Re-running failed jobs reuses the digest already pushed. Re-running all jobs
+# builds a new digest, which `publish` refuses, before attesting and signing
+# it, if `X.Y.Z` already points to another one: published versions never
 # change. Only admins can create `v*` tags, and nobody can move or delete them
 # (tag rulesets of the repository). `publish` runs one release at a time; a
 # newer release waiting for it can cancel an older one that waits too (one
@@ -310,11 +312,12 @@ jobs:
   # re-running this job sends it again. The token is a secret of the `release`
   # environment, like the other release credentials, so this job needs an
   # approval there, too. The job only runs if the variable `PUBGRADE_URL` is
-  # set for the repository or the organization: variables of an environment
-  # aren't visible to a job's `if:` (it is evaluated before the job enters the
-  # environment), and a check in a step would leave every release without
-  # Pubgrade waiting for an approval that serves nothing. The step fails if the
-  # other settings are missing
+  # set for the repository: variables of an environment aren't visible to a
+  # job's `if:` (it is evaluated before the job enters the environment), and a
+  # check in a step would leave every release without Pubgrade waiting for an
+  # approval that serves nothing. The step fails if `PUBGRADE_REPOSITORY_ID` or
+  # `PUBGRADE_TOKEN` is missing. See "Versioning and releases" in
+  # `docs/development.md` for where to set them.
   notify:
     name: Notify Pubgrade
     needs: [prepare, publish]

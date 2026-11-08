@@ -155,17 +155,22 @@ settings:
 
 Setting | Kind | Where | Meaning
 --- | --- | --- | ---
-`PUBGRADE_URL` | Variable | Repository or organization | Base URL of the Pubgrade API, with `https://`. Switches the notification on.
+`PUBGRADE_URL` | Variable | Repository | Base URL of the Pubgrade API, with `https://`. Switches the notification on.
 `PUBGRADE_REPOSITORY_ID` | Variable | Repository, or the `release` environment | The identifier from registering the repository in Pubgrade
 `PUBGRADE_TOKEN` | Secret | The `release` environment | The access token from registering the repository in Pubgrade
 
 Without `PUBGRADE_URL`, the job `Notify Pubgrade` is skipped, so releases
-don't wait for its approval. `PUBGRADE_URL` can't be a variable of the
-`release` environment: a job's condition is evaluated before the job enters
-its environment, so it doesn't see the environment's variables. With
-`PUBGRADE_URL`, the job waits for an approval in the `release` environment,
-like pushing and publishing, and fails if one of the other settings is
-missing.
+don't wait for its approval. Set `PUBGRADE_URL` for the repository, not in
+the `release` environment: a job's condition is evaluated before the job
+enters its environment, so a variable there doesn't switch the job on (and
+would override the repository's URL within the job). An organization
+variable would switch it on for every repository it is shared with, also
+those without a Pubgrade token. With `PUBGRADE_URL`, the job waits for an
+approval in the `release` environment, like pushing and publishing, and fails
+if one of the other settings is missing. If only this job fails or is
+rejected, the image is published all the same: fix the settings and re-run
+the job, or leave it; don't release a new version for it. Settings of the
+former `pubgrade` environment are no longer read: move them as above.
 
 ## Generating a new API stub
 
