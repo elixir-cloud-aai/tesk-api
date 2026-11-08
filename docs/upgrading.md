@@ -4,6 +4,36 @@
 
 Changes since 1.2.0 that clients or deployments may notice:
 
+- **Creator labels.** New tasks record their creator in the label
+  `creator-user-hash` (a hash of the user's `sub`) and the annotation
+  `creator-user-id` (the `sub` itself) instead of the label
+  `creator-user-id` (the `sub` with `@` replaced by `_`), so that any `sub`
+  works, also one longer than 63 characters or with characters that labels
+  don't allow, and different IDs are told apart (see [Task
+  creators](access-control.md#task-creators)). `logs[0].metadata.USER_ID`
+  shows the `sub` unchanged (e.g. `user@example.org` instead of
+  `user_example.org`). Tasks created before the upgrade keep the old label:
+  team admins and super admins see them as before, but their creators can no
+  longer list, get or cancel them. What to do:
+    - Upgrade when no tasks run, or let running tasks end first; if you want
+      their creators to keep access for a while, set
+      `TESK_API_AUTHORISATION_LEGACY_USER_LABELS=true` (the Helm chart of
+      TESK has no value for it yet). Turn it off again once the old tasks
+      are no longer needed (e.g. after the taskmaster's `TASK_TTL_SECONDS`).
+    - List the old tasks with `kubectl get jobs -n <namespace> -l
+      'job-type=taskmaster,creator-user-id,!creator-user-hash'`. The old
+      label can't be converted exactly, because its value doesn't tell
+      whether a `_` was an `@`. Delete old tasks that are no longer needed
+      (`kubectl delete jobs -n <namespace> -l
+      'creator-user-id,!creator-user-hash'`, which removes the executors'
+      jobs too; ConfigMaps that the job doesn't own stay, see "Deleted
+      tasks" below).
+    - The taskmaster (tesk-core) doesn't read these labels: it copies the
+      executors' jobs, with their labels and annotations, as TESK API
+      prepares them, so it needs no change.
+    - An older TESK API (e.g. after a rollback) doesn't match tasks created
+      by this one to their creators, as it doesn't know the new label.
+
 - **Task states from all jobs.** The state of a task comes from all its jobs
   (see [Getting tasks](index.md#getting-tasks)). An executor's job that
   failed, whichever executor it is, gives `EXECUTOR_ERROR`, also with the
