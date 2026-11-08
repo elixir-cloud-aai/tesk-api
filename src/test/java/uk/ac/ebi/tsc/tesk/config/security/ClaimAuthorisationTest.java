@@ -152,7 +152,8 @@ public class ClaimAuthorisationTest {
     public void labelSelector_claimUser() {
         User user = extract(properties(true, CLAIM, MEDIUM), MEDIUM);
         assertEquals(
-                "creator-user-id=user_example.org,!creator-group-name", user.getLabelSelector());
+                "creator-user-hash=d159ef624ed86697b4f1f3ff086aacdd,!creator-group-name",
+                user.getLabelSelector());
     }
 
     /** Admins see all tasks: no selector, also with the claim */
@@ -169,7 +170,16 @@ public class ClaimAuthorisationTest {
     public void labelSelector_memberWithClaim() {
         User user = extract(properties(true, CLAIM, MEDIUM), MEDIUM, "BASE_GROUP:TEST");
         assertEquals(
-                "creator-group-name in (TEST),creator-user-id=user_example.org",
+                "creator-group-name in (TEST),creator-user-hash=d159ef624ed86697b4f1f3ff086aacdd",
                 user.getLabelSelector());
+    }
+
+    /** The setting tesk.api.authorisation.legacy-user-labels reaches the user (issue #119) */
+    @Test
+    public void legacyUserLabels_fromProperties() {
+        AuthorisationProperties properties = properties(false, null);
+        assertFalse(extract(properties, null).isLegacyUserLabels());
+        properties.setLegacyUserLabels(true);
+        assertTrue(extract(properties, null).isLegacyUserLabels());
     }
 }

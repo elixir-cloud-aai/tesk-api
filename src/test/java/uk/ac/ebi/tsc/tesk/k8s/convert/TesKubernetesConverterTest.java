@@ -221,7 +221,12 @@ public class TesKubernetesConverterTest {
                 .extractingJsonPathNumberValue("@.resources.cpu_cores")
                 .isEqualTo(4);
         assertEquals(outputJob.getMetadata().getLabels().get("job-type"), "taskmaster");
-        assertEquals(outputJob.getMetadata().getLabels().get("creator-user-id"), "test-user-id");
+        assertEquals(
+                outputJob.getMetadata().getLabels().get("creator-user-hash"),
+                "c95b3f800751698e8f935156112885cc");
+        assertFalse(outputJob.getMetadata().getLabels().containsKey("creator-user-id"));
+        assertEquals(
+                outputJob.getMetadata().getAnnotations().get("creator-user-id"), "test-user-id");
         assertEquals(outputJob.getMetadata().getLabels().get("creator-group-name"), "ABC");
         // test of placing generated task ID
         assertEquals(outputJob.getMetadata().getName(), "task-35605447");
@@ -341,7 +346,12 @@ public class TesKubernetesConverterTest {
                 .containsOnly("task-35605447")
                 .hasSize(2);
         taskMasterInputJson
-                .extractingJsonPathArrayValue("executors[*].metadata.labels['creator-user-id']")
+                .extractingJsonPathArrayValue("executors[*].metadata.labels['creator-user-hash']")
+                .containsOnly("c95b3f800751698e8f935156112885cc")
+                .hasSize(2);
+        taskMasterInputJson
+                .extractingJsonPathArrayValue(
+                        "executors[*].metadata.annotations['creator-user-id']")
                 .containsOnly("test-user-id")
                 .hasSize(2);
 

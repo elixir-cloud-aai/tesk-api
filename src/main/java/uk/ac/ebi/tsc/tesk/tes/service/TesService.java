@@ -37,10 +37,10 @@ public interface TesService {
      * @return - TES task details
      */
     @PostAuthorize(
-            "(#user.username == returnObject.logs[0].metadata['USER_ID'] AND returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupMember(returnObject.logs[0].metadata['GROUP_NAME']))"
+            "(#user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupMember(returnObject.logs[0].metadata['GROUP_NAME']))"
                     + " OR (#user.teskAdmin)"
                     + " OR (returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupManager(returnObject.logs[0].metadata['GROUP_NAME']))"
-                    + " OR (#user.claimAuthorised AND #user.username == returnObject.logs[0].metadata['USER_ID'] AND returnObject.logs[0].metadata['GROUP_NAME'] == null)")
+                    + " OR (#user.claimAuthorised AND #user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] == null)")
     TesTask getTask(String taskId, TaskView view, User user);
 
     /**

@@ -77,7 +77,7 @@ public class TesKubernetesConverter {
         // put input task name as annotation
         taskMasterJob.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, task.getName());
         // creating user and owning group
-        taskMasterJob.getMetadata().putLabelsItem(LABEL_USERID_KEY, user.getUsername());
+        CreatorLabels.put(taskMasterJob.getMetadata(), user.getUsername());
         if (task.getTags() != null && task.getTags().containsKey("GROUP_NAME")) {
             taskMasterJob
                     .getMetadata()
@@ -127,7 +127,7 @@ public class TesKubernetesConverter {
         // put input task name as annotation
         taskMasterConfigMap.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, task.getName());
         // creating user and owning group
-        taskMasterConfigMap.getMetadata().putLabelsItem(LABEL_USERID_KEY, user.getUsername());
+        CreatorLabels.put(taskMasterConfigMap.getMetadata(), user.getUsername());
         if (task.getTags() != null && task.getTags().containsKey("GROUP_NAME")) {
             taskMasterConfigMap
                     .getMetadata()
@@ -228,7 +228,7 @@ public class TesKubernetesConverter {
         job.getMetadata()
                 .putLabelsItem(LABEL_EXECNO_KEY, Integer.valueOf(executorIndex).toString());
         job.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, tesTaskName);
-        job.getMetadata().putLabelsItem(LABEL_USERID_KEY, user.getUsername());
+        CreatorLabels.put(job.getMetadata(), user.getUsername());
         V1Container container = job.getSpec().getTemplate().getSpec().getContainers().get(0);
         // Tries to convert potential TRS URI into docker image. If conversion unsuccessful ->
         // leaves the original image value.
@@ -370,6 +370,24 @@ public class TesKubernetesConverter {
         return log;
     }
 
+    /**
+     * Puts the creating user's ID into the log's metadata ({@code USER_ID}): the full ID of tasks
+     * with the hash label (if the annotation matches it), or the value of the old label of tasks
+     * created before, which the log marks as such (see {@link CreatorLabels})
+     */
+    private static void putCreator(TesTaskLog log, V1ObjectMeta metadata) {
+        String creator;
+        if (CreatorLabels.isLegacy(metadata)) {
+            creator = CreatorLabels.legacyCreator(metadata);
+            log.setUserIdFromLegacyLabel(true);
+        } else {
+            creator = CreatorLabels.creatorId(metadata);
+        }
+        if (creator != null) {
+            log.putMetadataItem("USER_ID", creator);
+        }
+    }
+
     /** Extracts minimal view of TesTask from taskMaster's and executors' job and pod objects */
     public TesTask fromK8sJobsToTesTaskMinimal(Task taskmasterWithExecutors, boolean isList) {
         TesTask task = new TesTask();
@@ -381,7 +399,7 @@ public class TesKubernetesConverter {
         if (!isList) {
             TesTaskLog log = new TesTaskLog();
             task.addLogsItem(log);
-            log.putMetadataItem("USER_ID", metadata.getLabels().get(LABEL_USERID_KEY));
+            putCreator(log, metadata);
             if (metadata.getLabels().containsKey(LABEL_GROUPNAME_KEY)) {
                 log.putMetadataItem("GROUP_NAME", metadata.getLabels().get(LABEL_GROUPNAME_KEY));
             }
@@ -424,7 +442,7 @@ public class TesKubernetesConverter {
         task.addLogsItem(log);
         // TES requires outputs; TESK doesn't learn which files the outputs filer wrote
         log.setOutputs(new ArrayList<>());
-        log.putMetadataItem("USER_ID", taskMasterJobMetadata.getLabels().get(LABEL_USERID_KEY));
+        putCreator(log, taskMasterJobMetadata);
         if (taskMasterJobMetadata.getLabels().containsKey(LABEL_GROUPNAME_KEY)) {
             log.putMetadataItem(
                     "GROUP_NAME", taskMasterJobMetadata.getLabels().get(LABEL_GROUPNAME_KEY));

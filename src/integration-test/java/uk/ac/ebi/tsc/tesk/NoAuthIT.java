@@ -73,7 +73,7 @@ public class NoAuthIT {
                                         "$.metadata.labels['creator-group-name']", absent()))
                         .withRequestBody(
                                 matchingJsonPath(
-                                        "$.metadata.labels[?(@.creator-user-id == 'anonymousUser')]"))
+                                        "$.metadata.labels[?(@.creator-user-hash == '68385f9726ad05c8e551a8d5be5cd821')]"))
                         .willReturn(
                                 okJson(
                                         "{\"metadata\":{\"name\":\"task-fe99716a\",\"uid\":\"uid-1\"}}")));

@@ -4,8 +4,11 @@
       "metadata": {
         "labels": {
           "creator-group-name": "TEST",
-          "creator-user-id": "123",
+          "creator-user-hash": "a665a45920422f9d417e4867efdc4fb8",
           "job-type": "taskmaster"
+        },
+        "annotations": {
+          "creator-user-id": "123"
         },
         "name": "task-123"
       },
@@ -24,11 +27,12 @@
       "metadata": {
         "labels": {
           "creator-group-name": "TEST",
-          "creator-user-id": "124",
+          "creator-user-hash": "6affdae3b3c1aa6aa7689e9b6a7b3225",
           "job-type": "taskmaster"
         },
         "annotations": {
-          "tes-task-name": "align-reads"
+          "tes-task-name": "align-reads",
+          "creator-user-id": "124"
         },
         "name": "task-124"
       },
@@ -47,8 +51,11 @@
       "metadata": {
         "labels": {
           "creator-group-name": "ABC",
-          "creator-user-id": "123",
+          "creator-user-hash": "a665a45920422f9d417e4867efdc4fb8",
           "job-type": "taskmaster"
+        },
+        "annotations": {
+          "creator-user-id": "123"
         },
         "name": "task-125"
       },
@@ -67,8 +74,11 @@
       "metadata": {
         "labels": {
           "creator-group-name": "ABC",
-          "creator-user-id": "124",
+          "creator-user-hash": "6affdae3b3c1aa6aa7689e9b6a7b3225",
           "job-type": "taskmaster"
+        },
+        "annotations": {
+          "creator-user-id": "124"
         },
         "name": "task-126"
       },

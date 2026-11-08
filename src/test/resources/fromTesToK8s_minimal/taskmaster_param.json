@@ -11,12 +11,13 @@
       "kind": "Job",
       "metadata": {
         "annotations": {
+          "creator-user-id": "test-user-id"
         },
         "labels": {
           "job-type": "executor",
           "taskmaster-name": "task-98605447",
           "executor-no": "0",
-          "creator-user-id": "test-user-id"
+          "creator-user-hash": "c95b3f800751698e8f935156112885cc"
         },
         "name": "task-98605447-ex-00"
       },

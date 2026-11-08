@@ -15,8 +15,8 @@ import io.kubernetes.client.openapi.models.V1LimitRangeItem;
 import io.kubernetes.client.openapi.models.V1LimitRangeList;
 import io.kubernetes.client.openapi.models.V1PodList;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
@@ -270,28 +270,25 @@ public class KubernetesClientWrapper {
                 result.getItems().stream()
                         .filter(job -> !isBeingDeleted(job))
                         .collect(Collectors.toList()));
-        if (user.isMemberInNonManagedGroups()) {
-            // if there are groups, where user is a manager and other groups, where user is only a
-            // member
-            // filter the results (as it was not handled by label selector)
-            List<V1Job> filteredJobList = result.getItems();
-            filteredJobList =
-                    filteredJobList.stream()
+        if (user.getLabelSelector() != null) {
+            // the selector only narrows the jobs down: keep those of the groups the user manages
+            // and those the user created, by the annotation with the full ID (the hash label
+            // alone doesn't prove it, and the old label can't be selected for the user)
+            result.setItems(
+                    result.getItems().stream()
                             .filter(
                                     job ->
-                                            user.isGroupManager(
-                                                            job.getMetadata()
-                                                                    .getLabels()
-                                                                    .get(LABEL_GROUPNAME_KEY))
-                                                    || user.getUsername()
-                                                            .equals(
-                                                                    job.getMetadata()
-                                                                            .getLabels()
-                                                                            .get(LABEL_USERID_KEY)))
-                            .collect(Collectors.toList());
-            result.setItems(filteredJobList);
+                                            user.isGroupManager(groupOf(job))
+                                                    || user.isCreatorOf(job.getMetadata()))
+                            .collect(Collectors.toList()));
         }
         return result;
+    }
+
+    /** The group of the job's task, or null */
+    private static String groupOf(V1Job job) {
+        Map<String, String> labels = job.getMetadata().getLabels();
+        return labels == null ? null : labels.get(LABEL_GROUPNAME_KEY);
     }
 
     /**

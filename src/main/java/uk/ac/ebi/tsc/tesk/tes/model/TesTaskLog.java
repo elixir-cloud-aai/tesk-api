@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -39,6 +40,21 @@ public class TesTaskLog   {
   @JsonProperty("system_logs")
   @Valid
   private List<String> systemLogs = null;
+
+  // non-standard, internal only (not serialized): USER_ID in metadata is the value of the old label
+  // creator-user-id of a task created before the label creator-user-hash, not the full user ID
+  @JsonIgnore
+  private boolean userIdFromLegacyLabel = false;
+
+  @JsonIgnore
+  public boolean isUserIdFromLegacyLabel() {
+    return userIdFromLegacyLabel;
+  }
+
+  @JsonIgnore
+  public void setUserIdFromLegacyLabel(boolean userIdFromLegacyLabel) {
+    this.userIdFromLegacyLabel = userIdFromLegacyLabel;
+  }
 
   public TesTaskLog logs(List<TesExecutorLog> logs) {
     this.logs = logs;

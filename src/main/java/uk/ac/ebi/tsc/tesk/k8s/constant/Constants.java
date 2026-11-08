@@ -70,8 +70,21 @@ public class Constants {
     /** Value of the label, that holds executor's Cancelled state */
     public static final String LABEL_TASKSTATE_VALUE_CANC = "Cancelled";
 
-    /** Key of the label, that holds user id */
+    /**
+     * Key of the old label with the creating user's ID, with {@code @} replaced by {@code _}. New
+     * tasks don't get it; it is read for tasks created before {@link #LABEL_USERHASH_KEY} (see
+     * {@code tesk.api.authorisation.legacy-user-labels})
+     */
     public static final String LABEL_USERID_KEY = "creator-user-id";
+
+    /**
+     * Key of the label with a hash of the creating user's full ID (see {@link
+     * uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels}), by which the user's tasks are selected
+     */
+    public static final String LABEL_USERHASH_KEY = "creator-user-hash";
+
+    /** Key of the annotation with the creating user's full ID */
+    public static final String ANN_USERID_KEY = "creator-user-id";
 
     /** Key of the label, that holds user's group name */
     public static final String LABEL_GROUPNAME_KEY = "creator-group-name";

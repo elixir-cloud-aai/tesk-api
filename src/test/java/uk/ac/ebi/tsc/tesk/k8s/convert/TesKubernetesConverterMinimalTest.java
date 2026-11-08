@@ -130,7 +130,12 @@ public class TesKubernetesConverterMinimalTest {
                 .startsWith("echo");
 
         assertThat(outputJob.getMetadata().getLabels().get("job-type"), is("taskmaster"));
-        assertThat(outputJob.getMetadata().getLabels().get("creator-user-id"), is("test-user-id"));
+        assertThat(
+                outputJob.getMetadata().getLabels().get("creator-user-hash"),
+                is("c95b3f800751698e8f935156112885cc"));
+        assertThat(
+                outputJob.getMetadata().getAnnotations().get("creator-user-id"),
+                is("test-user-id"));
         assertThat(outputJob.getMetadata().getLabels().get("creator-group-name"), is("ABC"));
 
         Resource outputJobFile = new ClassPathResource("fromTesToK8s_minimal/job.json");
@@ -194,7 +199,7 @@ public class TesKubernetesConverterMinimalTest {
         taskMasterInputJson.extractingJsonPathNumberValue("volumes.size()").isEqualTo(0);
         taskMasterInputJson
                 .extractingJsonPathMapValue("executors[0].metadata.annotations")
-                .isEmpty();
+                .containsOnlyKeys("creator-user-id");
         taskMasterInputJson
                 .extractingJsonPathArrayValue("executors[*].metadata.labels['job-type']")
                 .containsOnly("executor")
@@ -309,6 +314,43 @@ public class TesKubernetesConverterMinimalTest {
         TesTask outputTask =
                 this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), true);
         assertThat(outputTask, CoreMatchers.is(expectedTask));
+    }
+
+    /** Tasks with the hash label: the full ID from the annotation (issue #119) */
+    @Test
+    public void fromK8sToTask_creatorFromAnnotation() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
+        V1ObjectMeta metadata = taskBuilder.getTask().getTaskmaster().getJob().getMetadata();
+        metadata.getLabels().remove(Constants.LABEL_USERID_KEY);
+        CreatorLabels.put(metadata, "user@example.org");
+        TesTask outputTask =
+                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        assertThat(
+                outputTask.getLogs().get(0).getMetadata().get("USER_ID"), is("user@example.org"));
+        assertThat(outputTask.getLogs().get(0).isUserIdFromLegacyLabel(), is(false));
+    }
+
+    /** An annotation that doesn't match the hash label gives no creator (issue #119) */
+    @Test
+    public void fromK8sToTask_creatorAnnotationNotMatchingHash() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
+        V1ObjectMeta metadata = taskBuilder.getTask().getTaskmaster().getJob().getMetadata();
+        CreatorLabels.put(metadata, "user@example.org");
+        metadata.putAnnotationsItem(Constants.ANN_USERID_KEY, "user_example.org");
+        TesTask outputTask =
+                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        assertNull(outputTask.getLogs().get(0).getMetadata().get("USER_ID"));
+        assertThat(outputTask.getLogs().get(0).isUserIdFromLegacyLabel(), is(false));
+    }
+
+    /** Tasks with only the old label show its value, marked as such (issue #119) */
+    @Test
+    public void fromK8sToTask_creatorFromLegacyLabel() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
+        TesTask outputTask =
+                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        assertThat(outputTask.getLogs().get(0).getMetadata().get("USER_ID"), is("TEST_USER"));
+        assertThat(outputTask.getLogs().get(0).isUserIdFromLegacyLabel(), is(true));
     }
 
     @Test

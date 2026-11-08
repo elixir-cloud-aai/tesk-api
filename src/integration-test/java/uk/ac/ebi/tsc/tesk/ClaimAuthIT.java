@@ -151,7 +151,7 @@ public class ClaimAuthIT {
                                         "$.metadata.labels['creator-group-name']", absent()))
                         .withRequestBody(
                                 matchingJsonPath(
-                                        "$.metadata.labels[?(@.creator-user-id == 'user_example.org')]"))
+                                        "$.metadata.labels[?(@.creator-user-hash == 'd159ef624ed86697b4f1f3ff086aacdd')]"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
         mockKubernetes.givenThat(
                 WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
@@ -217,11 +217,16 @@ public class ClaimAuthIT {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-user-id%3Duser_example.org%2C%21creator-group-name")
-                        .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
+                                        + "%2Ccreator-user-hash%3Dd159ef624ed86697b4f1f3ff086aacdd%2C%21creator-group-name")
+                        .willReturn(
+                                okJson(
+                                        MockUtil.jobList(
+                                                MockUtil.taskmaster(null, "user@example.org"),
+                                                MockUtil.taskmaster(null, "user_example.org")))));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
-        listTasks().andExpect(status().isOk()).andExpect(jsonPath("$.tasks.length()").value(4));
+        // the own task only, also if Kubernetes returned others
+        listTasks().andExpect(status().isOk()).andExpect(jsonPath("$.tasks.length()").value(1));
     }
 
     /** Admins still list all tasks, with or without the claim */
@@ -247,18 +252,18 @@ public class ClaimAuthIT {
             mockKubernetes.givenThat(
                     WireMock.get(
                                     "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                            + "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-id%3D123")
+                                            + "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-hash%3Da665a45920422f9d417e4867efdc4fb8")
                             .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
             MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
-            listTasks().andExpect(status().isOk()).andExpect(jsonPath("$.tasks.length()").value(4));
+            listTasks().andExpect(status().isOk()).andExpect(jsonPath("$.tasks.length()").value(2));
         }
     }
 
     @Test
     public void claimUser_getOwnTask() throws Exception {
         userInfo("user@example.org", "https://refeds.org/assurance/IAP/medium");
-        mockUngroupedTask("user_example.org");
+        mockUngroupedTask("user@example.org");
 
         getTask().andExpect(status().isOk());
     }
@@ -283,7 +288,7 @@ public class ClaimAuthIT {
     @Test
     public void claimAbsent_getOwnTask() throws Exception {
         userInfo("user@example.org", null);
-        mockUngroupedTask("user_example.org");
+        mockUngroupedTask("user@example.org");
 
         getTask().andExpect(status().isForbidden());
     }
@@ -291,7 +296,7 @@ public class ClaimAuthIT {
     @Test
     public void superAdmin_getUngroupedTask() throws Exception {
         userInfo("123", null, "GA4GH:GA4GH-CAP:EBI:ADMIN");
-        mockUngroupedTask("user_example.org");
+        mockUngroupedTask("user@example.org");
 
         getTask().andExpect(status().isOk());
     }
@@ -300,7 +305,7 @@ public class ClaimAuthIT {
     @Test
     public void claimUser_cancelOwnTask() throws Exception {
         userInfo("user@example.org", "https://refeds.org/assurance/IAP/medium");
-        mockUngroupedTask("user_example.org");
+        mockUngroupedTask("user@example.org");
 
         cancelTask()
                 .andExpect(status().isBadRequest())
@@ -353,7 +358,7 @@ public class ClaimAuthIT {
     @Test
     public void claimWrongValue_getOwnTask() throws Exception {
         userInfo("user@example.org", "https://refeds.org/assurance/IAP/low");
-        mockUngroupedTask("user_example.org");
+        mockUngroupedTask("user@example.org");
 
         getTask().andExpect(status().isForbidden());
     }
@@ -362,7 +367,7 @@ public class ClaimAuthIT {
     public void claimAbsentOrWrong_cancelOwnTask() throws Exception {
         for (String assurance : new String[] {null, "https://refeds.org/assurance/IAP/low"}) {
             userInfo("user@example.org", assurance);
-            mockUngroupedTask("user_example.org");
+            mockUngroupedTask("user@example.org");
 
             cancelTask().andExpect(status().isForbidden());
         }
@@ -372,7 +377,7 @@ public class ClaimAuthIT {
     @Test
     public void superAdmin_cancelUngroupedTask() throws Exception {
         userInfo("123", null, "GA4GH:GA4GH-CAP:EBI", "GA4GH:GA4GH-CAP:EBI:ADMIN");
-        mockUngroupedTask("user_example.org");
+        mockUngroupedTask("user@example.org");
 
         cancelTask()
                 .andExpect(status().isBadRequest())

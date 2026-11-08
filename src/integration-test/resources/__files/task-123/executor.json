@@ -3,7 +3,7 @@
     {
       "metadata": {
         "labels": {
-          "creator-user-id": "123",
+          "creator-user-hash": "a665a45920422f9d417e4867efdc4fb8",
           "job-type": "executor",
           "taskmaster-name": "task-123"
         },
