@@ -16,10 +16,10 @@ Environment variable | Meaning
 --- | ---
 `SPRING_PROFILES_ACTIVE` | `noauth` (default): no authentication or authorisation. `auth`: both on; see [Access control](access-control.md).
 `TESK_API_K8S_NAMESPACE` | Kubernetes namespace of all the jobs that TESK API creates. Default: `default`.
-`TESK_API_TASKMASTER_IMAGE_NAME` | Image of the taskmaster. Default: `eu.gcr.io/tes-wes/taskmaster`.
-`TESK_API_TASKMASTER_IMAGE_VERSION` | Tag of the taskmaster image. Default: `v0.10.0`.
-`TESK_API_TASKMASTER_FILER_IMAGE_NAME` | Image of the filer, passed on to the taskmaster, which creates the inputs and outputs filers with it. Default: `eu.gcr.io/tes-wes/filer`.
-`TESK_API_TASKMASTER_FILER_IMAGE_VERSION` | Tag of the filer image. Default: `v0.10.0`.
+`TESK_API_TASKMASTER_IMAGE_NAME` | Image of the taskmaster. Default: `docker.io/elixircloud/tesk-core-taskmaster`.
+`TESK_API_TASKMASTER_IMAGE_VERSION` | Tag of the taskmaster image. Default: `0.11.0`.
+`TESK_API_TASKMASTER_FILER_IMAGE_NAME` | Image of the filer, passed on to the taskmaster, which creates the inputs and outputs filers with it. Default: `docker.io/elixircloud/tesk-core-filer`.
+`TESK_API_TASKMASTER_FILER_IMAGE_VERSION` | Tag of the filer image. Default: `0.11.0`.
 `TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME` | Service account of the taskmaster jobs; it needs the rights to manage jobs, pods and persistent volume claims (e.g., the built-in `edit` role). Default: `default`.
 `TESK_API_TASKMASTER_DEBUG` | `true`: more verbose taskmaster logs (in the `FULL` view of a task). Default: `false`.
 `TESK_API_TASKMASTER_FTP_SECRET_NAME` | Name of a Kubernetes secret with the credentials of an FTP account, passed to the taskmaster as environment variables, for uploading outputs to that FTP server. Default: none.
@@ -46,4 +46,4 @@ organisation, contact, documentation URL, environment and storage locations
 are yours to fill in. Service info is public by default, also with the `auth`
 profile; if it names anything that only your users should see, set
 `TESK_API_SERVICE_INFO_PUBLIC` to `false` (in the Helm chart of TESK:
-`auth.service_info_public`).
+`auth.serviceInfoPublic`).

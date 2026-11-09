@@ -1,8 +1,11 @@
 # Upgrading
 
-## To the next release
+## To 1.2.0
 
-Changes since 1.2.0 that clients or deployments may notice:
+From 1.1.0, deployments may have to change their configuration, the rights
+of TESK API in Kubernetes and the order of the upgrade, and clients may
+notice changed answers: read all of the items below before you upgrade.
+What's new:
 
 - **Creator labels.** New tasks record their creator in the label
   `creator-user-hash` (a hash of the user's `sub`) and the annotation
@@ -18,7 +21,8 @@ Changes since 1.2.0 that clients or deployments may notice:
     - Upgrade when no tasks run, or let running tasks end first; if you want
       their creators to keep access for a while, set
       `TESK_API_AUTHORISATION_LEGACY_USER_LABELS=true` (the Helm chart of
-      TESK has no value for it yet). Turn it off again once the old tasks
+      TESK has no value for it; set it as an environment variable of the
+      deployment). Turn it off again once the old tasks
       are no longer needed (e.g. after the taskmaster's `TASK_TTL_SECONDS`).
     - List the old tasks with `kubectl get jobs -n <namespace> -l
       'job-type=taskmaster,creator-user-id,!creator-user-hash'`. The old
@@ -62,11 +66,12 @@ Changes since 1.2.0 that clients or deployments may notice:
   the task, as `GET` does, so a task whose executor failed while the
   taskmaster still runs can't be cancelled any more (`400 Bad Request`).
 - **Upgrade order.** Upgrade TESK API first, then the taskmaster
-  ([tesk-core](https://github.com/elixir-cloud-aai/tesk-core)) to the release
-  that keeps failed jobs (not released yet; see
+  ([tesk-core](https://github.com/elixir-cloud-aai/tesk-core)) to v0.11.0 or
+  later, which keeps failed jobs (see
   [tesk-core#98](https://github.com/elixir-cloud-aai/tesk-core/issues/98)).
-  Tasks running during the upgrade keep the taskmaster they were started
-  with. While only one of them is upgraded:
+  The Helm chart of TESK upgrades both at once (from chart 0.3.0, which sets
+  both versions); tasks running during the upgrade still keep the taskmaster
+  they were started with. While only one of them is upgraded:
     - This TESK API with an older taskmaster reports a task whose last
       executor's job the taskmaster deleted (because its pod couldn't pull
       its image) as `SYSTEM_ERROR`, instead of `COMPLETE`.
@@ -115,8 +120,8 @@ Changes since 1.2.0 that clients or deployments may notice:
   and `TESK_API_AUTHORISATION_CLAIM_VALUES`; see [Authorisation without
   groups](access-control.md#authorisation-without-groups)). It is off by
   default, so nothing changes unless you turn it on; read its security
-  implications first. The Helm chart of TESK doesn't set these yet; set them
-  as environment variables of the deployment.
+  implications first. The Helm chart of TESK sets them with `auth.claim`
+  (`enabled`, `name` and `values`; from chart 0.3.0).
 - **Non-root image.** The image runs as the user `tesk` (UID 1000, group 0)
   instead of `root`, with the home directory `/home/tesk` (see
   [Deployment](deployment.md#image)). The Helm chart of TESK already runs it
@@ -148,12 +153,6 @@ Changes since 1.2.0 that clients or deployments may notice:
   `SYSTEM_ERROR` until Kubernetes removed the job. ConfigMaps of tasks
   created before the upgrade have no owner and stay until you delete them
   (e.g. those whose taskmaster's job no longer exists).
-
-## To 1.2.0
-
-From 1.1.0, only deployments that use the Swagger UI have to change their
-configuration. What's new:
-
 - **Swagger UI off by default.** TESK API no longer serves the Swagger UI and
   its static resources and configuration (`/swagger-resources`) unless
   `TESK_API_SWAGGER_UI_ENABLED` is `true`; the root path (`/`) then redirects
@@ -161,7 +160,8 @@ configuration. What's new:
   Found`. The API description (`/v2/api-docs`) is served either way. If you or
   your users rely on the Swagger UI, e.g. for its built-in OpenID Connect
   client, set the variable in your deployment (see [API](api.md#swagger-ui));
-  the Helm chart of TESK has no value for it yet. Turning it on serves the
+  the Helm chart of TESK sets it with `tesk.swaggerUi.enabled` (from chart
+  0.3.0). Turning it on serves the
   Swagger UI and its static resources publicly, also with the `auth` profile:
   turn it on only where it is needed.
 - **Swagger UI client secret.** The Swagger UI is a public client: TESK API
@@ -178,13 +178,20 @@ configuration. What's new:
   default) keeps `GET` and `HEAD /service-info` public with the `auth`
   profile, as before; set it to `false` to require a valid token for them (see
   [Configuration](configuration.md#service-info)). The Helm chart of TESK sets
-  it with `auth.service_info_public`, which needs TESK API 1.2.0 or later.
+  it with `auth.serviceInfoPublic` (from chart 0.3.0), which needs TESK API
+  1.2.0 or later.
 - **Image.** The image is built from source on Eclipse Temurin 8 (Ubuntu)
   instead of the discontinued `openjdk:8-jdk-alpine`. Releases are published
   as `elixircloud/tesk-api:X.Y.Z` (and `latest`), signed with Sigstore and
   scanned before they are published; see [Deployment](deployment.md#image).
   If you mount files into the container or run it with a fixed user ID, check
   that these still fit the new base image.
+- **Taskmaster and filer images.** Without other settings, TESK API runs
+  the taskmaster `docker.io/elixircloud/tesk-core-taskmaster:0.11.0` and the
+  filer `docker.io/elixircloud/tesk-core-filer:0.11.0`, the images that
+  tesk-core publishes, instead of `eu.gcr.io/tes-wes/taskmaster:v0.10.0` and
+  `eu.gcr.io/tes-wes/filer:v0.10.0` (see
+  [Configuration](configuration.md)). The Helm chart of TESK sets its own.
 - **Service info version.** The built-in `service-info.yaml` reports version
   `1.2.0`. If you use your own file (`TESK_API_SERVICE_INFO_LOCATION`), update
   its `version` yourself.
