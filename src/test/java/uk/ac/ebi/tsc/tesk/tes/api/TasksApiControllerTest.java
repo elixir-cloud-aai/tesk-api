@@ -286,6 +286,37 @@ public class TasksApiControllerTest {
         }
     }
 
+    /**
+     * CPU cores, RAM and disk must be positive: zero and negative numbers are refused before
+     * Kubernetes is asked (issue #128)
+     */
+    @Test
+    public void createTask_invalid_nonPositiveResources() throws Exception {
+        String[][] cases =
+                new String[][] {
+                    {"cpu_cores_0.json", "cpu"},
+                    {"cpu_cores_minus_1.json", "cpu"},
+                    {"ram_gb_0.json", "ram"},
+                    {"ram_gb_minus_1.json", "ram"},
+                    {"disk_gb_0.json", "disk"},
+                    {"disk_gb_minus_5.json", "disk"}
+                };
+        for (String[] c : cases) {
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .header("Authorization", "Bearer BAR")
+                                    .content(
+                                            getFileContentFromResources(
+                                                    "invalid_tasks/resources/" + c[0]))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString(c[1])));
+        }
+        verify(this.tesService, never()).createTask(any(), any());
+    }
+
     /** Trailing zeros don't count as decimals */
     @Test
     public void createTask_valid_cpuCoresTrailingZeros() throws Exception {
