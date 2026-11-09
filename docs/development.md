@@ -124,7 +124,7 @@ Commits](https://www.conventionalcommits.org/) format, at most 50
 characters). For a release, `main` is moved forward to a commit of `dev`.
 Pushing a signed, annotated version tag runs the release workflow
 (`.github/workflows/release.yml`), which publishes the image to Docker Hub as
-`<org>/tesk-api`:
+`<org>/tesk-api` and creates the GitHub release:
 
 Tag | Image tags | Example
 --- | --- | ---
@@ -137,7 +137,19 @@ the versions must match the tag, so set them in a pull request first:
 - `pom.xml`: `X.Y.Z`, also for the pre-releases of `X.Y.Z` (e.g., `1.2.0` for
   `v1.2.0rc1`);
 - `CITATION.cff`: the tag without `v` (e.g., `1.2.0rc1` for `v1.2.0rc1`),
-  with `date-released`.
+  with `date-released`;
+- `docs/releases/<version>.md`, with the version as in `CITATION.cff`
+  (e.g., `docs/releases/1.2.0rc1.md`): the curated release notes, in the
+  organization's format: an intro paragraph saying what the release brings,
+  with a link to the upgrade notes if operators or clients must act, then
+  the sections `## Breaking changes`, `## Features`, `## Security`,
+  `## Fixes`, `## Documentation` and `## Maintenance` (in this order, empty
+  ones left out), holding bullets only, each ending with its issue and pull
+  request numbers, e.g., `(#12, #34)`. Links must be absolute, as the notes
+  are published on GitHub. The release workflow adds GitHub's generated
+  notes; the shared action
+  [`publish-release`](https://github.com/elixir-cloud-aai/.github/tree/main/actions/publish-release)
+  describes the format and its checks.
 
 `latest` goes by tags, so if a release fails, follow it with a higher version.
 Only admins can create release tags, and nobody can move or delete them (tag
@@ -146,7 +158,26 @@ rulesets). Pushing and publishing the image each wait for an approval in the
 before it is tagged; images are signed with Sigstore and carry provenance
 attestations.
 
-After publishing, the workflow makes one `POST /repositories/{id}/builds` to
+Once the image is published, the job `Publish release` creates the GitHub
+release of the tag (no manual step): the curated notes of the tagged commit,
+then GitHub's generated notes under `## Commits` (without their
+`## What's Changed` header, with "New Contributors"), and GitHub's
+`**Full Changelog**` line last. Versions below 1.0.0 and `a`, `b` and `rc`
+versions are pre-releases. The job needs no approval and no secrets, only
+`contents: write`. `Prepare release` runs the same checks first (the notes,
+the tag and its commit, published releases of the tag), so that a release
+with missing or malformed notes fails before anything is published. It can't
+see draft releases, so delete any draft of the tag before you push the tag.
+If only `Publish release` fails, re-run the failed jobs (not all jobs: once
+the GitHub release exists, `Prepare release` fails); a re-run passes without
+changes if the earlier attempt created the release after all. `Publish
+release` runs one release at a time, so that `latest` is set in order; if
+several tags are released at once, GitHub can cancel a waiting run of the
+job: re-run it the same way. Releases are
+never edited afterwards: fix mistakes in the notes of the next release.
+
+After publishing the image (without waiting for the GitHub release), the
+workflow makes one `POST /repositories/{id}/builds` to
 [Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade), which notifies the
 deployments that subscribed to upgrades, also for pre-releases, if they
 subscribed to those. This needs Pubgrade's publish mode

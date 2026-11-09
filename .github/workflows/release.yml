@@ -1,24 +1,33 @@
 # Release when a version tag (`vX.Y.Z`, or `vX.Y.ZaN`, `vX.Y.ZbN`, `vX.Y.ZrcN`
 # for pre-releases) is pushed: check the tag (signed, annotated, on `main`), the
-# versions in `pom.xml` and `CITATION.cff`, and that CI passed for its commit,
-# build the image and push it by digest, untagged (`push`), scan exactly that
-# digest in a job of its own, without the release credentials and signing
-# identity (`scan`), and only then attest its build provenance, sign it
-# (Sigstore keyless signing) and tag it `X.Y.Z` (and `latest`, for the highest
-# stable release; `publish`). Tags of other releases are never touched. Finally,
-# tell Pubgrade about the image (`notify`), if it is configured. See "Versioning
-# and releases" in `docs/development.md`.
+# versions in `pom.xml` and `CITATION.cff`, the curated release notes
+# (`docs/releases/<version>.md`), and that CI passed for its commit, build the
+# image and push it by digest, untagged (`push`), scan exactly that digest in a
+# job of its own, without the release credentials and signing identity
+# (`scan`), and only then attest its build provenance, sign it (Sigstore
+# keyless signing) and tag it `X.Y.Z` (and `latest`, for the highest stable
+# release; `release-image`). Tags of other releases are never touched. Then
+# create the GitHub release, with the curated notes followed by GitHub's
+# generated notes (`publish`, shared action
+# `elixir-cloud-aai/.github/actions/publish-release`), and, independently of
+# it, tell Pubgrade about the image (`notify`), if it is configured. See
+# "Versioning and releases" in `docs/development.md`.
 #
-# `push` and `publish` each need approval in the `release` environment (required
-# reviewer), and so does `notify` if Pubgrade is configured.
+# `push` and `release-image` each need approval in the `release` environment
+# (required reviewer), and so does `notify` if Pubgrade is configured.
 #
 # Re-running failed jobs reuses the digest already pushed. Re-running all jobs
-# builds a new digest, which `publish` refuses, before attesting and signing
-# it, if `X.Y.Z` already points to another one: published versions never
-# change. Only admins can create `v*` tags, and nobody can move or delete them
-# (tag rulesets of the repository). `publish` runs one release at a time; a
-# newer release waiting for it can cancel an older one that waits too (one
-# pending job per concurrency group): re-run the failed jobs of that run.
+# builds a new digest, which `release-image` refuses, before attesting and
+# signing it, if `X.Y.Z` already points to another one: published versions
+# never change. Only admins can create `v*` tags, and nobody can move or delete
+# them (tag rulesets of the repository). `release-image` and `publish` each run
+# one release at a time; a newer release waiting for one of them can cancel an
+# older one that waits too (one pending job per concurrency group): re-run the
+# failed jobs of that run.
+# `prepare` fails if a published release of the tag exists already (it can't
+# see drafts); `publish` fails on a draft of the tag, and on a published
+# release unless an earlier attempt created it (same curated notes, title and
+# pre-release flag), so re-run only the failed jobs.
 
 name: Release
 
@@ -115,6 +124,15 @@ jobs:
               echo "::error::Version in CITATION.cff is '${cff}', expected '${VERSION}'"
               exit 1
           fi
+      # The GitHub release (`publish`) starts with the curated notes of the
+      # tagged commit, so they must exist and be in the organization's format
+      # before anything is published
+      - name: Check release notes
+        uses: elixir-cloud-aai/.github/actions/publish-release@31f22fccc1f3c597ed7c1d1f75b2f85522155348 # v1.1.0
+        with:
+          notes: docs/releases/${{ steps.version.outputs.version }}.md
+          commit: ${{ steps.version.outputs.sha }}
+          check-only: "true"
       # The checks above don't run the tests: require a successful run of the
       # CI workflow for a push of the release commit (to `dev`, before it moved
       # to `main`); runs for pull requests test merge commits, not the commit
@@ -134,8 +152,8 @@ jobs:
 
   # Builds the image of the release commit once and pushes it by digest only
   # (untagged, with SBOM and provenance attestations), for `scan` to scan and
-  # `publish` to sign and tag. Digests of runs that fail are never signed or
-  # tagged, but stay on Docker Hub, untagged
+  # `release-image` to sign and tag. Digests of runs that fail are never signed
+  # or tagged, but stay on Docker Hub, untagged
   push:
     name: Push release image
     needs: prepare
@@ -156,8 +174,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       # OCI labels with the version, commit and source; `tags` only sets the
-      # version label (the image is tagged by digest in `publish`, after the
-      # scan)
+      # version label (the image is tagged by digest in `release-image`, after
+      # the scan)
       - name: Generate image labels
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -184,8 +202,9 @@ jobs:
   # Trivy (shared action `elixir-cloud-aai/.github/actions/scan-image`; fails on
   # fixable critical and high vulnerabilities, except those accepted in
   # `.trivyignore.yaml`), so that vulnerabilities published since CI scanned the
-  # commit block the release. Kept apart from `push` and `publish`, so that
-  # Trivy never runs next to the Docker Hub credentials and the signing identity
+  # commit block the release. Kept apart from `push` and `release-image`, so
+  # that Trivy never runs next to the Docker Hub credentials and the signing
+  # identity
   scan:
     name: Scan release image
     needs: [prepare, push]
@@ -214,8 +233,8 @@ jobs:
           category: release
           upload: "false"
 
-  publish:
-    name: Publish release image
+  release-image:
+    name: Release image
     needs: [prepare, push, scan]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -307,8 +326,40 @@ jobs:
               fi
           done
 
+  # Creates the GitHub release of the tag once the image is published: the
+  # curated notes of the tagged commit (`docs/releases/<version>.md`), then
+  # GitHub's generated notes, with the `**Full Changelog**` line last; a
+  # pre-release for versions below 1.0.0 and `a`, `b` and `rc` versions. No
+  # environment: it needs no secrets, only `contents: write`. The tag must still
+  # point to the release commit. Fails on a draft of the tag, and on a published
+  # release unless an earlier attempt of this job created it (then it passes
+  # without changes). One at a time, so that `latest` is decided in order; a
+  # cancelled pending run (see the header) is re-run like a failed one
+  publish:
+    name: Publish release
+    needs: [prepare, release-image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: ${{ github.workflow }}-publish-release
+      cancel-in-progress: false
+    permissions:
+      contents: write # create the release
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.prepare.outputs.sha }}
+      - name: Create release
+        uses: elixir-cloud-aai/.github/actions/publish-release@31f22fccc1f3c597ed7c1d1f75b2f85522155348 # v1.1.0
+        with:
+          notes: docs/releases/${{ needs.prepare.outputs.version }}.md
+          commit: ${{ needs.prepare.outputs.sha }}
+
   # One call to Pubgrade (publish mode, elixir-cloud-aai/Pubgrade#33), which
-  # notifies the subscribed deployments. No retries: a failed run says so, and
+  # notifies the subscribed deployments of the published image; it doesn't wait
+  # for the GitHub release (`publish`). No retries: a failed run says so, and
   # re-running this job sends it again. The token is a secret of the `release`
   # environment, like the other release credentials, so this job needs an
   # approval there, too. The job only runs if the variable `PUBGRADE_URL` is
@@ -320,7 +371,7 @@ jobs:
   # `docs/development.md` for where to set them.
   notify:
     name: Notify Pubgrade
-    needs: [prepare, publish]
+    needs: [prepare, release-image]
     if: vars.PUBGRADE_URL != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
