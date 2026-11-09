@@ -194,8 +194,7 @@ public class ElixirPrincipalExtractorTest {
                 new ElixirPrincipalExtractor(
                         new GroupNamesSecurityExtractor("groupNames", "whatever"), properties);
         User exact =
-                userWithGroups(
-                        extractor, "a+b(c)*\\E:BASE:TEST$x", "a+b(c)*\\E:BASE:XYZ:AD.MIN$x");
+                userWithGroups(extractor, "a+b(c)*\\E:BASE:TEST$x", "a+b(c)*\\E:BASE:XYZ:AD.MIN$x");
         assertThat(exact.isGroupMember("TEST"), is(true));
         assertThat(exact.isGroupManager("XYZ"), is(true));
         User near =
