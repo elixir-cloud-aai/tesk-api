@@ -169,13 +169,14 @@ class TaskStateResolverTest {
                             ANY,
                             ANY,
                             TesState.SYSTEM_ERROR),
-                    // Taskmaster still new, pending or running
+                    // Taskmaster still pending, new (no other jobs yet) or running
+                    new Row(NOT_CANCELLED, of(JobState.PENDING), ANY, ANY, ANY, TesState.QUEUED),
                     new Row(
                             NOT_CANCELLED,
-                            of(JobState.NEW, JobState.PENDING),
-                            ANY,
-                            ANY,
-                            ANY,
+                            of(JobState.NEW),
+                            of(JobState.ABSENT),
+                            of(JobState.ABSENT),
+                            of(JobState.ABSENT),
                             TesState.QUEUED),
                     new Row(
                             NOT_CANCELLED,
@@ -204,7 +205,9 @@ class TaskStateResolverTest {
                             ANY,
                             ANY,
                             ANY,
-                            TesState.RUNNING));
+                            TesState.RUNNING),
+                    // A taskmaster's job without pods but with other jobs of the task isn't new
+                    new Row(NOT_CANCELLED, of(JobState.NEW), ANY, ANY, ANY, TesState.SYSTEM_ERROR));
 
     static Stream<Arguments> combinations() {
         List<Arguments> combinations = new ArrayList<>();
@@ -378,7 +381,10 @@ class TaskStateResolverTest {
         assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.RUNNING);
     }
 
-    /** A taskmaster's job without any status yet, just created, is queued (issue #126). */
+    /**
+     * A taskmaster's job without a status object at all (the state NEW of the table has an empty
+     * one), just created, is queued (issue #126).
+     */
     @Test
     void newTaskmasterWithoutStatusIsQueued() {
         Task task = new Task(new Job(new V1Job().metadata(new V1ObjectMeta().name(TASK))));
@@ -397,6 +403,17 @@ class TaskStateResolverTest {
                         new V1Pod()
                                 .metadata(new V1ObjectMeta().name(TASK + "-pod"))
                                 .status(new V1PodStatus().phase("Running")));
+        assertThat(TaskStateResolver.resolve(task, () -> 1)).isEqualTo(TesState.SYSTEM_ERROR);
+    }
+
+    /**
+     * A taskmaster's job without pods but with failed ones counted (e.g. between retries, once the
+     * failed pods are gone) isn't new: a system error, as before.
+     */
+    @Test
+    void failedCountWithoutPodsIsNotNew() {
+        Task task = task(false, JobState.NEW, JobState.ABSENT, JobState.ABSENT, JobState.ABSENT);
+        task.getTaskmaster().getJob().getStatus().failed(1);
         assertThat(TaskStateResolver.resolve(task, () -> 1)).isEqualTo(TesState.SYSTEM_ERROR);
     }
 

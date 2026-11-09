@@ -125,8 +125,13 @@ What's new:
   has created the pod of its taskmaster's job, a task is `QUEUED`; before, it
   was `SYSTEM_ERROR` for that time, so that clients that polled a new task
   at once could take it for failed (see [Getting
-  tasks](index.md#getting-tasks)). On a test cluster this took up to 4.5
-  seconds with 50 tasks created at once.
+  tasks](index.md#getting-tasks)). In one test on minikube, with 50 tasks
+  created at once, this took about 4.5 seconds. A task whose taskmaster pod
+  Kubernetes can't create (e.g. a used-up `ResourceQuota`, or a pod that an
+  admission policy refuses) is `QUEUED` too now, instead of `SYSTEM_ERROR`,
+  until the cause goes away or someone deletes the job: if you alert on
+  `SYSTEM_ERROR` for such problems, watch the jobs' `FailedCreate` events
+  instead.
 - **Jobs without labels.** `GET /tasks/{id}` and `POST /tasks/{id}:cancel`
   (the requests that read a single task) answer `404 Not Found` for the name
   of a job without labels in the namespace, as for any job that isn't a
