@@ -96,6 +96,14 @@ public final class TaskStateResolver {
             }
             return TesState.RUNNING;
         }
+        // Just created: until the job controller has synced the job, it has
+        // no counts and no pods, and the task has no other jobs (issue #126)
+        if (!hasFailedPods(taskmasterJob)
+                && !taskmaster.hasPods()
+                && executors.isEmpty()
+                && !outputFiler.isPresent()) {
+            return TesState.QUEUED;
+        }
         return TesState.SYSTEM_ERROR;
     }
 

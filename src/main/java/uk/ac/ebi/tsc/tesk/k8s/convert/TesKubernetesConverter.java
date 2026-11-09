@@ -350,11 +350,13 @@ public class TesKubernetesConverter {
         // TODO - better return controller startTime, when possible (now it behaves as if started,
         // even if it is pending)
         log.setStartTime(
-                Optional.ofNullable(executorJob.getStatus().getStartTime())
+                Optional.ofNullable(executorJob.getStatus())
+                        .map(V1JobStatus::getStartTime)
                         .map(DATE_FORMATTER::print)
                         .orElse(null));
         log.setEndTime(
-                Optional.ofNullable(executorJob.getStatus().getCompletionTime())
+                Optional.ofNullable(executorJob.getStatus())
+                        .map(V1JobStatus::getCompletionTime)
                         .map(DATE_FORMATTER::print)
                         .orElse(null));
         // workaround for py-tes compatibility. py-tes breaks for ExecutorLogs that can unmarshal to
@@ -451,11 +453,13 @@ public class TesKubernetesConverter {
                     "GROUP_NAME", taskMasterJobMetadata.getLabels().get(LABEL_GROUPNAME_KEY));
         }
         log.setStartTime(
-                Optional.ofNullable(taskMasterJob.getStatus().getStartTime())
+                Optional.ofNullable(taskMasterJob.getStatus())
+                        .map(V1JobStatus::getStartTime)
                         .map(DATE_FORMATTER::print)
                         .orElse(null));
         log.setEndTime(
-                Optional.ofNullable(taskMasterJob.getStatus().getCompletionTime())
+                Optional.ofNullable(taskMasterJob.getStatus())
+                        .map(V1JobStatus::getCompletionTime)
                         .map(DATE_FORMATTER::print)
                         .orElse(null));
         for (Job executorJob : taskmasterWithExecutors.getExecutors()) {
@@ -467,7 +471,10 @@ public class TesKubernetesConverter {
 
     public Optional<String> getNameOfFirstRunningPod(V1PodList podList) {
         return podList.getItems().stream()
-                .filter(pod -> "Running".equals(pod.getStatus().getPhase()))
+                .filter(
+                        pod ->
+                                pod.getStatus() != null
+                                        && "Running".equals(pod.getStatus().getPhase()))
                 .findFirst()
                 .map(pod -> pod.getMetadata().getName());
     }

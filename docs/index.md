@@ -102,7 +102,16 @@ applies gives the state:
 6. The taskmaster's job is active: `INITIALIZING` until the first executor's
    job exists, `QUEUED` while a pod of the last executor's job is pending,
    otherwise `RUNNING`.
-7. Otherwise: `SYSTEM_ERROR`.
+7. The taskmaster's job isn't active, has no pods, Kubernetes counts none
+   as failed, and the task has no other jobs: `QUEUED`. This is the case right after the task was
+   created, until Kubernetes' job controller has created the job's pod; on a
+   busy cluster, e.g. when many tasks are created at once, that can take
+   seconds. A task also stays `QUEUED` while Kubernetes can't create that pod
+   at all (e.g. a `ResourceQuota` of the namespace is used up, or an
+   admission policy refuses the pod; see the job's events with `kubectl
+   describe job <task ID>`): if the cause doesn't go away, until someone
+   deletes the job.
+8. Otherwise: `SYSTEM_ERROR`.
 
 A job failed if Kubernetes set its condition `Failed`, or `FailureTarget`,
 which Kubernetes 1.31 and later set first. Without these conditions, an
@@ -132,6 +141,18 @@ The job's label gives the task the state `CANCELED`. A task that has ended,
 by the rules above, can't be cancelled (`400 Bad Request`). The pod's label
 reaches the taskmaster through the Downward API; when the taskmaster sees it,
 it stops the running executor and ends.
+
+If the taskmaster doesn't run yet (its pod is pending, or Kubernetes hasn't
+created it yet), a label on a pod created later wouldn't reach it. TESK API
+then labels the job as cancelled and sets its `parallelism` to 0 and its
+`activeDeadlineSeconds` to 1: Kubernetes creates no more pods for the job,
+removes the ones it has, and fails the job about a second later; it also
+labels any pending pod. The job's label keeps the task `CANCELED`. In tests
+on minikube (Kubernetes 1.28 and 1.34), no taskmaster cancelled this way
+started. A taskmaster whose container is starting at that very moment could
+still start until Kubernetes stops it;
+[tesk-core#132](https://github.com/elixir-cloud-aai/tesk-core/issues/132)
+tracks a check for cancellation in the taskmaster itself.
 
 TESK API checks the state before it labels the job. If the task ends in
 between, for example because an executor fails at that moment, the label

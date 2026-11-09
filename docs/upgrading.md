@@ -121,6 +121,29 @@ What's new:
   them on to Kubernetes and the taskmaster. **A task with `0` for any of
   them, which was accepted before, is now refused**: clients that send `0`
   for "no requirement" need to leave the field out instead.
+- **New tasks are queued.** Right after it was created, until Kubernetes
+  has created the pod of its taskmaster's job, a task is `QUEUED`; before, it
+  was `SYSTEM_ERROR` for that time, so that clients that polled a new task
+  at once could take it for failed (see [Getting
+  tasks](index.md#getting-tasks)). In one test on minikube, with 50 tasks
+  created at once, this took about 4.5 seconds. A task whose taskmaster pod
+  Kubernetes can't create (e.g. a used-up `ResourceQuota`, or a pod that an
+  admission policy refuses) is `QUEUED` too now, instead of `SYSTEM_ERROR`,
+  until the cause goes away or someone deletes the job: if you alert on
+  `SYSTEM_ERROR` for such problems, watch the jobs' `FailedCreate` events
+  instead.
+- **Cancelling tasks that haven't started.** A task whose taskmaster isn't
+  running yet (its pod is pending, or its job has no pod yet) can be
+  cancelled: TESK API labels the job (and a pending pod) as cancelled and
+  sets the job's `parallelism` to 0 and `activeDeadlineSeconds` to 1, so that
+  Kubernetes removes its pods and fails the job (see [Cancelling a
+  task](index.md#cancelling-a-task); this uses `patch` on `jobs`, which TESK
+  API already needs). Before, a task with a pending pod was reported
+  `CANCELED`, but its taskmaster started later all the same; a new task
+  without a pod couldn't be cancelled (`400 Bad Request`). A taskmaster whose
+  container is starting at the very moment of the request could still start
+  until Kubernetes stops it
+  ([tesk-core#132](https://github.com/elixir-cloud-aai/tesk-core/issues/132)).
 - **Jobs without labels.** `GET /tasks/{id}` and `POST /tasks/{id}:cancel`
   (the requests that read a single task) answer `404 Not Found` for the name
   of a job without labels in the namespace, as for any job that isn't a

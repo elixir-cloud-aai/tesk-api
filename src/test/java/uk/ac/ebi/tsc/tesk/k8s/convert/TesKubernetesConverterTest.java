@@ -506,6 +506,29 @@ public class TesKubernetesConverterTest {
         assertThat(outputTask, is(expectedTask));
     }
 
+    /**
+     * Jobs without a status yet (just created, before the job controller synced them) give a task
+     * without start or end times instead of an error (issue #126)
+     */
+    @Test
+    public void fromK8sToTask_jobsWithoutStatus() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        taskBuilder.getTask().getTaskmaster().getJob().setStatus(null);
+        taskBuilder.getTask().getExecutors().forEach(executor -> executor.getJob().setStatus(null));
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
+        assertNull(outputTask.getLogs().get(0).getStartTime());
+        assertNull(outputTask.getLogs().get(0).getEndTime());
+        outputTask
+                .getLogs()
+                .get(0)
+                .getLogs()
+                .forEach(
+                        log -> {
+                            assertNull(log.getStartTime());
+                            assertNull(log.getEndTime());
+                        });
+    }
+
     @Test
     public void fromK8sToTask_cancelled() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider();

@@ -416,9 +416,22 @@ public class TesKubernetesConverterMinimalTest {
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
+    /** A taskmaster's job without counts or pods, just created, is queued (issue #126) */
     @Test
-    public void fromK8sToTask_system_error_no_state() throws IOException {
+    public void fromK8sToTask_queued_new_job() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
+        TesTask expectedTask = this.prepareBaseExpectedTask();
+        expectedTask.setState(TesState.QUEUED);
+        TesTask outputTask =
+                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        assertThat(outputTask, CoreMatchers.is(expectedTask));
+    }
+
+    /** A taskmaster's job with failed pods counted, none active and no condition: an error */
+    @Test
+    public void fromK8sToTask_system_error_failed_pods() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
+        taskBuilder.getTask().getTaskmaster().getJob().getStatus().failed(1);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.SYSTEM_ERROR);
         TesTask outputTask =

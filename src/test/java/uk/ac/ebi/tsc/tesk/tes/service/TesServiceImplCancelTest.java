@@ -38,6 +38,8 @@ class TesServiceImplCancelTest {
 
     private KubernetesClientWrapper client;
     private TesServiceImpl service;
+    private V1Job taskmaster;
+    private V1PodList taskmasterPods;
 
     @BeforeEach
     void setUp() {
@@ -45,7 +47,7 @@ class TesServiceImplCancelTest {
         TesKubernetesConverter converter =
                 new TesKubernetesConverter(null, null, new ObjectMapper(), null, null);
         this.service = new TesServiceImpl(this.client, converter);
-        V1Job taskmaster =
+        this.taskmaster =
                 new V1Job()
                         .metadata(
                                 new V1ObjectMeta()
@@ -61,7 +63,8 @@ class TesServiceImplCancelTest {
                                         .name(TASK + "-pod")
                                         .putLabelsItem("job-name", TASK))
                         .status(new V1PodStatus().phase("Running"));
-        when(this.client.readTaskmasterJob(TASK)).thenReturn(taskmaster);
+        this.taskmasterPods = new V1PodList().addItemsItem(taskmasterPod);
+        when(this.client.readTaskmasterJob(TASK)).thenReturn(this.taskmaster);
         V1Pod executorPod =
                 new V1Pod()
                         .metadata(
@@ -74,7 +77,7 @@ class TesServiceImplCancelTest {
                         invocation -> {
                             V1Job job = invocation.getArgument(0);
                             if (TASK.equals(job.getMetadata().getName())) {
-                                return new V1PodList().addItemsItem(taskmasterPod);
+                                return this.taskmasterPods;
                             }
                             if ((TASK + "-ex-00").equals(job.getMetadata().getName())) {
                                 return new V1PodList().addItemsItem(executorPod);
@@ -82,6 +85,7 @@ class TesServiceImplCancelTest {
                             return new V1PodList().items(Collections.emptyList());
                         });
         when(this.client.getSingleTaskOutputFilerJob(TASK)).thenReturn(Optional.empty());
+        when(this.client.listSingleTaskExecutorJobs(TASK)).thenReturn(new V1JobList());
     }
 
     private static V1JobSpec selector(String jobName) {
@@ -115,6 +119,7 @@ class TesServiceImplCancelTest {
         assertThatThrownBy(() -> this.service.cancelTask(TASK))
                 .isInstanceOf(CancelNotRunningTask.class);
         verify(this.client, never()).labelJobAsCancelled(anyString());
+        verify(this.client, never()).cancelJobBeforeStart(anyString());
         verify(this.client, never()).labelPodAsCancelled(anyString());
     }
 
@@ -139,5 +144,74 @@ class TesServiceImplCancelTest {
         verify(this.client).labelJobAsCancelled(TASK);
         verify(this.client).labelPodAsCancelled(TASK + "-pod");
         verify(this.client, never()).labelPodAsCancelled(TASK + "-ex-00-pod");
+        verify(this.client, never()).cancelJobBeforeStart(anyString());
+    }
+
+    /**
+     * A task whose taskmaster's pod is pending is cancelled before it starts: the pod is labelled,
+     * and the job is labelled and ended, so that the pod is removed (issue #126).
+     */
+    @Test
+    void pendingTaskIsCancelledBeforeStart() {
+        this.taskmasterPods.getItems().get(0).getStatus().phase("Pending");
+        this.service.cancelTask(TASK);
+        verify(this.client).labelPodAsCancelled(TASK + "-pod");
+        verify(this.client).cancelJobBeforeStart(TASK);
+        verify(this.client, never()).labelJobAsCancelled(anyString());
+    }
+
+    /**
+     * The job of a task without a running taskmaster is ended first; a pending pod that can't be
+     * labelled (e.g. gone in between) doesn't fail the request (issue #126).
+     */
+    @Test
+    void pendingPodThatIsGoneIsSkipped() {
+        this.taskmasterPods.getItems().get(0).getStatus().phase("Pending");
+        org.mockito.Mockito.doThrow(
+                        uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException.fromApiException(
+                                new io.kubernetes.client.openapi.ApiException(404, "gone")))
+                .when(this.client)
+                .labelPodAsCancelled(TASK + "-pod");
+        this.service.cancelTask(TASK);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(this.client);
+        order.verify(this.client).cancelJobBeforeStart(TASK);
+        order.verify(this.client).labelPodAsCancelled(TASK + "-pod");
+    }
+
+    /**
+     * Without a running taskmaster, only pending pods are labelled: a pod in another phase (e.g.
+     * Unknown) isn't, but the job is ended all the same.
+     */
+    @Test
+    void podInOtherPhaseIsNotLabelled() {
+        this.taskmasterPods.getItems().get(0).getStatus().phase("Unknown");
+        this.service.cancelTask(TASK);
+        verify(this.client).cancelJobBeforeStart(TASK);
+        verify(this.client, never()).labelPodAsCancelled(anyString());
+    }
+
+    /** A taskmaster's pod without a status yet is neither running nor pending. */
+    @Test
+    void podWithoutStatusIsNotRunning() {
+        this.taskmasterPods.getItems().get(0).setStatus(null);
+        this.service.cancelTask(TASK);
+        verify(this.client).cancelJobBeforeStart(TASK);
+        verify(this.client, never()).labelJobAsCancelled(anyString());
+        verify(this.client, never()).labelPodAsCancelled(anyString());
+    }
+
+    /**
+     * A new task, whose taskmaster's job has no pod yet, is cancelled before it starts: the job is
+     * labelled and ended, so that a pod that the job controller may still create is removed (issue
+     * #126).
+     */
+    @Test
+    void newTaskIsCancelledBeforeStart() {
+        this.taskmaster.status(new V1JobStatus());
+        this.taskmasterPods.setItems(Collections.emptyList());
+        this.service.cancelTask(TASK);
+        verify(this.client).cancelJobBeforeStart(TASK);
+        verify(this.client, never()).labelJobAsCancelled(anyString());
+        verify(this.client, never()).labelPodAsCancelled(anyString());
     }
 }
