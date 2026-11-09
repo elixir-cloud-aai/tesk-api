@@ -117,8 +117,9 @@ Not Found`.
 
 `GET /service-info` describes the service, following the [GA4GH Service
 Info](https://github.com/ga4gh-discovery/ga4gh-service-info) schema: its ID,
-name, type (`org.ga4gh:TES`), organisation, contact and documentation URLs,
-version and the storage locations it supports. The content comes from a YAML
+name, type (`org.ga4gh:TES`, version `1.0.0`: TESK API implements TES
+1.0.0), organisation, contact and documentation URLs, version and the storage
+locations it supports. The content comes from a YAML
 file, set by `TESK_API_SERVICE_INFO_LOCATION` (by default the built-in
 [`service-info.yaml`](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/resources/service-info.yaml)).
 Set it to a file of your deployment, e.g. from a ConfigMap: the built-in one
