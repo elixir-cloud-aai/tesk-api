@@ -102,7 +102,11 @@ applies gives the state:
 6. The taskmaster's job is active: `INITIALIZING` until the first executor's
    job exists, `QUEUED` while a pod of the last executor's job is pending,
    otherwise `RUNNING`.
-7. Otherwise: `SYSTEM_ERROR`.
+7. The taskmaster's job has no pods, and Kubernetes counts none as failed:
+   `QUEUED`. This is the case right after the task was created, until
+   Kubernetes' job controller has created the job's pod; on a busy cluster,
+   e.g. when many tasks are created at once, that can take seconds.
+8. Otherwise: `SYSTEM_ERROR`.
 
 A job failed if Kubernetes set its condition `Failed`, or `FailureTarget`,
 which Kubernetes 1.31 and later set first. Without these conditions, an
