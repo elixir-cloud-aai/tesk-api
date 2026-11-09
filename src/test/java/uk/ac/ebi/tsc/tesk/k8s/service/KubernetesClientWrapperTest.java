@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_GROUPNAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 
@@ -618,6 +619,24 @@ public class KubernetesClientWrapperTest {
         assertThat(
                 wrapper.listAllTaskmasterJobsForUser(null, null, user).getItems(),
                 is(Arrays.asList(legacyJob("TEST", "c_d"), job("TEST", "e@f"))));
+    }
+
+    /** Jobs without labels belong to no group and no user, so the filter leaves them out */
+    @Test
+    public void listAllTaskmasterJobsForUser_jobWithoutLabels() throws ApiException {
+        V1ObjectMeta annotatedOnly = new V1ObjectMeta().putAnnotationsItem(ANN_USERID_KEY, "a@b");
+        listJobsReturning(
+                new V1Job().metadata(new V1ObjectMeta()),
+                new V1Job().metadata(annotatedOnly),
+                job("TEST", "a@b"));
+        User user =
+                User.builder("a@b")
+                        .teskMemberedGroups(StringUtils.commaDelimitedListToSet("TEST"))
+                        .legacyUserLabels(true)
+                        .build();
+        assertThat(
+                wrapper.listAllTaskmasterJobsForUser(null, null, user).getItems(),
+                is(Arrays.asList(job("TEST", "a@b"))));
     }
 
     /** Kubernetes answers an expired continue token with 410 Gone (issue #114) */
