@@ -1,0 +1,109 @@
+package uk.ac.ebi.tsc.tesk.tes.model;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Collections;
+import org.junit.Test;
+
+/** The task fields that TES 1.1 added (TESK#276) */
+public class Tes11FieldsTest {
+
+    @Test
+    public void output_pathPrefix() {
+        TesOutput output = new TesOutput().path("/data/*.bam").url("s3://b/out");
+        assertNull(output.getPathPrefix());
+        assertSame(output, output.pathPrefix("/data"));
+        assertEquals("/data", output.getPathPrefix());
+        output.setPathPrefix("/other");
+        assertEquals("/other", output.getPathPrefix());
+        assertTrue(output.toString().contains("pathPrefix: /other"));
+    }
+
+    @Test
+    public void output_equalsAndHashCode_includePathPrefix() {
+        TesOutput a = new TesOutput().path("/data/*.bam").url("s3://b/out").pathPrefix("/data");
+        TesOutput b = new TesOutput().path("/data/*.bam").url("s3://b/out").pathPrefix("/data");
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+        assertNotEquals(a, b.pathPrefix("/"));
+    }
+
+    @Test
+    public void input_streamable() {
+        TesInput input = new TesInput().path("/data/in.txt").url("s3://b/in.txt");
+        assertNull(input.getStreamable());
+        assertSame(input, input.streamable(true));
+        assertTrue(input.getStreamable());
+        input.setStreamable(false);
+        assertFalse(input.getStreamable());
+        assertTrue(input.toString().contains("streamable: false"));
+    }
+
+    @Test
+    public void input_equalsAndHashCode_includeStreamable() {
+        TesInput a = new TesInput().path("/in").url("s3://b/in").streamable(true);
+        TesInput b = new TesInput().path("/in").url("s3://b/in").streamable(true);
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+        assertNotEquals(
+                a, new TesInput().path("/in").url("s3://b/in").content("x").streamable(true));
+        assertNotEquals(a, b.streamable(false));
+    }
+
+    @Test
+    public void executor_ignoreError() {
+        TesExecutor executor = new TesExecutor().image("ubuntu");
+        assertNull(executor.getIgnoreError());
+        assertTrue(executor.isIgnoreErrorUnset());
+        assertSame(executor, executor.ignoreError(false));
+        assertFalse(executor.getIgnoreError());
+        assertTrue(executor.isIgnoreErrorUnset());
+        executor.setIgnoreError(true);
+        assertTrue(executor.getIgnoreError());
+        assertFalse(executor.isIgnoreErrorUnset());
+        assertTrue(executor.toString().contains("ignoreError: true"));
+    }
+
+    @Test
+    public void executor_equalsAndHashCode_includeIgnoreError() {
+        TesExecutor a = new TesExecutor().image("ubuntu").ignoreError(false);
+        TesExecutor b = new TesExecutor().image("ubuntu").ignoreError(false);
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+        assertNotEquals(
+                a,
+                new TesExecutor()
+                        .image("ubuntu")
+                        .env(Collections.singletonMap("A", "1"))
+                        .ignoreError(false));
+        assertNotEquals(a, b.ignoreError(true));
+    }
+
+    private static TesResources resources(String json) throws Exception {
+        return new ObjectMapper().readValue(json, TesResources.class);
+    }
+
+    @Test
+    public void resources_backendParametersOptional() throws Exception {
+        assertTrue(resources("{}").isBackendParametersOptional());
+        assertTrue(
+                resources("{\"backend_parameters\": {\"VmSize\": \"D64\"}}")
+                        .isBackendParametersOptional());
+        assertFalse(
+                resources(
+                                "{\"backend_parameters\": {\"VmSize\": \"D64\"},"
+                                        + " \"backend_parameters_strict\": true}")
+                        .isBackendParametersOptional());
+        assertTrue(
+                resources("{\"backend_parameters\": {}, \"backend_parameters_strict\": true}")
+                        .isBackendParametersOptional());
+        assertTrue(
+                resources("{\"backend_parameters_strict\": true}").isBackendParametersOptional());
+    }
+}
