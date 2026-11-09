@@ -160,6 +160,23 @@ public class KubernetesClientWrapperTest {
         wrapper.readTaskmasterJob("123");
     }
 
+    /** A job without labels isn't a taskmaster's job: 404, not 500 (issue #125) */
+    @Test(expected = TaskNotFoundException.class)
+    public void readTaskmasterJob_noLabels() throws Exception {
+        V1Job job = new V1Job().metadata(new V1ObjectMeta().name("123"));
+        given(batchApi.readNamespacedJob("123", "test-namespace", null, null, null))
+                .willReturn(job);
+        wrapper.readTaskmasterJob("123");
+    }
+
+    /** A job without metadata isn't a taskmaster's job either (issue #125) */
+    @Test(expected = TaskNotFoundException.class)
+    public void readTaskmasterJob_noMetadata() throws Exception {
+        given(batchApi.readNamespacedJob("123", "test-namespace", null, null, null))
+                .willReturn(new V1Job());
+        wrapper.readTaskmasterJob("123");
+    }
+
     @Test(expected = TaskNotFoundException.class)
     public void readTaskmasterJob_noJob() throws Exception {
         given(batchApi.readNamespacedJob("123", "test-namespace", null, null, null))
