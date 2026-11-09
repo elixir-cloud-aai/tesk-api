@@ -394,8 +394,8 @@ public class KubernetesClientWrapper {
 
     /**
      * Labels a taskmaster's job as cancelled and ends it, for a task whose taskmaster's pod doesn't
-     * run yet: Kubernetes fails the job once its active deadline of 1 second is over, and removes
-     * its pods (issue #126).
+     * run yet: with parallelism 0, Kubernetes creates no pods for the job and removes its pods at
+     * once, and fails the job once its active deadline of 1 second is over (issue #126).
      */
     public void cancelJobBeforeStart(String taskId) {
         try {

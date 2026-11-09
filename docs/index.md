@@ -144,15 +144,15 @@ it stops the running executor and ends.
 
 If the taskmaster doesn't run yet (its pod is pending, or Kubernetes hasn't
 created it yet), a label on a pod created later wouldn't reach it. TESK API
-then labels the job and any pending pod as cancelled, and sets the job's
-`activeDeadlineSeconds` to 1: Kubernetes fails the job about a second later
-and removes its pods, so a pending pod never starts. If Kubernetes creates
-the pod in that second, the taskmaster can start; Kubernetes then stops it,
-at the latest when the pod's termination grace period (30 seconds by
-default) is over
-([tesk-core#132](https://github.com/elixir-cloud-aai/tesk-core/issues/132)
-tracks a check for cancellation in the taskmaster). The job's label keeps
-the task `CANCELED`.
+then labels the job as cancelled and sets its `parallelism` to 0 and its
+`activeDeadlineSeconds` to 1: Kubernetes creates no more pods for the job,
+removes the ones it has, and fails the job about a second later; it also
+labels any pending pod. The job's label keeps the task `CANCELED`. In tests
+on minikube (Kubernetes 1.28 and 1.34), no taskmaster cancelled this way
+started. A taskmaster whose container is starting at that very moment could
+still start until Kubernetes stops it;
+[tesk-core#132](https://github.com/elixir-cloud-aai/tesk-core/issues/132)
+tracks a check for cancellation in the taskmaster itself.
 
 TESK API checks the state before it labels the job. If the task ends in
 between, for example because an executor fails at that moment, the label

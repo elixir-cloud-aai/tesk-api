@@ -124,8 +124,9 @@ public class Constants {
                             + "\"}}}");
 
     /**
-     * Cancels a taskmaster's job whose pod doesn't run yet: the cancel label, and an active
-     * deadline of 1 second, after which Kubernetes fails the job and removes its pods (issue #126)
+     * Cancels a taskmaster's job whose pod doesn't run yet: the cancel label, parallelism 0, so
+     * that Kubernetes creates no pods and removes the job's pods at once, and an active deadline of
+     * 1 second, after which Kubernetes fails the job (issue #126)
      */
     public static final V1Patch CANCEL_BEFORE_START_PATCH =
             new V1Patch(
@@ -133,7 +134,7 @@ public class Constants {
                             + LABEL_TASKSTATE_KEY
                             + "\":\""
                             + LABEL_TASKSTATE_VALUE_CANC
-                            + "\"}},\"spec\":{\"activeDeadlineSeconds\":1}}");
+                            + "\"}},\"spec\":{\"parallelism\":0,\"activeDeadlineSeconds\":1}}");
     /** Patch object passed to pod API, when cancelling task */
     // public static final V1Pod POD_CANCEL_PATCH = new V1Pod().metadata(new
     // V1ObjectMeta().putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC));

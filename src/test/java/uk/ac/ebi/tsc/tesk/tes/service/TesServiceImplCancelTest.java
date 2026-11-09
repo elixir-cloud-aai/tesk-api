@@ -161,6 +161,34 @@ class TesServiceImplCancelTest {
     }
 
     /**
+     * The job of a task without a running taskmaster is ended first; a pending pod that can't be
+     * labelled (e.g. gone in between) doesn't fail the request (issue #126).
+     */
+    @Test
+    void pendingPodThatIsGoneIsSkipped() {
+        this.taskmasterPods.getItems().get(0).getStatus().phase("Pending");
+        org.mockito.Mockito.doThrow(
+                        uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException.fromApiException(
+                                new io.kubernetes.client.openapi.ApiException(404, "gone")))
+                .when(this.client)
+                .labelPodAsCancelled(TASK + "-pod");
+        this.service.cancelTask(TASK);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(this.client);
+        order.verify(this.client).cancelJobBeforeStart(TASK);
+        order.verify(this.client).labelPodAsCancelled(TASK + "-pod");
+    }
+
+    /** A taskmaster's pod without a status yet is neither running nor pending. */
+    @Test
+    void podWithoutStatusIsNotRunning() {
+        this.taskmasterPods.getItems().get(0).setStatus(null);
+        this.service.cancelTask(TASK);
+        verify(this.client).cancelJobBeforeStart(TASK);
+        verify(this.client, never()).labelJobAsCancelled(anyString());
+        verify(this.client, never()).labelPodAsCancelled(anyString());
+    }
+
+    /**
      * A new task, whose taskmaster's job has no pod yet, is cancelled before it starts: the job is
      * labelled and ended, so that a pod that the job controller may still create is removed (issue
      * #126).

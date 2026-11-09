@@ -327,7 +327,9 @@ public class TesServiceImpl implements TesService {
             return;
         }
         // No taskmaster runs yet (its pod is pending, or the job has none yet): a pod created
-        // later wouldn't get the label, so Kubernetes ends the job instead (issue #126)
+        // later wouldn't get the label, so Kubernetes ends the job instead (issue #126). The job
+        // first: it decides; the pending pods' labels are a courtesy, as Kubernetes removes them
+        this.kubernetesClientWrapper.cancelJobBeforeStart(taskId);
         taskMasterPods.getItems().stream()
                 .filter(
                         pod ->
@@ -335,10 +337,21 @@ public class TesServiceImpl implements TesService {
                                         && PodPhase.PENDING
                                                 .getCode()
                                                 .equals(pod.getStatus().getPhase()))
-                .forEach(
-                        pod ->
-                                this.kubernetesClientWrapper.labelPodAsCancelled(
-                                        pod.getMetadata().getName()));
-        this.kubernetesClientWrapper.cancelJobBeforeStart(taskId);
+                .forEach(pod -> this.labelPendingPodAsCancelled(pod.getMetadata().getName()));
+    }
+
+    /**
+     * Labels a pending pod as cancelled; a pod that is gone already (or can't be patched) is
+     * skipped.
+     */
+    private void labelPendingPodAsCancelled(String podName) {
+        try {
+            this.kubernetesClientWrapper.labelPodAsCancelled(podName);
+        } catch (KubernetesException e) {
+            logger.info(
+                    "Pending pod {} of a cancelled task not labelled (HTTP {}); its job ends anyway",
+                    podName,
+                    e.getApiException().getCode());
+        }
     }
 }

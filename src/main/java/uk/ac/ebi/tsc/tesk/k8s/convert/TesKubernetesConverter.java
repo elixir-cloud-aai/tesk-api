@@ -467,7 +467,10 @@ public class TesKubernetesConverter {
 
     public Optional<String> getNameOfFirstRunningPod(V1PodList podList) {
         return podList.getItems().stream()
-                .filter(pod -> "Running".equals(pod.getStatus().getPhase()))
+                .filter(
+                        pod ->
+                                pod.getStatus() != null
+                                        && "Running".equals(pod.getStatus().getPhase()))
                 .findFirst()
                 .map(pod -> pod.getMetadata().getName());
     }

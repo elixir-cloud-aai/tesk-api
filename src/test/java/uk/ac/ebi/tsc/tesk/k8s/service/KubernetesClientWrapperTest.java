@@ -56,8 +56,9 @@ public class KubernetesClientWrapperTest {
     }
 
     /**
-     * A job cancelled before its pod runs is labelled as cancelled and gets an active deadline of 1
-     * second, in one patch, so that Kubernetes ends it and removes its pods (issue #126)
+     * A job cancelled before its pod runs is labelled as cancelled and gets parallelism 0 and an
+     * active deadline of 1 second, in one patch, so that Kubernetes removes its pods and fails it
+     * (issue #126)
      */
     @Test
     public void cancelJobBeforeStart() throws ApiException {
@@ -75,7 +76,7 @@ public class KubernetesClientWrapperTest {
                         isNull());
         assertEquals(
                 "{\"metadata\":{\"labels\":{\"task-status\":\"Cancelled\"}},"
-                        + "\"spec\":{\"activeDeadlineSeconds\":1}}",
+                        + "\"spec\":{\"parallelism\":0,\"activeDeadlineSeconds\":1}}",
                 patch.getValue().getValue());
     }
 
