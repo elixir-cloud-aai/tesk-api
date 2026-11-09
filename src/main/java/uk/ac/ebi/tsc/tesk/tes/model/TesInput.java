@@ -37,6 +37,9 @@ public class TesInput   {
   @JsonProperty("content")
   private String content;
 
+  @JsonProperty("streamable")
+  private Boolean streamable;
+
   public TesInput name(String name) {
     this.name = name;
     return this;
@@ -118,6 +121,25 @@ public class TesInput   {
     this.path = path;
   }
 
+  public TesInput streamable(Boolean streamable) {
+    this.streamable = streamable;
+    return this;
+  }
+
+  /**
+   * Whether the input may be streamed (TES 1.1), a hint that TESK ignores: inputs are always
+   * downloaded before the executors start.
+   * @return streamable
+  */
+  @ApiModelProperty(value = "Whether the input may be streamed instead of downloaded; a hint that TESK ignores, as TES allows.")
+  public Boolean getStreamable() {
+    return streamable;
+  }
+
+  public void setStreamable(Boolean streamable) {
+    this.streamable = streamable;
+  }
+
   public TesInput type(TesFileType type) {
     this.type = type;
     return this;
@@ -175,12 +197,13 @@ public class TesInput   {
         Objects.equals(this.url, tesInput.url) &&
         Objects.equals(this.path, tesInput.path) &&
         Objects.equals(this.type, tesInput.type) &&
-        Objects.equals(this.content, tesInput.content);
+        Objects.equals(this.content, tesInput.content) &&
+        Objects.equals(this.streamable, tesInput.streamable);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, description, url, path, type, content);
+    return Objects.hash(name, description, url, path, type, content, streamable);
   }
 
   @Override
@@ -194,6 +217,7 @@ public class TesInput   {
     sb.append("    path: ").append(toIndentedString(path)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    content: ").append(toIndentedString(content)).append("\n");
+    sb.append("    streamable: ").append(toIndentedString(streamable)).append("\n");
     sb.append("}");
     return sb.toString();
   }

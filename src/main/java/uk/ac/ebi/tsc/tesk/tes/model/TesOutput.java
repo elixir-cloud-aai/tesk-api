@@ -29,6 +29,9 @@ public class TesOutput   {
   @JsonProperty("path")
   private String path;
 
+  @JsonProperty("path_prefix")
+  private String pathPrefix;
+
   @JsonProperty("type")
   private TesFileType type = TesFileType.FILE;
 
@@ -114,6 +117,27 @@ public class TesOutput   {
     this.path = path;
   }
 
+  public TesOutput pathPrefix(String pathPrefix) {
+    this.pathPrefix = pathPrefix;
+    return this;
+  }
+
+  /**
+   * Prefix to be removed from matching outputs if `path` contains wildcards (TES 1.1); output URLs
+   * are constructed by appending pruned paths to the directory specified in `url`. Without it, a
+   * `path` with wildcards is taken as before: expanded for `file:` URLs, a file name otherwise.
+   * @return pathPrefix
+  */
+  @ApiModelProperty(example = "/data", value = "Prefix to be removed from matching outputs if `path` contains wildcards; output URLs are constructed by appending pruned paths to the directory specified in `url`. Ignored if `path` has no wildcards.")
+  @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
+  public String getPathPrefix() {
+    return pathPrefix;
+  }
+
+  public void setPathPrefix(String pathPrefix) {
+    this.pathPrefix = pathPrefix;
+  }
+
   public TesOutput type(TesFileType type) {
     this.type = type;
     return this;
@@ -150,12 +174,13 @@ public class TesOutput   {
         Objects.equals(this.description, tesOutput.description) &&
         Objects.equals(this.url, tesOutput.url) &&
         Objects.equals(this.path, tesOutput.path) &&
+        Objects.equals(this.pathPrefix, tesOutput.pathPrefix) &&
         Objects.equals(this.type, tesOutput.type);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, description, url, path, type);
+    return Objects.hash(name, description, url, path, pathPrefix, type);
   }
 
   @Override
@@ -167,6 +192,7 @@ public class TesOutput   {
     sb.append("    description: ").append(toIndentedString(description)).append("\n");
     sb.append("    url: ").append(toIndentedString(url)).append("\n");
     sb.append("    path: ").append(toIndentedString(path)).append("\n");
+    sb.append("    pathPrefix: ").append(toIndentedString(pathPrefix)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();

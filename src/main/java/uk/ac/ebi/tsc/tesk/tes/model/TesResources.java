@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.annotations.ApiModel;
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.validation.Valid;
+import javax.validation.constraints.AssertTrue;
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Digits;
 
@@ -142,6 +144,19 @@ public class TesResources   {
 
   public void setDiskGb(Double diskGb) {
     this.diskGb = diskGb;
+  }
+
+  /**
+   * TESK uses no backend parameters, so it refuses tasks that need them
+   * (`backend_parameters_strict`), as TES 1.1 asks; without it, they are ignored.
+   * @return whether the task doesn't need backend parameters
+   */
+  @JsonIgnore
+  @AssertTrue(message = "backend_parameters are not supported; leave out backend_parameters_strict to ignore them")
+  public boolean isBackendParametersOptional() {
+    return !Boolean.TRUE.equals(backendParametersStrict)
+        || backendParameters == null
+        || backendParameters.isEmpty();
   }
 
   public TesResources zones(List<String> zones) {

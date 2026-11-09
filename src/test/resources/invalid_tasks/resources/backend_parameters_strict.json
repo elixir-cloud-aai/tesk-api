@@ -1,0 +1,6 @@
+{
+  "executors": [
+    {"image": "ubuntu", "command": ["echo", "hello world"]}
+  ],
+  "resources": {"backend_parameters": {"VmSize": "Standard_D64_v3"}, "backend_parameters_strict": true}
+}

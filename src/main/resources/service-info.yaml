@@ -3,7 +3,7 @@ name: TESK
 type:
   group: org.ga4gh
   artifact: TES
-  version: '1.0.0'
+  version: '1.1.0'
 description:  GA4GH TES Server implementation for Kubernetes
 organization:
   name: EMBL-EBI

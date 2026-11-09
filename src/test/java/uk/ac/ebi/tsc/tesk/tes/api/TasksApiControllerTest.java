@@ -207,6 +207,7 @@ public class TasksApiControllerTest {
                     new String[] {"no_image.json", "image"},
                     new String[] {"no_command.json", "command"},
                     new String[] {"invalid_stdin.json", "stdin"},
+                    new String[] {"ignore_error_true.json", "ignore_error: true is not supported"},
                 };
         for (String[] file : files) {
             this.mvc
@@ -252,7 +253,8 @@ public class TasksApiControllerTest {
                 new String[][] {
                     new String[] {"no_path.json", "outputs[0].path"},
                     new String[] {"no_url.json", "outputs[0].url"},
-                    new String[] {"empty_type.json", "outputs[0].type"}
+                    new String[] {"empty_type.json", "outputs[0].type"},
+                    new String[] {"relative_path_prefix.json", "outputs[0].pathPrefix"}
                 };
         for (String[] file : files) {
             this.mvc
@@ -435,6 +437,43 @@ public class TasksApiControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * The fields that TES 1.1 added are accepted: outputs with wildcards and path_prefix,
+     * streamable inputs, ignore_error false and backend parameters that aren't strict
+     */
+    @Test
+    public void createTask_valid_tes11Fields() throws Exception {
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(
+                                        getFileContentFromResources(
+                                                "valid_tasks/tes_1_1_fields.json"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+    }
+
+    /** Strict backend parameters are refused: TESK uses none */
+    @Test
+    public void createTask_invalid_strictBackendParameters() throws Exception {
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(
+                                        getFileContentFromResources(
+                                                "invalid_tasks/resources/backend_parameters_strict.json"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().is4xxClientError())
+                .andExpect(
+                        jsonPath(
+                                "$.messages[0]",
+                                containsString("backend_parameters are not supported")));
     }
 
     /** Trailing zeros don't count as decimals */
