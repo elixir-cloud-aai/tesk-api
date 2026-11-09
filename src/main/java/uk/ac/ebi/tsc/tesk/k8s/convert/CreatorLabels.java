@@ -4,10 +4,9 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERHASH_KEY;
 
+import com.google.common.hash.Hashing;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 
 /**
@@ -29,19 +28,10 @@ public final class CreatorLabels {
 
     /** The value of the hash label for a user ID: the start of its SHA-256 (of UTF-8), in hex */
     public static String hash(String userId) {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            // every Java platform supports SHA-256
-            throw new IllegalStateException(e);
-        }
-        byte[] bytes = digest.digest(userId.getBytes(StandardCharsets.UTF_8));
-        StringBuilder hex = new StringBuilder(HASH_LENGTH);
-        for (int i = 0; i < HASH_LENGTH / 2; i++) {
-            hex.append(String.format("%02x", bytes[i]));
-        }
-        return hex.toString();
+        return Hashing.sha256()
+                .hashString(userId, StandardCharsets.UTF_8)
+                .toString()
+                .substring(0, HASH_LENGTH);
     }
 
     /** The value of the old label for a user ID */
