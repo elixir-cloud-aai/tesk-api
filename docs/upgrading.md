@@ -20,9 +20,9 @@ What's new:
   longer list, get or cancel them. What to do:
     - Upgrade when no tasks run, or let running tasks end first; if you want
       their creators to keep access for a while, set
-      `TESK_API_AUTHORISATION_LEGACY_USER_LABELS=true` (the Helm chart of
-      TESK has no value for it; set it as an environment variable of the
-      deployment). Turn it off again once the old tasks
+      `TESK_API_AUTHORISATION_LEGACY_USER_LABELS=true` (in the Helm chart
+      of TESK: `auth.legacyUserLabels`, from chart 0.3.0). Turn it off again
+      once the old tasks
       are no longer needed (e.g. after the taskmaster's `TASK_TTL_SECONDS`).
     - List the old tasks with `kubectl get jobs -n <namespace> -l
       'job-type=taskmaster,creator-user-id,!creator-user-hash'`. The old
