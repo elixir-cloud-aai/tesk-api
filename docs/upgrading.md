@@ -236,6 +236,10 @@ What's new:
   [Configuration](configuration.md#service-info)). The Helm chart of TESK sets
   it with `auth.serviceInfoPublic` (from chart 0.3.0), which needs TESK API
   1.2.0 or later.
+- **TES version in service info.** The built-in `service-info.yaml` reports
+  the type version as `"1.0.0"` instead of `"1.0"`. If you use your own
+  file, quote its `type.version` (e.g. `version: '1.0.0'`): unquoted, YAML
+  reads values like `1.0` as numbers.
 - **Image.** The image is built from source on Eclipse Temurin 8 (Ubuntu)
   instead of the discontinued `openjdk:8-jdk-alpine`. Releases are published
   as `elixircloud/tesk-api:X.Y.Z` (and `latest`), signed with Sigstore and
