@@ -3,7 +3,7 @@
 TESK API integrates with [Elixir AAI](https://www.elixir-europe.org/services/compute/aai) via [OpenID Connect](http://openid.net/connect/) protocol to authenticate and authorise requests. Authentication and authorisation are optional and can be switched off completely. When authentication is on, in order to perform any operation on tasks (get and/or create tasks) TESK API user will have to include a valid access token issued by Elixir AAI in the request header. To obtain such a token, a user will have to:
 * have a valid account in Elixir AAI
 * belong to a specific Elixir group (or, with [authorisation without groups](#authorisation-without-groups) on, have one of the configured values in a claim)
-* have access to a registered Elixir client application, that was assigned - among others - `groupNames` scope (with authorisation without groups, the scope that releases the configured claim).
+* have access to a registered Elixir client application, that was assigned - among others - the scope that releases the [groups claim](#configuration) (by default `eduperson_entitlement`) (with authorisation without groups, the scope that releases the configured claim).
 
 ## Switching on/off authentication and authorisation
 Authentication and authorisation can be globally switched on and off for TESK API using [Spring Profiles](https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-profiles.html). When the default `noauth` profile is active, all endpoints are unauthenticated (so the setting for `GET /service-info` below has no effect) and all (also previously) created TES tasks are visible to any user. New tasks are labelled as created by `anonymousUser` and no team ownership is assigned to new tasks. With `auth` profile activated, all the rules described below apply. Set the profile with `SPRING_PROFILES_ACTIVE` (see [Configuration](configuration.md#settings)).
@@ -24,12 +24,25 @@ At the moment (subject to change) TESK API does not require the access token to 
 * Not expired
 * Obtained by a user using any registered Elixir AAI client
 * Obtained by a user using any OIDC Flow
-* Obtained by a user using a client, that was granted `groupNames` scope (see [Authorisation](#authorisation))
+* Obtained by a user using a client, that was granted the scope that releases the [groups claim](#configuration) (by default `eduperson_entitlement`) (see [Authorisation](#authorisation))
 * Containing any audience
-* If Elixir AAI introduces groups-clients binding (presenting only those group names to clients, that where mentioned during client registration - currently each client receives all groups, as long as it has the scope `groupNames`), the token will have to be obtained using a client, which can receive those groups that are needed during Authorisation (see [below](#authorisation))
+* If Elixir AAI introduces groups-clients binding (presenting only those group names to clients, that where mentioned during client registration - currently each client receives all groups, as long as it has the scope that releases the groups claim), the token will have to be obtained using a client, which can receive those groups that are needed during Authorisation (see [below](#authorisation))
 
 #### Built-in client
-A valid token can be obtained using an OIDC client built in Swagger UI at the TESK API homepage, if the Swagger UI is on (`TESK_API_SWAGGER_UI_ENABLED` set to `true`; it is off by default). In order to use the client, it has to be configured, by placing Client ID - registered at Elixir AAI with Implicit Grant - in the API environment variable `TESK_API_SWAGGER_OAUTH_CLIENT_ID` (authorisation code grant also possible, with `TESK_API_SWAGGER_OAUTH_IMPLICIT` set to `false`, but discouraged). The Swagger UI runs in the browser, so it is a public client: register it at your identity provider as a public client, without a client secret. TESK API doesn't pass a client secret to the Swagger UI; `TESK_API_SWAGGER_OAUTH_CLIENT_SECRET` is deprecated and ignored. The Swagger UI of TESK API can't use PKCE yet, so with the authorisation code grant your identity provider must allow it for public clients without PKCE; otherwise use the implicit grant. Unless groups-clients relationship is introduced, token obtained using Swagger UI from one environment can be used to make calls to API installed elsewhere.   
+A valid token can be obtained using an OIDC client built in Swagger UI at the TESK API homepage, if the Swagger UI is on (`TESK_API_SWAGGER_UI_ENABLED` set to `true`; it is off by default). In order to use the client, it has to be configured, by placing Client ID - registered at Elixir AAI with Implicit Grant - in the API environment variable `TESK_API_SWAGGER_OAUTH_CLIENT_ID` (authorisation code grant also possible, with `TESK_API_SWAGGER_OAUTH_IMPLICIT` set to `false`, but discouraged). The Swagger UI runs in the browser, so it is a public client: register it at your identity provider as a public client, without a client secret. TESK API doesn't pass a client secret to the Swagger UI; `TESK_API_SWAGGER_OAUTH_CLIENT_SECRET` is deprecated and ignored. The Swagger UI of TESK API can't use PKCE yet, so with the authorisation code grant your identity provider must allow it for public clients without PKCE; otherwise use the implicit grant. Unless groups-clients relationship is introduced, token obtained using Swagger UI from one environment can be used to make calls to API installed elsewhere.
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_SWAGGER_OAUTH_CLIENT_ID` | Client ID of the Swagger UI at your identity provider. | `changeme`
+`TESK_API_SWAGGER_OAUTH_IMPLICIT` | `true`: the Swagger UI gets tokens with the implicit grant, from the authorisation endpoint. `false`: with the authorisation code grant, from the authorisation and token endpoints, without a client secret and without PKCE (see above). | `true`
+`TESK_API_SWAGGER_OAUTH_AUTHORIZATION_ENDPOINT` | Authorisation endpoint of the identity provider. | `https://login.elixir-czech.org/oidc/authorize`
+`TESK_API_SWAGGER_OAUTH_TOKEN_ENDPOINT` | Token endpoint of the identity provider; used only with the authorisation code grant. | `https://login.elixir-czech.org/oidc/token`
+`TESK_API_SWAGGER_OAUTH_SCOPES` | Comma-separated scopes that the Swagger UI offers, each as `<scope>:<description>` (the first `:` separates them). The user picks among them when logging in; the token needs a scope that releases the groups claim (or the claim for [authorisation without groups](#authorisation-without-groups)). | `openid`, the [groups claim](#configuration) (`eduperson_entitlement`), `profile` and `email`
+
+For the authorisation code grant, register the Swagger UI as a public client
+with the authorisation code grant, and with the redirect URI
+`<base URL of TESK API>/swagger-ui/oauth2-redirect.html`; your identity
+provider must issue tokens to it without a client secret and without PKCE.
 
 ### Token validation
 TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint. If user info is returned without error, token is considered valid. Invalid token or lack of thereof in `authorisation: Bearer` header will result in `HTTP 401 Unauthorized` error. 
@@ -82,9 +95,22 @@ Parts of Elixir groups 'authorisation framework' - particularly base group name,
 
 Environment variable | Meaning | Default
 ------------ |---|--
-`TESK_API_AUTHORISATION_PARENT_GROUP` | Full name of the base group (with default `elixir:` prefix, which is added by Elixir to all group names) | `elixir:GA4GH:GA4GH-CAP`
-`TESK_API_AUTHORISATION_ENV_SUBGROUP` | Name of the subgroup representing environment (aka Environment Group) | `EBI` (Full group name:  `elixir:GA4GH:GA4GH-CAP:EBI`)
-`TESK_API_AUTHORISATION_ADMIN_SUBGROUP` | Name of the subgroup representing admins (super admins or team admins) | `ADMIN` (Full group name of super-admins:  `elixir:GA4GH:GA4GH-CAP:EBI:ADMIN`)
+`TESK_API_AUTHORISATION_GROUPS_CLAIM` | Name of the claim of the user info with the user's group memberships (a string or a list of strings). The default [scopes of the Swagger UI](#built-in-client) request a scope of the same name. | `eduperson_entitlement`
+`TESK_API_AUTHORISATION_GROUP_PREFIX` | Text before the group names in that claim. | `urn:geant:elixir-europe.org:group:elixir:`
+`TESK_API_AUTHORISATION_GROUP_SUFFIX` | Text after the group names in that claim. | `#perun.elixir-czech.cz`
+`TESK_API_AUTHORISATION_DELIMITER` | Separator of the group levels in the names below. Keep `:`: TESK API recognises the team and team admin groups by `:` whatever this setting is. | `:`
+`TESK_API_AUTHORISATION_PARENT_GROUP` | Name of the Base Group, without prefix and suffix. | `GA4GH:GA4GH-CAP`
+`TESK_API_AUTHORISATION_ENV_SUBGROUP` | Name of the Environment Group below the Base Group. | `EBI`
+`TESK_API_AUTHORISATION_BASE_GROUP` | Full name of the Environment Group, without prefix and suffix; set it instead of the two settings above to give it directly. | the Base Group, the delimiter and the Environment Group: `GA4GH:GA4GH-CAP:EBI`
+`TESK_API_AUTHORISATION_ADMIN_SUBGROUP` | Name of the subgroups of admins (super admins below the Environment Group, team admins below a Team Group). | `ADMIN`
+
+With the defaults, the claim `eduperson_entitlement` of a member of the team
+`SDO` has the values
+`urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI#perun.elixir-czech.cz`
+(the Environment Group, which creating and cancelling tasks need) and
+`urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:SDO#perun.elixir-czech.cz`;
+an admin of that team has `…:EBI:SDO:ADMIN#perun.elixir-czech.cz`, a super
+admin `…:EBI:ADMIN#perun.elixir-czech.cz`. Team names can't contain `:`.
 
 ### Task creators
 
