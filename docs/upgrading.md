@@ -125,6 +125,9 @@ What's new:
   (the requests that read a single task) answer `404 Not Found` for the name
   of a job without labels in the namespace, as for any job that isn't a
   taskmaster's job; before, they answered `500 Internal Server Error`.
+- **RAM under any locale.** Tasks with `resources.ram_gb` are created also
+  when the JVM's default locale writes numbers with a decimal comma (e.g.
+  `de_DE`); before, creating them failed.
 - **Kubernetes client logs.** TESK API logs the calls of its Kubernetes
   client at `INFO`, like the rest; before, `KubernetesClientWrapper` was set
   to `TRACE`. For more detail, set e.g.

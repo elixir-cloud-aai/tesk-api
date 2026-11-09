@@ -64,10 +64,10 @@ stay integers, also if given with an exponent (`1e3` is returned as `1000`).
 
 `cpu_cores`, `ram_gb` and `disk_gb` must be positive if they are given: `0`
 and negative numbers are refused with `400 Bad Request`. `ram_gb` must be at
-least `0.000001` (TESK API requests RAM from Kubernetes with 6 decimals, so
-less would request none). Leave a field out instead: TESK API then requests
-no CPU or RAM (the defaults of the namespace's LimitRange may apply), and
-0.1 GB for the task's volume.
+least `0.000001`, the smallest amount that TESK API requests (it rounds RAM
+to 6 decimals before it asks Kubernetes). Leave a field out instead: TESK API
+then requests no CPU or RAM (the defaults of the namespace's LimitRange may
+apply), and 0.1 GB for the task's volume.
 
 ## Executor logs
 
