@@ -119,4 +119,87 @@ public class ElixirPrincipalExtractorTest {
         User user = (User) result;
         assertThat(user, is(modelUser));
     }
+
+    /** An extractor with the default prefix and suffix, which contain {@code .} */
+    private static ElixirPrincipalExtractor defaultsExtractor() {
+        AuthorisationProperties properties = new AuthorisationProperties();
+        properties.setBaseGroupPrefix(
+                "urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:");
+        properties.setAdminSubgroup("ADMIN");
+        properties.setAdminGroupFull(
+                "urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:ADMIN"
+                        + "#perun.elixir-czech.cz");
+        properties.setGroupSuffix("#perun.elixir-czech.cz");
+        return new ElixirPrincipalExtractor(
+                new GroupNamesSecurityExtractor("groupNames", "whatever"), properties);
+    }
+
+    private static User userWithGroups(ElixirPrincipalExtractor extractor, String... groups) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("sub", "123");
+        map.put("groupNames", Arrays.asList(groups));
+        return (User) extractor.extractPrincipal(map);
+    }
+
+    @Test
+    public void exactGroupNamesWithDotsMatch() {
+        User user =
+                userWithGroups(
+                        defaultsExtractor(),
+                        "urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:TEST"
+                                + "#perun.elixir-czech.cz",
+                        "urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:XYZ:ADMIN"
+                                + "#perun.elixir-czech.cz");
+        assertThat(user.isGroupMember("TEST"), is(true));
+        assertThat(user.isGroupManager("XYZ"), is(true));
+    }
+
+    @Test
+    public void nearIdenticalPrefixIsNoTeamGroup() {
+        // "elixir-europeXorg" differs from the configured "elixir-europe.org" only at the "."
+        User user =
+                userWithGroups(
+                        defaultsExtractor(),
+                        "urn:geant:elixir-europeXorg:group:elixir:GA4GH:GA4GH-CAP:EBI:TEST"
+                                + "#perun.elixir-czech.cz",
+                        "urn:geant:elixir-europeXorg:group:elixir:GA4GH:GA4GH-CAP:EBI:XYZ:ADMIN"
+                                + "#perun.elixir-czech.cz");
+        assertThat(user.isMember(), is(false));
+        assertThat(user.isManager(), is(false));
+    }
+
+    @Test
+    public void nearIdenticalSuffixIsNoTeamGroup() {
+        // "perunXelixir-czech.cz" differs from the configured "perun.elixir-czech.cz" only at a "."
+        User user =
+                userWithGroups(
+                        defaultsExtractor(),
+                        "urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:TEST"
+                                + "#perunXelixir-czech.cz",
+                        "urn:geant:elixir-europe.org:group:elixir:GA4GH:GA4GH-CAP:EBI:XYZ:ADMIN"
+                                + "#perunXelixir-czech.cz");
+        assertThat(user.isMember(), is(false));
+        assertThat(user.isManager(), is(false));
+    }
+
+    @Test
+    public void regexCharactersInSettingsAreLiteral() {
+        // the parts are matched as text, also characters such as "+", "*", "(", "$" and "\E"
+        AuthorisationProperties properties = new AuthorisationProperties();
+        properties.setBaseGroupPrefix("a+b(c)*\\E:BASE:");
+        properties.setAdminSubgroup("AD.MIN");
+        properties.setAdminGroupFull("a+b(c)*\\E:BASE:AD.MIN$x");
+        properties.setGroupSuffix("$x");
+        ElixirPrincipalExtractor extractor =
+                new ElixirPrincipalExtractor(
+                        new GroupNamesSecurityExtractor("groupNames", "whatever"), properties);
+        User exact =
+                userWithGroups(extractor, "a+b(c)*\\E:BASE:TEST$x", "a+b(c)*\\E:BASE:XYZ:AD.MIN$x");
+        assertThat(exact.isGroupMember("TEST"), is(true));
+        assertThat(exact.isGroupManager("XYZ"), is(true));
+        User near =
+                userWithGroups(extractor, "aab(c)*\\E:BASE:TEST$x", "a+b(c)*\\E:BASE:XYZ:ADxMIN$x");
+        assertThat(near.isMember(), is(false));
+        assertThat(near.isManager(), is(false));
+    }
 }

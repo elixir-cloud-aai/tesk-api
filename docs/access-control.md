@@ -112,6 +112,13 @@ With the defaults, the claim `eduperson_entitlement` of a member of the team
 an admin of that team has `…:EBI:SDO:ADMIN#perun.elixir-czech.cz`, a super
 admin `…:EBI:ADMIN#perun.elixir-czech.cz`. Team names can't contain `:`.
 
+The settings above (`…_GROUP_PREFIX`, `…_PARENT_GROUP`, `…_ENV_SUBGROUP`,
+`…_BASE_GROUP`, `…_DELIMITER`, `…_ADMIN_SUBGROUP` and `…_GROUP_SUFFIX`) are
+compared as plain text, character by character: characters such as `.`, `*`
+or `|` have no special meaning, so only group names with exactly the
+configured text count, and patterns (e.g. `(A|B)` for two groups) don't work.
+Only the team name in between can be any text without `:`.
+
 ### Task creators
 
 TESK API identifies users by the `sub` claim of the user info, compared

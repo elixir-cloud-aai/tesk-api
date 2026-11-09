@@ -33,19 +33,20 @@ public class ElixirPrincipalExtractor implements PrincipalExtractor {
             AuthoritiesExtractor groupsExtractor, AuthorisationProperties authorisationProperties) {
         this.groupsExtractor = groupsExtractor;
         this.authorisationProperties = authorisationProperties;
+        // the configured parts are text, matched literally; only the team name is a pattern
         MEMBERED_GROUP =
                 Pattern.compile(
                         "^"
-                                + authorisationProperties.getBaseGroupPrefix()
+                                + literal(authorisationProperties.getBaseGroupPrefix())
                                 + "([^:]+)"
-                                + authorisationProperties.getGroupSuffix());
+                                + literal(authorisationProperties.getGroupSuffix()));
         MANAGED_GROUP =
                 Pattern.compile(
                         "^"
-                                + authorisationProperties.getBaseGroupPrefix()
+                                + literal(authorisationProperties.getBaseGroupPrefix())
                                 + "([^:]+):"
-                                + authorisationProperties.getAdminSubgroup()
-                                + authorisationProperties.getGroupSuffix());
+                                + literal(authorisationProperties.getAdminSubgroup())
+                                + literal(authorisationProperties.getGroupSuffix()));
         AuthorisationProperties.Claim claim = authorisationProperties.getClaim();
         if (claim.isEnabled()) {
             Set<String> values =
@@ -66,6 +67,14 @@ public class ElixirPrincipalExtractor implements PrincipalExtractor {
             this.claimName = null;
             this.claimValues = Collections.emptySet();
         }
+    }
+
+    /**
+     * A configured part of the group names as a regular expression that matches exactly that text
+     * (an unset part as {@code null}, as before quoting)
+     */
+    private static String literal(String part) {
+        return Pattern.quote(String.valueOf(part));
     }
 
     /**
