@@ -142,6 +142,15 @@ by the rules above, can't be cancelled (`400 Bad Request`). The pod's label
 reaches the taskmaster through the Downward API; when the taskmaster sees it,
 it stops the running executor and ends.
 
+If the taskmaster doesn't run yet (its pod is pending, or Kubernetes hasn't
+created it yet), a label on a pod created later wouldn't reach it. TESK API
+then labels the job and any pending pod as cancelled, and sets the job's
+`activeDeadlineSeconds` to 1: Kubernetes fails the job about a second later
+and removes its pods, so a pending pod never starts. If Kubernetes creates
+the pod in that second, the taskmaster can start; Kubernetes then stops it,
+at the latest when the pod's termination grace period (30 seconds by
+default) is over. The job's label keeps the task `CANCELED`.
+
 TESK API checks the state before it labels the job. If the task ends in
 between, for example because an executor fails at that moment, the label
 still wins and the task stays `CANCELED`.

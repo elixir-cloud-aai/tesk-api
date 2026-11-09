@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.PodPhase;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.*;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
@@ -317,10 +318,27 @@ public class TesServiceImpl implements TesService {
         if (COMPLETED_STATES.contains(state)) {
             throw new CancelNotRunningTask(taskId);
         }
-        this.kubernetesClientWrapper.labelJobAsCancelled(taskId);
         V1PodList taskMasterPods = new V1PodList().items(task.getTaskmaster().getPods());
-        this.converter
-                .getNameOfFirstRunningPod(taskMasterPods)
-                .ifPresent(this.kubernetesClientWrapper::labelPodAsCancelled);
+        Optional<String> runningPod = this.converter.getNameOfFirstRunningPod(taskMasterPods);
+        if (runningPod.isPresent()) {
+            // the taskmaster sees the pod's label and stops the task
+            this.kubernetesClientWrapper.labelJobAsCancelled(taskId);
+            this.kubernetesClientWrapper.labelPodAsCancelled(runningPod.get());
+            return;
+        }
+        // No taskmaster runs yet (its pod is pending, or the job has none yet): a pod created
+        // later wouldn't get the label, so Kubernetes ends the job instead (issue #126)
+        taskMasterPods.getItems().stream()
+                .filter(
+                        pod ->
+                                pod.getStatus() != null
+                                        && PodPhase.PENDING
+                                                .getCode()
+                                                .equals(pod.getStatus().getPhase()))
+                .forEach(
+                        pod ->
+                                this.kubernetesClientWrapper.labelPodAsCancelled(
+                                        pod.getMetadata().getName()));
+        this.kubernetesClientWrapper.cancelJobBeforeStart(taskId);
     }
 }

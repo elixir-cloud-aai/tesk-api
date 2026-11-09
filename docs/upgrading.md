@@ -132,6 +132,17 @@ What's new:
   until the cause goes away or someone deletes the job: if you alert on
   `SYSTEM_ERROR` for such problems, watch the jobs' `FailedCreate` events
   instead.
+- **Cancelling tasks that haven't started.** A task whose taskmaster isn't
+  running yet (its pod is pending, or its job has no pod yet) can be
+  cancelled: TESK API labels the job (and a pending pod) as cancelled and
+  sets the job's `activeDeadlineSeconds` to 1, so that Kubernetes fails the
+  job and removes its pods (see [Cancelling a
+  task](index.md#cancelling-a-task)). Before, a task with a pending pod was
+  reported `CANCELED`, but its taskmaster started later all the same; a new
+  task without a pod couldn't be cancelled (`400 Bad Request`). A taskmaster
+  pod that Kubernetes creates in the moment of the request can still start,
+  and runs until its termination grace period is over (30 seconds by
+  default).
 - **Jobs without labels.** `GET /tasks/{id}` and `POST /tasks/{id}:cancel`
   (the requests that read a single task) answer `404 Not Found` for the name
   of a job without labels in the namespace, as for any job that isn't a

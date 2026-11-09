@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.k8s.service;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -52,6 +53,37 @@ public class KubernetesClientWrapperTest {
     public void setUp() {
 
         this.wrapper = new KubernetesClientWrapper(batchApi, batchApi, coreApi, coreApi, namespace);
+    }
+
+    /**
+     * A job cancelled before its pod runs is labelled as cancelled and gets an active deadline of 1
+     * second, in one patch, so that Kubernetes ends it and removes its pods (issue #126)
+     */
+    @Test
+    public void cancelJobBeforeStart() throws ApiException {
+        org.mockito.ArgumentCaptor<io.kubernetes.client.custom.V1Patch> patch =
+                org.mockito.ArgumentCaptor.forClass(io.kubernetes.client.custom.V1Patch.class);
+        wrapper.cancelJobBeforeStart("task-123");
+        Mockito.verify(batchApi)
+                .patchNamespacedJob(
+                        eq("task-123"),
+                        eq("test-namespace"),
+                        patch.capture(),
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        isNull());
+        assertEquals(
+                "{\"metadata\":{\"labels\":{\"task-status\":\"Cancelled\"}},"
+                        + "\"spec\":{\"activeDeadlineSeconds\":1}}",
+                patch.getValue().getValue());
+    }
+
+    @Test(expected = KubernetesException.class)
+    public void cancelJobBeforeStart_refused() throws ApiException {
+        given(batchApi.patchNamespacedJob(any(), any(), any(), any(), any(), any(), any()))
+                .willThrow(new ApiException(403, "forbidden"));
+        wrapper.cancelJobBeforeStart("task-123");
     }
 
     /** A ConfigMap is checked by creating it in a dry run */

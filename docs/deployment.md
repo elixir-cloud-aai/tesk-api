@@ -49,7 +49,7 @@ its namespace (`TESK_API_K8S_NAMESPACE`); the built-in `edit` role has them:
 
 Resource | Verbs | For
 --- | --- | ---
-`jobs` (`batch`) | `create`, `delete`, `get`, `list`, `patch` | Taskmaster jobs: create, read, list, label as cancelled; delete one whose ConfigMap couldn't be created
+`jobs` (`batch`) | `create`, `delete`, `get`, `list`, `patch` | Taskmaster jobs: create, read, list, label as cancelled (and end one whose taskmaster doesn't run yet); delete one whose ConfigMap couldn't be created
 `pods` | `list`, `patch` | Pods of the jobs: read, label as cancelled
 `pods/log` | `get` | Logs of the taskmaster and executors
 `configmaps` | `create`, `delete`, `get` | The taskmaster's input, owned by its job (`delete` where the admission plugin `OwnerReferencesPermissionEnforcement` is on, e.g. on OpenShift: it lets only those who may delete an object set its owner); a pod security context from a ConfigMap, if configured
