@@ -114,6 +114,20 @@ What's new:
   before; numbers with more digits or decimals are refused with `400 Bad
   Request`. The API description (`/v2/api-docs`) now gives `cpu_cores` as a
   number instead of an integer.
+- **Positive resources.** `resources.cpu_cores`, `ram_gb` and `disk_gb` must
+  be positive: `0` and negative numbers are refused with `400 Bad Request`
+  (see [API](api.md#resources)). Before, they were passed on to Kubernetes
+  and the taskmaster, which refused negative numbers, so that the task
+  failed or the request ended with `500 Internal Server Error`. Clients that
+  send `0` for "no requirement" need to leave the field out instead.
+- **Jobs without labels.** `GET /tasks/{id}` and `POST /tasks/{id}:cancel`
+  answer `404 Not Found` for the name of a job without labels in the
+  namespace, as for any job that isn't a taskmaster's job; before, they
+  answered `500 Internal Server Error`.
+- **Kubernetes client logs.** TESK API logs the calls of its Kubernetes
+  client at `INFO`, like the rest; before, `KubernetesClientWrapper` was set
+  to `TRACE`. For more detail, set e.g.
+  `LOGGING_LEVEL_UK_AC_EBI_TSC_TESK_K8S_SERVICE=DEBUG`.
 - **Authorisation without groups.** With the `auth` profile, TESK API can
   authorise users by a claim of the user info instead of group membership
   (`TESK_API_AUTHORISATION_CLAIM_ENABLED`, `TESK_API_AUTHORISATION_CLAIM_NAME`
