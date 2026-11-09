@@ -29,12 +29,28 @@ Environment variable | Meaning
 `TESK_API_SERVICE_INFO_LOCATION` | The YAML file of [service info](#service-info). Default: the built-in `classpath:service-info.yaml`.
 `TESK_API_SERVICE_INFO_PUBLIC` | With the `auth` profile: `true` (default) lets `GET` and `HEAD /service-info` answer without a token; `false` makes them need a valid token (no group membership). No effect with `noauth`, where all endpoints are open. Since 1.2.0.
 `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` | User info endpoint of the OpenID Connect provider, which validates tokens; see [Access control](access-control.md#token-validation). Default: ELIXIR AAI.
-`TESK_API_AUTHORISATION_*` | Authorisation by group membership; see [Access control](access-control.md#configuration).
+`TESK_API_AUTHORISATION_*` | Authorisation by group membership: `TESK_API_AUTHORISATION_GROUPS_CLAIM` (default `eduperson_entitlement`), `…_GROUP_PREFIX`, `…_GROUP_SUFFIX`, `…_DELIMITER`, `…_PARENT_GROUP`, `…_ENV_SUBGROUP`, `…_BASE_GROUP` and `…_ADMIN_SUBGROUP`; see [Access control](access-control.md#configuration) for their meanings and defaults.
 `TESK_API_AUTHORISATION_LEGACY_USER_LABELS` | `true`: tasks created by earlier versions, which have only the old creator label, belong to their creators again; `false` (default): only team admins and super admins see them. See [Access control](access-control.md#task-creators).
 `TESK_API_AUTHORISATION_CLAIM_*` | Authorisation without groups, by a claim of the user info; off by default. Turning it on lets everyone with one of the configured values run tasks; see [Access control](access-control.md#authorisation-without-groups) for the settings and their security implications.
 `TESK_API_SWAGGER_UI_ENABLED` | `true`: serves the [Swagger UI](api.md#swagger-ui) at `/swagger-ui/index.html` (the root path `/` redirects there) with its static resources and its configuration (`/swagger-resources`). `false` (default): serves none of them. The API description (`/v2/api-docs`) is served either way. Other values stop the app at startup. Turning it on serves the Swagger UI and its static resources publicly, also with the `auth` profile: turn it on only where it is needed. Since 1.2.0; before, the Swagger UI was always on.
-`TESK_API_SWAGGER_OAUTH_*` | The OpenID Connect client of the Swagger UI; see [Access control](access-control.md#built-in-client).
+`TESK_API_SWAGGER_OAUTH_*` | The OpenID Connect client of the Swagger UI, with the `auth` profile: `TESK_API_SWAGGER_OAUTH_CLIENT_ID`, `…_IMPLICIT` (default `true`: the implicit grant; `false`: the authorisation code grant without a client secret), `…_AUTHORIZATION_ENDPOINT`, `…_TOKEN_ENDPOINT` and `…_SCOPES`; see [Access control](access-control.md#built-in-client) for their meanings and defaults, and what the authorisation code grant needs.
 `TESK_API_SWAGGER_OAUTH_CLIENT_SECRET` | Deprecated since 1.2.0 and ignored: the Swagger UI is a public client and gets no client secret. TESK API logs a warning at startup if it is set. Remove it from your deployment; if a client secret was configured while the Swagger UI was on (always the case before 1.2.0, with the `auth` profile), rotate that secret at your identity provider (see [Upgrading](upgrading.md#to-120)).
+`TESK_API_TRS_URIPATTERN` | Pattern of executor images that TESK API looks up in a [GA4GH Tool Registry Service](#tool-images-from-a-tool-registry) (TRS). Default: `trs://{host}/{id}/versions/{version}`.
+`TESK_API_TRS_URLPATTERN` | URL that TESK API asks for such an image. Default: `https://{host}/ga4gh/trs/v2/tools/{id}/versions/{version}`.
+
+## Tool images from a tool registry
+
+An executor's `image` can name a tool version in a GA4GH Tool Registry
+Service instead of a container image. If it matches `TESK_API_TRS_URIPATTERN`
+(e.g. `trs://example.org/my-tool/versions/1.0`), TESK API takes `{host}`,
+`{id}` and `{version}` from it, sends `GET` to `TESK_API_TRS_URLPATTERN`
+with these values filled in (here
+`https://example.org/ga4gh/trs/v2/tools/my-tool/versions/1.0`), and runs the
+first Docker image of the answer. If the request fails or the answer has no
+Docker image, the executor gets the `image` as given. The host comes from
+the task, so TESK API sends these requests to any host that a task names;
+limit its outgoing network access (e.g. with a Kubernetes network policy) if
+your deployment needs that.
 
 ## Service info
 
