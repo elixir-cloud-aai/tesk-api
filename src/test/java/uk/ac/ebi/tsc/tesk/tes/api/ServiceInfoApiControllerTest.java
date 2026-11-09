@@ -14,8 +14,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 
 /**
- * Service info from the built-in {@code service-info.yaml} (the test resources have their own
- * file of that name, so it is read from the source tree)
+ * Service info from the built-in {@code service-info.yaml} (the test resources have their own file
+ * of that name, so it is read from the source tree)
  */
 public class ServiceInfoApiControllerTest {
 
@@ -41,7 +41,7 @@ public class ServiceInfoApiControllerTest {
         mvc.perform(get(SERVICE_INFO_URL))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type.group").value("org.ga4gh"))
-                .andExpect(jsonPath("$.type.artifact").value("TES"))
+                .andExpect(jsonPath("$.type.artifact").value("tes"))
                 .andExpect(jsonPath("$.type.version").value("1.0.0"));
     }
 }

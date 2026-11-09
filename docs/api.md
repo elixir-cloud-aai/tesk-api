@@ -117,7 +117,7 @@ Not Found`.
 
 `GET /service-info` describes the service, following the [GA4GH Service
 Info](https://github.com/ga4gh-discovery/ga4gh-service-info) schema: its ID,
-name, type (`org.ga4gh:TES`, version `1.0.0`: TESK API implements TES
+name, type (`org.ga4gh:tes`, version `1.0.0`: TESK API implements TES
 1.0.0), organisation, contact and documentation URLs, version and the storage
 locations it supports. The content comes from a YAML file, set by
 `TESK_API_SERVICE_INFO_LOCATION` (by default the built-in
