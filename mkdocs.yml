@@ -13,8 +13,10 @@ repo_name: elixir-cloud-aai/tesk-api
 edit_uri: edit/dev/docs/
 copyright: Copyright &copy; ELIXIR On-Cloud
 
-# Not pages
+# Not pages; the curated release notes (`releases/`) are published as GitHub
+# releases
 exclude_docs: |
+  releases/
   requirements.txt
 
 theme:
