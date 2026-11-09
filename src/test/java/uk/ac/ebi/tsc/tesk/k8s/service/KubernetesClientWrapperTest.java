@@ -621,7 +621,10 @@ public class KubernetesClientWrapperTest {
                 is(Arrays.asList(legacyJob("TEST", "c_d"), job("TEST", "e@f"))));
     }
 
-    /** Jobs without labels belong to no group and no user, so the filter leaves them out */
+    /**
+     * Jobs without labels belong to no group and no user, so the filter leaves them out, also with
+     * only the creator annotation and with the legacy-label setting on
+     */
     @Test
     public void listAllTaskmasterJobsForUser_jobWithoutLabels() throws ApiException {
         V1ObjectMeta annotatedOnly = new V1ObjectMeta().putAnnotationsItem(ANN_USERID_KEY, "a@b");

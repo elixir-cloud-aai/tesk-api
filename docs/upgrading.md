@@ -23,7 +23,9 @@ Changes since 1.2.0 that clients or deployments may notice:
     - List the old tasks with `kubectl get jobs -n <namespace> -l
       'job-type=taskmaster,creator-user-id,!creator-user-hash'`. The old
       label can't be converted exactly, because its value doesn't tell
-      whether a `_` was an `@`. Delete the old tasks that are no longer
+      whether a `_` was an `@`. (Kubernetes can't select by annotations:
+      an object that also has the annotation `creator-user-id` shows up
+      here too, but TESK API doesn't count it as old.) Delete the old tasks that are no longer
       needed by name (`kubectl delete jobs -n <namespace> <name>`).
       `kubectl delete jobs -n <namespace> -l
       'creator-user-id,!creator-user-hash'` deletes all old tasks at once,

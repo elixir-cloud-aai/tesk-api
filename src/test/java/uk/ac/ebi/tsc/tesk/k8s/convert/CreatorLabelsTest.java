@@ -89,7 +89,7 @@ public class CreatorLabelsTest {
 
     /** An annotation without the hash label is neither old nor valid: it names no creator */
     @Test
-    public void legacy_notWithTheAnnotation() {
+    public void isLegacy_falseWithTheAnnotation() {
         V1ObjectMeta metadata =
                 new V1ObjectMeta()
                         .putLabelsItem(LABEL_LEGACY_USERID_KEY, "a_b")
