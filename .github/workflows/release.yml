@@ -20,9 +20,10 @@
 # builds a new digest, which `release-image` refuses, before attesting and
 # signing it, if `X.Y.Z` already points to another one: published versions
 # never change. Only admins can create `v*` tags, and nobody can move or delete
-# them (tag rulesets of the repository). `release-image` runs one release at a
-# time; a newer release waiting for it can cancel an older one that waits too
-# (one pending job per concurrency group): re-run the failed jobs of that run.
+# them (tag rulesets of the repository). `release-image` and `publish` each run
+# one release at a time; a newer release waiting for one of them can cancel an
+# older one that waits too (one pending job per concurrency group): re-run the
+# failed jobs of that run.
 # `prepare` fails if a published release of the tag exists already (it can't
 # see drafts); `publish` fails on a draft of the tag, and on a published
 # release unless an earlier attempt created it (same curated notes, title and
@@ -332,7 +333,8 @@ jobs:
   # environment: it needs no secrets, only `contents: write`. The tag must still
   # point to the release commit. Fails on a draft of the tag, and on a published
   # release unless an earlier attempt of this job created it (then it passes
-  # without changes). One at a time, so that `latest` is decided in order
+  # without changes). One at a time, so that `latest` is decided in order; a
+  # cancelled pending run (see the header) is re-run like a failed one
   publish:
     name: Publish release
     needs: [prepare, release-image]

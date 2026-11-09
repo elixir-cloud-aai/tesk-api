@@ -170,7 +170,10 @@ with missing or malformed notes fails before anything is published. It can't
 see draft releases, so delete any draft of the tag before you push the tag.
 If only `Publish release` fails, re-run the failed jobs (not all jobs: once
 the GitHub release exists, `Prepare release` fails); a re-run passes without
-changes if the earlier attempt created the release after all. Releases are
+changes if the earlier attempt created the release after all. `Publish
+release` runs one release at a time, so that `latest` is set in order; if
+several tags are released at once, GitHub can cancel a waiting run of the
+job: re-run it the same way. Releases are
 never edited afterwards: fix mistakes in the notes of the next release.
 
 After publishing the image (without waiting for the GitHub release), the
