@@ -269,7 +269,10 @@ public class TesKubernetesConverter {
                                                 RESOURCE_MEM_KEY,
                                                 new QuantityFormatter()
                                                         .parse(
-                                                                String.format("%.6f", ramGb)
+                                                                String.format(
+                                                                                Locale.ROOT,
+                                                                                "%.6f",
+                                                                                ramGb)
                                                                         + RESOURCE_MEM_UNIT)));
 
         return job;

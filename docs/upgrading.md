@@ -114,6 +114,29 @@ What's new:
   before; numbers with more digits or decimals are refused with `400 Bad
   Request`. The API description (`/v2/api-docs`) now gives `cpu_cores` as a
   number instead of an integer.
+- **Positive resources (behaviour change).** `resources.cpu_cores`,
+  `ram_gb` and `disk_gb` must be positive, and `ram_gb` at least `0.000001`:
+  `0`, negative and smaller numbers are refused with `400 Bad Request` (see
+  [API](api.md#resources)). Before, TESK API didn't check them and passed
+  them on to Kubernetes and the taskmaster. **A task with `0` for any of
+  them, which was accepted before, is now refused**: clients that send `0`
+  for "no requirement" need to leave the field out instead.
+- **Jobs without labels.** `GET /tasks/{id}` and `POST /tasks/{id}:cancel`
+  (the requests that read a single task) answer `404 Not Found` for the name
+  of a job without labels in the namespace, as for any job that isn't a
+  taskmaster's job; before, they answered `500 Internal Server Error`.
+- **RAM under any locale.** Tasks with `resources.ram_gb` are created also
+  when the JVM's default locale writes numbers with a decimal comma (e.g.
+  `de_DE`); before, creating them failed.
+- **Kubernetes client logs.** `KubernetesClientWrapper` logs at `INFO`,
+  like the rest of TESK API, so the calls of its Kubernetes client are no
+  longer logged; before, it was set to `TRACE`, which logged its calls with
+  their arguments and the objects it created or labelled (the tasks'
+  Kubernetes objects, e.g. commands and environment variables). To log them
+  again, for debugging, set
+  `LOGGING_LEVEL_UK_AC_EBI_TSC_TESK_K8S_SERVICE=TRACE` (Spring Boot lowercases
+  logger names from environment variables, so name the package, not the
+  class).
 - **Authorisation without groups.** With the `auth` profile, TESK API can
   authorise users by a claim of the user info instead of group membership
   (`TESK_API_AUTHORISATION_CLAIM_ENABLED`, `TESK_API_AUTHORISATION_CLAIM_NAME`

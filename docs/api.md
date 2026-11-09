@@ -59,8 +59,15 @@ TESK API also accepts decimal numbers with up to 3 decimals (Kubernetes counts
 CPU in thousandths of a core), e.g. `0.5` for half a core (requested from
 Kubernetes as `500m`), up to `999999.999`; trailing zeros don't count
 (`0.5000` is `0.5`). Numbers with more digits or decimals are refused with
-`400 Bad Request`; negative numbers and `0` are not checked. TESK API returns the number as it was given; whole numbers
+`400 Bad Request`. TESK API returns the number as it was given; whole numbers
 stay integers, also if given with an exponent (`1e3` is returned as `1000`).
+
+`cpu_cores`, `ram_gb` and `disk_gb` must be positive if they are given: `0`
+and negative numbers are refused with `400 Bad Request`. `ram_gb` must be at
+least `0.000001`, the smallest amount that TESK API requests (it rounds RAM
+to 6 decimals before it asks Kubernetes). Leave a field out instead: TESK API
+then requests no CPU or RAM (the defaults of the namespace's LimitRange may
+apply), and 0.1 GB for the task's volume.
 
 ## Executor logs
 

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.validation.Valid;
+import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Digits;
 
 /**
@@ -54,6 +55,8 @@ public class TesResources   {
   @ApiModelProperty(example = "4", value = "Requested number of CPUs (TESK also accepts decimal numbers, e.g. 0.5)")
   //at most 999999.999: Kubernetes counts CPU in steps of 1m; bounds the number before it is converted
   @Digits(integer = 6, fraction = 3)
+  //positive: zero or negative numbers are refused (issue #128)
+  @DecimalMin(value = "0", inclusive = false)
 
   public BigDecimal getCpuCores() {
     return cpuCores;
@@ -108,7 +111,9 @@ public class TesResources   {
    * @return ramGb
   */
   @ApiModelProperty(example = "8", value = "Requested RAM required in gigabytes (GB)")
-
+  //positive, at least the smallest amount that TESK API requests from Kubernetes: it rounds
+  //RAM to 6 decimals, see TesKubernetesConverter (issue #128)
+  @DecimalMin(value = "0.000001")
 
   public Double getRamGb() {
     return ramGb;
@@ -128,7 +133,8 @@ public class TesResources   {
    * @return diskGb
   */
   @ApiModelProperty(example = "40", value = "Requested disk size in gigabytes (GB)")
-
+  //positive: zero or negative numbers are refused (issue #128)
+  @DecimalMin(value = "0", inclusive = false)
 
   public Double getDiskGb() {
     return diskGb;

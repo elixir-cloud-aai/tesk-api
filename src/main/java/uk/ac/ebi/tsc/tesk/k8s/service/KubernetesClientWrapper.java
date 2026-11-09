@@ -13,6 +13,7 @@ import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1LimitRange;
 import io.kubernetes.client.openapi.models.V1LimitRangeItem;
 import io.kubernetes.client.openapi.models.V1LimitRangeList;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
 import java.math.BigDecimal;
 import java.util.Locale;
@@ -135,13 +136,12 @@ public class KubernetesClientWrapper {
     public V1Job readTaskmasterJob(String taskId) {
         try {
             V1Job job = this.batchApi.readNamespacedJob(taskId, namespace, null, null, null);
-            if (!isBeingDeleted(job)
-                    && job.getMetadata().getLabels().entrySet().stream()
-                            .anyMatch(
-                                    entry ->
-                                            LABEL_JOBTYPE_KEY.equals(entry.getKey())
-                                                    && LABEL_JOBTYPE_VALUE_TASKM.equals(
-                                                            entry.getValue()))) {
+            // a job without metadata or labels isn't a taskmaster's job either
+            V1ObjectMeta metadata = job.getMetadata();
+            Map<String, String> labels = metadata == null ? null : metadata.getLabels();
+            if (labels != null
+                    && LABEL_JOBTYPE_VALUE_TASKM.equals(labels.get(LABEL_JOBTYPE_KEY))
+                    && !isBeingDeleted(job)) {
                 return job;
             }
         } catch (ApiException e) {

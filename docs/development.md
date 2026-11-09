@@ -184,6 +184,7 @@ it to a new version of the specification, run:
 This generates new versions of the model (`uk.ac.ebi.tsc.tesk.tes.model`) and
 the API stub (`uk.ac.ebi.tsc.tesk.tes.api`). The model classes carry [Bean
 Validation](https://beanvalidation.org/) annotations beyond those derived from
-the specification; restore them by hand in the generated code, and reconcile
+the specification (e.g. `@Digits` and `@DecimalMin` on the resources of
+`TesResources`); restore them by hand in the generated code, and reconcile
 any other manual changes, e.g. the internal field `userIdFromLegacyLabel` of
 `TesTaskLog` (not serialized), which the access check of a task needs.

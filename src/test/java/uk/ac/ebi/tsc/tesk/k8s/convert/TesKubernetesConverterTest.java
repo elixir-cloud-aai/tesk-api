@@ -19,6 +19,7 @@ import io.kubernetes.client.openapi.models.*;
 import java.io.*;
 import java.io.ByteArrayInputStream;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.zip.GZIPInputStream;
@@ -755,6 +756,35 @@ public class TesKubernetesConverterTest {
                 job.getSpec().getTemplate().getSpec().getContainers().get(0).getResources();
         assertEquals("500m", requirements.getLimits().get("cpu").toSuffixedString());
         assertEquals("500m", requirements.getRequests().get("cpu").toSuffixedString());
+    }
+
+    /**
+     * RAM is requested with a decimal point whatever the JVM's default locale is, e.g. also under a
+     * locale with a decimal comma
+     */
+    @Test
+    public void fromTesExecutorToK8sJob_ramIndependentOfLocale() throws IOException {
+        Locale defaultLocale = Locale.getDefault();
+        Locale.setDefault(Locale.GERMANY);
+        try {
+            TesResources resources =
+                    this.objectMapper.readValue("{\"ram_gb\": 1.5}", TesResources.class);
+            TesExecutor executor = new TesExecutor().image("alpine").addCommandItem("true");
+            V1Job job =
+                    this.converter.fromTesExecutorToK8sJob(
+                            "task-123",
+                            "name",
+                            executor,
+                            0,
+                            resources,
+                            User.builder("test-user-id").build());
+            V1ResourceRequirements requirements =
+                    job.getSpec().getTemplate().getSpec().getContainers().get(0).getResources();
+            // 1.5 GiB in bytes
+            assertEquals("1610612736", requirements.getRequests().get("memory").toSuffixedString());
+        } finally {
+            Locale.setDefault(defaultLocale);
+        }
     }
 
     /**
