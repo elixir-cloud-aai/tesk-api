@@ -168,15 +168,16 @@ What's new:
   default, so nothing changes unless you turn it on; read its security
   implications first. The Helm chart of TESK sets them with `auth.claim`
   (`enabled`, `name` and `values`; from chart 0.3.0).
-- **Group names matched literally.** The configured group prefix, groups,
-  admin subgroup and suffix are compared as plain text when TESK API
-  recognises team and team admin groups (see
-  [Configuration](access-control.md#configuration)). Before, they were used
-  as regular expressions, so that characters such as the `.` in the default
-  prefix and suffix matched any character. With the usual group names,
-  nothing changes; check your settings if they contain characters such as
-  `.`, `*`, `+`, `?`, `(`, `[`, `|`, `^`, `$` or `\` and relied on them as
-  patterns.
+- **Group names matched literally.** When TESK API recognises team and team
+  admin groups, it compares the group settings
+  (`TESK_API_AUTHORISATION_GROUP_PREFIX`, `…_PARENT_GROUP`,
+  `…_ENV_SUBGROUP`, `…_BASE_GROUP`, `…_DELIMITER`, `…_ADMIN_SUBGROUP` and
+  `…_GROUP_SUFFIX`) as plain text (see [Access
+  control](access-control.md#configuration)). Before, they were used as
+  regular expressions, so that characters such as the `.` in the default
+  prefix and suffix matched any character. With plain group names, as in the
+  defaults, nothing changes. If a setting relied on a pattern (e.g. `(A|B)`
+  or `.*`), it no longer matches: set the exact names instead.
 - **Non-root image.** The image runs as the user `tesk` (UID 1000, group 0)
   instead of `root`, with the home directory `/home/tesk` (see
   [Deployment](deployment.md#image)). The Helm chart of TESK already runs it
