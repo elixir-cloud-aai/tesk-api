@@ -149,7 +149,10 @@ then labels the job and any pending pod as cancelled, and sets the job's
 and removes its pods, so a pending pod never starts. If Kubernetes creates
 the pod in that second, the taskmaster can start; Kubernetes then stops it,
 at the latest when the pod's termination grace period (30 seconds by
-default) is over. The job's label keeps the task `CANCELED`.
+default) is over
+([tesk-core#132](https://github.com/elixir-cloud-aai/tesk-core/issues/132)
+tracks a check for cancellation in the taskmaster). The job's label keeps
+the task `CANCELED`.
 
 TESK API checks the state before it labels the job. If the task ends in
 between, for example because an executor fails at that moment, the label

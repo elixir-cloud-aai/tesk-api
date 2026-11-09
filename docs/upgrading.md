@@ -142,7 +142,8 @@ What's new:
   task without a pod couldn't be cancelled (`400 Bad Request`). A taskmaster
   pod that Kubernetes creates in the moment of the request can still start,
   and runs until its termination grace period is over (30 seconds by
-  default).
+  default; see
+  [tesk-core#132](https://github.com/elixir-cloud-aai/tesk-core/issues/132)).
 - **Jobs without labels.** `GET /tasks/{id}` and `POST /tasks/{id}:cancel`
   (the requests that read a single task) answer `404 Not Found` for the name
   of a job without labels in the namespace, as for any job that isn't a
