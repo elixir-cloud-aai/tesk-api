@@ -1,0 +1,9 @@
+{
+  "executors": [
+    {
+      "image": "ubuntu",
+      "command": ["echo", "hello world"]
+    }
+  ],
+  "resources": {"ram_gb": 0}
+}
