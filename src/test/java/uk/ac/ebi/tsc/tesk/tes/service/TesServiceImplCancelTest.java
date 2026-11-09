@@ -178,6 +178,18 @@ class TesServiceImplCancelTest {
         order.verify(this.client).labelPodAsCancelled(TASK + "-pod");
     }
 
+    /**
+     * Without a running taskmaster, only pending pods are labelled: a pod in another phase (e.g.
+     * Unknown) isn't, but the job is ended all the same.
+     */
+    @Test
+    void podInOtherPhaseIsNotLabelled() {
+        this.taskmasterPods.getItems().get(0).getStatus().phase("Unknown");
+        this.service.cancelTask(TASK);
+        verify(this.client).cancelJobBeforeStart(TASK);
+        verify(this.client, never()).labelPodAsCancelled(anyString());
+    }
+
     /** A taskmaster's pod without a status yet is neither running nor pending. */
     @Test
     void podWithoutStatusIsNotRunning() {
