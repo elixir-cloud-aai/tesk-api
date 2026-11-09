@@ -111,8 +111,9 @@ public class TesResources   {
    * @return ramGb
   */
   @ApiModelProperty(example = "8", value = "Requested RAM required in gigabytes (GB)")
-  //positive: zero or negative numbers are refused (issue #128)
-  @DecimalMin(value = "0", inclusive = false)
+  //positive, at least the smallest amount that TESK API requests from Kubernetes (6 decimals,
+  //see TesKubernetesConverter): smaller numbers would request no RAM (issue #128)
+  @DecimalMin(value = "0.000001")
 
   public Double getRamGb() {
     return ramGb;

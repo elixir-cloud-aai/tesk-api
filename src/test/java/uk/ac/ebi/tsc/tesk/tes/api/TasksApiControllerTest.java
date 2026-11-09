@@ -288,33 +288,63 @@ public class TasksApiControllerTest {
 
     /**
      * CPU cores, RAM and disk must be positive: zero and negative numbers are refused before
-     * Kubernetes is asked (issue #128)
+     * Kubernetes is asked, with the field and the bound in the message; RAM needs at least 0.000001
+     * GB, the smallest amount that TESK API requests from Kubernetes (issue #128)
      */
     @Test
     public void createTask_invalid_nonPositiveResources() throws Exception {
         String[][] cases =
                 new String[][] {
-                    {"cpu_cores_0.json", "cpu"},
-                    {"cpu_cores_minus_1.json", "cpu"},
-                    {"ram_gb_0.json", "ram"},
-                    {"ram_gb_minus_1.json", "ram"},
-                    {"disk_gb_0.json", "disk"},
-                    {"disk_gb_minus_5.json", "disk"}
+                    {"cpu_cores_0.json", "Field 'resources.cpuCores' must be greater than 0"},
+                    {"cpu_cores_minus_1.json", "Field 'resources.cpuCores' must be greater than 0"},
+                    {
+                        "ram_gb_0.json",
+                        "Field 'resources.ramGb' must be greater than or equal to 0.000001"
+                    },
+                    {
+                        "ram_gb_minus_1.json",
+                        "Field 'resources.ramGb' must be greater than or equal to 0.000001"
+                    },
+                    {
+                        "ram_gb_1e_7.json",
+                        "Field 'resources.ramGb' must be greater than or equal to 0.000001"
+                    },
+                    {"disk_gb_0.json", "Field 'resources.diskGb' must be greater than 0"},
+                    {"disk_gb_minus_5.json", "Field 'resources.diskGb' must be greater than 0"}
                 };
         for (String[] c : cases) {
-            this.mvc
-                    .perform(
-                            post(TASK_URL)
-                                    .header("Authorization", "Bearer BAR")
-                                    .content(
-                                            getFileContentFromResources(
-                                                    "invalid_tasks/resources/" + c[0]))
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .accept(MediaType.APPLICATION_JSON))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().string(containsString(c[1])));
+            try {
+                this.mvc
+                        .perform(
+                                post(TASK_URL)
+                                        .header("Authorization", "Bearer BAR")
+                                        .content(
+                                                getFileContentFromResources(
+                                                        "invalid_tasks/resources/" + c[0]))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .accept(MediaType.APPLICATION_JSON))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.messages[0]").value(c[1]));
+            } catch (AssertionError e) {
+                throw new AssertionError(c[0] + ": " + e.getMessage(), e);
+            }
         }
         verify(this.tesService, never()).createTask(any(), any());
+    }
+
+    /** The smallest amount of RAM that TESK API requests from Kubernetes is accepted (#128) */
+    @Test
+    public void createTask_valid_smallestRam() throws Exception {
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(
+                                        getFileContentFromResources(
+                                                "valid_tasks/ram_gb_0_000001.json"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
     }
 
     /** Trailing zeros don't count as decimals */
