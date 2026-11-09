@@ -152,6 +152,7 @@ public class ElixirPrincipalExtractor implements PrincipalExtractor {
                 .teskManagedGroups(managedGroups)
                 .teskAdmin(isAdmin)
                 .claimAuthorised(isClaimAuthorised(map))
+                .legacyUserLabels(authorisationProperties.isLegacyUserLabels())
                 .build();
     }
 }

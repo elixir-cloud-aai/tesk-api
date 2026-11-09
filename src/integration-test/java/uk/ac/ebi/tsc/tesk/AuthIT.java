@@ -27,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
 /**
  * Integration testing of security (authentication and authorisation using OIDC and Elixir groups)
@@ -82,7 +83,7 @@ public class AuthIT {
                                         "$.metadata.labels['creator-group-name']", absent()))
                         .withRequestBody(
                                 matchingJsonPath(
-                                        "$.metadata.labels[?(@.creator-user-id == '123')]"))
+                                        "$.metadata.labels[?(@.creator-user-hash == 'a665a45920422f9d417e4867efdc4fb8')]"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
@@ -116,7 +117,7 @@ public class AuthIT {
                                         "$.metadata.labels[?(@.creator-group-name == 'TEST')]"))
                         .withRequestBody(
                                 matchingJsonPath(
-                                        "$.metadata.labels[?(@.creator-user-id == '123')]"))
+                                        "$.metadata.labels[?(@.creator-user-hash == 'a665a45920422f9d417e4867efdc4fb8')]"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
@@ -170,7 +171,7 @@ public class AuthIT {
                                         "$.metadata.labels[?(@.creator-group-name == 'TEST')]"))
                         .withRequestBody(
                                 matchingJsonPath(
-                                        "$.metadata.labels[?(@.creator-user-id == '123')]"))
+                                        "$.metadata.labels[?(@.creator-user-hash == 'a665a45920422f9d417e4867efdc4fb8')]"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
@@ -201,7 +202,7 @@ public class AuthIT {
                 WireMock.post("/apis/batch/v1/namespaces/default/jobs")
                         .withRequestBody(
                                 matchingJsonPath(
-                                        "$.metadata.labels[?(@.creator-user-id == '123')]"))
+                                        "$.metadata.labels[?(@.creator-user-hash == 'a665a45920422f9d417e4867efdc4fb8')]"))
                         .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
 
         mockKubernetes.givenThat(
@@ -232,7 +233,7 @@ public class AuthIT {
                 WireMock.post("/apis/batch/v1/namespaces/default/jobs")
                         .withRequestBody(
                                 matchingJsonPath(
-                                        "$.metadata.labels[?(@.creator-user-id == '123')]"))
+                                        "$.metadata.labels[?(@.creator-user-hash == 'a665a45920422f9d417e4867efdc4fb8')]"))
                         .withRequestBody(
                                 matchingJsonPath(
                                         "$.metadata.labels[?(@.creator-group-name == 'ABC')]"))
@@ -560,11 +561,12 @@ public class AuthIT {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-id%3D123")
+                                        + "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-hash%3Da665a45920422f9d417e4867efdc4fb8")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
-        performListTask(4);
+        // only the own tasks (task-123 and task-125), also if Kubernetes returned others
+        performListTask(2);
     }
 
     @Test
@@ -601,7 +603,9 @@ public class AuthIT {
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
-        performListTask(4);
+        // the tasks of the group TEST, and the own task-125 of the group ABC, which Kubernetes
+        // wouldn't return for this selector
+        performListTask(3);
     }
 
     @Test
@@ -720,6 +724,104 @@ public class AuthIT {
         this.mvc
                 .perform(get(SERVICE_INFO_URL).header("Authorization", "Bearer BAR"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private void userInfo(String sub, String... groups) {
+        StringBuilder json = new StringBuilder("{\"sub\" : \"" + sub + "\", ");
+        json.append("\"eduperson_entitlement\" : [");
+        for (int i = 0; i < groups.length; i++) {
+            json.append(i > 0 ? "," : "")
+                    .append("\"urn:geant:elixir-europe.org:group:elixir:")
+                    .append(groups[i])
+                    .append("#perun.elixir-czech.cz\"");
+        }
+        json.append("]}");
+        mockElixir.givenThat(WireMock.get("/").willReturn(okJson(json.toString())));
+    }
+
+    private void expectGetTask(int status) throws Exception {
+        for (String view : new String[] {"MINIMAL", "BASIC", "FULL"}) {
+            this.mvc
+                    .perform(
+                            get(TASK_URL + "/{id}?view=" + view, "task-123")
+                                    .header("Authorization", "Bearer BAR"))
+                    .andExpect(status().is(status));
+        }
+    }
+
+    /** IDs that the old label encoding merged are told apart (issue #119) */
+    @Test
+    public void similarIds_getTask() throws Exception {
+        MockUtil.mockGroupTaskKubernetesResponses(this.mockKubernetes, "TEST", "a@b");
+        userInfo("a_b", "GA4GH:GA4GH-CAP:EBI", "GA4GH:GA4GH-CAP:EBI:TEST");
+        expectGetTask(403);
+        userInfo("a@b", "GA4GH:GA4GH-CAP:EBI", "GA4GH:GA4GH-CAP:EBI:TEST");
+        expectGetTask(200);
+    }
+
+    /** IDs that aren't valid label values, e.g. longer than 63 characters, work (issue #119) */
+    @Test
+    public void longId_createAndGetTask() throws Exception {
+        StringBuilder id = new StringBuilder("user|");
+        for (int i = 0; i < 70; i++) {
+            id.append("x");
+        }
+        userInfo(id.toString(), "GA4GH:GA4GH-CAP:EBI", "GA4GH:GA4GH-CAP:EBI:TEST");
+        mockKubernetes.givenThat(
+                WireMock.post("/apis/batch/v1/namespaces/default/jobs")
+                        .withRequestBody(
+                                matchingJsonPath(
+                                        "$.metadata.labels[?(@.creator-user-hash == '"
+                                                + CreatorLabels.hash(id.toString())
+                                                + "')]"))
+                        .withRequestBody(
+                                matchingJsonPath(
+                                        "$.metadata.annotations[?(@.creator-user-id == '"
+                                                + id
+                                                + "')]"))
+                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
+        mockKubernetes.givenThat(
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
+                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .content(
+                                        getFileContentFromResources(
+                                                "fromTesToK8s_minimal/task.json"))
+                                .header("Authorization", "Bearer BAR")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        MockUtil.mockGroupTaskKubernetesResponses(this.mockKubernetes, "TEST", id.toString());
+        expectGetTask(200);
+        this.mvc
+                .perform(
+                        get(TASK_URL + "/{id}?view=BASIC", "task-123")
+                                .header("Authorization", "Bearer BAR"))
+                .andExpect(jsonPath("$.logs[0].metadata.USER_ID").value(id.toString()));
+    }
+
+    /**
+     * Tasks with only the old label belong to no user while
+     * tesk.api.authorisation.legacy-user-labels is off (the default); group admins and super admins
+     * still get them (issue #119)
+     */
+    @Test
+    public void legacyLabel_getTask() throws Exception {
+        MockUtil.mockLegacyTaskKubernetesResponses(this.mockKubernetes, "TEST", "123");
+        userInfo("123", "GA4GH:GA4GH-CAP:EBI", "GA4GH:GA4GH-CAP:EBI:TEST");
+        expectGetTask(403);
+        userInfo("124", "GA4GH:GA4GH-CAP:EBI:TEST:ADMIN");
+        expectGetTask(200);
+        userInfo("124", "GA4GH:GA4GH-CAP:EBI:ADMIN");
+        expectGetTask(200);
+        this.mvc
+                .perform(
+                        get(TASK_URL + "/{id}?view=BASIC", "task-123")
+                                .header("Authorization", "Bearer BAR"))
+                .andExpect(jsonPath("$.logs[0].metadata.USER_ID").value("123"));
     }
 
     private void performListTask(int expectedLength) throws Exception {

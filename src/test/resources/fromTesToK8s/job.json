@@ -8,7 +8,7 @@
     },
     "labels": {
       "job-type": "taskmaster",
-      "creator-user-id": "test-user-id",
+      "creator-user-hash": "c95b3f800751698e8f935156112885cc",
       "creator-group-name": "ABC"
     },
     "name": "task-35605447"

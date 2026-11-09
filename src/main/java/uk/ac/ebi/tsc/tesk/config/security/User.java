@@ -1,16 +1,20 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.io.Serializable;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
+import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 
 /**
  * POJO for auhenticated user's data
@@ -37,6 +41,13 @@ public class User implements Serializable, UserDetails, Principal {
      * tesk.api.authorisation.claim (always false if that setting is off)
      */
     private boolean claimAuthorised = false;
+
+    /**
+     * Whether tasks created before the hash label, with only the old label {@code creator-user-id},
+     * are the user's if their label has the user's ID with {@code @} replaced by {@code _}
+     * (tesk.api.authorisation.legacy-user-labels; see {@link CreatorLabels})
+     */
+    private boolean legacyUserLabels = false;
 
     /**
      * List of 'organisational' groups, to which the user belongs (last part of Elixir group names
@@ -68,6 +79,43 @@ public class User implements Serializable, UserDetails, Principal {
         return claimAuthorised;
     }
 
+    public boolean isLegacyUserLabels() {
+        return legacyUserLabels;
+    }
+
+    /**
+     * Whether the user created the Kubernetes object: the hash label and the annotation give the
+     * user's ID, or, for objects with only the old label and only if {@link #legacyUserLabels} is
+     * on, the old label has the user's ID in the old encoding
+     */
+    public boolean isCreatorOf(V1ObjectMeta metadata) {
+        if (CreatorLabels.isLegacy(metadata)) {
+            return isLegacyCreator(CreatorLabels.legacyCreator(metadata));
+        }
+        return userId.equals(CreatorLabels.creatorId(metadata));
+    }
+
+    /**
+     * Whether the user created the task of the log, as {@link #isCreatorOf}: its metadata {@code
+     * USER_ID} holds the ID, or the value of the old label if {@link
+     * TesTaskLog#isUserIdFromLegacyLabel()}
+     */
+    public boolean isCreator(TesTaskLog log) {
+        if (log == null) {
+            return false;
+        }
+        Map<String, String> metadata = log.getMetadata();
+        String creator = metadata == null ? null : metadata.get("USER_ID");
+        if (log.isUserIdFromLegacyLabel()) {
+            return isLegacyCreator(creator);
+        }
+        return userId.equals(creator);
+    }
+
+    private boolean isLegacyCreator(String legacyLabel) {
+        return legacyUserLabels && CreatorLabels.legacyValue(userId).equals(legacyLabel);
+    }
+
     public boolean isGroupMember(String groupName) {
         return teskMemberedGroups != null && teskMemberedGroups.contains(groupName);
     }
@@ -91,22 +139,15 @@ public class User implements Serializable, UserDetails, Principal {
         return teskManagedGroups != null && teskManagedGroups.size() > 0;
     }
 
-    public boolean isMemberInNonManagedGroups() {
-        if (!isTeskAdmin() && isMember() && isManager()) {
-            Set<String> difference = new HashSet<>();
-            difference.addAll(this.teskMemberedGroups);
-            difference.removeAll(this.teskManagedGroups);
-            return difference.size() > 0;
-        }
-        return false;
-    }
-
     /**
      * Label selector of the taskmaster jobs that the user may list, in addition to the job type:
      * none for admins (all tasks); the groups (and, unless a manager of one, the own tasks in them)
      * for group members and managers; the own tasks without a group for users authorised by the
      * claim only (tesk.api.authorisation.claim). Null also for users without any of these rights,
-     * who may not list tasks at all (see {@code TesService#listTasks}).
+     * who may not list tasks at all (see {@code TesService#listTasks}). The own tasks are selected
+     * by the hash label, which only narrows the list down: the caller checks the creator of each
+     * job ({@link #isCreatorOf}). With {@link #legacyUserLabels}, the selector can't name the
+     * creator, as tasks may have either label, and only selects by group.
      */
     public String getLabelSelector() {
         Set<String> allTeskGroups = new LinkedHashSet<>();
@@ -125,21 +166,22 @@ public class User implements Serializable, UserDetails, Principal {
                     .append(" in (")
                     .append(StringUtils.collectionToCommaDelimitedString(allTeskGroups))
                     .append(")");
-            if (!isManager()) {
-                sb.append(",").append(Constants.LABEL_USERID_KEY).append("=").append(getUsername());
+            if (!isManager() && !legacyUserLabels) {
+                sb.append(",").append(creatorSelector());
             }
             return sb.toString();
         }
         if (isClaimAuthorised()) {
             // authorised without groups: only the own tasks without a group (admins returned
             // above, so that they keep seeing all tasks)
-            return Constants.LABEL_USERID_KEY
-                    + "="
-                    + getUsername()
-                    + ",!"
-                    + Constants.LABEL_GROUPNAME_KEY;
+            String noGroup = "!" + Constants.LABEL_GROUPNAME_KEY;
+            return legacyUserLabels ? noGroup : creatorSelector() + "," + noGroup;
         }
         return null;
+    }
+
+    private String creatorSelector() {
+        return Constants.LABEL_USERHASH_KEY + "=" + CreatorLabels.hash(userId);
     }
 
     User(
@@ -153,7 +195,8 @@ public class User implements Serializable, UserDetails, Principal {
             Set<String> teskMemberedGroups,
             Set<String> teskManagedGroups,
             boolean teskAdmin,
-            boolean claimAuthorised) {
+            boolean claimAuthorised,
+            boolean legacyUserLabels) {
         this.userId = userId;
         this.preferredUsername = preferredUsername;
         this.name = name;
@@ -165,6 +208,7 @@ public class User implements Serializable, UserDetails, Principal {
         this.teskManagedGroups = teskManagedGroups;
         this.teskAdmin = teskAdmin;
         this.claimAuthorised = claimAuthorised;
+        this.legacyUserLabels = legacyUserLabels;
     }
 
     @Override
@@ -178,9 +222,10 @@ public class User implements Serializable, UserDetails, Principal {
         return null;
     }
 
+    /** The user's ID (the OIDC {@code sub}), unchanged */
     @Override
     public String getUsername() {
-        return userId.replaceAll("@", "_");
+        return userId;
     }
 
     @Override
@@ -241,6 +286,8 @@ public class User implements Serializable, UserDetails, Principal {
                 + isTeskAdmin()
                 + ", claimAuthorised="
                 + isClaimAuthorised()
+                + ", legacyUserLabels="
+                + isLegacyUserLabels()
                 + "}";
     }
 
@@ -259,6 +306,9 @@ public class User implements Serializable, UserDetails, Principal {
             return false;
         }
         if (claimAuthorised != user.claimAuthorised) {
+            return false;
+        }
+        if (legacyUserLabels != user.legacyUserLabels) {
             return false;
         }
         if (userId != null ? !userId.equals(user.userId) : user.userId != null) {
@@ -305,6 +355,7 @@ public class User implements Serializable, UserDetails, Principal {
         result = 31 * result + (allGroups != null ? allGroups.hashCode() : 0);
         result = 31 * result + (teskAdmin ? 1 : 0);
         result = 31 * result + (claimAuthorised ? 1 : 0);
+        result = 31 * result + (legacyUserLabels ? 1 : 0);
         result = 31 * result + (teskMemberedGroups != null ? teskMemberedGroups.hashCode() : 0);
         result = 31 * result + (teskManagedGroups != null ? teskManagedGroups.hashCode() : 0);
         return result;
@@ -322,6 +373,7 @@ public class User implements Serializable, UserDetails, Principal {
         private Set<String> teskManagedGroups;
         private boolean teskAdmin = false;
         private boolean claimAuthorised = false;
+        private boolean legacyUserLabels = false;
 
         UserBuilder(String userId) {
             this.userId = userId;
@@ -381,6 +433,11 @@ public class User implements Serializable, UserDetails, Principal {
             return this;
         }
 
+        public UserBuilder legacyUserLabels(boolean legacyUserLabels) {
+            this.legacyUserLabels = legacyUserLabels;
+            return this;
+        }
+
         public User build() {
             return new User(
                     userId,
@@ -393,7 +450,8 @@ public class User implements Serializable, UserDetails, Principal {
                     teskMemberedGroups,
                     teskManagedGroups,
                     teskAdmin,
-                    claimAuthorised);
+                    claimAuthorised,
+                    legacyUserLabels);
         }
     }
 }

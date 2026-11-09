@@ -39,6 +39,14 @@ public class AuthorisationProperties {
     private final Claim claim = new Claim();
 
     /**
+     * Whether tasks created before the label creator-user-hash, which only have the label
+     * creator-user-id (the creator's ID with @ replaced by _), are matched to their creators by
+     * that label (off by default; issue #119). For a transition after an upgrade: the old encoding
+     * gives different IDs the same value.
+     */
+    private boolean legacyUserLabels = false;
+
+    /**
      * Authorisation without groups (issue #78): if enabled, users whose user info has one of the
      * values in the claim may create tasks without a group, and see, get and cancel their own tasks
      * without a group. Group members and admins keep their rights.
@@ -78,6 +86,14 @@ public class AuthorisationProperties {
 
     public Claim getClaim() {
         return claim;
+    }
+
+    public boolean isLegacyUserLabels() {
+        return legacyUserLabels;
+    }
+
+    public void setLegacyUserLabels(boolean legacyUserLabels) {
+        this.legacyUserLabels = legacyUserLabels;
     }
 
     public String getGroupsClaim() {

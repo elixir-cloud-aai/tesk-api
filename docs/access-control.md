@@ -86,6 +86,35 @@ Environment variable | Meaning | Default
 `TESK_API_AUTHORISATION_ENV_SUBGROUP` | Name of the subgroup representing environment (aka Environment Group) | `EBI` (Full group name:  `elixir:GA4GH:GA4GH-CAP:EBI`)
 `TESK_API_AUTHORISATION_ADMIN_SUBGROUP` | Name of the subgroup representing admins (super admins or team admins) | `ADMIN` (Full group name of super-admins:  `elixir:GA4GH:GA4GH-CAP:EBI:ADMIN`)
 
+### Task creators
+
+TESK API identifies users by the `sub` claim of the user info, compared
+exactly. It records the creator of a task on the task's Kubernetes objects (the
+taskmaster's job, its ConfigMap and the executors' jobs):
+
+* the label `creator-user-hash`: the first 32 hexadecimal digits (128 bits)
+  of the SHA-256 hash of the `sub` (in UTF-8). Kubernetes selects a user's
+  tasks by it. Label values are limited to 63 characters from
+  `[A-Za-z0-9._-]`; the hash fits any `sub`.
+* the annotation `creator-user-id`: the `sub` itself. A task is the user's
+  only if the annotation is the user's `sub` and the label is its hash.
+
+`logs[0].metadata.USER_ID` of a task (in the `BASIC` and `FULL` views) shows
+the annotation. The team of a task is the label `creator-group-name`.
+
+Tasks created by earlier versions of TESK API have the label `creator-user-id`
+instead, with the `sub`'s `@` replaced by `_`; their `USER_ID` shows that
+value. That encoding gives different IDs the same value (e.g. `a@b` and
+`a_b`), and doesn't fit IDs longer than 63 characters or with other
+characters, so TESK API doesn't match these tasks to users by default: team
+admins and super admins see them as before, their creators don't. For a
+transition after the upgrade, the following setting matches them by the old
+label again (see [Upgrading](upgrading.md#to-the-next-release)):
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHORISATION_LEGACY_USER_LABELS` | `true`: a task with only the old label `creator-user-id` belongs to the users whose `sub`, with `@` replaced by `_`, is the label's value. Tasks with the label `creator-user-hash` or the annotation `creator-user-id` still need the exact `sub`: a task with only one of the two names no creator, also with this setting. Team members then list all tasks of their teams through Kubernetes, and users authorised by the claim only all tasks without a team; TESK API checks the creator of each, so pages can be shorter or empty, and listing reads more objects. | `false`
+
 ## Authorisation without groups
 
 Some OpenID Connect providers (e.g. LS Login) give no group memberships that
@@ -143,7 +172,5 @@ the claim lists only their tasks without a team.
 * TESK API reads the claim from the user info endpoint on each request, so a
   value revoked at the provider takes effect at the next request. Tasks that
   are already running keep running.
-* Users are identified by `sub` (with `@` replaced by `_`), as for group
-  members: tasks are labelled with it. As for all users, Kubernetes allows
-  label values of up to 63 characters, so users with longer subjects can't
-  create tasks.
+* Users are identified by `sub`, compared exactly, as for group members (see
+  [Task creators](#task-creators)).
