@@ -13,7 +13,7 @@ The TESK API acts as a Resource Server in the OIDC contract, whereas Elixir AAI 
 
 ### Public endpoints
 These `GET` and `HEAD` requests need no token, also with the `auth` profile:
-* `GET /service-info` (under the base path of the TES API), so that registries and clients can see what a service offers and how to get access. This is the default. To require a valid token for it (no group membership needed), set the environment variable `TESK_API_SERVICE_INFO_PUBLIC` to `false` (in the [Helm chart of TESK](https://github.com/elixir-cloud-aai/TESK): `auth.service_info_public`, which needs TESK API 1.2.0 or later). Service info can name your organisation, contact and storage locations: check the file that `TESK_API_SERVICE_INFO_LOCATION` points to (by default the built-in [`service-info.yaml`](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/resources/service-info.yaml); see [Configuration](configuration.md#service-info)) if that matters for your deployment.
+* `GET /service-info` (under the base path of the TES API), so that registries and clients can see what a service offers and how to get access. This is the default. To require a valid token for it (no group membership needed), set the environment variable `TESK_API_SERVICE_INFO_PUBLIC` to `false` (in the [Helm chart of TESK](https://github.com/elixir-cloud-aai/TESK): `auth.serviceInfoPublic`, from chart 0.3.0, which needs TESK API 1.2.0 or later). Service info can name your organisation, contact and storage locations: check the file that `TESK_API_SERVICE_INFO_LOCATION` points to (by default the built-in [`service-info.yaml`](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/resources/service-info.yaml); see [Configuration](configuration.md#service-info)) if that matters for your deployment.
 * The API description, and the Swagger UI if it is on (`TESK_API_SWAGGER_UI_ENABLED`; see [API](api.md#swagger-ui)).
 
 A request that does carry a token has it validated on these too: with an invalid token, the answer is `HTTP 401 Unauthorized`.
@@ -109,7 +109,7 @@ value. That encoding gives different IDs the same value (e.g. `a@b` and
 characters, so TESK API doesn't match these tasks to users by default: team
 admins and super admins see them as before, their creators don't. For a
 transition after the upgrade, the following setting matches them by the old
-label again (see [Upgrading](upgrading.md#to-the-next-release)):
+label again (see [Upgrading](upgrading.md#to-120)):
 
 Environment variable | Meaning | Default
 --- | --- | ---

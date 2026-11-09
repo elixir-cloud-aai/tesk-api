@@ -8,8 +8,8 @@ description:  GA4GH TES Server implementation for Kubernetes
 organization:
   name: EMBL-EBI
   url: https://www.ebi.ac.uk/
-contactUrl: https://github.com/EMBL-EBI-TSI/TESK/issues
-documentationUrl: https://github.com/EMBL-EBI-TSI/TESK
+contactUrl: https://github.com/elixir-cloud-aai/tesk-api/issues
+documentationUrl: https://tesk.readthedocs.io/en/latest/tesk-api/
 createdAt: 2021-04-06
 environment: dev
 version: 1.2.0
