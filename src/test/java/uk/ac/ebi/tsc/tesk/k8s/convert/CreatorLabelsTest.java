@@ -86,4 +86,15 @@ public class CreatorLabelsTest {
         assertNull(CreatorLabels.legacyCreator(new V1ObjectMeta()));
         assertNull(CreatorLabels.creatorId(new V1ObjectMeta()));
     }
+
+    /** An annotation without the hash label is neither old nor valid: it names no creator */
+    @Test
+    public void legacy_notWithTheAnnotation() {
+        V1ObjectMeta metadata =
+                new V1ObjectMeta()
+                        .putLabelsItem(LABEL_LEGACY_USERID_KEY, "a_b")
+                        .putAnnotationsItem(ANN_USERID_KEY, "a@b");
+        assertFalse(CreatorLabels.isLegacy(metadata));
+        assertNull(CreatorLabels.creatorId(metadata));
+    }
 }

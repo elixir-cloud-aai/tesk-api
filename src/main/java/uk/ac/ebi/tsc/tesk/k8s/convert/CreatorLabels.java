@@ -45,9 +45,13 @@ public final class CreatorLabels {
         metadata.putAnnotationsItem(ANN_USERID_KEY, userId);
     }
 
-    /** Whether the object was created before the hash label: it has none */
+    /**
+     * Whether the object was created before the hash label: it has neither the hash label nor the
+     * annotation (an object with only one of them names no creator, see {@link #creatorId})
+     */
     public static boolean isLegacy(V1ObjectMeta metadata) {
-        return get(metadata.getLabels(), LABEL_USERHASH_KEY) == null;
+        return get(metadata.getLabels(), LABEL_USERHASH_KEY) == null
+                && get(metadata.getAnnotations(), ANN_USERID_KEY) == null;
     }
 
     /**

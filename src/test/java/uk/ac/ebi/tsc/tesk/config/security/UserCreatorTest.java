@@ -107,6 +107,14 @@ public class UserCreatorTest {
         assertFalse(user("a@b", true).isCreatorOf(new V1ObjectMeta()));
     }
 
+    /** The old label counts only on objects without the new metadata, not with the annotation */
+    @Test
+    public void isCreatorOf_oldLabelNotWithTheAnnotation() {
+        V1ObjectMeta metadata = legacyLabel("a_b").putAnnotationsItem(ANN_USERID_KEY, "a_b");
+        assertFalse(user("a@b", true).isCreatorOf(metadata));
+        assertFalse(user("a_b", true).isCreatorOf(metadata));
+    }
+
     @Test
     public void isCreator_exactId() {
         assertTrue(user("a@b", false).isCreator(log("a@b", false)));
