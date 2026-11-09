@@ -128,10 +128,15 @@ What's new:
 - **RAM under any locale.** Tasks with `resources.ram_gb` are created also
   when the JVM's default locale writes numbers with a decimal comma (e.g.
   `de_DE`); before, creating them failed.
-- **Kubernetes client logs.** TESK API logs the calls of its Kubernetes
-  client at `INFO`, like the rest; before, `KubernetesClientWrapper` was set
-  to `TRACE`. For more detail, set e.g.
-  `LOGGING_LEVEL_UK_AC_EBI_TSC_TESK_K8S_SERVICE=DEBUG`.
+- **Kubernetes client logs.** `KubernetesClientWrapper` logs at `INFO`,
+  like the rest of TESK API, so the calls of its Kubernetes client are no
+  longer logged; before, it was set to `TRACE`, which logged its calls with
+  their arguments and the objects it created or labelled (the tasks'
+  Kubernetes objects, e.g. commands and environment variables). To log them
+  again, for debugging, set
+  `LOGGING_LEVEL_UK_AC_EBI_TSC_TESK_K8S_SERVICE=TRACE` (Spring Boot lowercases
+  logger names from environment variables, so name the package, not the
+  class).
 - **Authorisation without groups.** With the `auth` profile, TESK API can
   authorise users by a claim of the user info instead of group membership
   (`TESK_API_AUTHORISATION_CLAIM_ENABLED`, `TESK_API_AUTHORISATION_CLAIM_NAME`
