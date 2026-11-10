@@ -20,6 +20,7 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobStatus;
+import io.kubernetes.client.openapi.models.V1LocalObjectReference;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1Secret;
@@ -313,6 +314,48 @@ public class TesKubernetesConverterMinimalTest {
                         .path("registry.example.org")
                         .path("auth")
                         .asText());
+    }
+
+    @Test
+    public void privateExecutorImageKeepsTemplatePullSecrets() {
+        Supplier<V1Job> templateWithPullSecret =
+                () -> {
+                    V1Job job = executorTemplateSupplier.get();
+                    job.getSpec()
+                            .getTemplate()
+                            .getSpec()
+                            .addImagePullSecretsItem(
+                                    new V1LocalObjectReference().name("shared-pull-secret"));
+                    return job;
+                };
+        TesKubernetesConverter converterWithPullSecret =
+                new TesKubernetesConverter(
+                        templateWithPullSecret,
+                        taskmasterTemplateSupplier,
+                        objectMapper,
+                        gson,
+                        trsToolClient);
+        TesExecutor executor =
+                new TesExecutor()
+                        .image("registry.example.org/project/image:1")
+                        .addCommandItem("true")
+                        .dockerRegistry("registry.example.org")
+                        .dockerLogin("robot")
+                        .dockerPass("secret-password");
+
+        V1Job job =
+                converterWithPullSecret.fromTesExecutorToK8sJob(
+                        "task-98605447",
+                        "task name",
+                        executor,
+                        0,
+                        null,
+                        User.builder("test-user-id").build());
+
+        org.assertj.core.api.Assertions.assertThat(
+                        job.getSpec().getTemplate().getSpec().getImagePullSecrets())
+                .extracting(V1LocalObjectReference::getName)
+                .containsExactly("shared-pull-secret", "task-98605447-ex-00");
     }
 
     private TaskBuilder prepareBaseTaskBuider(boolean withExecutors, boolean withPods)

@@ -153,6 +153,26 @@ public class TasksApiControllerTest {
     }
 
     @Test
+    public void createTask_rejectsWhitespaceInRegistryAddress() throws Exception {
+        String task =
+                "{\"executors\":[{\"image\":\"registry.example.org/image\","
+                        + "\"command\":[\"true\"],"
+                        + "\"docker_registry\":\"registry.example.org invalid\","
+                        + "\"docker_login\":\"robot\",\"docker_pass\":\"private-token\"}]}";
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(task)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("docker_registry")))
+                .andExpect(content().string(not(containsString("private-token"))));
+        verify(this.tesService, never()).createTask(any(), any());
+    }
+
+    @Test
     public void createTask_acceptsPrivateImageCredentials() throws Exception {
         String task =
                 "{\"executors\":[{\"image\":\"registry.example.org/image\","

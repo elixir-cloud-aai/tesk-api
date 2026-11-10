@@ -218,12 +218,8 @@ public class TesKubernetesConverter {
                             Collections.singletonMap(
                                     executor.getDockerRegistry(),
                                     Collections.singletonMap("auth", auth)));
-            byte[] dockerConfigJson;
-            try {
-                dockerConfigJson = this.objectMapper.writeValueAsBytes(dockerConfig);
-            } catch (JsonProcessingException e) {
-                throw new IllegalStateException("Could not encode Docker registry credentials", e);
-            }
+            byte[] dockerConfigJson =
+                    this.gson.toJson(dockerConfig).getBytes(StandardCharsets.UTF_8);
             V1Secret secret =
                     new V1Secret()
                             .apiVersion("v1")

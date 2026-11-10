@@ -148,6 +148,18 @@ public class KubernetesClientWrapperTest {
     }
 
     @Test
+    public void checkSecret_webhookWithoutDryRun() throws ApiException {
+        given(coreApi.createNamespacedSecret(any(), any(), any(), any(), any()))
+                .willThrow(
+                        new ApiException(
+                                "",
+                                400,
+                                null,
+                                "{\"message\":\"admission webhook does not support dry run\"}"));
+        wrapper.checkSecret(new V1Secret());
+    }
+
+    @Test
     public void checkSecret_refused() throws ApiException {
         given(coreApi.createNamespacedSecret(any(), any(), any(), any(), any()))
                 .willThrow(new ApiException(403, "private-token"));
