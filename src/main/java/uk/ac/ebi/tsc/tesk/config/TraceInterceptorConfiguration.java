@@ -32,7 +32,8 @@ public class TraceInterceptorConfiguration {
     }
 
     @Pointcut(
-            "execution(public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+.create*(..))")
+            "execution(public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+.create*(..))"
+                    + " && !execution(public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+.createSecret(..))")
     public void createMethods() {}
 
     @Pointcut(

@@ -53,6 +53,7 @@ Resource | Verbs | For
 `pods` | `list`, `patch` | Pods of the jobs: read, label as cancelled
 `pods/log` | `get` | Logs of the taskmaster and executors
 `configmaps` | `create`, `delete`, `get` | The taskmaster's input, owned by its job (`delete` where the admission plugin `OwnerReferencesPermissionEnforcement` is on, e.g. on OpenShift: it lets only those who may delete an object set its owner); a pod security context from a ConfigMap, if configured
+`secrets` | `create`, `delete` | Private executor image credentials, as Secrets owned by the taskmaster Job (`delete` for `OwnerReferencesPermissionEnforcement`)
 `limitranges` | `list` | Raising requested memory to the namespace's minimum (without the right, it logs an error and goes on)
 
 The taskmaster's service account (`TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME`)

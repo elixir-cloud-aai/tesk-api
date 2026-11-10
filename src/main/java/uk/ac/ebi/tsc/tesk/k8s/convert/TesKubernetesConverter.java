@@ -11,6 +11,7 @@ import io.kubernetes.client.custom.QuantityFormatter;
 import io.kubernetes.client.openapi.models.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -197,6 +198,44 @@ public class TesKubernetesConverter {
         return taskMasterConfigMap;
     }
 
+    /** Creates one Docker registry Secret per executor that has registry credentials. */
+    public List<V1Secret> fromTesTaskToK8sImagePullSecrets(TesTask task, V1Job taskMasterJob) {
+        List<V1Secret> secrets = new ArrayList<>();
+        String taskId = taskMasterJob.getMetadata().getName();
+        for (int i = 0; i < task.getExecutors().size(); i++) {
+            TesExecutor executor = task.getExecutors().get(i);
+            if (executor.getDockerRegistry() == null) {
+                continue;
+            }
+            String auth =
+                    Base64.getEncoder()
+                            .encodeToString(
+                                    (executor.getDockerLogin() + ":" + executor.getDockerPass())
+                                            .getBytes(StandardCharsets.UTF_8));
+            Map<String, Object> dockerConfig =
+                    Collections.singletonMap(
+                            "auths",
+                            Collections.singletonMap(
+                                    executor.getDockerRegistry(),
+                                    Collections.singletonMap("auth", auth)));
+            byte[] dockerConfigJson;
+            try {
+                dockerConfigJson = this.objectMapper.writeValueAsBytes(dockerConfig);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Could not encode Docker registry credentials", e);
+            }
+            V1Secret secret =
+                    new V1Secret()
+                            .apiVersion("v1")
+                            .kind("Secret")
+                            .metadata(new V1ObjectMeta().name(new Task(taskId).getExecutorName(i)))
+                            .type("kubernetes.io/dockerconfigjson");
+            secret.setData(Collections.singletonMap(".dockerconfigjson", dockerConfigJson));
+            secrets.add(secret);
+        }
+        return secrets;
+    }
+
     /**
      * Converts TES executor to new K8s Job object, that is passed to taskMaster as part of input
      * parameters Name of executor job relies on taskMaster job's name (taskmaster's jobs name +
@@ -233,6 +272,15 @@ public class TesKubernetesConverter {
         // Tries to convert potential TRS URI into docker image. If conversion unsuccessful ->
         // leaves the original image value.
         container.image(this.trsClient.getDockerImageForToolVersionURI(executor.getImage()));
+        if (executor.getDockerRegistry() != null) {
+            job.getSpec()
+                    .getTemplate()
+                    .getSpec()
+                    .setImagePullSecrets(
+                            Collections.singletonList(
+                                    new V1LocalObjectReference()
+                                            .name(job.getMetadata().getName())));
+        }
         // Should we map executor's command to job container's command (==ENTRYPOINT) or job
         // container's args (==CMD)?
         // It will be command == ENTRYPOINT, because of shell requirement and no custom entrypoints

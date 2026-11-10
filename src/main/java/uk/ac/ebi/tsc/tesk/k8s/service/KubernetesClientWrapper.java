@@ -15,6 +15,7 @@ import io.kubernetes.client.openapi.models.V1LimitRangeItem;
 import io.kubernetes.client.openapi.models.V1LimitRangeList;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
+import io.kubernetes.client.openapi.models.V1Secret;
 import java.math.BigDecimal;
 import java.util.Locale;
 import java.util.Map;
@@ -120,6 +121,29 @@ public class KubernetesClientWrapper {
     public V1ConfigMap createConfigMap(V1ConfigMap map) {
         try {
             return this.coreApi.createNamespacedConfigMap(namespace, map, null, null, null);
+        } catch (ApiException e) {
+            throw KubernetesException.fromApiException(e);
+        }
+    }
+
+    /** Checks the Secret's admission and permissions before creating the taskmaster job. */
+    public void checkSecret(V1Secret secret) {
+        try {
+            this.coreApi.createNamespacedSecret(namespace, secret, null, DRY_RUN_ALL, null);
+        } catch (ApiException e) {
+            if (isDryRunUnsupported(e)) {
+                logger.warn(
+                        "Skipped the dry run of a task's image pull Secret: an admission webhook"
+                                + " doesn't support dry runs");
+                return;
+            }
+            throw KubernetesException.fromApiException(e);
+        }
+    }
+
+    public V1Secret createSecret(V1Secret secret) {
+        try {
+            return this.coreApi.createNamespacedSecret(namespace, secret, null, null, null);
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }

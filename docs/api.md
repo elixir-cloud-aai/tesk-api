@@ -69,6 +69,37 @@ to 6 decimals before it asks Kubernetes). Leave a field out instead: TESK API
 then requests no CPU or RAM (the defaults of the namespace's LimitRange may
 apply), and 0.1 GB for the task's volume.
 
+## Private executor images
+
+To pull a private executor image, include `docker_registry`, `docker_login`
+and `docker_pass` on that executor in `POST /tasks`:
+
+```json
+{
+  "executors": [{
+    "image": "registry.example.org/project/tool:1.0",
+    "command": ["tool"],
+    "docker_registry": "registry.example.org",
+    "docker_login": "robot",
+    "docker_pass": "registry-access-token"
+  }]
+}
+```
+
+All three fields are required together. `docker_registry` is the registry
+address used as the key in Docker's `auths` configuration; it must match the
+registry serving the image. TESK API creates a Kubernetes Secret of type
+`kubernetes.io/dockerconfigjson` for that executor and sets its Job pod's
+`imagePullSecrets`. Each executor may use different credentials; public-image
+executors need none. The Secret is owned by the taskmaster Job, so Kubernetes
+removes it when that Job is removed.
+
+`docker_login` and `docker_pass` are create-only fields. TESK API does not put
+them in the taskmaster Job's task annotation or its ConfigMap, and does not
+return them in `GET /tasks` or `GET /tasks/{id}`. They are an extension of the
+TES 1.0 task format, pending a common approach in the [TES specification
+discussion](https://github.com/ga4gh/task-execution-schemas/issues/167).
+
 ## Executor logs
 
 With the views `BASIC` and `FULL`, a task's `logs[0].logs` has one entry per

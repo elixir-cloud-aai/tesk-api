@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.ArrayList;
@@ -22,6 +23,15 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
 public class TesExecutor   {
   @JsonProperty("image")
   private String image;
+
+  @JsonProperty("docker_registry")
+  private String dockerRegistry;
+
+  @JsonProperty(value = "docker_login", access = JsonProperty.Access.WRITE_ONLY)
+  private String dockerLogin;
+
+  @JsonProperty(value = "docker_pass", access = JsonProperty.Access.WRITE_ONLY)
+  private String dockerPass;
 
   @JsonProperty("command")
   @Valid
@@ -62,6 +72,59 @@ public class TesExecutor   {
 
   public void setImage(String image) {
     this.image = image;
+  }
+
+  public TesExecutor dockerRegistry(String dockerRegistry) {
+    this.dockerRegistry = dockerRegistry;
+    return this;
+  }
+
+  @ApiModelProperty(value = "Registry address for a private executor image. Supply it with docker_login and docker_pass when creating a task.")
+  public String getDockerRegistry() {
+    return dockerRegistry;
+  }
+
+  public void setDockerRegistry(String dockerRegistry) {
+    this.dockerRegistry = dockerRegistry;
+  }
+
+  public TesExecutor dockerLogin(String dockerLogin) {
+    this.dockerLogin = dockerLogin;
+    return this;
+  }
+
+  @ApiModelProperty(value = "Registry username, used only when creating the task; never returned.")
+  public String getDockerLogin() {
+    return dockerLogin;
+  }
+
+  public void setDockerLogin(String dockerLogin) {
+    this.dockerLogin = dockerLogin;
+  }
+
+  public TesExecutor dockerPass(String dockerPass) {
+    this.dockerPass = dockerPass;
+    return this;
+  }
+
+  @ApiModelProperty(value = "Registry password or access token, used only when creating the task; never returned.")
+  public String getDockerPass() {
+    return dockerPass;
+  }
+
+  public void setDockerPass(String dockerPass) {
+    this.dockerPass = dockerPass;
+  }
+
+  @JsonIgnore
+  @AssertTrue(message = "docker_registry, docker_login and docker_pass must all be supplied together")
+  public boolean isDockerCredentialsValid() {
+    boolean any = dockerRegistry != null || dockerLogin != null || dockerPass != null;
+    return !any || (hasText(dockerRegistry) && hasText(dockerLogin) && hasText(dockerPass));
+  }
+
+  private static boolean hasText(String value) {
+    return value != null && !value.trim().isEmpty();
   }
 
   public TesExecutor command(List<String> command) {
@@ -212,6 +275,9 @@ public class TesExecutor   {
     }
     TesExecutor tesExecutor = (TesExecutor) o;
     return Objects.equals(this.image, tesExecutor.image) &&
+        Objects.equals(this.dockerRegistry, tesExecutor.dockerRegistry) &&
+        Objects.equals(this.dockerLogin, tesExecutor.dockerLogin) &&
+        Objects.equals(this.dockerPass, tesExecutor.dockerPass) &&
         Objects.equals(this.command, tesExecutor.command) &&
         Objects.equals(this.workdir, tesExecutor.workdir) &&
         Objects.equals(this.stdin, tesExecutor.stdin) &&
@@ -222,7 +288,7 @@ public class TesExecutor   {
 
   @Override
   public int hashCode() {
-    return Objects.hash(image, command, workdir, stdin, stdout, stderr, env);
+    return Objects.hash(image, dockerRegistry, dockerLogin, dockerPass, command, workdir, stdin, stdout, stderr, env);
   }
 
   @Override
@@ -231,6 +297,10 @@ public class TesExecutor   {
     sb.append("class TesExecutor {\n");
     
     sb.append("    image: ").append(toIndentedString(image)).append("\n");
+    sb.append("    docker_registry: ").append(toIndentedString(dockerRegistry)).append("\n");
+    if (dockerLogin != null || dockerPass != null) {
+      sb.append("    docker credentials: [REDACTED]\n");
+    }
     sb.append("    command: ").append(toIndentedString(command)).append("\n");
     sb.append("    workdir: ").append(toIndentedString(workdir)).append("\n");
     sb.append("    stdin: ").append(toIndentedString(stdin)).append("\n");

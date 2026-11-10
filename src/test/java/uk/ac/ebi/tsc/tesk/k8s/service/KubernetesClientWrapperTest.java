@@ -139,6 +139,30 @@ public class KubernetesClientWrapperTest {
     }
 
     @Test
+    public void checkSecret() throws ApiException {
+        V1Secret secret = new V1Secret().metadata(new V1ObjectMeta().name("task-123-ex-00"));
+        wrapper.checkSecret(secret);
+        Mockito.verify(coreApi)
+                .createNamespacedSecret(
+                        eq("test-namespace"), same(secret), isNull(), eq("All"), isNull());
+    }
+
+    @Test(expected = KubernetesException.class)
+    public void checkSecret_refused() throws ApiException {
+        given(coreApi.createNamespacedSecret(any(), any(), any(), any(), any()))
+                .willThrow(new ApiException(403, "forbidden"));
+        wrapper.checkSecret(new V1Secret());
+    }
+
+    @Test
+    public void createSecret() throws ApiException {
+        V1Secret secret = new V1Secret().metadata(new V1ObjectMeta().name("task-123-ex-00"));
+        given(coreApi.createNamespacedSecret("test-namespace", secret, null, null, null))
+                .willReturn(secret);
+        assertThat(wrapper.createSecret(secret), is(secret));
+    }
+
+    @Test
     public void createJob() throws ApiException {
         V1Job inJob = new V1Job().metadata(new V1ObjectMeta().name("test job"));
         V1Job outJob =

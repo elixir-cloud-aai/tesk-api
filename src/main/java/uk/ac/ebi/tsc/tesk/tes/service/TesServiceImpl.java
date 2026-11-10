@@ -9,8 +9,10 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_VERSION
 import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobList;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1PodList;
+import io.kubernetes.client.openapi.models.V1Secret;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -75,13 +77,20 @@ public class TesServiceImpl implements TesService {
                 V1Job taskMasterJob = this.converter.fromTesTaskToK8sJob(task, user);
                 V1ConfigMap taskMasterConfigMap =
                         this.converter.fromTesTaskToK8sConfigMap(task, user, taskMasterJob);
+                List<V1Secret> imagePullSecrets =
+                        this.converter.fromTesTaskToK8sImagePullSecrets(task, taskMasterJob);
                 // fails before the job exists, e.g. for a ConfigMap that is too large, a name that
                 // is taken, or no right to set the owner: the dry run has an owner reference with
                 // a placeholder UID, which Kubernetes doesn't store
-                setOwner(taskMasterConfigMap, taskMasterJob, UUID.randomUUID().toString());
+                String placeholderUid = UUID.randomUUID().toString();
+                setOwner(taskMasterConfigMap.getMetadata(), taskMasterJob, placeholderUid);
                 this.kubernetesClientWrapper.checkConfigMap(taskMasterConfigMap);
+                for (V1Secret secret : imagePullSecrets) {
+                    setOwner(secret.getMetadata(), taskMasterJob, placeholderUid);
+                    this.kubernetesClientWrapper.checkSecret(secret);
+                }
                 V1Job createdJob = this.kubernetesClientWrapper.createJob(taskMasterJob);
-                this.createOwnedConfigMap(taskMasterConfigMap, createdJob);
+                this.createOwnedResources(taskMasterConfigMap, imagePullSecrets, createdJob);
                 return this.converter.fromK8sJobToTesCreateTaskResponse(createdJob);
             } catch (KubernetesException e) {
                 // in case of job name collision retry converting task to job (with new generated
@@ -97,35 +106,35 @@ public class TesServiceImpl implements TesService {
         }
     }
 
-    /** Makes the job, with the given UID, the only owner of the ConfigMap. */
-    private static void setOwner(V1ConfigMap configMap, V1Job job, String uid) {
-        configMap
-                .getMetadata()
-                .setOwnerReferences(
-                        Collections.singletonList(
-                                new V1OwnerReference()
-                                        .apiVersion(K8S_BATCH_API_VERSION)
-                                        .kind(K8S_BATCH_API_JOB_TYPE)
-                                        .name(job.getMetadata().getName())
-                                        .uid(uid)));
+    /** Makes the job, with the given UID, the only owner of a task resource. */
+    private static void setOwner(V1ObjectMeta metadata, V1Job job, String uid) {
+        metadata.setOwnerReferences(
+                Collections.singletonList(
+                        new V1OwnerReference()
+                                .apiVersion(K8S_BATCH_API_VERSION)
+                                .kind(K8S_BATCH_API_JOB_TYPE)
+                                .name(job.getMetadata().getName())
+                                .uid(uid)));
     }
 
     /**
-     * Creates the taskmaster's ConfigMap, owned by its job, so that Kubernetes deletes the
-     * ConfigMap with the job (e.g. after the job's TTL). The job's UID is known only once the job
-     * exists, so the job is created first (after a dry run of the ConfigMap); its pod waits until
-     * the ConfigMap it mounts exists. If the ConfigMap can't be created, the job is deleted, so
-     * that its pod doesn't wait forever, and the ConfigMap's error is passed on (a name collision
-     * then creates the task again). If the job can't be deleted either, an error that isn't a
-     * {@link KubernetesException} is passed on instead (cause: the delete's error), so that the
-     * task isn't created again.
+     * Creates the taskmaster's image pull Secrets and ConfigMap, owned by its job, so that
+     * Kubernetes deletes them with the job. The job's UID is known only once it exists, so the job
+     * is created first (after dry runs); its pod waits for the ConfigMap. Secrets are created
+     * before the ConfigMap, so the taskmaster cannot start executor jobs before their pull secrets
+     * exist. If creating a resource fails, the job is deleted. If deleting it fails too, an error
+     * that isn't a {@link KubernetesException} stops retries.
      *
      * <p>The owner reference doesn't set {@code blockOwnerDeletion}, which would need the right to
      * update the job's finalizers.
      */
-    private void createOwnedConfigMap(V1ConfigMap configMap, V1Job job) {
-        setOwner(configMap, job, job.getMetadata().getUid());
+    private void createOwnedResources(V1ConfigMap configMap, List<V1Secret> secrets, V1Job job) {
+        setOwner(configMap.getMetadata(), job, job.getMetadata().getUid());
         try {
+            for (V1Secret secret : secrets) {
+                setOwner(secret.getMetadata(), job, job.getMetadata().getUid());
+                this.kubernetesClientWrapper.createSecret(secret);
+            }
             this.kubernetesClientWrapper.createConfigMap(configMap);
         } catch (RuntimeException e) {
             try {
@@ -134,7 +143,7 @@ public class TesServiceImpl implements TesService {
                 // the job stays: no retry, which could leave more jobs behind, or let this one
                 // run with another task's ConfigMap of the same name
                 logger.error(
-                        "Creating the ConfigMap of job {} failed ({}), and deleting the job"
+                        "Creating a resource of job {} failed ({}), and deleting the job"
                                 + " failed, too",
                         job.getMetadata().getName(),
                         e.getMessage(),
@@ -143,7 +152,7 @@ public class TesServiceImpl implements TesService {
                 // collision, which would create the task again
                 IllegalStateException error =
                         new IllegalStateException(
-                                "Creating the ConfigMap of a task failed, and deleting its job"
+                                "Creating a resource of a task failed, and deleting its job"
                                         + " failed, too",
                                 deleteError);
                 error.addSuppressed(e);

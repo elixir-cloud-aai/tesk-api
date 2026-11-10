@@ -15,14 +15,18 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CA
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
+import io.kubernetes.client.openapi.models.V1Secret;
 import java.io.*;
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.zip.GZIPInputStream;
@@ -50,6 +54,7 @@ import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
+import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
@@ -236,6 +241,78 @@ public class TesKubernetesConverterMinimalTest {
         taskMasterInputJson.isEqualToJson(
                 new ClassPathResource("fromTesToK8s_minimal/taskmaster_param.json"),
                 JSONCompareMode.NON_EXTENSIBLE);
+    }
+
+    @Test
+    public void privateExecutorImageUsesOwnedSecretWithoutExposingCredentials() throws IOException {
+        given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-98605447");
+        TesExecutor publicExecutor = new TesExecutor().image("ubuntu").addCommandItem("true");
+        TesExecutor privateExecutor =
+                new TesExecutor()
+                        .image("registry.example.org/project/image:1")
+                        .addCommandItem("true")
+                        .dockerRegistry("registry.example.org")
+                        .dockerLogin("robot")
+                        .dockerPass("secret-password");
+        TesTask task =
+                new TesTask().addExecutorsItem(publicExecutor).addExecutorsItem(privateExecutor);
+        User user = User.builder("test-user-id").build();
+
+        V1Job taskmaster = this.converter.fromTesTaskToK8sJob(task, user);
+        String annotation = taskmaster.getMetadata().getAnnotations().get("json-input");
+        org.assertj.core.api.Assertions.assertThat(annotation)
+                .contains("registry.example.org")
+                .doesNotContain("robot", "secret-password", "docker_login", "docker_pass");
+        org.assertj.core.api.Assertions.assertThat(privateExecutor.toString())
+                .doesNotContain("robot", "secret-password");
+
+        V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, taskmaster);
+        try (InputStreamReader reader =
+                new InputStreamReader(
+                        new GZIPInputStream(
+                                new ByteArrayInputStream(
+                                        configMap.getBinaryData().get("JSON_INPUT.gz"))),
+                        StandardCharsets.UTF_8)) {
+            JsonObject input = this.gson.fromJson(reader, JsonObject.class);
+            String serialized = input.toString();
+            org.assertj.core.api.Assertions.assertThat(serialized)
+                    .doesNotContain("robot", "secret-password", "docker_login", "docker_pass");
+            org.assertj.core.api.Assertions.assertThat(
+                            input.getAsJsonArray("executors")
+                                    .get(0)
+                                    .getAsJsonObject()
+                                    .getAsJsonObject("spec")
+                                    .getAsJsonObject("template")
+                                    .getAsJsonObject("spec")
+                                    .has("imagePullSecrets"))
+                    .isFalse();
+            org.assertj.core.api.Assertions.assertThat(
+                            input.getAsJsonArray("executors")
+                                    .get(1)
+                                    .getAsJsonObject()
+                                    .getAsJsonObject("spec")
+                                    .getAsJsonObject("template")
+                                    .getAsJsonObject("spec")
+                                    .getAsJsonArray("imagePullSecrets")
+                                    .get(0)
+                                    .getAsJsonObject()
+                                    .get("name")
+                                    .getAsString())
+                    .isEqualTo("task-98605447-ex-01");
+        }
+
+        V1Secret secret = this.converter.fromTesTaskToK8sImagePullSecrets(task, taskmaster).get(0);
+        assertEquals("task-98605447-ex-01", secret.getMetadata().getName());
+        assertEquals("kubernetes.io/dockerconfigjson", secret.getType());
+        assertEquals(
+                Base64.getEncoder()
+                        .encodeToString("robot:secret-password".getBytes(StandardCharsets.UTF_8)),
+                this.objectMapper
+                        .readTree(secret.getData().get(".dockerconfigjson"))
+                        .path("auths")
+                        .path("registry.example.org")
+                        .path("auth")
+                        .asText());
     }
 
     private TaskBuilder prepareBaseTaskBuider(boolean withExecutors, boolean withPods)
