@@ -18,8 +18,20 @@ public class KubernetesException extends RuntimeException {
         return new KubernetesException(apiException);
     }
 
+    /** Avoids logging a Secret admission error that may echo the submitted credentials. */
+    public static KubernetesException fromSecretApiException(ApiException apiException) {
+        return new KubernetesException(
+                apiException,
+                "Kubernetes rejected an image pull Secret (HTTP " + apiException.getCode() + ")");
+    }
+
     private KubernetesException(ApiException apiException) {
         super(apiException.getMessage(), apiException.getCause());
+        this.apiException = apiException;
+    }
+
+    private KubernetesException(ApiException apiException, String safeMessage) {
+        super(safeMessage);
         this.apiException = apiException;
     }
 

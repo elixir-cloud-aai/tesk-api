@@ -276,10 +276,8 @@ public class TesKubernetesConverter {
             job.getSpec()
                     .getTemplate()
                     .getSpec()
-                    .setImagePullSecrets(
-                            Collections.singletonList(
-                                    new V1LocalObjectReference()
-                                            .name(job.getMetadata().getName())));
+                    .addImagePullSecretsItem(
+                            new V1LocalObjectReference().name(job.getMetadata().getName()));
         }
         // Should we map executor's command to job container's command (==ENTRYPOINT) or job
         // container's args (==CMD)?

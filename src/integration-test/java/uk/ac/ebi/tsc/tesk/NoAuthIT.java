@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,10 +11,16 @@ import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.SERVICE_INFO_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.List;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -45,6 +52,8 @@ import org.springframework.test.web.servlet.MockMvc;
 public class NoAuthIT {
 
     @Autowired private MockMvc mvc;
+
+    @Autowired private ObjectMapper objectMapper;
 
     @Rule
     public WireMockRule mockKubernetes =
@@ -110,6 +119,91 @@ public class NoAuthIT {
                                         "$.metadata.ownerReferences[?(@.kind == 'Job'"
                                                 + " && @.name == 'task-fe99716a'"
                                                 + " && @.uid == 'uid-1')]")));
+    }
+
+    @Test
+    public void createTaskWithPrivateExecutorImage() throws Exception {
+        mockKubernetes.givenThat(
+                WireMock.post("/apis/batch/v1/namespaces/default/jobs")
+                        .willReturn(
+                                okJson(
+                                        "{\"metadata\":{\"name\":\"task-fe99716a\",\"uid\":\"uid-1\"}}")));
+        mockKubernetes.givenThat(
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/secrets"))
+                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a-ex-01\"}}")));
+        mockKubernetes.givenThat(
+                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
+                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
+
+        String task =
+                "{\"executors\":["
+                        + "{\"image\":\"ubuntu:22.04\",\"command\":[\"true\"]},"
+                        + "{\"image\":\"registry.example.org/project/tool:1.0\","
+                        + "\"command\":[\"true\"],"
+                        + "\"docker_registry\":\"registry.example.org\","
+                        + "\"docker_login\":\"robot\",\"docker_pass\":\"private-token\"}]}";
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .content(task)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("task-fe99716a"));
+
+        List<LoggedRequest> jobRequests =
+                mockKubernetes.findAll(
+                        postRequestedFor(urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs")));
+        assertThat(jobRequests).hasSize(1);
+        String generatedName =
+                objectMapper
+                        .readTree(jobRequests.get(0).getBodyAsString())
+                        .path("metadata")
+                        .path("name")
+                        .asText();
+        assertThat(jobRequests.get(0).getBodyAsString())
+                .doesNotContain("robot", "private-token", "docker_login", "docker_pass");
+
+        List<LoggedRequest> secretRequests =
+                mockKubernetes.findAll(
+                        postRequestedFor(urlPathEqualTo("/api/v1/namespaces/default/secrets")));
+        assertThat(secretRequests).hasSize(2);
+        for (LoggedRequest request : secretRequests) {
+            JsonNode secret = objectMapper.readTree(request.getBodyAsString());
+            assertThat(secret.path("metadata").path("name").asText())
+                    .isEqualTo(generatedName + "-ex-01");
+            assertThat(secret.path("type").asText()).isEqualTo("kubernetes.io/dockerconfigjson");
+            String encoded = secret.path("data").path(".dockerconfigjson").asText();
+            JsonNode config = objectMapper.readTree(Base64.getDecoder().decode(encoded));
+            String auth = config.path("auths").path("registry.example.org").path("auth").asText();
+            assertThat(new String(Base64.getDecoder().decode(auth), StandardCharsets.UTF_8))
+                    .isEqualTo("robot:private-token");
+            String uid =
+                    secret.path("metadata").path("ownerReferences").get(0).path("uid").asText();
+            if (request.getUrl().contains("dryRun=All")) {
+                assertThat(uid).isNotEqualTo("uid-1");
+            } else {
+                assertThat(uid).isEqualTo("uid-1");
+            }
+        }
+
+        JsonNode definitions =
+                objectMapper
+                        .readTree(
+                                this.mvc
+                                        .perform(get("/v2/api-docs"))
+                                        .andExpect(status().isOk())
+                                        .andReturn()
+                                        .getResponse()
+                                        .getContentAsString())
+                        .path("definitions");
+        JsonNode requestProperties = definitions.path("TesExecutorReq").path("properties");
+        JsonNode responseProperties = definitions.path("TesExecutorRes").path("properties");
+        assertThat(requestProperties.has("docker_registry")).isTrue();
+        assertThat(requestProperties.has("docker_login")).isTrue();
+        assertThat(requestProperties.has("docker_pass")).isTrue();
+        assertThat(responseProperties.has("docker_login")).isFalse();
+        assertThat(responseProperties.has("docker_pass")).isFalse();
     }
 
     @Test

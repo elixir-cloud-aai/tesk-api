@@ -123,6 +123,14 @@ public class TesExecutor   {
     return !any || (hasText(dockerRegistry) && hasText(dockerLogin) && hasText(dockerPass));
   }
 
+  @JsonIgnore
+  @AssertTrue(message = "docker_registry must not contain whitespace or embedded credentials")
+  public boolean isDockerRegistryValid() {
+    return dockerRegistry == null ||
+        (hasText(dockerRegistry) && dockerRegistry.indexOf('@') < 0 &&
+            dockerRegistry.codePoints().noneMatch(Character::isWhitespace));
+  }
+
   private static boolean hasText(String value) {
     return value != null && !value.trim().isEmpty();
   }

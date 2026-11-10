@@ -132,6 +132,27 @@ public class TasksApiControllerTest {
     }
 
     @Test
+    public void createTask_rejectsCredentialsEmbeddedInRegistryAddress() throws Exception {
+        String task =
+                "{\"executors\":[{\"image\":\"registry.example.org/image\","
+                        + "\"command\":[\"true\"],"
+                        + "\"docker_registry\":\"https://robot:embedded-token@registry.example.org\","
+                        + "\"docker_login\":\"robot\",\"docker_pass\":\"private-token\"}]}";
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(task)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("embedded credentials")))
+                .andExpect(content().string(not(containsString("embedded-token"))))
+                .andExpect(content().string(not(containsString("private-token"))));
+        verify(this.tesService, never()).createTask(any(), any());
+    }
+
+    @Test
     public void createTask_acceptsPrivateImageCredentials() throws Exception {
         String task =
                 "{\"executors\":[{\"image\":\"registry.example.org/image\","

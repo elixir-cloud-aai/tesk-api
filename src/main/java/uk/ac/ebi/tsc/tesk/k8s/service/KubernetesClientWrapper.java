@@ -137,7 +137,7 @@ public class KubernetesClientWrapper {
                                 + " doesn't support dry runs");
                 return;
             }
-            throw KubernetesException.fromApiException(e);
+            throw KubernetesException.fromSecretApiException(e);
         }
     }
 
@@ -145,7 +145,7 @@ public class KubernetesClientWrapper {
         try {
             return this.coreApi.createNamespacedSecret(namespace, secret, null, null, null);
         } catch (ApiException e) {
-            throw KubernetesException.fromApiException(e);
+            throw KubernetesException.fromSecretApiException(e);
         }
     }
 

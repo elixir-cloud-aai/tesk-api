@@ -40,9 +40,9 @@ When TESK API gets a request to create a task, these steps follow:
    passes the taskmaster a JSON object with the task's inputs, outputs and
    volumes (unchanged) and its executors (as Kubernetes jobs), in a ConfigMap
    that the job owns (see [Deleting tasks](#deleting-tasks)). It creates the
-   job first and the ConfigMap right after it; the taskmaster's pod waits
-   until the ConfigMap exists (see [Failures when creating a
-   task](#failures-when-creating-a-task)). The request returns at once, with
+   job first, then any private executor image pull Secrets, then the ConfigMap.
+   The taskmaster's pod waits until the ConfigMap exists (see [Failures when
+   creating a task](#failures-when-creating-a-task)). The request returns at once, with
    the generated task ID, without waiting for the task.
 2. If the task has inputs, outputs or volumes, the taskmaster creates a
    persistent volume claim (PVC) for the task.
@@ -64,17 +64,18 @@ When TESK API gets a request to create a task, these steps follow:
 
 #### Failures when creating a task
 
-Before it creates the job, TESK API checks the ConfigMap in a dry run, with
-an owner reference to the job that has a placeholder UID: a ConfigMap that
-Kubernetes refuses (e.g. one above Kubernetes' limit of 1 MiB, or one whose
-owner TESK API may not set) fails the request before anything is created,
-and a name that is taken is replaced by a new one. If an admission webhook
-for ConfigMaps doesn't support dry runs, Kubernetes refuses every dry run;
-TESK API then logs a warning and skips the check. If the ConfigMap can't be
-created after the job all the same, TESK API deletes the job again (if the name was taken in between,
-it then tries again with a new name). If that deletion fails too, TESK API
-logs both errors and fails the request (`500 Internal Server Error`) without
-trying again. The job then stays behind: it is listed as a task in state
+Before it creates the job, TESK API checks the ConfigMap and any private image
+pull Secrets in dry runs, with owner references to the job that have a
+placeholder UID: a resource that Kubernetes refuses (e.g. a ConfigMap above
+Kubernetes' limit of 1 MiB, a name already taken, or an owner TESK API may
+not set) fails the request before anything is created, and a name that is
+taken is replaced by a new one. If an admission webhook for either resource
+doesn't support dry runs, TESK API logs a warning and skips that check. If
+creating a Secret or the ConfigMap fails after the job was created, TESK API
+deletes the job again (if the name was taken in between, it then tries again
+with a new name). If that deletion fails too, TESK API logs both errors and
+fails the request (`500 Internal Server Error`) without trying again. The job
+then stays behind: it is listed as a task in state
 `QUEUED` whose ID the client never got, and its pod waits for the ConfigMap
 until someone deletes the job. The same happens if the request to create the
 job fails (e.g. times out) after Kubernetes has created the job.
@@ -171,9 +172,10 @@ after Kubernetes has returned a page of taskmaster jobs, so a page can be shorte
 
 Kubernetes deletes a task's objects with its taskmaster's job, through [owner
 references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/):
-the ConfigMap that TESK API creates, and the filer and executor jobs (with
-their pods) that the taskmaster creates. The taskmaster can set a TTL on its
-own job (`TASK_TTL_SECONDS`, see the taskmaster's documentation in
+the ConfigMap and any private image pull Secrets that TESK API creates, and
+the filer and executor jobs (with their pods) that the taskmaster creates.
+The taskmaster can set a TTL on its own job (`TASK_TTL_SECONDS`, see the
+taskmaster's documentation in
 [tesk-core](https://github.com/elixir-cloud-aai/tesk-core)), so that
 Kubernetes deletes finished tasks after that time; without it, tasks are kept
 until someone deletes their jobs. To delete a task by hand, delete its

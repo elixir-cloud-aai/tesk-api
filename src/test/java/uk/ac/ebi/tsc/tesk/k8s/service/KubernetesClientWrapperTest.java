@@ -147,11 +147,17 @@ public class KubernetesClientWrapperTest {
                         eq("test-namespace"), same(secret), isNull(), eq("All"), isNull());
     }
 
-    @Test(expected = KubernetesException.class)
+    @Test
     public void checkSecret_refused() throws ApiException {
         given(coreApi.createNamespacedSecret(any(), any(), any(), any(), any()))
-                .willThrow(new ApiException(403, "forbidden"));
-        wrapper.checkSecret(new V1Secret());
+                .willThrow(new ApiException(403, "private-token"));
+        try {
+            wrapper.checkSecret(new V1Secret());
+            fail("Expected KubernetesException");
+        } catch (KubernetesException e) {
+            assertEquals(403, e.getApiException().getCode());
+            assertEquals("Kubernetes rejected an image pull Secret (HTTP 403)", e.getMessage());
+        }
     }
 
     @Test
@@ -160,6 +166,19 @@ public class KubernetesClientWrapperTest {
         given(coreApi.createNamespacedSecret("test-namespace", secret, null, null, null))
                 .willReturn(secret);
         assertThat(wrapper.createSecret(secret), is(secret));
+    }
+
+    @Test
+    public void createSecret_refusedDoesNotExposeCredentials() throws ApiException {
+        given(coreApi.createNamespacedSecret(any(), any(), any(), any(), any()))
+                .willThrow(new ApiException(422, "private-token"));
+        try {
+            wrapper.createSecret(new V1Secret());
+            fail("Expected KubernetesException");
+        } catch (KubernetesException e) {
+            assertEquals(422, e.getApiException().getCode());
+            assertEquals("Kubernetes rejected an image pull Secret (HTTP 422)", e.getMessage());
+        }
     }
 
     @Test
