@@ -1,7 +1,8 @@
 # API
 
 TESK API implements the [GA4GH TES API
-1.0](https://github.com/ga4gh/task-execution-schemas) under the base path
+1.1](https://github.com/ga4gh/task-execution-schemas) (see [TES 1.1
+fields](#tes-11-fields)) under the base path
 `/ga4gh/tes/v1` (setting `openapi.taskExecutionService.base-path`):
 
 Method | Path | Operation
@@ -50,6 +51,35 @@ refused with `400 Bad Request`; the message names `page_token`, but not
 its value. Start again without `page_token`. Other errors of Kubernetes,
 also for forged tokens that it can't tell apart from its own failures, still
 give `500 Internal Server Error`.
+
+## TES 1.1 fields
+
+TESK accepts the fields that TES 1.1 added to tasks:
+
+- `outputs[].path_prefix`: an output whose `path` has wildcards (`*`, `?`,
+  `[`) and a `path_prefix` uploads each match to `url`, a directory, plus
+  its path below `path_prefix` (e.g. `/data/s1/out.bam` for the `path`
+  `/data/*/out.bam` and `path_prefix` `/data` to `url`/`s1/out.bam`). A
+  pattern that matches nothing uploads nothing and doesn't fail the task.
+  `path_prefix` must be an absolute path, and the part of `path` before
+  its first wildcard or a directory above it (`/data` or `/` for
+  `/data/*/out.bam`, not `/data/s1`); `path` must have no wildcards in its
+  first component (`/*.bam` is refused), as the output is mounted at that
+  part. Both are refused with `400 Bad Request`. Without `path_prefix`,
+  outputs are taken as before: wildcards are expanded for `file:` URLs
+  only. This needs a
+  taskmaster and filer that support it (see
+  [tesk-core#134](https://github.com/elixir-cloud-aai/tesk-core/pull/134)).
+- `inputs[].streamable`: accepted and ignored, as TES allows: inputs are
+  always downloaded before the executors start.
+- `executors[].ignore_error`: only `false` is accepted. TESK stops at the
+  first executor that fails, so `true` is refused with `400 Bad Request`
+  rather than run differently than asked.
+- `resources.backend_parameters`: TESK uses none, and ignores them, unless
+  `backend_parameters_strict` is `true`, for which TES asks to refuse the
+  task: such tasks are refused with `400 Bad Request`.
+
+Service info reports the TES version 1.1.0 (`type.version`).
 
 ## Resources
 
@@ -169,8 +199,8 @@ Not Found`.
 
 `GET /service-info` describes the service, following the [GA4GH Service
 Info](https://github.com/ga4gh-discovery/ga4gh-service-info) schema: its ID,
-name, type (`org.ga4gh:tes`, version `1.0.0`: TESK API implements TES
-1.0.0), organisation, contact and documentation URLs, version and the storage
+name, type (`org.ga4gh:tes`, version `1.1.0`: TESK API implements TES
+1.1.0), organisation, contact and documentation URLs, version and the storage
 locations it supports. The content comes from a YAML file, set by
 `TESK_API_SERVICE_INFO_LOCATION` (by default the built-in
 [`service-info.yaml`](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/resources/service-info.yaml)).

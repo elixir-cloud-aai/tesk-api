@@ -1,0 +1,8 @@
+{
+  "executors": [
+    {"image": "ubuntu", "command": ["echo", "hello world"]}
+  ],
+  "outputs": [
+    {"url": "s3://bucket/out", "path": "/data/*.bam", "path_prefix": "data", "type": "FILE"}
+  ]
+}

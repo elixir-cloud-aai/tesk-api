@@ -1,0 +1,4 @@
+{
+  "executors": [{"image": "ubuntu", "command": ["echo", "hello world"]}],
+  "outputs": [{"url": "s3://bucket/out", "path": "/data/*/out.txt", "path_prefix": "/data/s1", "type": "FILE"}]
+}
