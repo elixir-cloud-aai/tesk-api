@@ -2,7 +2,6 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -38,10 +37,10 @@ public class TesExecutorTest {
     }
 
     @Test
-    public void lonePasswordIsRedactedInDiagnosticString() {
+    public void lonePasswordIsOmittedFromDiagnosticString() {
         String diagnostic = new TesExecutor().dockerPass("private-token").toString();
-        assertTrue(diagnostic.contains("docker credentials: [REDACTED]"));
         assertFalse(diagnostic.contains("private-token"));
+        assertFalse(diagnostic.contains("docker credentials"));
     }
 
     private static TesExecutor executor(String registry, String login, String password) {

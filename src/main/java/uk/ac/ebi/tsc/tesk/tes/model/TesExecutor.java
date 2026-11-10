@@ -306,9 +306,6 @@ public class TesExecutor   {
     
     sb.append("    image: ").append(toIndentedString(image)).append("\n");
     sb.append("    docker_registry: ").append(toIndentedString(dockerRegistry)).append("\n");
-    if (dockerLogin != null || dockerPass != null) {
-      sb.append("    docker credentials: [REDACTED]\n");
-    }
     sb.append("    command: ").append(toIndentedString(command)).append("\n");
     sb.append("    workdir: ").append(toIndentedString(workdir)).append("\n");
     sb.append("    stdin: ").append(toIndentedString(stdin)).append("\n");
