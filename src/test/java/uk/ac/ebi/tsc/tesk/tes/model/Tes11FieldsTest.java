@@ -106,4 +106,42 @@ public class Tes11FieldsTest {
         assertTrue(
                 resources("{\"backend_parameters_strict\": true}").isBackendParametersOptional());
     }
+
+    private static TesOutput pattern(String path, String prefix) {
+        return new TesOutput().url("s3://b/out").path(path).pathPrefix(prefix);
+    }
+
+    @Test
+    public void output_patternRootAndNormalize() {
+        assertEquals("/data", TesOutput.patternRoot("/data/*/out.txt"));
+        assertEquals("/data/a", TesOutput.patternRoot("//data/./a/b/../*.bam"));
+        assertEquals("", TesOutput.patternRoot("/*.txt"));
+        assertEquals("/data/a", TesOutput.patternRoot("/data/a"));
+        assertEquals("/", TesOutput.normalize("/../"));
+        assertEquals("/a/c", TesOutput.normalize("/a/b/../c/"));
+    }
+
+    @Test
+    public void output_pathPrefixMustBeAboveThePattern() {
+        assertTrue(pattern("/data/*/out.txt", "/data").isPathPrefixAbovePattern());
+        assertTrue(pattern("/data/*/out.txt", "/data/").isPathPrefixAbovePattern());
+        assertTrue(pattern("/data/a/*.txt", "/data").isPathPrefixAbovePattern());
+        assertTrue(pattern("/data/*.txt", "/").isPathPrefixAbovePattern());
+        assertFalse(pattern("/data/*/out.txt", "/data/s1").isPathPrefixAbovePattern());
+        assertFalse(pattern("/data2/*.txt", "/data").isPathPrefixAbovePattern());
+        // not patterns: path_prefix is ignored
+        assertTrue(pattern("/data/out.txt", "/elsewhere").isPathPrefixAbovePattern());
+        assertTrue(new TesOutput().path("/data/*.txt").isPathPrefixAbovePattern());
+        assertTrue(pattern("/data/*.txt", "").isPathPrefixAbovePattern());
+        assertTrue(new TesOutput().isPathPrefixAbovePattern());
+    }
+
+    @Test
+    public void output_patternMustNotHaveWildcardsInItsFirstComponent() {
+        assertFalse(pattern("/*.txt", "/").isPatternBelowRoot());
+        assertTrue(pattern("/*.txt", "/").isPathPrefixAbovePattern());
+        assertTrue(pattern("/data/*.txt", "/").isPatternBelowRoot());
+        // without path_prefix, the path is a file name (TES 1.0), as before
+        assertTrue(new TesOutput().path("/*.txt").isPatternBelowRoot());
+    }
 }

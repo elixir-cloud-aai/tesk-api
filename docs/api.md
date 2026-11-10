@@ -61,8 +61,13 @@ TESK accepts the fields that TES 1.1 added to tasks:
   its path below `path_prefix` (e.g. `/data/s1/out.bam` for the `path`
   `/data/*/out.bam` and `path_prefix` `/data` to `url`/`s1/out.bam`). A
   pattern that matches nothing uploads nothing and doesn't fail the task.
-  `path_prefix` must be an absolute path. Without it, outputs are taken as
-  before: wildcards are expanded for `file:` URLs only. This needs a
+  `path_prefix` must be an absolute path, and the part of `path` before
+  its first wildcard or a directory above it (`/data` or `/` for
+  `/data/*/out.bam`, not `/data/s1`); `path` must have no wildcards in its
+  first component (`/*.bam` is refused), as the output is mounted at that
+  part. Both are refused with `400 Bad Request`. Without `path_prefix`,
+  outputs are taken as before: wildcards are expanded for `file:` URLs
+  only. This needs a
   taskmaster and filer that support it (see
   [tesk-core#134](https://github.com/elixir-cloud-aai/tesk-core/pull/134)).
 - `inputs[].streamable`: accepted and ignored, as TES allows: inputs are

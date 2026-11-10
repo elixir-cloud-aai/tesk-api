@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -136,6 +137,70 @@ public class TesOutput   {
 
   public void setPathPrefix(String pathPrefix) {
     this.pathPrefix = pathPrefix;
+  }
+
+  /**
+   * An output with wildcards is mounted at its deepest directory without wildcards, which a
+   * pattern like `/*.txt` doesn't have.
+   *
+   * @return whether `path` has no wildcards in its first component, if it is used as a pattern
+   */
+  @JsonIgnore
+  @AssertTrue(message = "path with wildcards must have none in its first component, e.g. /data/*.txt rather than /*.txt")
+  public boolean isPatternBelowRoot() {
+    return !isPattern() || !patternRoot(path).isEmpty();
+  }
+
+  /**
+   * The filer removes `path_prefix` from each match, so it must be the pattern's directory
+   * without wildcards, or above it; else the output fails after the executors ran.
+   *
+   * @return whether `path_prefix` is a component-wise prefix of the pattern's directory
+   */
+  @JsonIgnore
+  @AssertTrue(message = "path_prefix must be the part of path before its first wildcard, or a directory above it")
+  public boolean isPathPrefixAbovePattern() {
+    if (!isPattern() || patternRoot(path).isEmpty()) {
+      return true;
+    }
+    String prefix = normalize(pathPrefix);
+    String root = patternRoot(path);
+    return prefix.equals("/") || root.equals(prefix) || root.startsWith(prefix + "/");
+  }
+
+  private boolean isPattern() {
+    return path != null && pathPrefix != null && !pathPrefix.isEmpty() && path.matches(".*[*?\\[].*");
+  }
+
+  /** The directories of a pattern before its first component with wildcards, normalized. */
+  static String patternRoot(String pattern) {
+    StringBuilder root = new StringBuilder();
+    for (String part : normalize(pattern).split("/")) {
+      if (part.isEmpty()) {
+        continue;
+      }
+      if (part.matches(".*[*?\\[].*")) {
+        break;
+      }
+      root.append('/').append(part);
+    }
+    return root.toString();
+  }
+
+  /** Resolves `.`, `..` (up to the root) and repeated slashes of an absolute path. */
+  static String normalize(String path) {
+    java.util.Deque<String> parts = new java.util.ArrayDeque<>();
+    for (String part : path.split("/")) {
+      if (part.isEmpty() || part.equals(".")) {
+        continue;
+      }
+      if (part.equals("..")) {
+        parts.pollLast();
+      } else {
+        parts.addLast(part);
+      }
+    }
+    return parts.isEmpty() ? "/" : "/" + String.join("/", parts);
   }
 
   public TesOutput type(TesFileType type) {

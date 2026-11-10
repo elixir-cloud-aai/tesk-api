@@ -254,7 +254,13 @@ public class TasksApiControllerTest {
                     new String[] {"no_path.json", "outputs[0].path"},
                     new String[] {"no_url.json", "outputs[0].url"},
                     new String[] {"empty_type.json", "outputs[0].type"},
-                    new String[] {"relative_path_prefix.json", "outputs[0].pathPrefix"}
+                    new String[] {"relative_path_prefix.json", "outputs[0].pathPrefix"},
+                    new String[] {
+                        "wildcard_in_first_component.json", "none in its first component"
+                    },
+                    new String[] {
+                        "path_prefix_below_pattern.json", "part of path before its first wildcard"
+                    }
                 };
         for (String[] file : files) {
             this.mvc
