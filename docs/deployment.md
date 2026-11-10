@@ -56,6 +56,10 @@ Resource | Verbs | For
 `secrets` | `create`, `delete` | Private executor image credentials, as Secrets owned by the taskmaster Job (`delete` for `OwnerReferencesPermissionEnforcement`)
 `limitranges` | `list` | Raising requested memory to the namespace's minimum (without the right, it logs an error and goes on)
 
+Passing private executor image credentials in TES requests is an
+[experimental workaround for proof-of-concept use only](api.md#private-executor-images),
+not a feature for production clients.
+
 The taskmaster's service account (`TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME`)
 needs to manage jobs, pods and persistent volume claims.
 

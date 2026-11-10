@@ -261,11 +261,21 @@ public class TesKubernetesConverterMinimalTest {
 
         V1Job taskmaster = this.converter.fromTesTaskToK8sJob(task, user);
         String annotation = taskmaster.getMetadata().getAnnotations().get("json-input");
+        String[] credentialRepresentations = {
+            "robot",
+            "secret-password",
+            "docker_login",
+            "docker_pass",
+            Base64.getEncoder().encodeToString("robot".getBytes(StandardCharsets.UTF_8)),
+            Base64.getEncoder().encodeToString("secret-password".getBytes(StandardCharsets.UTF_8)),
+            Base64.getEncoder()
+                    .encodeToString("robot:secret-password".getBytes(StandardCharsets.UTF_8))
+        };
         org.assertj.core.api.Assertions.assertThat(annotation)
                 .contains("registry.example.org")
-                .doesNotContain("robot", "secret-password", "docker_login", "docker_pass");
+                .doesNotContain(credentialRepresentations);
         org.assertj.core.api.Assertions.assertThat(privateExecutor.toString())
-                .doesNotContain("robot", "secret-password");
+                .doesNotContain(credentialRepresentations);
 
         V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, taskmaster);
         try (InputStreamReader reader =
@@ -277,7 +287,7 @@ public class TesKubernetesConverterMinimalTest {
             JsonObject input = this.gson.fromJson(reader, JsonObject.class);
             String serialized = input.toString();
             org.assertj.core.api.Assertions.assertThat(serialized)
-                    .doesNotContain("robot", "secret-password", "docker_login", "docker_pass");
+                    .doesNotContain(credentialRepresentations);
             org.assertj.core.api.Assertions.assertThat(
                             input.getAsJsonArray("executors")
                                     .get(0)

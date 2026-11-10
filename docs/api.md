@@ -71,6 +71,14 @@ apply), and 0.1 GB for the task's volume.
 
 ## Private executor images
 
+> **Experimental workaround for proof-of-concept use only.** The
+> `docker_registry`, `docker_login` and `docker_pass` executor fields are
+> TESK-specific extensions, not part of the GA4GH TES specification. Clients
+> should not rely on them in production. TESK will deprecate this workaround
+> as soon as GA4GH provides guidance for passing secrets, and remove it once
+> a common replacement is implemented across TES implementations. See the
+> [TES discussion](https://github.com/ga4gh/task-execution-schemas/issues/167).
+
 To pull a private executor image, include `docker_registry`, `docker_login`
 and `docker_pass` on that executor in `POST /tasks`:
 
@@ -111,9 +119,7 @@ where needed.
 
 `docker_login` and `docker_pass` are create-only fields. TESK API does not put
 them in the taskmaster Job's task annotation or its ConfigMap, and does not
-return them in `GET /tasks` or `GET /tasks/{id}`. They are an extension of the
-TES 1.0 task format, pending a common approach in the [TES specification
-discussion](https://github.com/ga4gh/task-execution-schemas/issues/167).
+return them in `GET /tasks` or `GET /tasks/{id}`.
 
 ## Executor logs
 

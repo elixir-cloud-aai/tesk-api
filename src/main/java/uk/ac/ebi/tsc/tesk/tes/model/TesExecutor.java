@@ -79,7 +79,7 @@ public class TesExecutor   {
     return this;
   }
 
-  @ApiModelProperty(value = "Registry address for a private executor image. Supply it with docker_login and docker_pass when creating a task.")
+  @ApiModelProperty(value = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry address for a private executor image. Supply it with docker_login and docker_pass when creating a task.")
   public String getDockerRegistry() {
     return dockerRegistry;
   }
@@ -93,7 +93,7 @@ public class TesExecutor   {
     return this;
   }
 
-  @ApiModelProperty(value = "Registry username, used only when creating the task; never returned.")
+  @ApiModelProperty(value = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry username, used only when creating the task; never returned.")
   public String getDockerLogin() {
     return dockerLogin;
   }
@@ -107,7 +107,7 @@ public class TesExecutor   {
     return this;
   }
 
-  @ApiModelProperty(value = "Registry password or access token, used only when creating the task; never returned.")
+  @ApiModelProperty(value = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry password or access token, used only when creating the task; never returned.")
   public String getDockerPass() {
     return dockerPass;
   }
