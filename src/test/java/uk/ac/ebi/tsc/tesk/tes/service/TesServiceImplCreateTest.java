@@ -18,7 +18,9 @@ import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
+import io.kubernetes.client.openapi.models.V1Secret;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +52,8 @@ class TesServiceImplCreateTest {
         this.client = mock(KubernetesClientWrapper.class);
         this.converter = mock(TesKubernetesConverter.class);
         this.service = new TesServiceImpl(this.client, this.converter);
+        when(this.converter.fromTesTaskToK8sImagePullSecrets(any(TesTask.class), any(V1Job.class)))
+                .thenReturn(Collections.emptyList());
         when(this.converter.fromK8sJobToTesCreateTaskResponse(any(V1Job.class)))
                 .thenAnswer(
                         invocation ->
@@ -90,6 +94,55 @@ class TesServiceImplCreateTest {
 
     private static KubernetesException kubernetesError(HttpStatus status) {
         return KubernetesException.fromApiException(new ApiException(status.value(), "error"));
+    }
+
+    private void convertsWithSecret(String name) {
+        this.converts(name);
+        when(this.converter.fromTesTaskToK8sImagePullSecrets(any(TesTask.class), any(V1Job.class)))
+                .thenReturn(
+                        Collections.singletonList(
+                                new V1Secret().metadata(new V1ObjectMeta().name(name + "-ex-00"))));
+    }
+
+    @Test
+    void secretIsCreatedBeforeConfigMapAndOwnedByTaskmaster() {
+        this.convertsWithSecret("task-1");
+
+        this.service.createTask(this.task, USER);
+
+        InOrder order = inOrder(this.client);
+        order.verify(this.client).checkConfigMap(any(V1ConfigMap.class));
+        order.verify(this.client).checkSecret(any(V1Secret.class));
+        order.verify(this.client).createJob(any(V1Job.class));
+        ArgumentCaptor<V1Secret> secret = ArgumentCaptor.forClass(V1Secret.class);
+        order.verify(this.client).createSecret(secret.capture());
+        order.verify(this.client).createConfigMap(any(V1ConfigMap.class));
+        assertThat(secret.getValue().getMetadata().getOwnerReferences())
+                .singleElement()
+                .satisfies(owner -> assertThat(owner.getUid()).isEqualTo("uid-task-1"));
+    }
+
+    @Test
+    void refusedSecretCreatesNoJob() {
+        this.convertsWithSecret("task-1");
+        KubernetesException error = kubernetesError(HttpStatus.FORBIDDEN);
+        doThrow(error).when(this.client).checkSecret(any(V1Secret.class));
+
+        assertThatThrownBy(() -> this.service.createTask(this.task, USER)).isSameAs(error);
+
+        verify(this.client, never()).createJob(any(V1Job.class));
+    }
+
+    @Test
+    void jobIsDeletedIfSecretCreationFails() {
+        this.convertsWithSecret("task-1");
+        KubernetesException error = kubernetesError(HttpStatus.FORBIDDEN);
+        when(this.client.createSecret(any(V1Secret.class))).thenThrow(error);
+
+        assertThatThrownBy(() -> this.service.createTask(this.task, USER)).isSameAs(error);
+
+        verify(this.client).deleteJob("task-1");
+        verify(this.client, never()).createConfigMap(any(V1ConfigMap.class));
     }
 
     /** The job is created first; the ConfigMap is owned by the created job. */

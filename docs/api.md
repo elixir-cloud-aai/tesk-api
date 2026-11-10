@@ -69,6 +69,58 @@ to 6 decimals before it asks Kubernetes). Leave a field out instead: TESK API
 then requests no CPU or RAM (the defaults of the namespace's LimitRange may
 apply), and 0.1 GB for the task's volume.
 
+## Private executor images
+
+> **Experimental workaround for proof-of-concept use only.** The
+> `docker_registry`, `docker_login` and `docker_pass` executor fields are
+> TESK-specific extensions, not part of the GA4GH TES specification. Clients
+> should not rely on them in production. TESK will deprecate this workaround
+> as soon as GA4GH provides guidance for passing secrets, and remove it once
+> a common replacement is implemented across TES implementations. See the
+> [TES discussion](https://github.com/ga4gh/task-execution-schemas/issues/167).
+
+To pull a private executor image, include `docker_registry`, `docker_login`
+and `docker_pass` on that executor in `POST /tasks`:
+
+```json
+{
+  "executors": [{
+    "image": "registry.example.org/project/tool:1.0",
+    "command": ["tool"],
+    "docker_registry": "registry.example.org",
+    "docker_login": "robot",
+    "docker_pass": "registry-access-token"
+  }]
+}
+```
+
+All three fields are required together. `docker_registry` is the registry
+address used as the key in Docker's `auths` configuration; it must match the
+registry serving the image. For Docker Hub, use
+`https://index.docker.io/v1/`, as in [Kubernetes' private registry
+example](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+Do not put a username or password in this address: `docker_registry` is
+stored with the task and returned by the API. Addresses containing whitespace
+or `@` are rejected. TESK API creates a Kubernetes Secret of type
+`kubernetes.io/dockerconfigjson` for that executor and sets its Job pod's
+`imagePullSecrets`. Each executor may use different credentials; public-image
+executors need none. The Secret is owned by the taskmaster Job, so Kubernetes
+removes it when that Job is removed. Without a task TTL, the job and Secret
+remain until an operator deletes the job; see [Deleting tasks](index.md#deleting-tasks).
+
+The API validates the request and creates the Secret, but Kubernetes pulls the
+image later. An incorrect registry key or expired token can still cause the
+executor pod to fail with `ImagePullBackOff`; inspect its pod events to diagnose
+the pull failure. Send credentials to TESK API over HTTPS and use a scoped
+registry token. Kubernetes Secret data is base64-encoded, not encrypted by
+base64; restrict who can read Secrets in the namespace and configure
+[encryption at rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
+where needed.
+
+`docker_login` and `docker_pass` are create-only fields. TESK API does not put
+them in the taskmaster Job's task annotation or its ConfigMap, and does not
+return them in `GET /tasks` or `GET /tasks/{id}`.
+
 ## Executor logs
 
 With the views `BASIC` and `FULL`, a task's `logs[0].logs` has one entry per

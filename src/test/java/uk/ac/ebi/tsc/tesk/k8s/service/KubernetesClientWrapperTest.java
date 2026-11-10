@@ -139,6 +139,61 @@ public class KubernetesClientWrapperTest {
     }
 
     @Test
+    public void checkSecret() throws ApiException {
+        V1Secret secret = new V1Secret().metadata(new V1ObjectMeta().name("task-123-ex-00"));
+        wrapper.checkSecret(secret);
+        Mockito.verify(coreApi)
+                .createNamespacedSecret(
+                        eq("test-namespace"), same(secret), isNull(), eq("All"), isNull());
+    }
+
+    @Test
+    public void checkSecret_webhookWithoutDryRun() throws ApiException {
+        given(coreApi.createNamespacedSecret(any(), any(), any(), any(), any()))
+                .willThrow(
+                        new ApiException(
+                                "",
+                                400,
+                                null,
+                                "{\"message\":\"admission webhook does not support dry run\"}"));
+        wrapper.checkSecret(new V1Secret());
+    }
+
+    @Test
+    public void checkSecret_refused() throws ApiException {
+        given(coreApi.createNamespacedSecret(any(), any(), any(), any(), any()))
+                .willThrow(new ApiException(403, "private-token"));
+        try {
+            wrapper.checkSecret(new V1Secret());
+            fail("Expected KubernetesException");
+        } catch (KubernetesException e) {
+            assertEquals(403, e.getApiException().getCode());
+            assertEquals("Kubernetes rejected an image pull Secret (HTTP 403)", e.getMessage());
+        }
+    }
+
+    @Test
+    public void createSecret() throws ApiException {
+        V1Secret secret = new V1Secret().metadata(new V1ObjectMeta().name("task-123-ex-00"));
+        given(coreApi.createNamespacedSecret("test-namespace", secret, null, null, null))
+                .willReturn(secret);
+        assertThat(wrapper.createSecret(secret), is(secret));
+    }
+
+    @Test
+    public void createSecret_refusedDoesNotExposeCredentials() throws ApiException {
+        given(coreApi.createNamespacedSecret(any(), any(), any(), any(), any()))
+                .willThrow(new ApiException(422, "private-token"));
+        try {
+            wrapper.createSecret(new V1Secret());
+            fail("Expected KubernetesException");
+        } catch (KubernetesException e) {
+            assertEquals(422, e.getApiException().getCode());
+            assertEquals("Kubernetes rejected an image pull Secret (HTTP 422)", e.getMessage());
+        }
+    }
+
+    @Test
     public void createJob() throws ApiException {
         V1Job inJob = new V1Job().metadata(new V1ObjectMeta().name("test job"));
         V1Job outJob =

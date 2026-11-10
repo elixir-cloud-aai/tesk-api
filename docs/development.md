@@ -218,4 +218,8 @@ Validation](https://beanvalidation.org/) annotations beyond those derived from
 the specification (e.g. `@Digits` and `@DecimalMin` on the resources of
 `TesResources`); restore them by hand in the generated code, and reconcile
 any other manual changes, e.g. the internal field `userIdFromLegacyLabel` of
-`TesTaskLog` (not serialized), which the access check of a task needs.
+`TesTaskLog` (not serialized), which the access check of a task needs. Until
+the experimental private image credential workaround remains supported, also
+restore the `docker_registry`, `docker_login` and `docker_pass` fields,
+validation, write-only handling, and experimental API descriptions in
+`TesExecutor`; the API and converter tests check this extension.
