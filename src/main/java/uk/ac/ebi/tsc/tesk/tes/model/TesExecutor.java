@@ -1,8 +1,8 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.ArrayList;
@@ -52,6 +52,9 @@ public class TesExecutor   {
   @JsonProperty("env")
   @Valid
   private Map<String, String> env = null;
+
+  @JsonProperty("ignore_error")
+  private Boolean ignoreError;
 
   public TesExecutor image(String image) {
     this.image = image;
@@ -244,6 +247,35 @@ public class TesExecutor   {
     this.stderr = stderr;
   }
 
+  public TesExecutor ignoreError(Boolean ignoreError) {
+    this.ignoreError = ignoreError;
+    return this;
+  }
+
+  /**
+   * Whether to run the next executor, and finish the task, after this executor fails (TES 1.1).
+   * TESK stops at the first executor that fails, so it accepts only `false`.
+   * @return ignoreError
+  */
+  @ApiModelProperty(value = "Whether errors of this executor are ignored, and the next one runs. TESK doesn't support it: only false is accepted.")
+  public Boolean getIgnoreError() {
+    return ignoreError;
+  }
+
+  public void setIgnoreError(Boolean ignoreError) {
+    this.ignoreError = ignoreError;
+  }
+
+  /**
+   * Refuses `ignore_error: true`, rather than running the task differently than asked.
+   * @return whether the executor doesn't ask to ignore its errors
+   */
+  @JsonIgnore
+  @AssertTrue(message = "ignore_error: true is not supported; TESK stops at the first executor that fails")
+  public boolean isIgnoreErrorUnset() {
+    return ignoreError == null || !ignoreError;
+  }
+
   public TesExecutor env(Map<String, String> env) {
     this.env = env;
     return this;
@@ -291,12 +323,13 @@ public class TesExecutor   {
         Objects.equals(this.stdin, tesExecutor.stdin) &&
         Objects.equals(this.stdout, tesExecutor.stdout) &&
         Objects.equals(this.stderr, tesExecutor.stderr) &&
-        Objects.equals(this.env, tesExecutor.env);
+        Objects.equals(this.env, tesExecutor.env) &&
+        Objects.equals(this.ignoreError, tesExecutor.ignoreError);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(image, dockerRegistry, dockerLogin, dockerPass, command, workdir, stdin, stdout, stderr, env);
+    return Objects.hash(image, dockerRegistry, dockerLogin, dockerPass, command, workdir, stdin, stdout, stderr, env, ignoreError);
   }
 
   @Override
@@ -312,6 +345,7 @@ public class TesExecutor   {
     sb.append("    stdout: ").append(toIndentedString(stdout)).append("\n");
     sb.append("    stderr: ").append(toIndentedString(stderr)).append("\n");
     sb.append("    env: ").append(toIndentedString(env)).append("\n");
+    sb.append("    ignoreError: ").append(toIndentedString(ignoreError)).append("\n");
     sb.append("}");
     return sb.toString();
   }

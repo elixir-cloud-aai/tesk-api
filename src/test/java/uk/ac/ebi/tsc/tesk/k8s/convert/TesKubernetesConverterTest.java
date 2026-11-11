@@ -442,6 +442,35 @@ public class TesKubernetesConverterTest {
                 JSONCompareMode.NON_EXTENSIBLE);
     }
 
+    /** The filer gets path_prefix, which it removes from the matches of a pattern (TES 1.1) */
+    @Test
+    public void fromTesTaskToK8sConfigMap_passesPathPrefix() throws IOException {
+        given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-35605447");
+        TesTask inputTask =
+                this.objectMapper.readValue(
+                        TestUtils.getFileContentFromResources("valid_tasks/tes_1_1_fields.json"),
+                        TesTask.class);
+        User user = User.builder("test-user-id").build();
+        V1Job job = this.converter.fromTesTaskToK8sJob(inputTask, user);
+        V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(inputTask, user, job);
+        GZIPInputStream gis =
+                new GZIPInputStream(
+                        new ByteArrayInputStream(configMap.getBinaryData().get("JSON_INPUT.gz")));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(gis, "UTF-8"));
+        StringBuilder json = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            json.append(line);
+        }
+
+        JsonContentAssert taskMasterInput = new JsonContentAssert(this.getClass(), json.toString());
+        taskMasterInput.extractingJsonPathStringValue("outputs[0].path").isEqualTo("/data/*.bam");
+        taskMasterInput.extractingJsonPathStringValue("outputs[0].path_prefix").isEqualTo("/data");
+        taskMasterInput
+                .extractingJsonPathStringValue("outputs[0].url")
+                .isEqualTo("s3://bucket/out");
+    }
+
     private TaskBuilder prepareBaseTaskBuider(boolean withExecutor) throws IOException {
         TaskBuilder taskBuilder = TaskBuilder.newSingleTask();
         taskBuilder.addJob(

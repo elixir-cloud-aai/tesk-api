@@ -35,13 +35,13 @@ public class ServiceInfoApiControllerTest {
                         .build();
     }
 
-    /** GA4GH specifications use semantic versioning: TES 1.0.0, as a string */
+    /** GA4GH specifications use semantic versioning: TES 1.1.0, as a string */
     @Test
     public void getServiceInfo_reportsTesTypeVersionAsString() throws Exception {
         mvc.perform(get(SERVICE_INFO_URL))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type.group").value("org.ga4gh"))
                 .andExpect(jsonPath("$.type.artifact").value("tes"))
-                .andExpect(jsonPath("$.type.version").value("1.0.0"));
+                .andExpect(jsonPath("$.type.version").value("1.1.0"));
     }
 }

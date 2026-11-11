@@ -1,0 +1,12 @@
+{
+  "inputs": [
+    {"url": "s3://bucket/in.txt", "path": "/data/in.txt", "type": "FILE", "streamable": true}
+  ],
+  "outputs": [
+    {"url": "s3://bucket/out", "path": "/data/*.bam", "path_prefix": "/data", "type": "FILE"}
+  ],
+  "executors": [
+    {"image": "ubuntu", "command": ["echo", "hello world"], "ignore_error": false}
+  ],
+  "resources": {"backend_parameters": {"VmSize": "Standard_D64_v3"}}
+}

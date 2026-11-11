@@ -1,0 +1,5 @@
+{
+  "executors": [
+    {"image": "ubuntu", "command": ["echo", "hello world"], "ignore_error": true}
+  ]
+}
