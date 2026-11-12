@@ -355,6 +355,39 @@ public class TesKubernetesConverter {
      * @return the number of executors, or null if the task isn't stored or can't be read
      */
     Integer extractExecutorCount(V1Job taskMasterJob) {
+        JsonNode executors = this.readStoredTaskField(taskMasterJob, "executors");
+        return executors != null && executors.isArray() ? executors.size() : null;
+    }
+
+    /**
+     * Reads the tags of the task stored with the taskmaster's job (annotation {@code json-input}),
+     * for the tag filter of listTasks.
+     *
+     * @param taskMasterJob - taskmaster's job
+     * @return the tags (a tag whose value is JSON null has the value null), or null if the task has
+     *     none, or isn't stored or can't be read
+     */
+    public Map<String, String> extractTags(V1Job taskMasterJob) {
+        JsonNode tags = this.readStoredTaskField(taskMasterJob, "tags");
+        if (tags == null || !tags.isObject()) {
+            return null;
+        }
+        Map<String, String> result = new HashMap<>();
+        tags.fields()
+                .forEachRemaining(
+                        tag ->
+                                result.put(
+                                        tag.getKey(),
+                                        tag.getValue().isNull() ? null : tag.getValue().asText()));
+        return result;
+    }
+
+    /**
+     * Reads a field of the task stored with the taskmaster's job (annotation {@code json-input}).
+     *
+     * @return the field, or null if the task isn't stored, can't be read, or has no such field
+     */
+    private JsonNode readStoredTaskField(V1Job taskMasterJob, String field) {
         String inputJson =
                 Optional.ofNullable(taskMasterJob.getMetadata().getAnnotations())
                         .map(ann -> ann.get(ANN_JSON_INPUT_KEY))
@@ -365,14 +398,13 @@ public class TesKubernetesConverter {
         try {
             // readTree gives null or a missing node for empty input, depending on the Jackson
             // version
-            JsonNode executors =
-                    Optional.ofNullable(this.objectMapper.readTree(inputJson))
-                            .map(tree -> tree.get("executors"))
-                            .orElse(null);
-            return executors != null && executors.isArray() ? executors.size() : null;
+            return Optional.ofNullable(this.objectMapper.readTree(inputJson))
+                    .map(tree -> tree.get(field))
+                    .orElse(null);
         } catch (IOException ex) {
             logger.info(
-                    "Reading the executors of task {} from JSON failed; {}",
+                    "Reading the {} of task {} from JSON failed; {}",
+                    field,
                     taskMasterJob.getMetadata().getName(),
                     ex.getMessage());
             return null;

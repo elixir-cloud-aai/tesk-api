@@ -264,12 +264,13 @@ public class TesServiceImpl implements TesService {
      * executors, all pods), combines them together into valid {@link Task} objects and converts to
      * result with means of the converter.
      *
-     * <p>Kubernetes can't select jobs by a prefix of an annotation, so the tasks are filtered by
-     * name after Kubernetes returned a page of taskmaster jobs: a page can be shorter than {@code
-     * pageSize}, even empty, while {@code next_page_token} still leads to the next page.
+     * <p>Kubernetes can't select jobs by a prefix of an annotation, by the tags of the task stored
+     * with the job, or by the state, which TESK derives from all the task's jobs. So the tasks are
+     * filtered after Kubernetes returned a page of taskmaster jobs: by name and tags first, by
+     * state once the other jobs are read. A page can be shorter than {@code pageSize}, even empty,
+     * while {@code next_page_token} still leads to the next page.
      *
-     * @param namePrefix - only tasks whose names start with it (case-sensitive); all tasks if null
-     *     or empty
+     * @param filter - only tasks that match it (name prefix, state and tags)
      * @param pageSize - maximum number of taskmaster jobs read for the page
      * @param pageToken - continue token of Kubernetes, from the previous page's next_page_token
      * @param view - one of {@link TaskView} values, decides on how much detail is put in each
@@ -278,7 +279,7 @@ public class TesServiceImpl implements TesService {
      */
     @Override
     public TesListTasksResponse listTasks(
-            String namePrefix, Long pageSize, String pageToken, TaskView view, User user) {
+            TaskFilter filter, Long pageSize, String pageToken, TaskView view, User user) {
 
         V1JobList taskmasterJobs =
                 this.kubernetesClientWrapper.listAllTaskmasterJobsForUser(
@@ -288,7 +289,12 @@ public class TesServiceImpl implements TesService {
         String nextPageToken = taskmasterJobs.getMetadata().getContinue();
         List<V1Job> matchingTaskmasterJobs =
                 taskmasterJobs.getItems().stream()
-                        .filter(job -> hasNamePrefix(job, namePrefix))
+                        .filter(job -> filter.matchesName(taskName(job)))
+                        .filter(
+                                job ->
+                                        !filter.hasTags()
+                                                || filter.matchesTags(
+                                                        this.converter.extractTags(job)))
                         .collect(Collectors.toList());
         if (matchingTaskmasterJobs.isEmpty()) {
             // nothing to combine: spare the lists of all executors, filers and pods
@@ -305,25 +311,23 @@ public class TesServiceImpl implements TesService {
                         .addPodList(jobPods.getItems());
         List<TesTask> tasks =
                 taskListBuilder.getTaskList().stream()
+                        // the state is derived only if the filter needs it
+                        .filter(
+                                task ->
+                                        !filter.hasState()
+                                                || filter.matchesState(
+                                                        this.converter.extractStateFromK8sJobs(
+                                                                task)))
                         .map(task -> this.getTask(task, view, true))
                         .collect(Collectors.toList());
         return new TesListTasksResponse().tasks(tasks).nextPageToken(nextPageToken);
     }
 
-    /**
-     * Whether the name of a taskmaster job's task (annotation {@code tes-task-name}) starts with
-     * the prefix. Every task matches a null or empty prefix; a task without a name matches no
-     * other.
-     */
-    private static boolean hasNamePrefix(V1Job taskmasterJob, String namePrefix) {
-        if (namePrefix == null || namePrefix.isEmpty()) {
-            return true;
-        }
-        String name =
-                Optional.ofNullable(taskmasterJob.getMetadata().getAnnotations())
-                        .map(annotations -> annotations.get(ANN_TESTASK_NAME_KEY))
-                        .orElse(null);
-        return name != null && name.startsWith(namePrefix);
+    /** The name of a taskmaster job's task (annotation {@code tes-task-name}), or null. */
+    private static String taskName(V1Job taskmasterJob) {
+        return Optional.ofNullable(taskmasterJob.getMetadata().getAnnotations())
+                .map(annotations -> annotations.get(ANN_TESTASK_NAME_KEY))
+                .orElse(null);
     }
 
     /**

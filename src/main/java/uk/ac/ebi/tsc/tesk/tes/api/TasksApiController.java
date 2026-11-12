@@ -1,15 +1,20 @@
 package uk.ac.ebi.tsc.tesk.tes.api;
 
 import io.swagger.annotations.ApiParam;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.propertyeditors.StringArrayPropertyEditor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +23,7 @@ import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageSizeException;
 import uk.ac.ebi.tsc.tesk.tes.model.*;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
+import uk.ac.ebi.tsc.tesk.tes.service.TaskFilter;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
 @javax.annotation.Generated(
@@ -35,6 +41,17 @@ public class TasksApiController implements TasksApi {
     static final long MAX_PAGE_SIZE = 2048;
 
     private final TesService tesService;
+
+    /**
+     * Keeps each value of a repeated parameter as it is: Spring would split a single value at
+     * commas (e.g. {@code tag_key=a,b} into two keys), but tag keys and values may contain them.
+     * Only {@code tag_key} and {@code tag_value} are arrays.
+     */
+    @InitBinder
+    public void keepCommasInArrayParameters(WebDataBinder binder) {
+        binder.registerCustomEditor(
+                String[].class, new StringArrayPropertyEditor(null, null, false, false));
+    }
 
     public ResponseEntity<Object> cancelTask(
             @ApiParam(value = "", required = true) @PathVariable("id") String id) {
@@ -77,6 +94,21 @@ public class TasksApiController implements TasksApi {
                     @RequestParam(value = "name_prefix", required = false)
                     String namePrefix,
             @ApiParam(
+                            value =
+                                    "OPTIONAL. Filter tasks by state. Other values than those of tesState give 400 Bad Request. Pages can be shorter, also with state.")
+                    @RequestParam(value = "state", required = false)
+                    TesState state,
+            @ApiParam(
+                            value =
+                                    "OPTIONAL. Filter tasks by tags: a task must have each tag_key, with the tag_value of the same position; a key without a value, or with an empty one, matches any value. Repeat the parameter for more tags. Pages can be shorter, also with tags.")
+                    @RequestParam(value = "tag_key", required = false)
+                    String[] tagKey,
+            @ApiParam(
+                            value =
+                                    "OPTIONAL. The values of the tags in tag_key, in the same order. More values than keys give 400 Bad Request.")
+                    @RequestParam(value = "tag_value", required = false)
+                    String[] tagValue,
+            @ApiParam(
                             example = "256",
                             value =
                                     "OPTIONAL. Number of tasks to return in one page, from 1 to "
@@ -100,10 +132,17 @@ public class TasksApiController implements TasksApi {
         if (pageSize != null && (pageSize < 1 || pageSize > MAX_PAGE_SIZE)) {
             throw new InvalidPageSizeException(MAX_PAGE_SIZE);
         }
+        TaskFilter filter =
+                new TaskFilter(
+                        namePrefix, state, TaskFilter.zipTags(asList(tagKey), asList(tagValue)));
         TesListTasksResponse response =
                 this.tesService.listTasks(
-                        namePrefix, pageSize, pageToken, TaskView.fromString(view), this.getUser());
+                        filter, pageSize, pageToken, TaskView.fromString(view), this.getUser());
         return new ResponseEntity<TesListTasksResponse>(response, HttpStatus.OK);
+    }
+
+    private static List<String> asList(String[] values) {
+        return values == null ? null : Arrays.asList(values);
     }
 
     private User getUser() {

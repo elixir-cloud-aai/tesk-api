@@ -19,7 +19,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentMatcher;
@@ -43,13 +46,17 @@ import org.springframework.security.oauth2.provider.OAuth2Request;
 import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.model.TesListTasksResponse;
+import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
+import uk.ac.ebi.tsc.tesk.tes.service.TaskFilter;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
 @RunWith(SpringRunner.class)
@@ -553,7 +560,12 @@ public class TasksApiControllerTest {
                                     .accept(MediaType.APPLICATION_JSON))
                     .andExpect(status().isOk());
             verify(this.tesService)
-                    .listTasks(isNull(), eq(pageSize), isNull(), eq(TaskView.MINIMAL), any());
+                    .listTasks(
+                            eq(TaskFilter.NONE),
+                            eq(pageSize),
+                            isNull(),
+                            eq(TaskView.MINIMAL),
+                            any());
         }
     }
 
@@ -574,5 +586,130 @@ public class TasksApiControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("page_token")))
                 .andExpect(content().string(not(containsString("secret-token"))));
+    }
+
+    /** Lists the tasks with these query parameters (name, value, name, value, ...). */
+    private ResultActions listWith(String... params) throws Exception {
+        MockHttpServletRequestBuilder request =
+                get(TASK_URL)
+                        .header("Authorization", "Bearer BAR")
+                        .accept(MediaType.APPLICATION_JSON);
+        for (int i = 0; i < params.length; i += 2) {
+            request.param(params[i], params[i + 1]);
+        }
+        return this.mvc.perform(request);
+    }
+
+    /** Every state of TES 1.1 is a filter, also those that TESK may never report (issue #143). */
+    @Test
+    public void listTasks_filtersByEveryState() throws Exception {
+        given(this.tesService.listTasks(any(), any(), any(), any(), any()))
+                .willReturn(new TesListTasksResponse());
+        for (TesState state : TesState.values()) {
+            listWith("state", state.getValue()).andExpect(status().isOk());
+            verify(this.tesService)
+                    .listTasks(
+                            eq(new TaskFilter(null, state, null)),
+                            isNull(),
+                            isNull(),
+                            eq(TaskView.MINIMAL),
+                            any());
+        }
+    }
+
+    /**
+     * Other states, also in lower case, are refused, naming the parameter but not the value (issue
+     * #143).
+     */
+    @Test
+    public void listTasks_invalidState() throws Exception {
+        for (String state : new String[] {"running", "DONE", "1", "secret-state"}) {
+            listWith("state", state)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("state")))
+                    .andExpect(content().string(not(containsString("secret"))));
+        }
+        verify(this.tesService, never()).listTasks(any(), any(), any(), any(), any());
+    }
+
+    /**
+     * tag_key and tag_value are zipped into the tags; keys without a value match any value, and
+     * commas are part of a key or value (issue #143).
+     */
+    @Test
+    public void listTasks_filtersByTags() throws Exception {
+        given(this.tesService.listTasks(any(), any(), any(), any(), any()))
+                .willReturn(new TesListTasksResponse());
+        listWith(
+                        "tag_key", "WORKFLOW_ID",
+                        "tag_key", "a,b",
+                        "tag_key", "PROJECT",
+                        "tag_value", "cwl-01234",
+                        "tag_value", "x, y",
+                        "name_prefix", "align",
+                        "state", "RUNNING",
+                        "page_size", "10",
+                        "page_token", "token-2",
+                        "view", "BASIC")
+                .andExpect(status().isOk());
+        List<Map.Entry<String, String>> tags =
+                Arrays.asList(
+                        TaskFilter.tag("WORKFLOW_ID", "cwl-01234"),
+                        TaskFilter.tag("a,b", "x, y"),
+                        TaskFilter.tag("PROJECT", ""));
+        verify(this.tesService)
+                .listTasks(
+                        eq(new TaskFilter("align", TesState.RUNNING, tags)),
+                        eq(10L),
+                        eq("token-2"),
+                        eq(TaskView.BASIC),
+                        any());
+    }
+
+    /** A single key with a comma stays one key (issue #143). */
+    @Test
+    public void listTasks_singleTagKeyKeepsCommas() throws Exception {
+        given(this.tesService.listTasks(any(), any(), any(), any(), any()))
+                .willReturn(new TesListTasksResponse());
+        listWith("tag_key", "a,b", "tag_value", "c,d").andExpect(status().isOk());
+        verify(this.tesService)
+                .listTasks(
+                        eq(
+                                new TaskFilter(
+                                        null,
+                                        null,
+                                        Collections.singletonList(TaskFilter.tag("a,b", "c,d")))),
+                        isNull(),
+                        isNull(),
+                        eq(TaskView.MINIMAL),
+                        any());
+    }
+
+    /** More values than keys are refused, naming both parameters (issue #143). */
+    @Test
+    public void listTasks_moreTagValuesThanKeys() throws Exception {
+        listWith("tag_key", "foo", "tag_value", "bar", "tag_value", "secret-value")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("tag_value")))
+                .andExpect(jsonPath("$.message", containsString("tag_key")))
+                .andExpect(content().string(not(containsString("secret-value"))));
+        listWith("tag_value", "bar").andExpect(status().isBadRequest());
+        verify(this.tesService, never()).listTasks(any(), any(), any(), any(), any());
+    }
+
+    /** Empty filters, as forms send them for unset fields, filter nothing (issue #143). */
+    @Test
+    public void listTasks_emptyFiltersFilterNothing() throws Exception {
+        given(this.tesService.listTasks(any(), any(), any(), any(), any()))
+                .willReturn(new TesListTasksResponse());
+        listWith("name_prefix", "", "state", "", "tag_key", "", "tag_value", "")
+                .andExpect(status().isOk());
+        verify(this.tesService)
+                .listTasks(
+                        eq(new TaskFilter("", null, null)),
+                        isNull(),
+                        isNull(),
+                        eq(TaskView.MINIMAL),
+                        any());
     }
 }
