@@ -55,21 +55,19 @@ public class TaskFilter {
      * TES specification asks: the n-th value belongs to the n-th key; keys without a value match
      * any value. A repeated key is one more tag the task must have, so {@code foo=bar} and {@code
      * foo=baz} match no task. Empty keys filter nothing (as an empty {@code name_prefix} or {@code
-     * state}), and neither do empty values beyond the keys.
+     * state}); the values of the keys after them keep their positions.
      *
      * @param tagKeys - the keys; null or empty for no tag filter
      * @param tagValues - the values; null or empty for any value of every key
      * @return the tags, in the order of the keys
-     * @throws InvalidTagFilterException if there are more values than keys, other than empty ones
+     * @throws InvalidTagFilterException if there are more values than keys (also empty ones)
      */
     public static List<Map.Entry<String, String>> zipTags(
             List<String> tagKeys, List<String> tagValues) {
         List<String> keys = tagKeys == null ? Collections.emptyList() : tagKeys;
         List<String> values = tagValues == null ? Collections.emptyList() : tagValues;
-        for (int i = keys.size(); i < values.size(); i++) {
-            if (values.get(i) != null && !values.get(i).isEmpty()) {
-                throw new InvalidTagFilterException();
-            }
+        if (values.size() > keys.size()) {
+            throw new InvalidTagFilterException();
         }
         List<Map.Entry<String, String>> tags = new ArrayList<>();
         for (int i = 0; i < keys.size(); i++) {

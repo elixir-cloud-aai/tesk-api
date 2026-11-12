@@ -127,23 +127,19 @@ class TaskFilterTest {
     }
 
     /**
-     * Empty keys filter nothing, like an empty name_prefix or state, and neither do empty values
-     * beyond the keys.
+     * Empty keys filter nothing, like an empty name_prefix or state; the values of the keys after
+     * them keep their positions.
      */
     @Test
-    void zipTagsIgnoresEmptyParameters() {
+    void zipTagsIgnoresEmptyKeys() {
         assertThat(TaskFilter.zipTags(Collections.singletonList(""), null)).isEmpty();
         assertThat(TaskFilter.zipTags(Arrays.asList("", "foo"), Arrays.asList("ignored", "bar")))
                 .containsExactly(tag("foo", "bar"));
-        assertThat(TaskFilter.zipTags(null, Collections.singletonList(""))).isEmpty();
-        assertThat(TaskFilter.zipTags(null, Collections.singletonList(null))).isEmpty();
         assertThat(TaskFilter.zipTags(Arrays.asList(null, "foo"), Arrays.asList("x", null)))
                 .containsExactly(tag("foo", ""));
-        assertThat(TaskFilter.zipTags(Collections.singletonList("foo"), Arrays.asList("bar", "")))
-                .containsExactly(tag("foo", "bar"));
     }
 
-    /** More values than keys are refused. */
+    /** More values than keys are refused, also empty ones, as the issue asks. */
     @Test
     void zipTagsRefusesMoreValuesThanKeys() {
         assertThatThrownBy(
@@ -155,6 +151,13 @@ class TaskFilterTest {
                 .hasMessageContaining("tag_value")
                 .hasMessageContaining("tag_key");
         assertThatThrownBy(() -> TaskFilter.zipTags(null, Collections.singletonList("bar")))
+                .isInstanceOf(InvalidTagFilterException.class);
+        assertThatThrownBy(() -> TaskFilter.zipTags(null, Collections.singletonList("")))
+                .isInstanceOf(InvalidTagFilterException.class);
+        assertThatThrownBy(
+                        () ->
+                                TaskFilter.zipTags(
+                                        Collections.singletonList("foo"), Arrays.asList("bar", "")))
                 .isInstanceOf(InvalidTagFilterException.class);
     }
 

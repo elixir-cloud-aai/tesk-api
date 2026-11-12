@@ -50,11 +50,14 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
   must match, so `foo=bar` and `foo=baz` together match no task. Each
   parameter is one key or value, commas included. An empty `tag_key`
   filters nothing (its `tag_value` is ignored; the values of the keys after
-  it keep their positions). More `tag_value`s than
-  `tag_key`s are refused with `400 Bad Request`, unless the extra ones are
-  empty.
+  it keep their positions). More `tag_value`s than `tag_key`s, also empty
+  ones, are refused with `400 Bad Request`.
 
-All filters combine: a task must match each of them, in every view.
+All filters combine: a task must match each of them, in every view. The
+state filter uses the state that the same response reports: TESK API reads
+the task's jobs and pods with several requests to Kubernetes, so a task that
+changes its state while they are read can be filtered by a state that
+combines both moments, as its reported state does.
 
 Task names, tags and states aren't Kubernetes labels, so Kubernetes can't
 select them: TESK API reads the tags from the task stored with the
