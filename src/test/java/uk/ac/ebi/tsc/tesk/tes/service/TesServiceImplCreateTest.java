@@ -22,16 +22,23 @@ import io.kubernetes.client.openapi.models.V1Secret;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.tes.model.TesCreateTaskResponse;
+import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 
 /**
@@ -330,5 +337,57 @@ class TesServiceImplCreateTest {
 
         verify(this.client, never()).deleteJob(anyString());
         verify(this.client, times(1)).createConfigMap(any(V1ConfigMap.class));
+    }
+
+    /**
+     * Backend parameters are removed before the task is converted, so that neither the job's
+     * annotation nor the ConfigMap has them; the job notes the ignored keys, and a warning names
+     * them, but not their values (issue #145). A retry after a name collision keeps the note.
+     */
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void backendParametersAreDroppedWithWarning(CapturedOutput output) {
+        Map<String, String> parameters = new TreeMap<>();
+        parameters.put("VmSize", "Standard_D64_v3");
+        this.task.resources(new TesResources().backendParameters(parameters));
+        this.converts("task-1");
+        when(this.converter.fromTesTaskToK8sJob(this.task, USER))
+                .thenAnswer(
+                        invocation -> {
+                            assertThat(this.task.getResources().getBackendParameters()).isNull();
+                            return new V1Job().metadata(new V1ObjectMeta().name("task-1"));
+                        });
+        when(this.client.createJob(any(V1Job.class)))
+                .thenThrow(kubernetesError(HttpStatus.CONFLICT))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        this.service.createTask(this.task, USER);
+
+        ArgumentCaptor<V1Job> job = ArgumentCaptor.forClass(V1Job.class);
+        verify(this.client, times(2)).createJob(job.capture());
+        for (V1Job created : job.getAllValues()) {
+            assertThat(created.getMetadata().getAnnotations())
+                    .containsEntry(Constants.ANN_IGNORED_BACKEND_PARAMETERS_KEY, "[\"VmSize\"]");
+        }
+        assertThat(output.getOut())
+                .contains("task-1")
+                .contains("Ignored backend_parameters, which TESK doesn't support: [\"VmSize\"]")
+                .doesNotContain("Standard_D64_v3");
+    }
+
+    /** Without backend parameters, the job has no note and nothing is logged about them. */
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void noBackendParametersNoNote(CapturedOutput output) {
+        this.converts("task-1");
+        when(this.client.createJob(any(V1Job.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        this.service.createTask(this.task, USER);
+
+        ArgumentCaptor<V1Job> job = ArgumentCaptor.forClass(V1Job.class);
+        verify(this.client).createJob(job.capture());
+        assertThat(job.getValue().getMetadata().getAnnotations()).isNull();
+        assertThat(output.getOut()).doesNotContain("backend_parameters");
     }
 }
