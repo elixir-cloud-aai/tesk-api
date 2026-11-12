@@ -228,14 +228,10 @@ public class TesOutput   {
     this.type = type;
   }
 
-  /**
-   * Reads the type from JSON. TES 1.1 doesn't require it (issue #146): left out, it keeps its
-   * default, and an explicit {@code null} is {@code FILE} too. Unknown values become {@code null}
-   * and fail validation.
-   */
+  /** Reads the type from JSON, see {@link TesFileType#fromJson}; left out, it stays FILE. */
   @JsonSetter("type")
   private void setTypeFromJson(String type) {
-    this.type = type == null ? TesFileType.FILE : TesFileType.fromValue(type);
+    this.type = TesFileType.fromJson(type);
   }
 
 

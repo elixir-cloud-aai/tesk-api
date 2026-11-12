@@ -231,7 +231,8 @@ public class TasksApiControllerTest {
                 new String[][] {
                     new String[] {"no_path.json", "inputs[0].path"},
                     new String[] {"no_source.json", "URL or content required"},
-                    new String[] {"wrong_type.json", "inputs[0].type"}
+                    new String[] {"wrong_type.json", "inputs[0].type"},
+                    new String[] {"empty_type.json", "inputs[0].type"}
                 };
         for (String[] file : files) {
             this.mvc
@@ -255,6 +256,7 @@ public class TasksApiControllerTest {
                     new String[] {"no_path.json", "outputs[0].path"},
                     new String[] {"no_url.json", "outputs[0].url"},
                     new String[] {"empty_type.json", "outputs[0].type"},
+                    new String[] {"wrong_type.json", "outputs[0].type"},
                     new String[] {"relative_path_prefix.json", "outputs[0].pathPrefix"},
                     new String[] {
                         "wildcard_in_first_component.json", "none in its first component"
@@ -484,9 +486,17 @@ public class TasksApiControllerTest {
                 .createTask(
                         argThat(
                                 task ->
-                                        task.getInputs().get(0).getType() == TesFileType.FILE
-                                                && task.getOutputs().get(0).getType()
-                                                        == TesFileType.FILE),
+                                        task.getInputs().stream()
+                                                        .allMatch(
+                                                                input ->
+                                                                        input.getType()
+                                                                                == TesFileType.FILE)
+                                                && task.getOutputs().stream()
+                                                        .allMatch(
+                                                                output ->
+                                                                        output.getType()
+                                                                                == TesFileType
+                                                                                        .FILE)),
                         any());
     }
 

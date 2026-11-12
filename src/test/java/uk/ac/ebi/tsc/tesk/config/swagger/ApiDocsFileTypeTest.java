@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.API_DOCS_URL;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -30,7 +31,7 @@ public class ApiDocsFileTypeTest {
 
     @Test
     public void typeIsOptionalWithTwoValues() throws Exception {
-        ResultActions docs = this.mvc.perform(get("/v2/api-docs")).andExpect(status().isOk());
+        ResultActions docs = this.mvc.perform(get(API_DOCS_URL)).andExpect(status().isOk());
         for (String model :
                 new String[] {"TesInputReq", "TesInputRes", "TesOutputReq", "TesOutputRes"}) {
             String definition = "$.definitions." + model;

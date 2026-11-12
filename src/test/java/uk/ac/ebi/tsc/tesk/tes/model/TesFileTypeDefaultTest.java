@@ -12,6 +12,7 @@ import org.junit.Test;
  */
 public class TesFileTypeDefaultTest {
 
+    /** A plain mapper; TasksApiControllerTest covers the application's. */
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private TesInput input(String json) throws Exception {

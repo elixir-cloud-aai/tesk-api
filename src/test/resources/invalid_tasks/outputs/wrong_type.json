@@ -1,0 +1,18 @@
+{
+  "executors": [
+    {
+      "image": "ubuntu",
+      "command": [
+        "echo",
+        "hello world"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "path": "/data/out",
+      "url": "s3://bucket/out",
+      "type": "UNKNOWN"
+    }
+  ]
+}
