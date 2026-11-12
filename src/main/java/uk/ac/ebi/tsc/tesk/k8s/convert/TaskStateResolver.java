@@ -7,6 +7,8 @@ import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobCondition;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1PodCondition;
+import io.kubernetes.client.openapi.models.V1PodStatus;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -15,6 +17,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
@@ -35,7 +39,80 @@ public final class TaskStateResolver {
     private static final Set<String> FAILED_CONDITIONS =
             Collections.unmodifiableSet(new HashSet<>(Arrays.asList("Failed", "FailureTarget")));
 
+    /**
+     * Reasons of the pod condition DisruptionTarget (Kubernetes 1.26+) that make an executor's
+     * failure a preemption: the system stopped the pod, not the executor's command (issue #144).
+     */
+    private static final Set<String> DISRUPTION_REASONS =
+            Collections.unmodifiableSet(
+                    new HashSet<>(
+                            Arrays.asList(
+                                    "PreemptionByScheduler",
+                                    "TerminationByKubelet",
+                                    "DeletionByTaintManager",
+                                    "EvictionByEvictionAPI")));
+
+    /** Pod phases of pods that have ended. */
+    private static final Set<String> ENDED_POD_PHASES =
+            Collections.unmodifiableSet(
+                    new HashSet<>(
+                            Arrays.asList(
+                                    K8sConstants.PodPhase.SUCCEEDED.getCode(),
+                                    K8sConstants.PodPhase.FAILED.getCode())));
+
     private TaskStateResolver() {}
+
+    /**
+     * Whether any job of the task (taskmaster, executors, outputs filer) still has a pod that
+     * hasn't ended (pending, running, also while terminating, or without a status yet), or one that
+     * Kubernetes counts as active.
+     */
+    private static boolean hasActiveJob(Task task) {
+        Stream<Job> jobs =
+                Stream.concat(
+                        Stream.concat(
+                                Stream.of(task.getTaskmaster()), task.getExecutors().stream()),
+                        task.getOutputFiler().map(Stream::of).orElseGet(Stream::empty));
+        return jobs.anyMatch(
+                job ->
+                        isActive(job.getJob())
+                                || job.getPods().stream().anyMatch(pod -> !hasEnded(pod)));
+    }
+
+    private static boolean hasEnded(V1Pod pod) {
+        return pod.getStatus() != null && ENDED_POD_PHASES.contains(pod.getStatus().getPhase());
+    }
+
+    /**
+     * Whether a failed executor's job failed because Kubernetes disrupted its pods: at least one of
+     * its pods has the condition DisruptionTarget with one of {@link #DISRUPTION_REASONS}, and
+     * every failed pod has it. Pods that Kubernetes deleted can't be told apart: without pods, the
+     * job counts as not disrupted.
+     */
+    private static boolean wasDisrupted(Job executor) {
+        List<V1Pod> pods = executor.getPods();
+        boolean anyDisrupted = pods.stream().anyMatch(TaskStateResolver::isDisrupted);
+        String failed = K8sConstants.PodPhase.FAILED.getCode();
+        boolean failedPodsDisrupted =
+                pods.stream()
+                        .filter(pod -> pod.getStatus() != null)
+                        .filter(pod -> failed.equals(pod.getStatus().getPhase()))
+                        .allMatch(TaskStateResolver::isDisrupted);
+        return anyDisrupted && failedPodsDisrupted;
+    }
+
+    private static boolean isDisrupted(V1Pod pod) {
+        List<V1PodCondition> conditions =
+                Optional.ofNullable(pod.getStatus())
+                        .map(V1PodStatus::getConditions)
+                        .orElse(Collections.emptyList());
+        return conditions.stream()
+                .anyMatch(
+                        condition ->
+                                "DisruptionTarget".equals(condition.getType())
+                                        && "True".equals(condition.getStatus())
+                                        && DISRUPTION_REASONS.contains(condition.getReason()));
+    }
 
     /**
      * Derives the state of a task.
@@ -50,7 +127,7 @@ public final class TaskStateResolver {
         Job taskmaster = task.getTaskmaster();
         V1Job taskmasterJob = taskmaster.getJob();
         if (isCancelled(taskmasterJob)) {
-            return TesState.CANCELED;
+            return hasActiveJob(task) ? TesState.CANCELING : TesState.CANCELED;
         }
 
         boolean taskmasterCompleted = hasSucceeded(taskmasterJob);
@@ -61,9 +138,14 @@ public final class TaskStateResolver {
         boolean taskmasterEnded = taskmasterCompleted || taskmasterFailed;
 
         List<Job> executors = task.getExecutors();
-        if (executors.stream()
-                .anyMatch(executor -> hasFailed(executor.getJob(), taskmasterEnded))) {
-            return TesState.EXECUTOR_ERROR;
+        List<Job> failedExecutors =
+                executors.stream()
+                        .filter(executor -> hasFailed(executor.getJob(), taskmasterEnded))
+                        .collect(Collectors.toList());
+        if (!failedExecutors.isEmpty()) {
+            return failedExecutors.stream().allMatch(TaskStateResolver::wasDisrupted)
+                    ? TesState.PREEMPTED
+                    : TesState.EXECUTOR_ERROR;
         }
         if (taskmasterFailed) {
             return TesState.SYSTEM_ERROR;

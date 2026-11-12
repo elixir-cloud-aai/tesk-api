@@ -7,9 +7,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_FILER_SUF;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_VALUE_EXEC;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_VALUE_TASKM;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +24,7 @@ import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1LabelSelector;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1PodCondition;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1PodStatus;
 import java.util.Collections;
@@ -213,5 +217,104 @@ class TesServiceImplCancelTest {
         verify(this.client).cancelJobBeforeStart(TASK);
         verify(this.client, never()).labelJobAsCancelled(anyString());
         verify(this.client, never()).labelPodAsCancelled(anyString());
+    }
+
+    private void verifyNothingPatched() {
+        verify(this.client, never()).labelJobAsCancelled(anyString());
+        verify(this.client, never()).cancelJobBeforeStart(anyString());
+        verify(this.client, never()).labelPodAsCancelled(anyString());
+    }
+
+    /** The taskmaster's job is labelled as cancelled; its pod has the given phase. */
+    private void cancelledTaskmaster(String podPhase) {
+        this.taskmaster
+                .getMetadata()
+                .putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
+        if (!"Running".equals(podPhase)) {
+            this.taskmaster.status(new V1JobStatus().failed(1));
+        }
+        this.taskmasterPods.getItems().get(0).getStatus().phase(podPhase);
+    }
+
+    /**
+     * A task that is canceling (cancelled, a pod still running) is cancelled already: the request
+     * succeeds and patches nothing again (issue #144).
+     */
+    @Test
+    void cancelingTaskIsNotPatchedAgain() {
+        this.cancelledTaskmaster("Running");
+        this.service.cancelTask(TASK);
+        this.verifyNothingPatched();
+    }
+
+    /** A cancelled task whose pods all ended can't be cancelled again (issue #144). */
+    @Test
+    void canceledTaskIsNotCancelled() {
+        this.cancelledTaskmaster("Failed");
+        assertThatThrownBy(() -> this.service.cancelTask(TASK))
+                .isInstanceOf(CancelNotRunningTask.class);
+        this.verifyNothingPatched();
+    }
+
+    /**
+     * The outputs filer's pods are read, too: a cancelled task whose filer still runs is canceling
+     * (issue #144).
+     */
+    @Test
+    void runningOutputFilerKeepsTaskCanceling() {
+        this.cancelledTaskmaster("Failed");
+        V1Job filer =
+                new V1Job()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name(TASK + JOB_NAME_FILER_SUF)
+                                        .putLabelsItem("job-name", TASK + JOB_NAME_FILER_SUF))
+                        .spec(selector(TASK + JOB_NAME_FILER_SUF))
+                        .status(new V1JobStatus());
+        when(this.client.getSingleTaskOutputFilerJob(TASK)).thenReturn(Optional.of(filer));
+        V1Pod filerPod =
+                new V1Pod()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name(TASK + "-filer-pod")
+                                        .putLabelsItem("job-name", TASK + JOB_NAME_FILER_SUF))
+                        .status(new V1PodStatus().phase("Running"));
+        when(this.client.listSingleJobPods(filer))
+                .thenReturn(new V1PodList().addItemsItem(filerPod));
+        this.service.cancelTask(TASK);
+        this.verifyNothingPatched();
+    }
+
+    /** A preempted task has ended and can't be cancelled (issue #144). */
+    @Test
+    void preemptedTaskIsNotCancelled() {
+        this.executorWithCondition("Failed");
+        V1Pod evictedPod =
+                new V1Pod()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name(TASK + "-ex-00-pod")
+                                        .putLabelsItem("job-name", TASK + "-ex-00"))
+                        .status(
+                                new V1PodStatus()
+                                        .phase("Failed")
+                                        .addConditionsItem(
+                                                new V1PodCondition()
+                                                        .type("DisruptionTarget")
+                                                        .status("True")
+                                                        .reason("EvictionByEvictionAPI")));
+        when(this.client.listSingleJobPods(any(V1Job.class)))
+                .thenAnswer(
+                        invocation ->
+                                TASK.equals(
+                                                invocation
+                                                        .<V1Job>getArgument(0)
+                                                        .getMetadata()
+                                                        .getName())
+                                        ? this.taskmasterPods
+                                        : new V1PodList().addItemsItem(evictedPod));
+        assertThatThrownBy(() -> this.service.cancelTask(TASK))
+                .isInstanceOf(CancelNotRunningTask.class);
+        this.verifyNothingPatched();
     }
 }

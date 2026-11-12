@@ -10,6 +10,7 @@ import io.kubernetes.client.openapi.models.V1JobCondition;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1PodCondition;
 import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.openapi.models.V1PodStatus;
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
@@ -58,7 +60,12 @@ class TaskStateResolverTest {
         /** A pod failed, no condition yet (older clusters) and no pod active. */
         FAILED_PODS,
         /** A pod failed and another is active: the job retries. */
-        RETRYING
+        RETRYING,
+        /**
+         * A pod failed with the condition DisruptionTarget (e.g. preempted or evicted); condition
+         * Failed (issue #144).
+         */
+        PREEMPTED
     }
 
     /** Wildcard of the decision table. */
@@ -66,9 +73,17 @@ class TaskStateResolverTest {
 
     private static final Set<JobState> FAILING =
             EnumSet.of(JobState.FAILED, JobState.FAILURE_TARGET);
+    /** Job states with a pod that is pending or running (also a terminating one). */
+    private static final Set<JobState> ACTIVE_POD =
+            EnumSet.of(
+                    JobState.PENDING, JobState.RUNNING, JobState.FAILURE_TARGET, JobState.RETRYING);
     /** Taskmaster states that end the task's other jobs; failed pods alone may still be retried. */
     private static final Set<JobState> ENDED_TM =
-            EnumSet.of(JobState.SUCCEEDED, JobState.FAILED, JobState.FAILURE_TARGET);
+            EnumSet.of(
+                    JobState.SUCCEEDED,
+                    JobState.FAILED,
+                    JobState.FAILURE_TARGET,
+                    JobState.PREEMPTED);
 
     private static final Set<JobState> TASKMASTER_STATES =
             EnumSet.complementOf(EnumSet.of(JobState.ABSENT));
@@ -117,7 +132,12 @@ class TaskStateResolverTest {
     /** The decision table; the first row that matches gives the state. */
     private static final List<Row> TABLE =
             Arrays.asList(
-                    // Cancelled tasks stay cancelled
+                    // Cancelled tasks are canceling while any of their jobs has a pending or
+                    // running pod, then cancelled (issue #144)
+                    new Row(true, ACTIVE_POD, ANY, ANY, ANY, TesState.CANCELING),
+                    new Row(true, ANY, ACTIVE_POD, ANY, ANY, TesState.CANCELING),
+                    new Row(true, ANY, ANY, ACTIVE_POD, ANY, TesState.CANCELING),
+                    new Row(true, ANY, ANY, ANY, ACTIVE_POD, TesState.CANCELING),
                     new Row(true, ANY, ANY, ANY, ANY, TesState.CANCELED),
                     // A failed executor, whichever, is an executor error
                     new Row(NOT_CANCELLED, ANY, FAILING, ANY, ANY, TesState.EXECUTOR_ERROR),
@@ -137,16 +157,43 @@ class TaskStateResolverTest {
                             of(JobState.FAILED_PODS, JobState.RETRYING),
                             ANY,
                             TesState.EXECUTOR_ERROR),
+                    // An executor whose pods were disrupted is preempted, if no executor
+                    // failed otherwise (issue #144)
+                    new Row(
+                            NOT_CANCELLED,
+                            ANY,
+                            of(JobState.PREEMPTED),
+                            ANY,
+                            ANY,
+                            TesState.PREEMPTED),
+                    new Row(
+                            NOT_CANCELLED,
+                            ANY,
+                            ANY,
+                            of(JobState.PREEMPTED),
+                            ANY,
+                            TesState.PREEMPTED),
                     // A failed taskmaster or filer is a system error (a taskmaster with
                     // failed pods and none active, maybe between retries, too, as before)
                     new Row(
                             NOT_CANCELLED,
-                            of(JobState.FAILED, JobState.FAILURE_TARGET, JobState.FAILED_PODS),
+                            of(
+                                    JobState.FAILED,
+                                    JobState.FAILURE_TARGET,
+                                    JobState.FAILED_PODS,
+                                    JobState.PREEMPTED),
                             ANY,
                             ANY,
                             ANY,
                             TesState.SYSTEM_ERROR),
-                    new Row(NOT_CANCELLED, ANY, ANY, ANY, FAILING, TesState.SYSTEM_ERROR),
+                    // A disrupted filer is a system error: only executors are preempted
+                    new Row(
+                            NOT_CANCELLED,
+                            ANY,
+                            ANY,
+                            ANY,
+                            of(JobState.FAILED, JobState.FAILURE_TARGET, JobState.PREEMPTED),
+                            TesState.SYSTEM_ERROR),
                     new Row(
                             NOT_CANCELLED,
                             ENDED_TM,
@@ -417,6 +464,121 @@ class TaskStateResolverTest {
         assertThat(TaskStateResolver.resolve(task, () -> 1)).isEqualTo(TesState.SYSTEM_ERROR);
     }
 
+    /**
+     * Every reason of DisruptionTarget counts as preempted: the scheduler's preemption, the
+     * kubelet's termination (e.g. node shutdown or pressure), the taint manager and the Eviction
+     * API (e.g. a drain); a pod that is still terminating counts, too (issue #144).
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "PreemptionByScheduler",
+                "TerminationByKubelet",
+                "DeletionByTaintManager",
+                "EvictionByEvictionAPI"
+            })
+    void everyDisruptionReasonIsPreempted(String reason) {
+        Task failed = failedExecutor(failedPod(disruption(reason)));
+        assertThat(TaskStateResolver.resolve(failed, () -> 1)).isEqualTo(TesState.PREEMPTED);
+        Task terminating =
+                failedExecutor(
+                        new V1PodStatus().phase("Running").addConditionsItem(disruption(reason)));
+        assertThat(TaskStateResolver.resolve(terminating, () -> 1)).isEqualTo(TesState.PREEMPTED);
+    }
+
+    /**
+     * Without a disruption that TESK knows, with one whose status isn't "True", or without pods
+     * (e.g. deleted), a failed executor is an executor error (issue #144).
+     */
+    @Test
+    void otherFailuresAreExecutorErrors() {
+        assertThat(TaskStateResolver.resolve(failedExecutor(failedPod()), () -> 1))
+                .isEqualTo(TesState.EXECUTOR_ERROR);
+        assertThat(
+                        TaskStateResolver.resolve(
+                                failedExecutor(failedPod(disruption("SomethingElse"))), () -> 1))
+                .isEqualTo(TesState.EXECUTOR_ERROR);
+        assertThat(
+                        TaskStateResolver.resolve(
+                                failedExecutor(
+                                        failedPod(
+                                                disruption("PreemptionByScheduler").type("Ready"))),
+                                () -> 1))
+                .isEqualTo(TesState.EXECUTOR_ERROR);
+        assertThat(
+                        TaskStateResolver.resolve(
+                                failedExecutor(
+                                        failedPod(
+                                                disruption("PreemptionByScheduler")
+                                                        .status("False"))),
+                                () -> 1))
+                .isEqualTo(TesState.EXECUTOR_ERROR);
+        assertThat(TaskStateResolver.resolve(failedExecutor(), () -> 1))
+                .isEqualTo(TesState.EXECUTOR_ERROR);
+        assertThat(TaskStateResolver.resolve(failedExecutor((V1PodStatus) null), () -> 1))
+                .isEqualTo(TesState.EXECUTOR_ERROR);
+    }
+
+    /**
+     * An executor whose job retried is preempted only if every failed pod was disrupted: one that
+     * failed on its own makes it an executor error (issue #144).
+     */
+    @Test
+    void retriedExecutorIsPreemptedOnlyIfEveryFailedPodWasDisrupted() {
+        V1PodStatus preempted = failedPod(disruption("PreemptionByScheduler"));
+        V1PodStatus evicted = failedPod(disruption("EvictionByEvictionAPI"));
+        assertThat(TaskStateResolver.resolve(failedExecutor(preempted, evicted), () -> 1))
+                .isEqualTo(TesState.PREEMPTED);
+        assertThat(TaskStateResolver.resolve(failedExecutor(preempted, failedPod()), () -> 1))
+                .isEqualTo(TesState.EXECUTOR_ERROR);
+    }
+
+    /** One executor failed on its own, another was preempted: an executor error (issue #144). */
+    @Test
+    void executorErrorWinsOverPreempted() {
+        Task task =
+                task(
+                        false,
+                        JobState.SUCCEEDED,
+                        JobState.PREEMPTED,
+                        JobState.FAILED,
+                        JobState.ABSENT);
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.EXECUTOR_ERROR);
+    }
+
+    /**
+     * A cancelled task is canceling while a pod hasn't ended (also one without a status yet, or in
+     * phase Unknown), and cancelled once all pods ended (issue #144).
+     */
+    @Test
+    void cancelledTaskIsCancelingUntilPodsEnded() {
+        Task task = task(true, JobState.FAILED, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
+        assertThat(TaskStateResolver.resolve(task, () -> 1)).isEqualTo(TesState.CANCELED);
+        task.getExecutors().get(0).addPod(pod(TASK + "-ex-00-pod-2", null));
+        assertThat(TaskStateResolver.resolve(task, () -> 1)).isEqualTo(TesState.CANCELING);
+        Task unknown =
+                task(true, JobState.FAILED, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
+        unknown.getExecutors()
+                .get(0)
+                .addPod(pod(TASK + "-ex-00-pod-2", new V1PodStatus().phase("Unknown")));
+        assertThat(TaskStateResolver.resolve(unknown, () -> 1)).isEqualTo(TesState.CANCELING);
+    }
+
+    /**
+     * A job that Kubernetes still counts as active is canceling, also if its pods weren't read
+     * (issue #144).
+     */
+    @Test
+    void activeCountWithoutPodsIsCanceling() {
+        Task task = task(true, JobState.FAILED, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
+        task.setOutputFiler(
+                new Job(
+                        new V1Job()
+                                .metadata(new V1ObjectMeta().name(TASK + JOB_NAME_FILER_SUF))
+                                .status(new V1JobStatus().active(1))));
+        assertThat(TaskStateResolver.resolve(task, () -> 1)).isEqualTo(TesState.CANCELING);
+    }
+
     private static Task task(
             boolean cancelled,
             JobState taskmaster,
@@ -479,15 +641,56 @@ class TaskStateResolverTest {
                 status.failed(1).active(1);
                 podPhase = "Running";
                 break;
+            case PREEMPTED:
+                status.failed(1)
+                        .addConditionsItem(new V1JobCondition().type("Failed").status("True"));
+                return withPod(
+                        name,
+                        status,
+                        new V1PodStatus()
+                                .phase("Failed")
+                                .addConditionsItem(disruption("PreemptionByScheduler")));
             default:
                 throw new IllegalArgumentException(state.name());
         }
+        return withPod(name, status, new V1PodStatus().phase(podPhase));
+    }
+
+    private static Job withPod(String name, V1JobStatus status, V1PodStatus podStatus) {
         Job job = new Job(new V1Job().metadata(new V1ObjectMeta().name(name)).status(status));
-        job.addPod(
-                new V1Pod()
-                        .metadata(new V1ObjectMeta().name(name + "-pod"))
-                        .spec(new V1PodSpec())
-                        .status(new V1PodStatus().phase(podPhase)));
+        job.addPod(pod(name + "-pod", podStatus));
         return job;
+    }
+
+    private static V1Pod pod(String name, V1PodStatus status) {
+        return new V1Pod()
+                .metadata(new V1ObjectMeta().name(name))
+                .spec(new V1PodSpec())
+                .status(status);
+    }
+
+    /** The condition that Kubernetes 1.26+ sets on a pod that it disrupts, with this reason. */
+    private static V1PodCondition disruption(String reason) {
+        return new V1PodCondition().type("DisruptionTarget").status("True").reason(reason);
+    }
+
+    /** A task whose only executor failed, with pods of these statuses. */
+    private static Task failedExecutor(V1PodStatus... podStatuses) {
+        Task task =
+                task(false, JobState.RUNNING, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
+        Job executor = task.getExecutors().get(0);
+        executor.getPods().clear();
+        for (int i = 0; i < podStatuses.length; i++) {
+            executor.addPod(pod(TASK + "-ex-00-pod-" + i, podStatuses[i]));
+        }
+        return task;
+    }
+
+    private static V1PodStatus failedPod(V1PodCondition... conditions) {
+        V1PodStatus status = new V1PodStatus().phase("Failed");
+        for (V1PodCondition condition : conditions) {
+            status.addConditionsItem(condition);
+        }
+        return status;
     }
 }

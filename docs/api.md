@@ -38,7 +38,8 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
   filters nothing.
 - `state` lists only the tasks in that state. It accepts every `tesState`
   of TES 1.1, in capitals (e.g. `RUNNING`, also `CANCELING` and
-  `PREEMPTED`, which TESK API doesn't report yet, so they list no tasks);
+  `PREEMPTED`; see [Getting tasks](index.md#getting-tasks) for when TESK
+  API reports them);
   other values are refused with `400 Bad Request`, and the message names
   `state`. An empty `state` filters nothing.
 - `tag_key` and `tag_value` list only the tasks with these tags. Repeat

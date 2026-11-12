@@ -197,7 +197,14 @@ public class TesServiceImpl implements TesService {
         Optional<V1Job> outputFilerJob =
                 this.kubernetesClientWrapper.getSingleTaskOutputFilerJob(
                         taskMasterJob.getMetadata().getName());
-        outputFilerJob.ifPresent(taskBuilder::addJob);
+        if (outputFilerJob.isPresent()) {
+            // its pods tell whether a cancelled task is still canceling (issue #144)
+            taskBuilder.addJob(outputFilerJob.get());
+            taskBuilder.addPodList(
+                    this.kubernetesClientWrapper
+                            .listSingleJobPods(outputFilerJob.get())
+                            .getItems());
+        }
         return taskBuilder.getTask();
     }
 
@@ -330,6 +337,10 @@ public class TesServiceImpl implements TesService {
         TesState state = this.converter.extractStateFromK8sJobs(task);
         if (COMPLETED_STATES.contains(state)) {
             throw new CancelNotRunningTask(taskId);
+        }
+        if (state == TesState.CANCELING) {
+            // cancelled already, its pods are still stopping: nothing to patch again (issue #144)
+            return;
         }
         V1PodList taskMasterPods = new V1PodList().items(task.getTaskmaster().getPods());
         Optional<String> runningPod = this.converter.getNameOfFirstRunningPod(taskMasterPods);

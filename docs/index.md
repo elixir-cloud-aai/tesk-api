@@ -91,8 +91,14 @@ and combines them into the TES task.
 The task's state comes from these jobs. In this order, the first rule that
 applies gives the state:
 
-1. The taskmaster's job is labelled as cancelled: `CANCELED`.
-2. An executor's job failed, whichever executor it is: `EXECUTOR_ERROR`.
+1. The taskmaster's job is labelled as cancelled: `CANCELING` while any job
+   of the task (taskmaster, executors, outputs filer) has a pod that hasn't
+   ended (pending, running, also while it terminates, without a status yet,
+   or in phase `Unknown`) or that Kubernetes still counts as active;
+   `CANCELED` once none has.
+2. An executor's job failed, whichever executor it is: `PREEMPTED` if
+   Kubernetes disrupted the pods of every failed executor (see below),
+   otherwise `EXECUTOR_ERROR`.
 3. The taskmaster's job or the outputs filer's job failed: `SYSTEM_ERROR`.
 4. The taskmaster's job completed: `COMPLETE` if the jobs of all the task's
    executors exist and completed, otherwise `SYSTEM_ERROR` (e.g., the inputs
@@ -128,9 +134,22 @@ of an executor are those of its only run. The taskmaster's environment
 variable `EXECUTOR_BACKOFF_LIMIT` sets another limit (see
 [Configuration](configuration.md)); TESK's Helm chart sets it from
 `tesk.executorRetries` (2 by default). The limit also covers pods that
-Kubernetes evicts or preempts: without retries, the executor's job fails, and
-the task becomes `EXECUTOR_ERROR`, also if the executor's command didn't
-fail. The taskmaster's own job keeps Kubernetes' default retries: a
+Kubernetes evicts or preempts: without retries, the executor's job fails.
+
+The task is then `PREEMPTED` instead of `EXECUTOR_ERROR` if the executor's
+command didn't fail: a failed executor's job counts as disrupted if at least
+one of its pods has the condition `DisruptionTarget` (Kubernetes 1.26 and
+later) with the status `True` and one of the reasons
+`PreemptionByScheduler` (the scheduler preempted it for a pod of higher
+priority), `TerminationByKubelet` (e.g. node shutdown or node pressure),
+`DeletionByTaintManager` (a `NoExecute` taint) or `EvictionByEvictionAPI`
+(e.g. `kubectl drain`), and every failed pod of the job has it. If one
+executor failed on its own, the task is `EXECUTOR_ERROR`. TESK API sees the
+condition only while the pod exists: Kubernetes deletes the pods that the
+scheduler preempts, the taint manager or the Eviction API evict, once the
+job controller has counted them, so such a pod is usually gone soon after
+the job failed (pods that the kubelet terminated stay). A failed executor
+whose pods are gone counts as `EXECUTOR_ERROR`. The taskmaster's own job keeps Kubernetes' default retries: a
 taskmaster that is restarted, e.g. after its pod was evicted, continues with
 the jobs that already exist. Between its retries, the task is reported as
 `SYSTEM_ERROR`, also while an executor's pod is pending.
@@ -138,17 +157,21 @@ the jobs that already exist. Between its retries, the task is reported as
 ### Cancelling a task
 
 To cancel a task, TESK API labels the taskmaster's job and pod as cancelled.
-The job's label gives the task the state `CANCELED`. A task that has ended,
-by the rules above, can't be cancelled (`400 Bad Request`). The pod's label
-reaches the taskmaster through the Downward API; when the taskmaster sees it,
-it stops the running executor and ends.
+The job's label gives the task the state `CANCELING`, and `CANCELED` once
+none of its jobs has a pod that hasn't ended (see the rules above). A task
+that has ended (`COMPLETE`, `EXECUTOR_ERROR`, `SYSTEM_ERROR`, `PREEMPTED`, or
+`CANCELED`) can't be cancelled (`400 Bad Request`). Cancelling a task that is
+`CANCELING` answers `200 OK` and changes nothing. The pod's label reaches
+the taskmaster through the Downward API; when the taskmaster sees it, it
+stops the running executor and ends.
 
 If the taskmaster doesn't run yet (its pod is pending, or Kubernetes hasn't
 created it yet), a label on a pod created later wouldn't reach it. TESK API
 then labels the job as cancelled and sets its `parallelism` to 0 and its
 `activeDeadlineSeconds` to 1: Kubernetes creates no more pods for the job,
 removes the ones it has, and fails the job about a second later; it also
-labels any pending pod. The job's label keeps the task `CANCELED`. In tests
+labels any pending pod. The job's label keeps the task cancelled
+(`CANCELING`, then `CANCELED`). In tests
 on minikube (Kubernetes 1.28 and 1.34), no taskmaster cancelled this way
 started. A taskmaster whose container is starting at that very moment could
 still start until Kubernetes stops it;
@@ -157,7 +180,7 @@ tracks a check for cancellation in the taskmaster itself.
 
 TESK API checks the state before it labels the job. If the task ends in
 between, for example because an executor fails at that moment, the label
-still wins and the task stays `CANCELED`.
+still wins and the task stays cancelled (`CANCELING`, then `CANCELED`).
 
 ### Deleting tasks
 
