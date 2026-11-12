@@ -2,13 +2,16 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 
 import java.io.InputStream;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import javax.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Construct;
 import org.yaml.snakeyaml.constructor.Constructor;
@@ -49,7 +52,16 @@ public class ServiceInfoService {
     public void loadYaml() {
         Yaml yaml = new Yaml(new OffsetDateTimePropertyConstructor());
         try (InputStream is = resourceFile.getInputStream()) {
-            serviceInfo = yaml.loadAs(is, TesServiceInfo.class);
+            TesServiceInfo loaded = yaml.loadAs(is, TesServiceInfo.class);
+            List<String> backendParameters = loaded.getTesResourcesBackendParameters();
+            if (backendParameters != null && !backendParameters.isEmpty()) {
+                log.warn(
+                        "Service info lists tesResources_backend_parameters, but TESK supports"
+                                + " none and ignores them in tasks: it reports none; set it to []");
+            }
+            // TESK supports no backend parameters, whatever the file lists (TES 1.1)
+            loaded.setTesResourcesBackendParameters(Collections.emptyList());
+            serviceInfo = loaded;
         } catch (Exception e) {
             log.error("Unable to parse Service Info Yaml", e);
         }
@@ -63,6 +75,15 @@ public class ServiceInfoService {
     class OffsetDateTimePropertyConstructor extends Constructor {
         public OffsetDateTimePropertyConstructor() {
             yamlClassConstructors.put(NodeId.scalar, new TimeStampConstruct());
+            // keys of the service info schema that aren't Java property names (TES 1.1)
+            TypeDescription serviceInfo = new TypeDescription(TesServiceInfo.class);
+            serviceInfo.substituteProperty(
+                    "tesResources_backend_parameters",
+                    List.class,
+                    "getTesResourcesBackendParameters",
+                    "setTesResourcesBackendParameters",
+                    String.class);
+            addTypeDescription(serviceInfo);
         }
 
         class TimeStampConstruct extends Constructor.ConstructScalar {

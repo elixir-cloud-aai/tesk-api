@@ -536,6 +536,28 @@ public class TesKubernetesConverterTest {
     }
 
     /**
+     * Backend parameters stored with tasks created before TESK dropped them aren't returned: TES
+     * 1.1 says that backends don't return unsupported keys (issue #145)
+     */
+    @Test
+    public void fromK8sToTask_dropsStoredBackendParameters() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        Map<String, String> annotations =
+                taskBuilder.getTask().getTaskmaster().getJob().getMetadata().getAnnotations();
+        TesTask storedTask =
+                this.objectMapper.readValue(
+                        annotations.get(Constants.ANN_JSON_INPUT_KEY), TesTask.class);
+        Map<String, String> parameters = new HashMap<>();
+        parameters.put("VmSize", "Standard_D64_v3");
+        storedTask.getResources().setBackendParameters(parameters);
+        annotations.put(
+                Constants.ANN_JSON_INPUT_KEY, this.objectMapper.writeValueAsString(storedTask));
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
+        assertNull(outputTask.getResources().getBackendParameters());
+        assertThat(outputTask, is(this.prepareBaseExpectedTask()));
+    }
+
+    /**
      * Jobs without a status yet (just created, before the job controller synced them) give a task
      * without start or end times instead of an error (issue #126)
      */

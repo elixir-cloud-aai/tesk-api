@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.PodPhase;
+import uk.ac.ebi.tsc.tesk.k8s.convert.IgnoredBackendParameters;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.*;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
@@ -60,6 +61,8 @@ public class TesServiceImpl implements TesService {
     @Override
     public TesCreateTaskResponse createTask(TesTask task, User user) {
 
+        // TESK supports no backend parameters: they are neither stored nor returned (TES 1.1)
+        List<String> ignoredBackendParameters = IgnoredBackendParameters.removeFrom(task);
         int attemptsNo = 0;
         while (true) {
             try {
@@ -75,6 +78,8 @@ public class TesServiceImpl implements TesService {
                 }
 
                 V1Job taskMasterJob = this.converter.fromTesTaskToK8sJob(task, user);
+                IgnoredBackendParameters.annotate(
+                        taskMasterJob.getMetadata(), ignoredBackendParameters);
                 V1ConfigMap taskMasterConfigMap =
                         this.converter.fromTesTaskToK8sConfigMap(task, user, taskMasterJob);
                 List<V1Secret> imagePullSecrets =
@@ -91,6 +96,13 @@ public class TesServiceImpl implements TesService {
                 }
                 V1Job createdJob = this.kubernetesClientWrapper.createJob(taskMasterJob);
                 this.createOwnedResources(taskMasterConfigMap, imagePullSecrets, createdJob);
+                // only for tasks that exist: a failed create leaves no task to warn about
+                if (!ignoredBackendParameters.isEmpty()) {
+                    logger.warn(
+                            "Task {}: {}",
+                            createdJob.getMetadata().getName(),
+                            IgnoredBackendParameters.message(ignoredBackendParameters));
+                }
                 return this.converter.fromK8sJobToTesCreateTaskResponse(createdJob);
             } catch (KubernetesException e) {
                 // in case of job name collision retry converting task to job (with new generated
@@ -241,6 +253,9 @@ public class TesServiceImpl implements TesService {
                 task.getLogs().get(0).addSystemLogsItem(taskMasterPodLog);
             }
         }
+        // after the taskmaster's log, which clients may expect first
+        IgnoredBackendParameters.systemLog(taskObjects.getTaskmaster().getJob().getMetadata())
+                .ifPresent(task.getLogs().get(0)::addSystemLogsItem);
         return task;
     }
 

@@ -44,4 +44,13 @@ public class ServiceInfoApiControllerTest {
                 .andExpect(jsonPath("$.type.artifact").value("tes"))
                 .andExpect(jsonPath("$.type.version").value("1.1.0"));
     }
+
+    /** TES 1.1: service info lists the backend parameters that TESK supports, none (issue #145) */
+    @Test
+    public void getServiceInfo_listsNoBackendParameters() throws Exception {
+        mvc.perform(get(SERVICE_INFO_URL))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tesResources_backend_parameters").isArray())
+                .andExpect(jsonPath("$.tesResources_backend_parameters").isEmpty());
+    }
 }
