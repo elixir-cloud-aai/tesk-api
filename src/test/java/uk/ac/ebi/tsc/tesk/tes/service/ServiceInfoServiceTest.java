@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
 import java.net.URISyntaxException;
@@ -59,5 +60,19 @@ public class ServiceInfoServiceTest {
         assertThat(result.getName(), is("example application"));
         assertThat(result.getTesResourcesBackendParameters(), is(Collections.emptyList()));
         assertThat(output.getOut(), containsString("set it to []"));
+    }
+
+    /** The list of backend parameters counts for equality (issue #145) */
+    @Test
+    public void serviceInfo_backendParametersEquality() {
+        TesServiceInfo info =
+                new TesServiceInfo().tesResourcesBackendParameters(Collections.emptyList());
+        TesServiceInfo same = new TesServiceInfo();
+        same.setTesResourcesBackendParameters(Collections.emptyList());
+        assertThat(info, is(same));
+        assertThat(info.hashCode(), is(same.hashCode()));
+        assertThat(info.toString(), containsString("tesResourcesBackendParameters: []"));
+        assertThat(info, is(not(new TesServiceInfo())));
+        assertThat(info, is(not(new TesServiceInfo().storage(Collections.emptyList()))));
     }
 }
