@@ -342,11 +342,16 @@ public class NoAuthIT {
                 .andExpect(jsonPath("$.tasks[0].id").value("task-201"))
                 .andExpect(jsonPath("$.tasks[1].id").value("task-202"));
         this.mvc
-                .perform(get(TASK_URL + "?tag_key=WORKFLOW_ID&state=CANCELED&view=BASIC"))
+                .perform(get(TASK_URL + "?tag_key=WORKFLOW_ID&state=CANCELING&view=BASIC"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tasks.length()").value(1))
                 .andExpect(jsonPath("$.tasks[0].id").value("task-202"))
                 .andExpect(jsonPath("$.tasks[0].tags.WORKFLOW_ID").value("cwl-01234"));
+        // its taskmaster job is still active: canceling, not cancelled yet (issue #144)
+        this.mvc
+                .perform(get(TASK_URL + "?state=CANCELED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(0));
         this.mvc
                 .perform(get(TASK_URL).param("tag_key", "a,b"))
                 .andExpect(status().isOk())

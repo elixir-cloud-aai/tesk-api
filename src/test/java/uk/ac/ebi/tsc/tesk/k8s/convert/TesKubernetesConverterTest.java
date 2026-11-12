@@ -591,7 +591,7 @@ public class TesKubernetesConverterTest {
                 .getLabels()
                 .putIfAbsent(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
         TesTask expectedTask = this.prepareBaseExpectedTask();
-        expectedTask.setState(TesState.CANCELED);
+        expectedTask.setState(TesState.CANCELING);
         TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
         assertThat(outputTask, is(expectedTask));
     }
@@ -617,7 +617,7 @@ public class TesKubernetesConverterTest {
                 .putIfAbsent(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(1);
         TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
-        assertThat(state, is(TesState.CANCELED));
+        assertThat(state, is(TesState.CANCELING));
     }
 
     @Test

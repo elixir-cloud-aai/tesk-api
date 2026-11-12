@@ -277,7 +277,7 @@ class TesServiceImplListTest {
         for (TaskView view : TaskView.values()) {
             assertThat(listByState(TesState.INITIALIZING, view))
                     .containsExactly("task-1", "task-3");
-            assertThat(listByState(TesState.CANCELED, view)).containsExactly("task-2");
+            assertThat(listByState(TesState.CANCELING, view)).containsExactly("task-2");
             assertThat(listByState(TesState.COMPLETE, view)).isEmpty();
         }
     }
@@ -297,7 +297,7 @@ class TesServiceImplListTest {
 
         TesListTasksResponse response =
                 this.service.listTasks(
-                        new TaskFilter("align", TesState.CANCELED, tags("foo", "bar")),
+                        new TaskFilter("align", TesState.CANCELING, tags("foo", "bar")),
                         3L,
                         null,
                         TaskView.MINIMAL,
