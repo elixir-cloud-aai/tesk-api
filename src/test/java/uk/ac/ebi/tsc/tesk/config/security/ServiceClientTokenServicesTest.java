@@ -559,4 +559,63 @@ public class ServiceClientTokenServicesTest {
         assertEquals(60, defaults.getClockSkewSeconds());
         assertTrue(defaults.getClientIds().isEmpty());
     }
+
+    @Test
+    public void withoutIssuedAt_isRefused() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.unsetClaim("iat");
+        refused(sign(claims));
+    }
+
+    @Test
+    public void issuedInTheFuture_isRefused() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setIssuedAt(NumericDate.fromSeconds(NumericDate.now().getValue() + 600));
+        claims.setExpirationTimeMinutesInTheFuture(70);
+        refused(sign(claims));
+    }
+
+    /** Keys only come from https URLs, or http to the local host */
+    @Test
+    public void insecureUrls() {
+        assertTrue(ServiceClientTokenServices.isSecure("https://login.example.org/oidc/"));
+        assertTrue(ServiceClientTokenServices.isSecure("http://localhost:8080/oidc/"));
+        assertTrue(ServiceClientTokenServices.isSecure("http://127.0.0.1/jwk"));
+        assertFalse(ServiceClientTokenServices.isSecure("http://login.example.org/oidc/"));
+        assertFalse(ServiceClientTokenServices.isSecure("http://localhost.example.org/"));
+        assertFalse(ServiceClientTokenServices.isSecure("ftp://login.example.org/"));
+        assertFalse(ServiceClientTokenServices.isSecure("https:///no-host"));
+        assertFalse(ServiceClientTokenServices.isSecure("not a url"));
+    }
+
+    @Test
+    public void insecureIssuer_failsAtStartup() {
+        properties.getServiceClients().setIssuer("http://login.example.org/oidc/");
+        assertThrows(IllegalStateException.class, this::services);
+    }
+
+    @Test
+    public void insecureJwksUri_failsAtStartup() {
+        properties.getServiceClients().setJwksUri("http://login.example.org/jwk");
+        assertThrows(IllegalStateException.class, this::services);
+    }
+
+    @Test
+    public void discoveredInsecureJwksUri_isRefused() throws Exception {
+        idp.givenThat(
+                get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
+                        .willReturn(
+                                okJson(
+                                        "{\"issuer\":\""
+                                                + issuer()
+                                                + "\",\"jwks_uri\":\"http://login.example.org/jwk\"}")));
+        refused(sign(claims(CLIENT)));
+    }
+
+    /** Service clients never match tasks by the old creator label */
+    @Test
+    public void serviceClient_ignoresLegacyUserLabels() throws Exception {
+        properties.setLegacyUserLabels(true);
+        assertFalse(accepted(sign(claims(CLIENT))).isLegacyUserLabels());
+    }
 }

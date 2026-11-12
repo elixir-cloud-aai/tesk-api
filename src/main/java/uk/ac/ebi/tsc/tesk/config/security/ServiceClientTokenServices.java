@@ -1,6 +1,8 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +89,9 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
     /** Connect and read timeouts of the requests to the issuer, in milliseconds */
     private static final int HTTP_TIMEOUT_MS = 5_000;
 
+    /** Age of a token (by iat) beyond which it is refused, whatever its exp: a year */
+    private static final int MAX_TOKEN_AGE_SECONDS = 365 * 24 * 3600;
+
     /** How long the keys are kept if fetching them again fails, in seconds */
     private static final long RETAIN_KEYS_ON_ERROR_SECONDS = 15 * 60;
 
@@ -99,7 +104,7 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
     private final boolean requireAccessTokenType;
     private final boolean requireClientSubject;
     private final int clockSkewSeconds;
-    private final boolean legacyUserLabels;
+
     private final long jwksRefreshIntervalMs;
 
     /** Parses tokens without checking them, to tell whether they are service clients' tokens */
@@ -168,8 +173,34 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
         this.requireAccessTokenType = settings.isRequireAccessTokenType();
         this.requireClientSubject = settings.isRequireClientSubject();
         this.clockSkewSeconds = settings.getClockSkewSeconds();
-        this.legacyUserLabels = properties.isLegacyUserLabels();
         this.jwksRefreshIntervalMs = jwksRefreshIntervalMs;
+        if (!isSecure(this.issuer) || (this.jwksUri != null && !isSecure(this.jwksUri))) {
+            throw new IllegalStateException(
+                    "tesk.api.authorisation.service-clients.issuer and .jwks-uri must be https"
+                            + " URLs (http only for localhost)");
+        }
+    }
+
+    /**
+     * Whether keys from the URL can be trusted: https, or http to the local host only (e.g. for
+     * tests), as anyone on the network path of plain http could give TESK API keys of their own
+     */
+    static boolean isSecure(String url) {
+        URI uri;
+        try {
+            uri = new URI(url);
+        } catch (URISyntaxException e) {
+            return false;
+        }
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if ("https".equalsIgnoreCase(scheme)) {
+            return host != null;
+        }
+        return "http".equalsIgnoreCase(scheme)
+                && ("localhost".equalsIgnoreCase(host)
+                        || "127.0.0.1".equals(host)
+                        || "[::1]".equals(host));
     }
 
     @Override
@@ -251,7 +282,7 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
                 User.builder(clientId)
                         .allGroups(Collections.emptySet())
                         .serviceClient(true)
-                        .legacyUserLabels(this.legacyUserLabels)
+                        .legacyUserLabels(false)
                         .build();
         UsernamePasswordAuthenticationToken userAuthentication =
                 new UsernamePasswordAuthenticationToken(user, "N/A", AuthorityUtils.NO_AUTHORITIES);
@@ -367,6 +398,9 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
         if (!this.issuer.equals(document.get("issuer")) || !(jwks instanceof String)) {
             throw new JoseException("Discovery document of another issuer or without jwks_uri");
         }
+        if (!isSecure((String) jwks)) {
+            throw new JoseException("Discovery document with a jwks_uri that isn't https");
+        }
         return (String) jwks;
     }
 
@@ -377,6 +411,10 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
                         .setJwsAlgorithmConstraints(ALGORITHMS)
                         .setExpectedIssuer(true, this.issuer)
                         .setRequireExpirationTime()
+                        // iat is required by RFC 9068, and may be neither in the future nor more
+                        // than a year old
+                        .setRequireIssuedAt()
+                        .setIssuedAtRestrictions(this.clockSkewSeconds, MAX_TOKEN_AGE_SECONDS)
                         .setAllowedClockSkewInSeconds(this.clockSkewSeconds);
         if (this.audience != null) {
             builder.setExpectedAudience(true, this.audience);

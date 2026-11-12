@@ -12,6 +12,7 @@ import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.util.Config;
 import org.jose4j.jwk.JsonWebKeySet;
 import org.jose4j.jwk.RsaJsonWebKey;
@@ -202,6 +203,8 @@ public class ServiceClientAuthIT {
 
     @Test
     public void serviceClient_getList_ownTasksOnly() throws Exception {
+        V1Job othersTask = MockUtil.taskmaster(null, "other-gateway");
+        othersTask.getMetadata().setName("task-456");
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
@@ -211,14 +214,14 @@ public class ServiceClientAuthIT {
                         .willReturn(
                                 okJson(
                                         MockUtil.jobList(
-                                                MockUtil.taskmaster(null, CLIENT),
-                                                MockUtil.taskmaster(null, "other-gateway")))));
+                                                MockUtil.taskmaster(null, CLIENT), othersTask))));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
         // the own task only, also if Kubernetes returned others
         listTasks(serviceToken())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(1));
+                .andExpect(jsonPath("$.tasks.length()").value(1))
+                .andExpect(jsonPath("$.tasks[0].id").value("task-123"));
         noUserInfoCalls();
     }
 

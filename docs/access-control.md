@@ -235,6 +235,9 @@ service token, and TESK API checks it locally:
   configured issuer), or from `…_JWKS_URI`. Only asymmetric algorithms (RSA,
   RSA-PSS, ECDSA) are accepted. The keys are cached, and fetched again for a
   token with an unknown key ID, at most once every 10 seconds;
+* `iat`, which the token must have ([RFC 9068, section
+  2.2](https://datatracker.ietf.org/doc/html/rfc9068#section-2.2)), and which
+  may be neither in the future nor more than a year old;
 * `exp`, which the token must have, and `nbf`, if it has one, with
   a leeway of `…_CLOCK_SKEW_SECONDS`;
 * the header `typ`, which must be `at+jwt` ([RFC 9068, section
@@ -275,7 +278,7 @@ Environment variable | Meaning | Default
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_CLAIM` | Claim that names the client. Some providers use `azp`. | `client_id`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_ACCESS_TOKEN_TYPE` | `true`: the header `typ` must be `at+jwt`. Set it to `false` only for providers that don't set it. | `true`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_CLIENT_SUBJECT` | `true`: the token's `sub` must be the client ID, as in tokens of the client credentials grant; tokens of users obtained through a listed client go through the user info endpoint, as user tokens. `false`: any `sub`; then every token that a user gets through a listed client is accepted as the client's. | `true`
-`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLOCK_SKEW_SECONDS` | Leeway for `exp` and `nbf`, in seconds. | `60`
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLOCK_SKEW_SECONDS` | Leeway for `exp`, `nbf` and `iat` (in the future), in seconds. | `60`
 
 If the setting is on without an issuer or without a non-blank client ID, or
 with a negative leeway, TESK API doesn't start. The discovery document and
@@ -309,7 +312,8 @@ Tasks of a client record it as their creator as for users (see [Task
 creators](#task-creators)): the label `creator-user-hash` has the hash of the
 client ID, the annotation `creator-user-id` and `logs[0].metadata.USER_ID`
 the client ID. Super admins see these tasks, as all tasks; team admins
-don't, as they belong to no team.
+don't, as they belong to no team. `TESK_API_AUTHORISATION_LEGACY_USER_LABELS`
+doesn't apply to service clients: they never match tasks by the old label.
 
 User IDs (`sub` of the user info) and client IDs share this record, so a
 user whose `sub` is a listed client's ID would share the client's tasks:
@@ -340,6 +344,8 @@ its users may see and cancel which task.
   receives such a token (e.g. that other service) can use it at TESK API
   until it expires. Set the audience if your provider lets you choose it.
 * TESK API trusts every key that it gets from the issuer's discovery
-  document or JWKS URI. Use `https://` URLs for the issuer and
-  `…_JWKS_URI` (TESK API doesn't enforce it), so that nobody on the network
-  path can give it keys of their own.
+  document or JWKS URI, so these must be `https://` URLs (plain `http://`
+  only to `localhost`, e.g. for tests), so that nobody on the network path
+  can give it keys of their own: with other URLs in the settings, TESK API
+  doesn't start, and a discovery document with another `jwks_uri` is
+  refused.

@@ -115,7 +115,7 @@ public class AuthorisationProperties {
          * client have the user's {@code sub} and are then validated as user tokens
          */
         private boolean requireClientSubject = true;
-        /** Leeway for {@code exp} and {@code nbf}, in seconds */
+        /** Leeway for {@code exp}, {@code nbf} and {@code iat} (in the future), in seconds */
         private int clockSkewSeconds = 60;
 
         public boolean isEnabled() {
