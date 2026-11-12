@@ -48,6 +48,12 @@ public class Constants {
     public static final String ANN_JSON_INPUT_KEY = "json-input";
 
     /**
+     * Key of the annotation of the taskmaster's job with the keys of the task's backend parameters,
+     * which TESK doesn't support and therefore doesn't store (a JSON array of strings)
+     */
+    public static final String ANN_IGNORED_BACKEND_PARAMETERS_KEY = "ignored-backend-parameters";
+
+    /**
      * Key of the label, that stores taskmaster's name (==TES task generated ID) in executor jobs
      */
     public static final String LABEL_TESTASK_ID_KEY = "taskmaster-name";

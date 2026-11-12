@@ -6,6 +6,7 @@ import static org.junit.Assert.assertThat;
 import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import org.junit.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -35,5 +36,17 @@ public class ServiceInfoServiceTest {
         assertThat(result, is(expected));
         subject.loadYaml();
         assertThat(result, is(expected));
+    }
+
+    /** A file of a deployment may list backend parameters, a field of TES 1.1 (issue #145) */
+    @Test
+    public void getServiceInfo_backendParameters() {
+        ServiceInfoService service =
+                new ServiceInfoService(
+                        new ClassPathResource("service-info-backend-parameters.yaml"));
+        service.setUp();
+        TesServiceInfo result = service.getServiceInfo();
+        assertThat(result.getName(), is("example application"));
+        assertThat(result.getTesResourcesBackendParameters(), is(Arrays.asList("VmSize", "Queue")));
     }
 }

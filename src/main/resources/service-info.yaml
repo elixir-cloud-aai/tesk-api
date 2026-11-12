@@ -15,3 +15,5 @@ environment: dev
 version: 1.2.0
 storage:
 - ftp://ftp-private.ebi.ac.uk
+# TESK supports no backend parameters (TES 1.1)
+tesResources_backend_parameters: []

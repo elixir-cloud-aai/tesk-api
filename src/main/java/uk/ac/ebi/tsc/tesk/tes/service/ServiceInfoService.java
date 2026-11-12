@@ -3,12 +3,14 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 import java.io.InputStream;
 import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.List;
 import javax.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Construct;
 import org.yaml.snakeyaml.constructor.Constructor;
@@ -63,6 +65,15 @@ public class ServiceInfoService {
     class OffsetDateTimePropertyConstructor extends Constructor {
         public OffsetDateTimePropertyConstructor() {
             yamlClassConstructors.put(NodeId.scalar, new TimeStampConstruct());
+            // keys of the service info schema that aren't Java property names (TES 1.1)
+            TypeDescription serviceInfo = new TypeDescription(TesServiceInfo.class);
+            serviceInfo.substituteProperty(
+                    "tesResources_backend_parameters",
+                    List.class,
+                    "getTesResourcesBackendParameters",
+                    "setTesResourcesBackendParameters",
+                    String.class);
+            addTypeDescription(serviceInfo);
         }
 
         class TimeStampConstruct extends Constructor.ConstructScalar {
