@@ -6,6 +6,13 @@ From 1.2.0, deployments need no changes: the new options are off by
 default. TESK API 1.3.0 accepts the task fields and list filters of TES 1.1,
 and clients may notice changed answers:
 
+- **TES 1.1 fields.** `outputs[].path_prefix`, `inputs[].streamable`,
+  `executors[].ignore_error` and `resources.backend_parameters_strict` are
+  accepted instead of being refused as unknown fields, with two exceptions
+  that are refused with `400 Bad Request`, as TESK can't do what they ask:
+  `ignore_error: true` (TESK stops at the first executor that fails) and
+  `backend_parameters_strict: true` with `backend_parameters` (see [TES 1.1
+  fields](api.md#tes-11-fields)).
 - **Wildcards without `path_prefix`.** An output whose `path` has wildcards
   (`*`, `?`, `[`) but no `path_prefix` is refused with `400 Bad Request`,
   unless its `url` is a `file:` URL or has no scheme, as TES 1.1 requires
@@ -25,9 +32,9 @@ and clients may notice changed answers:
   states of TES 1.0 must accept the new ones.
 - **`backend_parameters`.** They are no longer stored or returned, also for
   tasks created by earlier versions; with the view `FULL`, a task lists the
-  keys it ignored in `logs[0].system_logs`. Tasks that also set
-  `backend_parameters_strict: true` are refused with `400 Bad Request`, as
-  TESK supports no backend parameters.
+  keys it ignored in `logs[0].system_logs` (only tasks created by 1.3.0 or
+  later: earlier versions recorded no ignored keys, so their tasks list
+  none).
   Service info lists `tesResources_backend_parameters` (always `[]`); keep
   it at `[]` in your own service info file, if you use one.
 - **Service info.** `type.version` is `1.1.0` instead of `1.0.0`. If you
