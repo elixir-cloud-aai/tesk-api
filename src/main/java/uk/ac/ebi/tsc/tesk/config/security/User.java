@@ -43,6 +43,13 @@ public class User implements Serializable, UserDetails, Principal {
     private boolean claimAuthorised = false;
 
     /**
+     * Is this principal a service client, authenticated by an access token of an allow-listed
+     * client (tesk.api.authorisation.service-clients) instead of the user info; its ID is the
+     * client's ID, and it has no groups
+     */
+    private boolean serviceClient = false;
+
+    /**
      * Whether tasks created before the hash label, with only the old label {@code creator-user-id},
      * are the user's if their label has the user's ID with {@code @} replaced by {@code _}
      * (tesk.api.authorisation.legacy-user-labels; see {@link CreatorLabels})
@@ -77,6 +84,19 @@ public class User implements Serializable, UserDetails, Principal {
 
     public boolean isClaimAuthorised() {
         return claimAuthorised;
+    }
+
+    public boolean isServiceClient() {
+        return serviceClient;
+    }
+
+    /**
+     * Whether the principal may create tasks without a group, and list, get and cancel its own
+     * tasks without a group: users authorised by the claim (tesk.api.authorisation.claim), and
+     * service clients (tesk.api.authorisation.service-clients)
+     */
+    public boolean isAuthorisedWithoutGroup() {
+        return claimAuthorised || serviceClient;
     }
 
     public boolean isLegacyUserLabels() {
@@ -143,11 +163,12 @@ public class User implements Serializable, UserDetails, Principal {
      * Label selector of the taskmaster jobs that the user may list, in addition to the job type:
      * none for admins (all tasks); the groups (and, unless a manager of one, the own tasks in them)
      * for group members and managers; the own tasks without a group for users authorised by the
-     * claim only (tesk.api.authorisation.claim). Null also for users without any of these rights,
-     * who may not list tasks at all (see {@code TesService#listTasks}). The own tasks are selected
-     * by the hash label, which only narrows the list down: the caller checks the creator of each
-     * job ({@link #isCreatorOf}). With {@link #legacyUserLabels}, the selector can't name the
-     * creator, as tasks may have either label, and only selects by group.
+     * claim only (tesk.api.authorisation.claim) and for service clients. Null also for users
+     * without any of these rights, who may not list tasks at all (see {@code
+     * TesService#listTasks}). The own tasks are selected by the hash label, which only narrows the
+     * list down: the caller checks the creator of each job ({@link #isCreatorOf}). With {@link
+     * #legacyUserLabels}, the selector can't name the creator, as tasks may have either label, and
+     * only selects by group.
      */
     public String getLabelSelector() {
         Set<String> allTeskGroups = new LinkedHashSet<>();
@@ -171,7 +192,7 @@ public class User implements Serializable, UserDetails, Principal {
             }
             return sb.toString();
         }
-        if (isClaimAuthorised()) {
+        if (isAuthorisedWithoutGroup()) {
             // authorised without groups: only the own tasks without a group (admins returned
             // above, so that they keep seeing all tasks)
             String noGroup = "!" + Constants.LABEL_GROUPNAME_KEY;
@@ -196,6 +217,7 @@ public class User implements Serializable, UserDetails, Principal {
             Set<String> teskManagedGroups,
             boolean teskAdmin,
             boolean claimAuthorised,
+            boolean serviceClient,
             boolean legacyUserLabels) {
         this.userId = userId;
         this.preferredUsername = preferredUsername;
@@ -208,11 +230,16 @@ public class User implements Serializable, UserDetails, Principal {
         this.teskManagedGroups = teskManagedGroups;
         this.teskAdmin = teskAdmin;
         this.claimAuthorised = claimAuthorised;
+        this.serviceClient = serviceClient;
         this.legacyUserLabels = legacyUserLabels;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
+        if (this.allGroups == null || this.allGroups.isEmpty()) {
+            // no groups (e.g. service clients): no authorities, rather than an empty one
+            return AuthorityUtils.NO_AUTHORITIES;
+        }
         return AuthorityUtils.createAuthorityList(
                 StringUtils.collectionToCommaDelimitedString(this.allGroups));
     }
@@ -286,6 +313,8 @@ public class User implements Serializable, UserDetails, Principal {
                 + isTeskAdmin()
                 + ", claimAuthorised="
                 + isClaimAuthorised()
+                + ", serviceClient="
+                + isServiceClient()
                 + ", legacyUserLabels="
                 + isLegacyUserLabels()
                 + "}";
@@ -306,6 +335,9 @@ public class User implements Serializable, UserDetails, Principal {
             return false;
         }
         if (claimAuthorised != user.claimAuthorised) {
+            return false;
+        }
+        if (serviceClient != user.serviceClient) {
             return false;
         }
         if (legacyUserLabels != user.legacyUserLabels) {
@@ -355,6 +387,7 @@ public class User implements Serializable, UserDetails, Principal {
         result = 31 * result + (allGroups != null ? allGroups.hashCode() : 0);
         result = 31 * result + (teskAdmin ? 1 : 0);
         result = 31 * result + (claimAuthorised ? 1 : 0);
+        result = 31 * result + (serviceClient ? 1 : 0);
         result = 31 * result + (legacyUserLabels ? 1 : 0);
         result = 31 * result + (teskMemberedGroups != null ? teskMemberedGroups.hashCode() : 0);
         result = 31 * result + (teskManagedGroups != null ? teskManagedGroups.hashCode() : 0);
@@ -373,6 +406,7 @@ public class User implements Serializable, UserDetails, Principal {
         private Set<String> teskManagedGroups;
         private boolean teskAdmin = false;
         private boolean claimAuthorised = false;
+        private boolean serviceClient = false;
         private boolean legacyUserLabels = false;
 
         UserBuilder(String userId) {
@@ -433,6 +467,11 @@ public class User implements Serializable, UserDetails, Principal {
             return this;
         }
 
+        public UserBuilder serviceClient(boolean serviceClient) {
+            this.serviceClient = serviceClient;
+            return this;
+        }
+
         public UserBuilder legacyUserLabels(boolean legacyUserLabels) {
             this.legacyUserLabels = legacyUserLabels;
             return this;
@@ -451,6 +490,7 @@ public class User implements Serializable, UserDetails, Principal {
                     teskManagedGroups,
                     teskAdmin,
                     claimAuthorised,
+                    serviceClient,
                     legacyUserLabels);
         }
     }

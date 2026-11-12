@@ -38,6 +38,9 @@ public class AuthorisationProperties {
     /** Authorisation without groups, by a claim of the user info (off by default) */
     private final Claim claim = new Claim();
 
+    /** Tokens of allow-listed service clients, checked locally (off by default) */
+    private final ServiceClients serviceClients = new ServiceClients();
+
     /**
      * Whether tasks created before the label creator-user-hash, which only have the label
      * creator-user-id (the creator's ID with @ replaced by _), are matched to their creators by
@@ -84,8 +87,116 @@ public class AuthorisationProperties {
         }
     }
 
+    /**
+     * Access tokens of services (issue #153): if enabled, a JWT access token that the issuer below
+     * signed for one of the listed clients (OAuth 2.0 client credentials grant) is checked locally,
+     * against the issuer's keys, instead of at the user info endpoint, and authenticates that
+     * client as a principal of its own, without groups (see {@link ServiceClientTokenServices}).
+     * Other tokens are validated at the user info endpoint, as before.
+     */
+    public static class ServiceClients {
+        /** Whether tokens of the listed clients are accepted */
+        private boolean enabled = false;
+        /** Issuer of the tokens, compared exactly with their {@code iss} claim */
+        private String issuer;
+        /** JWKS URI of the issuer; if unset, from the issuer's OpenID Connect discovery */
+        private String jwksUri;
+        /** Claim that names the client (RFC 9068: {@code client_id}; some providers: azp) */
+        private String clientClaim = "client_id";
+        /** IDs of the clients whose tokens are accepted (compared exactly) */
+        private List<String> clientIds = new ArrayList<>();
+        /** If set, the token's {@code aud} must be or contain this value */
+        private String audience;
+        /** Whether the token's header must have {@code typ} {@code at+jwt} (RFC 9068) */
+        private boolean requireAccessTokenType = true;
+        /**
+         * Whether the token's {@code sub} must be the client's ID, as for tokens of the client
+         * credentials grant (RFC 9068, section 2.2); tokens of users obtained through a listed
+         * client have the user's {@code sub} and are then validated as user tokens
+         */
+        private boolean requireClientSubject = true;
+        /** Leeway for {@code exp}, {@code nbf} and {@code iat}, in seconds */
+        private int clockSkewSeconds = 60;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getIssuer() {
+            return issuer;
+        }
+
+        public void setIssuer(String issuer) {
+            this.issuer = issuer;
+        }
+
+        public String getJwksUri() {
+            return jwksUri;
+        }
+
+        public void setJwksUri(String jwksUri) {
+            this.jwksUri = jwksUri;
+        }
+
+        public String getClientClaim() {
+            return clientClaim;
+        }
+
+        public void setClientClaim(String clientClaim) {
+            this.clientClaim = clientClaim;
+        }
+
+        public List<String> getClientIds() {
+            return clientIds;
+        }
+
+        public void setClientIds(List<String> clientIds) {
+            this.clientIds = clientIds;
+        }
+
+        public String getAudience() {
+            return audience;
+        }
+
+        public void setAudience(String audience) {
+            this.audience = audience;
+        }
+
+        public boolean isRequireAccessTokenType() {
+            return requireAccessTokenType;
+        }
+
+        public void setRequireAccessTokenType(boolean requireAccessTokenType) {
+            this.requireAccessTokenType = requireAccessTokenType;
+        }
+
+        public boolean isRequireClientSubject() {
+            return requireClientSubject;
+        }
+
+        public void setRequireClientSubject(boolean requireClientSubject) {
+            this.requireClientSubject = requireClientSubject;
+        }
+
+        public int getClockSkewSeconds() {
+            return clockSkewSeconds;
+        }
+
+        public void setClockSkewSeconds(int clockSkewSeconds) {
+            this.clockSkewSeconds = clockSkewSeconds;
+        }
+    }
+
     public Claim getClaim() {
         return claim;
+    }
+
+    public ServiceClients getServiceClients() {
+        return serviceClients;
     }
 
     public boolean isLegacyUserLabels() {

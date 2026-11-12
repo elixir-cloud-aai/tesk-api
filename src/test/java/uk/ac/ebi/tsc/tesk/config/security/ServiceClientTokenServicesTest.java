@@ -1,0 +1,428 @@
+package uk.ac.ebi.tsc.tesk.config.security;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import java.util.Arrays;
+import java.util.Collections;
+import org.jose4j.jwk.JsonWebKeySet;
+import org.jose4j.jwk.RsaJsonWebKey;
+import org.jose4j.jwk.RsaJwkGenerator;
+import org.jose4j.jws.AlgorithmIdentifiers;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.NumericDate;
+import org.jose4j.keys.HmacKey;
+import org.jose4j.lang.JoseException;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.springframework.boot.test.system.OutputCaptureRule;
+import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+
+/**
+ * Tokens of allow-listed service clients (issue #153), signed with test keys and checked against a
+ * JSON Web Key Set and discovery document served by WireMock
+ */
+public class ServiceClientTokenServicesTest {
+
+    private static final String CLIENT = "gateway-client";
+    private static final String OTHER_CLIENT = "other-client";
+
+    private static RsaJsonWebKey key;
+    private static RsaJsonWebKey otherKey;
+
+    @Rule public WireMockRule idp = new WireMockRule(options().dynamicPort());
+    @Rule public OutputCaptureRule output = new OutputCaptureRule();
+
+    private ResourceServerTokenServices userInfo;
+    private OAuth2Authentication userAuthentication;
+    private AuthorisationProperties properties;
+
+    @BeforeClass
+    public static void generateKeys() throws JoseException {
+        key = RsaJwkGenerator.generateJwk(2048);
+        key.setKeyId("key-1");
+        otherKey = RsaJwkGenerator.generateJwk(2048);
+        otherKey.setKeyId("key-2");
+    }
+
+    @Before
+    public void setUp() {
+        userInfo = mock(ResourceServerTokenServices.class);
+        userAuthentication = mock(OAuth2Authentication.class);
+        when(userInfo.loadAuthentication(anyString())).thenReturn(userAuthentication);
+        properties = new AuthorisationProperties();
+        AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
+        settings.setEnabled(true);
+        settings.setIssuer(issuer());
+        settings.setClientIds(Arrays.asList(CLIENT, "second-client"));
+        discovery(issuer());
+        jwks(key);
+    }
+
+    private String issuer() {
+        return "http://localhost:" + idp.port() + "/oidc/";
+    }
+
+    private void discovery(String documentIssuer) {
+        idp.givenThat(
+                get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
+                        .willReturn(
+                                okJson(
+                                        "{\"issuer\":\""
+                                                + documentIssuer
+                                                + "\",\"jwks_uri\":\"http://localhost:"
+                                                + idp.port()
+                                                + "/oidc/jwk\"}")));
+    }
+
+    private void jwks(RsaJsonWebKey... keys) {
+        idp.givenThat(get("/oidc/jwk").willReturn(okJson(new JsonWebKeySet(keys).toJson())));
+    }
+
+    private ServiceClientTokenServices services() {
+        return new ServiceClientTokenServices(userInfo, properties);
+    }
+
+    /** Claims of a valid token of the client credentials grant of {@code client} */
+    private JwtClaims claims(String client) {
+        JwtClaims claims = new JwtClaims();
+        claims.setIssuer(issuer());
+        claims.setClaim("client_id", client);
+        claims.setSubject(client);
+        claims.setAudience("tesk");
+        claims.setIssuedAtToNow();
+        claims.setExpirationTimeMinutesInTheFuture(60);
+        claims.setGeneratedJwtId();
+        claims.setClaim("scope", "openid");
+        return claims;
+    }
+
+    private static String sign(JwtClaims claims, RsaJsonWebKey signer, String keyId, String type)
+            throws JoseException {
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setPayload(claims.toJson());
+        jws.setKey(signer.getPrivateKey());
+        jws.setKeyIdHeaderValue(keyId);
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
+        if (type != null) {
+            jws.setHeader("typ", type);
+        }
+        return jws.getCompactSerialization();
+    }
+
+    private static String sign(JwtClaims claims) throws JoseException {
+        return sign(claims, key, key.getKeyId(), "at+jwt");
+    }
+
+    private User accepted(String token) {
+        OAuth2Authentication authentication = services().loadAuthentication(token);
+        verify(userInfo, never()).loadAuthentication(anyString());
+        return (User) authentication.getPrincipal();
+    }
+
+    private void refused(String token) {
+        ServiceClientTokenServices services = services();
+        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+        verify(userInfo, never()).loadAuthentication(anyString());
+    }
+
+    private void passedOn(String token) {
+        assertSame(userAuthentication, services().loadAuthentication(token));
+        verify(userInfo).loadAuthentication(token);
+    }
+
+    @Test
+    public void listedClient_isAccepted_asPrincipalOfItsOwn() throws Exception {
+        String token = sign(claims(CLIENT));
+
+        User user = accepted(token);
+
+        assertEquals(CLIENT, user.getUsername());
+        assertTrue(user.isServiceClient());
+        assertTrue(user.isAuthorisedWithoutGroup());
+        assertFalse(user.isClaimAuthorised());
+        assertFalse(user.isMember());
+        assertFalse(user.isTeskAdmin());
+        assertTrue(user.getAuthorities().isEmpty());
+        assertThat(output.getOut(), containsString("Accepted token of service client " + CLIENT));
+        assertThat(output.getOut(), not(containsString(token)));
+    }
+
+    @Test
+    public void unlistedClient_isPassedOn() throws Exception {
+        passedOn(sign(claims(OTHER_CLIENT)));
+    }
+
+    @Test
+    public void otherIssuer_isPassedOn() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setIssuer("https://other.example.org/");
+        passedOn(sign(claims));
+    }
+
+    /** The issuer is compared exactly, also with the trailing slash */
+    @Test
+    public void issuerWithoutTrailingSlash_isPassedOn() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setIssuer(issuer().replaceAll("/$", ""));
+        passedOn(sign(claims));
+    }
+
+    @Test
+    public void opaqueToken_isPassedOn() {
+        passedOn("2YotnFZFEjr1zCsicMWpAA");
+    }
+
+    /** A token of a user obtained through a listed client has the user's sub */
+    @Test
+    public void userTokenOfListedClient_isPassedOn() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setSubject("user@example.org");
+        passedOn(sign(claims));
+    }
+
+    @Test
+    public void userSubject_isAccepted_ifThatCheckIsOff() throws Exception {
+        properties.getServiceClients().setRequireClientSubject(false);
+        JwtClaims claims = claims(CLIENT);
+        claims.setSubject("user@example.org");
+
+        assertEquals(CLIENT, accepted(sign(claims)).getUsername());
+    }
+
+    @Test
+    public void expired_isRefused() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setExpirationTimeMinutesInTheFuture(-5);
+        String token = sign(claims);
+
+        refused(token);
+        assertThat(output.getOut(), containsString("Refused token of service client " + CLIENT));
+        assertThat(output.getOut(), containsString("expired"));
+        assertThat(output.getOut(), not(containsString(token)));
+    }
+
+    /** Within the leeway (60 seconds by default), an expired token is still accepted */
+    @Test
+    public void justExpired_isAccepted() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setIssuedAt(NumericDate.fromSeconds(NumericDate.now().getValue() - 3600));
+        claims.setExpirationTimeMinutesInTheFuture(-0.5f);
+        accepted(sign(claims));
+    }
+
+    @Test
+    public void withoutExpiration_isRefused() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.unsetClaim("exp");
+        refused(sign(claims));
+    }
+
+    @Test
+    public void notYetValid_isRefused() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setNotBeforeMinutesInThePast(-5);
+        refused(sign(claims));
+    }
+
+    @Test
+    public void badSignature_isRefused() throws Exception {
+        // signed with another key under the ID of the issuer's key
+        refused(sign(claims(CLIENT), otherKey, key.getKeyId(), "at+jwt"));
+        assertThat(output.getOut(), containsString("invalid signature"));
+    }
+
+    @Test
+    public void unsigned_isRefused() throws Exception {
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setPayload(claims(CLIENT).toJson());
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.NONE);
+        jws.setHeader("typ", "at+jwt");
+        jws.setAlgorithmConstraints(org.jose4j.jwa.AlgorithmConstraints.NO_CONSTRAINTS);
+        refused(jws.getCompactSerialization());
+    }
+
+    /** HMAC signatures aren't accepted, e.g. with the public key's bytes as the secret */
+    @Test
+    public void symmetricSignature_isRefused() throws Exception {
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setPayload(claims(CLIENT).toJson());
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.HMAC_SHA256);
+        jws.setKey(new HmacKey(key.getPublicKey().getEncoded()));
+        jws.setKeyIdHeaderValue(key.getKeyId());
+        jws.setHeader("typ", "at+jwt");
+        refused(jws.getCompactSerialization());
+    }
+
+    /** A token with a new key ID makes TESK API fetch the key set again */
+    @Test
+    public void unknownKeyId_refreshesTheKeys() throws Exception {
+        ServiceClientTokenServices services =
+                new ServiceClientTokenServices(userInfo, properties, 0);
+        services.loadAuthentication(sign(claims(CLIENT)));
+        // the issuer rotates its keys
+        jwks(key, otherKey);
+
+        OAuth2Authentication authentication =
+                services.loadAuthentication(
+                        sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt"));
+
+        assertEquals(CLIENT, ((User) authentication.getPrincipal()).getUsername());
+        idp.verify(2, getRequestedFor(urlEqualTo("/oidc/jwk")));
+        // the discovery document is read once
+        idp.verify(
+                1,
+                getRequestedFor(urlEqualTo("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)));
+    }
+
+    @Test
+    public void keyIdNotInTheKeySet_isRefused() throws Exception {
+        refused(sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt"));
+    }
+
+    /** Unknown key IDs don't make TESK API fetch the key set more often than the interval */
+    @Test
+    public void unknownKeyIds_refreshTheKeysAtMostOncePerInterval() throws Exception {
+        ServiceClientTokenServices services = services();
+        services.loadAuthentication(sign(claims(CLIENT)));
+        String unknown = sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt");
+        for (int i = 0; i < 3; i++) {
+            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(unknown));
+        }
+        idp.verify(1, getRequestedFor(urlEqualTo("/oidc/jwk")));
+    }
+
+    @Test
+    public void withoutAccessTokenType_isRefused() throws Exception {
+        refused(sign(claims(CLIENT), key, key.getKeyId(), null));
+        refused(sign(claims(CLIENT), key, key.getKeyId(), "JWT"));
+    }
+
+    @Test
+    public void withoutAccessTokenType_isAccepted_ifThatCheckIsOff() throws Exception {
+        properties.getServiceClients().setRequireAccessTokenType(false);
+        accepted(sign(claims(CLIENT), key, key.getKeyId(), "JWT"));
+    }
+
+    @Test
+    public void audience_isChecked_ifSet() throws Exception {
+        properties.getServiceClients().setAudience("tesk");
+        accepted(sign(claims(CLIENT)));
+
+        JwtClaims several = claims(CLIENT);
+        several.setAudience("other-service", "tesk");
+        accepted(sign(several));
+
+        JwtClaims other = claims(CLIENT);
+        other.setAudience("other-service");
+        refused(sign(other));
+
+        JwtClaims none = claims(CLIENT);
+        none.unsetClaim("aud");
+        refused(sign(none));
+    }
+
+    /** Without the setting, any audience (or none) is accepted */
+    @Test
+    public void audience_isNotChecked_ifUnset() throws Exception {
+        JwtClaims none = claims(CLIENT);
+        none.unsetClaim("aud");
+        accepted(sign(none));
+    }
+
+    @Test
+    public void clientClaim_isConfigurable() throws Exception {
+        properties.getServiceClients().setClientClaim("azp");
+        JwtClaims claims = claims(OTHER_CLIENT);
+        claims.setClaim("azp", CLIENT);
+        claims.setSubject(CLIENT);
+
+        assertEquals(CLIENT, accepted(sign(claims)).getUsername());
+    }
+
+    @Test
+    public void jwksUri_isUsedWithoutDiscovery_ifSet() throws Exception {
+        properties.getServiceClients().setJwksUri("http://localhost:" + idp.port() + "/oidc/jwk");
+
+        accepted(sign(claims(CLIENT)));
+
+        idp.verify(
+                0,
+                getRequestedFor(urlEqualTo("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)));
+    }
+
+    @Test
+    public void discoveryOfAnotherIssuer_isRefused() throws Exception {
+        discovery("https://other.example.org/");
+        refused(sign(claims(CLIENT)));
+        assertThat(output.getOut(), containsString("keys of the issuer unavailable"));
+    }
+
+    @Test
+    public void discoveryUnavailable_isRefused() throws Exception {
+        idp.givenThat(
+                get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
+                        .willReturn(aResponse().withStatus(503)));
+        refused(sign(claims(CLIENT)));
+    }
+
+    @Test
+    public void readAccessToken_isPassedOn() {
+        services().readAccessToken("token");
+        verify(userInfo).readAccessToken("token");
+    }
+
+    @Test
+    public void settingsWithoutIssuer_failAtStartup() {
+        properties.getServiceClients().setIssuer(" ");
+        assertThrows(IllegalStateException.class, this::services);
+    }
+
+    @Test
+    public void settingsWithoutClients_failAtStartup() {
+        properties.getServiceClients().setClientIds(Collections.singletonList(" "));
+        assertThrows(IllegalStateException.class, this::services);
+        properties.getServiceClients().setClientIds(null);
+        assertThrows(IllegalStateException.class, this::services);
+    }
+
+    @Test
+    public void settingsWithNegativeLeeway_failAtStartup() {
+        properties.getServiceClients().setClockSkewSeconds(-1);
+        assertThrows(IllegalStateException.class, this::services);
+    }
+
+    /** Tasks of a service client are selected by its ID, without a group */
+    @Test
+    public void serviceClient_listsItsOwnTasksWithoutGroup() throws Exception {
+        User user = accepted(sign(claims(CLIENT)));
+        assertEquals(
+                "creator-user-hash="
+                        + uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels.hash(CLIENT)
+                        + ",!creator-group-name",
+                user.getLabelSelector());
+    }
+}
