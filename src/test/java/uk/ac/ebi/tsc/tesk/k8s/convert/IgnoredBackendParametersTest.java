@@ -3,12 +3,12 @@ package uk.ac.ebi.tsc.tesk.k8s.convert;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
@@ -23,9 +23,7 @@ class IgnoredBackendParametersTest {
     private static TesTask taskWith(Map<String, String> parameters) {
         return new TesTask()
                 .resources(
-                        new TesResources()
-                                .cpuCores(java.math.BigDecimal.ONE)
-                                .backendParameters(parameters));
+                        new TesResources().cpuCores(BigDecimal.ONE).backendParameters(parameters));
     }
 
     @Test
@@ -39,7 +37,7 @@ class IgnoredBackendParametersTest {
 
         assertThat(keys).containsExactly("Queue", "VmSize");
         assertThat(task.getResources().getBackendParameters()).isNull();
-        assertThat(task.getResources().getCpuCores()).isEqualTo(java.math.BigDecimal.ONE);
+        assertThat(task.getResources().getCpuCores()).isEqualTo(BigDecimal.ONE);
     }
 
     @Test
@@ -79,14 +77,26 @@ class IgnoredBackendParametersTest {
                         "Ignored backend_parameters, which TESK doesn't support: [\"a\\\"\\nb\"]");
     }
 
+    /** Keys are quoted as JSON only, without HTML escaping */
     @Test
-    void noKeysNoAnnotationNoSystemLog() {
+    void messageKeepsHtmlCharacters() {
+        assertThat(IgnoredBackendParameters.message(Collections.singletonList("a<b='c'&d>")))
+                .isEqualTo(
+                        "Ignored backend_parameters, which TESK doesn't support: [\"a<b='c'&d>\"]");
+    }
+
+    @Test
+    void noKeysNoAnnotation() {
         V1ObjectMeta metadata = new V1ObjectMeta();
 
         IgnoredBackendParameters.annotate(metadata, Collections.emptyList());
 
         assertThat(metadata.getAnnotations()).isNull();
-        assertThat(IgnoredBackendParameters.systemLog(metadata)).isEqualTo(Optional.empty());
+        assertThat(IgnoredBackendParameters.systemLog(metadata)).isEmpty();
+    }
+
+    @Test
+    void otherAnnotationsNoSystemLog() {
         assertThat(
                         IgnoredBackendParameters.systemLog(
                                 new V1ObjectMeta().putAnnotationsItem("other", "value")))

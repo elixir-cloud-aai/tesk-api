@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk.k8s.convert;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_IGNORED_BACKEND_PARAMETERS_KEY;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +26,8 @@ public final class IgnoredBackendParameters {
     private static final String MESSAGE =
             "Ignored backend_parameters, which TESK doesn't support: ";
 
-    private static final Gson GSON = new Gson();
+    /** Keys as sent: no HTML escaping (e.g. of {@code <} or {@code '}) */
+    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     private IgnoredBackendParameters() {}
 
@@ -65,6 +67,6 @@ public final class IgnoredBackendParameters {
     public static Optional<String> systemLog(V1ObjectMeta metadata) {
         return Optional.ofNullable(metadata.getAnnotations())
                 .map(annotations -> annotations.get(ANN_IGNORED_BACKEND_PARAMETERS_KEY))
-                .map(keys -> MESSAGE + keys);
+                .map(keys -> MESSAGE + keys); // the keys as quoted by message()
     }
 }

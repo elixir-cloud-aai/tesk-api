@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -7,7 +8,9 @@ import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import org.junit.Rule;
 import org.junit.Test;
+import org.springframework.boot.test.system.OutputCaptureRule;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import uk.ac.ebi.tsc.tesk.tes.model.ServiceOrganization;
@@ -18,6 +21,8 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
  * @since 09/04/2021
  */
 public class ServiceInfoServiceTest {
+
+    @Rule public OutputCaptureRule output = new OutputCaptureRule();
 
     private Resource serviceInfoFile = new ClassPathResource("service-info.yaml");
     private ServiceInfoService subject = new ServiceInfoService(serviceInfoFile);
@@ -48,5 +53,7 @@ public class ServiceInfoServiceTest {
         TesServiceInfo result = service.getServiceInfo();
         assertThat(result.getName(), is("example application"));
         assertThat(result.getTesResourcesBackendParameters(), is(Arrays.asList("VmSize", "Queue")));
+        // TESK supports none, whatever the file lists
+        assertThat(output.getOut(), containsString("set it to []"));
     }
 }

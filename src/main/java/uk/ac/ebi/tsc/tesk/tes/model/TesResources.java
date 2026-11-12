@@ -152,8 +152,7 @@ public class TesResources   {
   }
 
   /**
-   * Key-value pairs for the backend; TESK supports no keys, so it doesn't store them (see
-   * {@code IgnoredBackendParameters})
+   * Key-value pairs for the backend; TESK supports no keys, so it doesn't store them
    * @return backendParameters
   */
   @ApiModelProperty(value = "Key-value pairs for the backend. TESK supports no keys: it ignores them, logs a warning naming them, and neither stores nor returns them.")

@@ -28,7 +28,7 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 
 /**
  * With the view {@code FULL}, the task log's {@code system_logs} has the warning about the backend
- * parameters that TESK ignored (issue #145), before the taskmaster's log.
+ * parameters that TESK ignored (issue #145), after the taskmaster's log.
  */
 class TesServiceImplSystemLogsTest {
 
@@ -75,7 +75,7 @@ class TesServiceImplSystemLogsTest {
     }
 
     @Test
-    void fullViewHasWarningBeforeTaskmasterLog() {
+    void fullViewHasWarningAfterTaskmasterLog() {
         this.taskmaster
                 .getMetadata()
                 .putAnnotationsItem(Constants.ANN_IGNORED_BACKEND_PARAMETERS_KEY, "[\"VmSize\"]");
@@ -84,8 +84,8 @@ class TesServiceImplSystemLogsTest {
 
         assertThat(task.getLogs().get(0).getSystemLogs())
                 .containsExactly(
-                        "Ignored backend_parameters, which TESK doesn't support: [\"VmSize\"]",
-                        "taskmaster log");
+                        "taskmaster log",
+                        "Ignored backend_parameters, which TESK doesn't support: [\"VmSize\"]");
     }
 
     @Test

@@ -96,6 +96,7 @@ public class TesServiceImpl implements TesService {
                 }
                 V1Job createdJob = this.kubernetesClientWrapper.createJob(taskMasterJob);
                 this.createOwnedResources(taskMasterConfigMap, imagePullSecrets, createdJob);
+                // only for tasks that exist: a failed create leaves no task to warn about
                 if (!ignoredBackendParameters.isEmpty()) {
                     logger.warn(
                             "Task {}: {}",
@@ -243,8 +244,6 @@ public class TesServiceImpl implements TesService {
             }
         }
 
-        IgnoredBackendParameters.systemLog(taskObjects.getTaskmaster().getJob().getMetadata())
-                .ifPresent(task.getLogs().get(0)::addSystemLogsItem);
         if (taskObjects.getTaskmaster().hasPods()) {
             String taskMasterPodLog =
                     this.kubernetesClientWrapper.readPodLog(
@@ -254,6 +253,9 @@ public class TesServiceImpl implements TesService {
                 task.getLogs().get(0).addSystemLogsItem(taskMasterPodLog);
             }
         }
+        // after the taskmaster's log, which clients may expect first
+        IgnoredBackendParameters.systemLog(taskObjects.getTaskmaster().getJob().getMetadata())
+                .ifPresent(task.getLogs().get(0)::addSystemLogsItem);
         return task;
     }
 

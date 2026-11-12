@@ -52,6 +52,12 @@ public class ServiceInfoService {
         Yaml yaml = new Yaml(new OffsetDateTimePropertyConstructor());
         try (InputStream is = resourceFile.getInputStream()) {
             serviceInfo = yaml.loadAs(is, TesServiceInfo.class);
+            List<String> backendParameters = serviceInfo.getTesResourcesBackendParameters();
+            if (backendParameters != null && !backendParameters.isEmpty()) {
+                log.warn(
+                        "Service info lists tesResources_backend_parameters, but TESK supports"
+                                + " none and ignores them in tasks; set it to []");
+            }
         } catch (Exception e) {
             log.error("Unable to parse Service Info Yaml", e);
         }
@@ -62,6 +68,8 @@ public class ServiceInfoService {
     }
 
     // https://bitbucket.org/asomov/snakeyaml/wiki/Howto#markdown-header-how-to-parse-jodatime
+    // Also maps the keys of the service info schema that aren't Java property names: add new
+    // ones there
     class OffsetDateTimePropertyConstructor extends Constructor {
         public OffsetDateTimePropertyConstructor() {
             yamlClassConstructors.put(NodeId.scalar, new TimeStampConstruct());
