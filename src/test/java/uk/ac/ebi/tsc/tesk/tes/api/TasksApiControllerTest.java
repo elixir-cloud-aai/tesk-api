@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.api;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -19,9 +20,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +52,9 @@ import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.model.TesFileType;
+import uk.ac.ebi.tsc.tesk.tes.model.TesInput;
 import uk.ac.ebi.tsc.tesk.tes.model.TesListTasksResponse;
+import uk.ac.ebi.tsc.tesk.tes.model.TesOutput;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
@@ -482,22 +488,20 @@ public class TasksApiControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
-        verify(this.tesService)
-                .createTask(
-                        argThat(
-                                task ->
-                                        task.getInputs().stream()
-                                                        .allMatch(
-                                                                input ->
-                                                                        input.getType()
-                                                                                == TesFileType.FILE)
-                                                && task.getOutputs().stream()
-                                                        .allMatch(
-                                                                output ->
-                                                                        output.getType()
-                                                                                == TesFileType
-                                                                                        .FILE)),
-                        any());
+        ArgumentCaptor<TesTask> task = ArgumentCaptor.forClass(TesTask.class);
+        verify(this.tesService).createTask(task.capture(), any());
+        // one type null, one left out, each
+        List<TesFileType> files = Arrays.asList(TesFileType.FILE, TesFileType.FILE);
+        assertEquals(
+                files,
+                task.getValue().getInputs().stream()
+                        .map(TesInput::getType)
+                        .collect(Collectors.toList()));
+        assertEquals(
+                files,
+                task.getValue().getOutputs().stream()
+                        .map(TesOutput::getType)
+                        .collect(Collectors.toList()));
     }
 
     /** Strict backend parameters are refused: TESK uses none */
