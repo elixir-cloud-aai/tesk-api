@@ -83,6 +83,12 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
      */
     static final long JWKS_REFRESH_INTERVAL_MS = 10_000;
 
+    /** Connect and read timeouts of the requests to the issuer, in milliseconds */
+    private static final int HTTP_TIMEOUT_MS = 5_000;
+
+    /** How long the keys are kept if fetching them again fails, in seconds */
+    private static final long RETAIN_KEYS_ON_ERROR_SECONDS = 15 * 60;
+
     private final ResourceServerTokenServices userInfoTokenServices;
     private final String issuer;
     private final String jwksUri;
@@ -105,6 +111,9 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
 
     /** Checks the tokens of service clients; built on first use (it may need the discovery) */
     private volatile JwtConsumer verifier;
+
+    /** Until when (epoch milliseconds) a failed discovery isn't tried again */
+    private long discoveryRetryAt = 0;
 
     /**
      * @param userInfoTokenServices the token services of the user info endpoint, for all other
@@ -164,19 +173,34 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
             throws AuthenticationException, InvalidTokenException {
         String clientId = listedClient(accessToken);
         if (clientId == null) {
-            return this.userInfoTokenServices.loadAuthentication(accessToken);
+            OAuth2Authentication authentication =
+                    this.userInfoTokenServices.loadAuthentication(accessToken);
+            Object principal = authentication == null ? null : authentication.getPrincipal();
+            if (principal instanceof User
+                    && this.clientIds.contains(((User) principal).getUsername())) {
+                // a user with a listed client's ID would share the client's tasks
+                logger.warn(
+                        "Refused user token: its sub is the ID of service client {}",
+                        ((User) principal).getUsername());
+                throw new InvalidTokenException("User ID of a service client");
+            }
+            return authentication;
         }
         try {
             verifier().process(accessToken);
         } catch (InvalidJwtException e) {
             logger.warn("Refused token of service client {}: {}", clientId, reasons(e));
             throw new InvalidTokenException("Invalid access token of a service client");
-        } catch (IOException | JoseException | RuntimeException e) {
+        } catch (IOException | JoseException e) {
             // the discovery document can't be read or has no JWKS URI
             logger.warn(
                     "Refused token of service client {}: keys of the issuer unavailable ({})",
                     clientId,
-                    e.getClass().getSimpleName());
+                    e.getMessage());
+            throw new InvalidTokenException("Invalid access token of a service client");
+        } catch (RuntimeException e) {
+            // unexpected: logged with its stack trace (which doesn't hold the token)
+            logger.warn("Refused token of service client {}: unexpected error", clientId, e);
             throw new InvalidTokenException("Invalid access token of a service client");
         }
         logger.info("Accepted token of service client {}", clientId);
@@ -232,25 +256,55 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
         return new OAuth2Authentication(request, userAuthentication);
     }
 
+    /**
+     * The verifier, built on first use. If the discovery fails, it isn't tried again for the
+     * refresh interval: tokens (which may be forged, as the claims that select this path are read
+     * before the signature is checked) are refused at once until then, so that they can't make
+     * requests wait for the issuer one after another.
+     */
     private JwtConsumer verifier() throws IOException, JoseException {
         JwtConsumer consumer = this.verifier;
-        if (consumer == null) {
-            synchronized (this) {
-                consumer = this.verifier;
-                if (consumer == null) {
-                    consumer = buildVerifier(keyResolver());
-                    this.verifier = consumer;
+        if (consumer != null) {
+            return consumer;
+        }
+        synchronized (this) {
+            if (this.verifier == null) {
+                if (System.currentTimeMillis() < this.discoveryRetryAt) {
+                    throw new IOException("discovery failed recently");
+                }
+                try {
+                    this.verifier = buildVerifier(keyResolver());
+                } catch (IOException | JoseException | RuntimeException e) {
+                    this.discoveryRetryAt = System.currentTimeMillis() + this.jwksRefreshIntervalMs;
+                    throw e;
                 }
             }
+            return this.verifier;
         }
-        return consumer;
     }
 
     private VerificationKeyResolver keyResolver() throws IOException, JoseException {
         String uri = this.jwksUri != null ? this.jwksUri : discoverJwksUri();
         HttpsJwks jwks = new HttpsJwks(uri);
+        jwks.setSimpleHttpGet(httpGet());
         jwks.setRefreshReprieveThreshold(this.jwksRefreshIntervalMs);
+        // keeps the keys if fetching them again fails when the cache expires
+        jwks.setRetainCacheOnErrorDuration(RETAIN_KEYS_ON_ERROR_SECONDS);
+        // fetched now, so that a failure is subject to the backoff of verifier(); jose4j
+        // refetches an empty key set on every token, without the reprieve
+        if (jwks.getJsonWebKeys().isEmpty()) {
+            throw new JoseException("The key set of the issuer has no keys");
+        }
         return new HttpsJwksVerificationKeyResolver(jwks);
+    }
+
+    /** HTTP client of the discovery and the key set, with short timeouts */
+    private static Get httpGet() {
+        Get get = new Get();
+        get.setConnectTimeout(HTTP_TIMEOUT_MS);
+        get.setReadTimeout(HTTP_TIMEOUT_MS);
+        get.setRetries(0);
+        return get;
     }
 
     /**
@@ -259,7 +313,7 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
      */
     private String discoverJwksUri() throws IOException, JoseException {
         String url = this.issuer.replaceAll("/+$", "") + DISCOVERY_PATH;
-        SimpleResponse response = new Get().get(url);
+        SimpleResponse response = httpGet().get(url);
         if (response.getStatusCode() != 200) {
             throw new IOException("Discovery answered with status " + response.getStatusCode());
         }

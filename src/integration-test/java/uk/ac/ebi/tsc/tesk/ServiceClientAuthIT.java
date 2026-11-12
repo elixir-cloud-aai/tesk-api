@@ -19,6 +19,7 @@ import org.jose4j.jwk.RsaJwkGenerator;
 import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.NumericDate;
 import org.jose4j.lang.JoseException;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -275,8 +276,8 @@ public class ServiceClientAuthIT {
     @Test
     public void expiredServiceToken_isUnauthorized() throws Exception {
         JwtClaims claims = claims(CLIENT);
-        claims.setIssuedAt(org.jose4j.jwt.NumericDate.fromSeconds(1_000_000_000L));
-        claims.setExpirationTime(org.jose4j.jwt.NumericDate.fromSeconds(1_000_003_600L));
+        claims.setIssuedAt(NumericDate.fromSeconds(1_000_000_000L));
+        claims.setExpirationTime(NumericDate.fromSeconds(1_000_003_600L));
 
         listTasks(sign(claims)).andExpect(status().isUnauthorized());
         noUserInfoCalls();

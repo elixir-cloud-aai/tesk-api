@@ -235,7 +235,7 @@ service token, and TESK API checks it locally:
   configured issuer), or from `…_JWKS_URI`. Only asymmetric algorithms (RSA,
   RSA-PSS, ECDSA) are accepted. The keys are cached, and fetched again for a
   token with an unknown key ID, at most once every 10 seconds;
-* `exp`, which the token must have, and `nbf` and `iat`, if it has them, with
+* `exp`, which the token must have, and `nbf`, if it has one, with
   a leeway of `…_CLOCK_SKEW_SECONDS`;
 * the header `typ`, which must be `at+jwt` ([RFC 9068, section
   4](https://datatracker.ietf.org/doc/html/rfc9068#section-4)), so that ID
@@ -275,7 +275,7 @@ Environment variable | Meaning | Default
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_CLAIM` | Claim that names the client. Some providers use `azp`. | `client_id`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_ACCESS_TOKEN_TYPE` | `true`: the header `typ` must be `at+jwt`. Set it to `false` only for providers that don't set it. | `true`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_CLIENT_SUBJECT` | `true`: the token's `sub` must be the client ID, as in tokens of the client credentials grant; tokens of users obtained through a listed client go through the user info endpoint, as user tokens. `false`: any `sub`; then every token that a user gets through a listed client is accepted as the client's. | `true`
-`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLOCK_SKEW_SECONDS` | Leeway for `exp`, `nbf` and `iat`, in seconds. | `60`
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLOCK_SKEW_SECONDS` | Leeway for `exp` and `nbf`, in seconds. | `60`
 
 If the setting is on without an issuer or without a non-blank client ID, or
 with a negative leeway, TESK API doesn't start. The discovery document and
@@ -307,10 +307,12 @@ client ID, the annotation `creator-user-id` and `logs[0].metadata.USER_ID`
 the client ID. Super admins see these tasks, as all tasks; team admins
 don't, as they belong to no team.
 
-User IDs (`sub` of the user info) and client IDs share this record: a user
-whose `sub` is a listed client's ID would see the client's tasks. Providers
-give clients and users IDs of different forms, so this matters only if the
-user info endpoint is of another provider, whose users could have such IDs.
+User IDs (`sub` of the user info) and client IDs share this record, so a
+user whose `sub` is a listed client's ID would share the client's tasks:
+with the setting on, TESK API refuses such users (`401 Unauthorized`, logged
+as a warning). Providers give clients and users IDs of different forms, so
+this happens only if the user info endpoint is of another provider, whose
+users could have such IDs.
 
 A gateway that runs tasks for its users runs all of them as its client:
 TESK API doesn't know the users behind it, and the gateway decides which of
@@ -333,3 +335,7 @@ its users may see and cancel which task.
   audience, also tokens that the client got for other services: whoever
   receives such a token (e.g. that other service) can use it at TESK API
   until it expires. Set the audience if your provider lets you choose it.
+* TESK API trusts every key that it gets from the issuer's discovery
+  document or JWKS URI. Use `https://` URLs for the issuer and
+  `…_JWKS_URI` (TESK API doesn't enforce it), so that nobody on the network
+  path can give it keys of their own.

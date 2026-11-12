@@ -23,6 +23,9 @@ import static org.mockito.Mockito.when;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import java.util.Arrays;
 import java.util.Collections;
+import org.jose4j.jwa.AlgorithmConstraints;
+import org.jose4j.jwk.EcJwkGenerator;
+import org.jose4j.jwk.EllipticCurveJsonWebKey;
 import org.jose4j.jwk.JsonWebKeySet;
 import org.jose4j.jwk.RsaJsonWebKey;
 import org.jose4j.jwk.RsaJwkGenerator;
@@ -30,6 +33,7 @@ import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.NumericDate;
+import org.jose4j.keys.EllipticCurves;
 import org.jose4j.keys.HmacKey;
 import org.jose4j.lang.JoseException;
 import org.junit.Before;
@@ -40,6 +44,7 @@ import org.springframework.boot.test.system.OutputCaptureRule;
 import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
 /**
  * Tokens of allow-listed service clients (issue #153), signed with test keys and checked against a
@@ -261,7 +266,7 @@ public class ServiceClientTokenServicesTest {
         jws.setPayload(claims(CLIENT).toJson());
         jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.NONE);
         jws.setHeader("typ", "at+jwt");
-        jws.setAlgorithmConstraints(org.jose4j.jwa.AlgorithmConstraints.NO_CONSTRAINTS);
+        jws.setAlgorithmConstraints(AlgorithmConstraints.NO_CONSTRAINTS);
         refused(jws.getCompactSerialization());
     }
 
@@ -420,9 +425,97 @@ public class ServiceClientTokenServicesTest {
     public void serviceClient_listsItsOwnTasksWithoutGroup() throws Exception {
         User user = accepted(sign(claims(CLIENT)));
         assertEquals(
-                "creator-user-hash="
-                        + uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels.hash(CLIENT)
-                        + ",!creator-group-name",
+                "creator-user-hash=" + CreatorLabels.hash(CLIENT) + ",!creator-group-name",
                 user.getLabelSelector());
+    }
+
+    /** A failed discovery isn't tried again within the interval: tokens are refused at once */
+    @Test
+    public void failedDiscovery_isNotRetriedWithinTheInterval() throws Exception {
+        idp.givenThat(
+                get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
+                        .willReturn(aResponse().withStatus(503)));
+        ServiceClientTokenServices services = services();
+        String token = sign(claims(CLIENT));
+        for (int i = 0; i < 3; i++) {
+            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+        }
+        idp.verify(
+                1,
+                getRequestedFor(urlEqualTo("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)));
+    }
+
+    /** ... and is tried again after it */
+    @Test
+    public void failedDiscovery_isRetriedAfterTheInterval() throws Exception {
+        idp.givenThat(
+                get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
+                        .willReturn(aResponse().withStatus(503)));
+        ServiceClientTokenServices services =
+                new ServiceClientTokenServices(userInfo, properties, 0);
+        String token = sign(claims(CLIENT));
+        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+        discovery(issuer());
+
+        services.loadAuthentication(token);
+    }
+
+    @Test
+    public void emptyKeySet_isRefused() throws Exception {
+        jwks();
+        refused(sign(claims(CLIENT)));
+    }
+
+    /** ECDSA signatures are accepted, as RSA ones */
+    @Test
+    public void ecdsaSignature_isAccepted() throws Exception {
+        EllipticCurveJsonWebKey ecKey = EcJwkGenerator.generateJwk(EllipticCurves.P256);
+        ecKey.setKeyId("ec-1");
+        idp.givenThat(get("/oidc/jwk").willReturn(okJson(new JsonWebKeySet(ecKey).toJson())));
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setPayload(claims(CLIENT).toJson());
+        jws.setKey(ecKey.getPrivateKey());
+        jws.setKeyIdHeaderValue(ecKey.getKeyId());
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.ECDSA_USING_P256_CURVE_AND_SHA256);
+        jws.setHeader("typ", "at+jwt");
+
+        accepted(jws.getCompactSerialization());
+    }
+
+    /** A client claim that isn't a string names no client */
+    @Test
+    public void clientClaimNotAString_isPassedOn() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setStringListClaim("client_id", CLIENT);
+        passedOn(sign(claims));
+    }
+
+    /** A user whose sub is a listed client's ID would share its tasks, so is refused */
+    @Test
+    public void userWithClientId_isRefused() {
+        when(userAuthentication.getPrincipal()).thenReturn(User.builder(CLIENT).build());
+        ServiceClientTokenServices services = services();
+
+        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication("opaque"));
+        verify(userInfo).loadAuthentication("opaque");
+    }
+
+    @Test
+    public void otherUser_isPassedOn() {
+        when(userAuthentication.getPrincipal())
+                .thenReturn(User.builder("user@example.org").build());
+        passedOn("opaque");
+    }
+
+    @Test
+    public void defaults() {
+        AuthorisationProperties.ServiceClients defaults =
+                new AuthorisationProperties().getServiceClients();
+        assertFalse(defaults.isEnabled());
+        assertEquals("client_id", defaults.getClientClaim());
+        assertTrue(defaults.isRequireAccessTokenType());
+        assertTrue(defaults.isRequireClientSubject());
+        assertEquals(60, defaults.getClockSkewSeconds());
+        assertTrue(defaults.getClientIds().isEmpty());
     }
 }
