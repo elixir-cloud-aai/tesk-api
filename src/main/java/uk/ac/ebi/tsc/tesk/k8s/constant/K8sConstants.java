@@ -9,6 +9,7 @@ public class K8sConstants {
 
     public enum PodPhase {
         PENDING("Pending"),
+        RUNNING("Running"),
         SUCCEEDED("Succeeded"),
         FAILED("Failed");
         private String code;

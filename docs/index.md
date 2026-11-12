@@ -95,7 +95,12 @@ applies gives the state:
    of the task (taskmaster, executors, outputs filer) has a pod that hasn't
    ended (pending, running, also while it terminates, without a status yet,
    or in phase `Unknown`) or that Kubernetes still counts as active;
-   `CANCELED` once none has.
+   `CANCELED` once none has. A pod that is still listed after its deletion
+   time (the end of its grace period) counts as ended: it most likely ran
+   on a node that is gone, and Kubernetes removes it only once the node is
+   removed (or tainted `out-of-service`). The inputs filer's job isn't
+   read: a task cancelled while it downloads inputs can be `CANCELED`
+   before the inputs filer's pod has ended.
 2. An executor's job failed, whichever executor it is: `PREEMPTED` if
    Kubernetes disrupted the pods of every failed executor (see below),
    otherwise `EXECUTOR_ERROR`.
@@ -143,16 +148,19 @@ later) with the status `True` and one of the reasons
 `PreemptionByScheduler` (the scheduler preempted it for a pod of higher
 priority), `TerminationByKubelet` (e.g. node shutdown or node pressure),
 `DeletionByTaintManager` (a `NoExecute` taint) or `EvictionByEvictionAPI`
-(e.g. `kubectl drain`), and every failed pod of the job has it. If one
+(e.g. `kubectl drain`), and every pod of the job in phase `Failed` has it. If
+one
 executor failed on its own, the task is `EXECUTOR_ERROR`. TESK API sees the
 condition only while the pod exists: Kubernetes deletes the pods that the
 scheduler preempts, the taint manager or the Eviction API evict, once the
 job controller has counted them, so such a pod is usually gone soon after
 the job failed (pods that the kubelet terminated stay). A failed executor
-whose pods are gone counts as `EXECUTOR_ERROR`. The taskmaster's own job keeps Kubernetes' default retries: a
-taskmaster that is restarted, e.g. after its pod was evicted, continues with
-the jobs that already exist. Between its retries, the task is reported as
-`SYSTEM_ERROR`, also while an executor's pod is pending.
+whose pods are gone counts as `EXECUTOR_ERROR`.
+
+The taskmaster's own job keeps Kubernetes' default retries: a taskmaster that
+is restarted, e.g. after its pod was evicted, continues with the jobs that
+already exist. Between its retries, the task is reported as `SYSTEM_ERROR`,
+also while an executor's pod is pending.
 
 ### Cancelling a task
 
@@ -161,7 +169,9 @@ The job's label gives the task the state `CANCELING`, and `CANCELED` once
 none of its jobs has a pod that hasn't ended (see the rules above). A task
 that has ended (`COMPLETE`, `EXECUTOR_ERROR`, `SYSTEM_ERROR`, `PREEMPTED`, or
 `CANCELED`) can't be cancelled (`400 Bad Request`). Cancelling a task that is
-`CANCELING` answers `200 OK` and changes nothing. The pod's label reaches
+`CANCELING` answers `200 OK`; it only labels a running taskmaster pod that
+doesn't have the label yet (e.g. labelling it failed before, or Kubernetes
+restarted the taskmaster). The pod's label reaches
 the taskmaster through the Downward API; when the taskmaster sees it, it
 stops the running executor and ends.
 

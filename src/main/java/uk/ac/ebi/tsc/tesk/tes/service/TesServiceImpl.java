@@ -3,6 +3,8 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_JOB_TYPE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_VERSION;
 
@@ -11,6 +13,7 @@ import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
+import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1Secret;
 import java.util.ArrayList;
@@ -24,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.PodPhase;
+import uk.ac.ebi.tsc.tesk.k8s.convert.TaskStateResolver;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.*;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
@@ -198,12 +202,14 @@ public class TesServiceImpl implements TesService {
                 this.kubernetesClientWrapper.getSingleTaskOutputFilerJob(
                         taskMasterJob.getMetadata().getName());
         if (outputFilerJob.isPresent()) {
-            // its pods tell whether a cancelled task is still canceling (issue #144)
             taskBuilder.addJob(outputFilerJob.get());
-            taskBuilder.addPodList(
-                    this.kubernetesClientWrapper
-                            .listSingleJobPods(outputFilerJob.get())
-                            .getItems());
+            if (TaskStateResolver.isCancelled(taskMasterJob)) {
+                // its pods tell whether a cancelled task is still canceling (issue #144)
+                taskBuilder.addPodList(
+                        this.kubernetesClientWrapper
+                                .listSingleJobPods(outputFilerJob.get())
+                                .getItems());
+            }
         }
         return taskBuilder.getTask();
     }
@@ -339,7 +345,15 @@ public class TesServiceImpl implements TesService {
             throw new CancelNotRunningTask(taskId);
         }
         if (state == TesState.CANCELING) {
-            // cancelled already, its pods are still stopping: nothing to patch again (issue #144)
+            // cancelled already, its pods are still stopping (issue #144); a running taskmaster
+            // pod without the label (e.g. labelling it failed, or Kubernetes restarted the
+            // taskmaster) gets it now, nothing else is patched again
+            task.getTaskmaster().getPods().stream()
+                    .filter(TesServiceImpl::isRunningAndNotLabelledCancelled)
+                    .forEach(
+                            pod ->
+                                    this.kubernetesClientWrapper.labelPodAsCancelled(
+                                            pod.getMetadata().getName()));
             return;
         }
         V1PodList taskMasterPods = new V1PodList().items(task.getTaskmaster().getPods());
@@ -362,6 +376,20 @@ public class TesServiceImpl implements TesService {
                                                 .getCode()
                                                 .equals(pod.getStatus().getPhase()))
                 .forEach(pod -> this.labelPendingPodAsCancelled(pod.getMetadata().getName()));
+    }
+
+    private static boolean isRunningAndNotLabelledCancelled(V1Pod pod) {
+        boolean running =
+                pod.getStatus() != null
+                        && PodPhase.RUNNING.getCode().equals(pod.getStatus().getPhase());
+        boolean labelled =
+                Optional.ofNullable(pod.getMetadata().getLabels())
+                        .map(
+                                labels ->
+                                        LABEL_TASKSTATE_VALUE_CANC.equals(
+                                                labels.get(LABEL_TASKSTATE_KEY)))
+                        .orElse(false);
+        return running && !labelled;
     }
 
     /**

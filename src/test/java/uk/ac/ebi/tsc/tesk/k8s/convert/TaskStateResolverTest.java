@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.joda.time.DateTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -478,12 +479,33 @@ class TaskStateResolverTest {
                 "EvictionByEvictionAPI"
             })
     void everyDisruptionReasonIsPreempted(String reason) {
+        assertThat(TaskStateResolver.DISRUPTION_REASONS).contains(reason);
         Task failed = failedExecutor(failedPod(disruption(reason)));
         assertThat(TaskStateResolver.resolve(failed, () -> 1)).isEqualTo(TesState.PREEMPTED);
         Task terminating =
                 failedExecutor(
                         new V1PodStatus().phase("Running").addConditionsItem(disruption(reason)));
         assertThat(TaskStateResolver.resolve(terminating, () -> 1)).isEqualTo(TesState.PREEMPTED);
+    }
+
+    /** The test above covers every reason that counts as a disruption. */
+    @Test
+    void disruptionReasonsAreTested() {
+        assertThat(TaskStateResolver.DISRUPTION_REASONS).hasSize(4);
+    }
+
+    /**
+     * Only pods in phase Failed must have been disrupted: a failed pod without the condition next
+     * to a running one with it is an executor error (issue #144).
+     */
+    @Test
+    void failedPodWithoutDisruptionIsExecutorError() {
+        V1PodStatus terminating =
+                new V1PodStatus()
+                        .phase("Running")
+                        .addConditionsItem(disruption("PreemptionByScheduler"));
+        assertThat(TaskStateResolver.resolve(failedExecutor(failedPod(), terminating), () -> 1))
+                .isEqualTo(TesState.EXECUTOR_ERROR);
     }
 
     /**
@@ -562,6 +584,21 @@ class TaskStateResolverTest {
                 .get(0)
                 .addPod(pod(TASK + "-ex-00-pod-2", new V1PodStatus().phase("Unknown")));
         assertThat(TaskStateResolver.resolve(unknown, () -> 1)).isEqualTo(TesState.CANCELING);
+    }
+
+    /**
+     * A pod that is still listed after its deletion time (e.g. on a node that is gone) has ended;
+     * one within its grace period hasn't (issue #144).
+     */
+    @Test
+    void podPastItsDeletionTimeHasEnded() {
+        Task stuck = task(true, JobState.FAILED, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
+        V1Pod pod = pod(TASK + "-ex-00-pod-2", new V1PodStatus().phase("Running"));
+        pod.getMetadata().deletionTimestamp(DateTime.now().minusMinutes(1));
+        stuck.getExecutors().get(0).addPod(pod);
+        assertThat(TaskStateResolver.resolve(stuck, () -> 1)).isEqualTo(TesState.CANCELED);
+        pod.getMetadata().deletionTimestamp(DateTime.now().plusMinutes(1));
+        assertThat(TaskStateResolver.resolve(stuck, () -> 1)).isEqualTo(TesState.CANCELING);
     }
 
     /**

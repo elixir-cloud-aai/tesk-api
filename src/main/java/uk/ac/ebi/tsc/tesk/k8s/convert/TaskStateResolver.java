@@ -6,6 +6,7 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CA
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobCondition;
 import io.kubernetes.client.openapi.models.V1JobStatus;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodCondition;
 import io.kubernetes.client.openapi.models.V1PodStatus;
@@ -19,6 +20,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.joda.time.DateTime;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
@@ -43,7 +45,7 @@ public final class TaskStateResolver {
      * Reasons of the pod condition DisruptionTarget (Kubernetes 1.26+) that make an executor's
      * failure a preemption: the system stopped the pod, not the executor's command (issue #144).
      */
-    private static final Set<String> DISRUPTION_REASONS =
+    static final Set<String> DISRUPTION_REASONS =
             Collections.unmodifiableSet(
                     new HashSet<>(
                             Arrays.asList(
@@ -64,8 +66,8 @@ public final class TaskStateResolver {
 
     /**
      * Whether any job of the task (taskmaster, executors, outputs filer) still has a pod that
-     * hasn't ended (pending, running, also while terminating, or without a status yet), or one that
-     * Kubernetes counts as active.
+     * hasn't ended (see {@link #hasEnded}), or one that Kubernetes counts as active. The inputs
+     * filer's job isn't read, so it doesn't count.
      */
     private static boolean hasActiveJob(Task task) {
         Stream<Job> jobs =
@@ -79,15 +81,29 @@ public final class TaskStateResolver {
                                 || job.getPods().stream().anyMatch(pod -> !hasEnded(pod)));
     }
 
+    /**
+     * Whether a pod has ended: it is in phase {@code Succeeded} or {@code Failed}, or its deletion
+     * time (the end of its grace period) has passed. Any other pod (pending, running, terminating
+     * within its grace period, in phase {@code Unknown}, or without a status yet) hasn't. A pod
+     * still listed after its deletion time most likely ran on a node that is gone, and Kubernetes
+     * removes it only once that node is removed; it doesn't keep a cancelled task canceling.
+     */
     private static boolean hasEnded(V1Pod pod) {
-        return pod.getStatus() != null && ENDED_POD_PHASES.contains(pod.getStatus().getPhase());
+        if (pod.getStatus() != null && ENDED_POD_PHASES.contains(pod.getStatus().getPhase())) {
+            return true;
+        }
+        DateTime deletion =
+                Optional.ofNullable(pod.getMetadata())
+                        .map(V1ObjectMeta::getDeletionTimestamp)
+                        .orElse(null);
+        return deletion != null && deletion.isBeforeNow();
     }
 
     /**
      * Whether a failed executor's job failed because Kubernetes disrupted its pods: at least one of
-     * its pods has the condition DisruptionTarget with one of {@link #DISRUPTION_REASONS}, and
-     * every failed pod has it. Pods that Kubernetes deleted can't be told apart: without pods, the
-     * job counts as not disrupted.
+     * its pods (in any phase, e.g. one still terminating) has the condition DisruptionTarget with
+     * one of {@link #DISRUPTION_REASONS}, and every pod in phase {@code Failed} has it. Pods that
+     * Kubernetes deleted can't be told apart: without pods, the job counts as not disrupted.
      */
     private static boolean wasDisrupted(Job executor) {
         List<V1Pod> pods = executor.getPods();
@@ -189,7 +205,8 @@ public final class TaskStateResolver {
         return TesState.SYSTEM_ERROR;
     }
 
-    private static boolean isCancelled(V1Job job) {
+    /** Whether a taskmaster's job is labelled as cancelled. */
+    public static boolean isCancelled(V1Job job) {
         return Optional.ofNullable(job.getMetadata().getLabels())
                 .map(labels -> LABEL_TASKSTATE_VALUE_CANC.equals(labels.get(LABEL_TASKSTATE_KEY)))
                 .orElse(false);

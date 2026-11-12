@@ -225,15 +225,33 @@ class TesServiceImplCancelTest {
         verify(this.client, never()).labelPodAsCancelled(anyString());
     }
 
-    /** The taskmaster's job is labelled as cancelled; its pod has the given phase. */
-    private void cancelledTaskmaster(String podPhase) {
+    private V1Pod taskmasterPod() {
+        return this.taskmasterPods.getItems().get(0);
+    }
+
+    /**
+     * The taskmaster's job is labelled as cancelled; its pod runs and, if {@code podLabelled}, is
+     * labelled, too.
+     */
+    private void cancelledRunningTaskmaster(boolean podLabelled) {
         this.taskmaster
                 .getMetadata()
                 .putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
-        if (!"Running".equals(podPhase)) {
-            this.taskmaster.status(new V1JobStatus().failed(1));
+        this.taskmasterPod().getStatus().phase("Running");
+        if (podLabelled) {
+            this.taskmasterPod()
+                    .getMetadata()
+                    .putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
         }
-        this.taskmasterPods.getItems().get(0).getStatus().phase(podPhase);
+    }
+
+    /** The taskmaster's job is labelled as cancelled and failed: its pod has ended. */
+    private void cancelledEndedTaskmaster() {
+        this.taskmaster
+                .getMetadata()
+                .putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
+        this.taskmaster.status(new V1JobStatus().failed(1));
+        this.taskmasterPod().getStatus().phase("Failed");
     }
 
     /**
@@ -242,15 +260,59 @@ class TesServiceImplCancelTest {
      */
     @Test
     void cancelingTaskIsNotPatchedAgain() {
-        this.cancelledTaskmaster("Running");
+        this.cancelledRunningTaskmaster(true);
         this.service.cancelTask(TASK);
         this.verifyNothingPatched();
+    }
+
+    /**
+     * A canceling task whose running taskmaster pod lacks the label (e.g. labelling it failed, or
+     * Kubernetes restarted the taskmaster) gets it; the job isn't patched again (issue #144).
+     */
+    @Test
+    void cancelingTaskLabelsUnlabelledTaskmasterPod() {
+        this.cancelledRunningTaskmaster(false);
+        this.service.cancelTask(TASK);
+        verify(this.client).labelPodAsCancelled(this.taskmasterPod().getMetadata().getName());
+        verify(this.client, never()).labelJobAsCancelled(anyString());
+        verify(this.client, never()).cancelJobBeforeStart(anyString());
+    }
+
+    /** A taskmaster pod without a status yet isn't labelled again either (issue #144). */
+    @Test
+    void cancelingTaskSkipsTaskmasterPodWithoutStatus() {
+        this.cancelledRunningTaskmaster(true);
+        this.taskmasterPods.addItemsItem(
+                new V1Pod()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name(TASK + "-pod-2")
+                                        .putLabelsItem("job-name", TASK)));
+        this.service.cancelTask(TASK);
+        this.verifyNothingPatched();
+    }
+
+    /** The outputs filer's pods are read only for a cancelled task (issue #144). */
+    @Test
+    void outputFilerPodsAreNotReadForTaskNotCancelled() {
+        V1Job filer =
+                new V1Job()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name(TASK + JOB_NAME_FILER_SUF)
+                                        .putLabelsItem("job-name", TASK + JOB_NAME_FILER_SUF))
+                        .spec(selector(TASK + JOB_NAME_FILER_SUF))
+                        .status(new V1JobStatus().active(1));
+        when(this.client.getSingleTaskOutputFilerJob(TASK)).thenReturn(Optional.of(filer));
+        this.service.cancelTask(TASK);
+        verify(this.client, never()).listSingleJobPods(filer);
+        verify(this.client).labelJobAsCancelled(TASK);
     }
 
     /** A cancelled task whose pods all ended can't be cancelled again (issue #144). */
     @Test
     void canceledTaskIsNotCancelled() {
-        this.cancelledTaskmaster("Failed");
+        this.cancelledEndedTaskmaster();
         assertThatThrownBy(() -> this.service.cancelTask(TASK))
                 .isInstanceOf(CancelNotRunningTask.class);
         this.verifyNothingPatched();
@@ -262,7 +324,7 @@ class TesServiceImplCancelTest {
      */
     @Test
     void runningOutputFilerKeepsTaskCanceling() {
-        this.cancelledTaskmaster("Failed");
+        this.cancelledEndedTaskmaster();
         V1Job filer =
                 new V1Job()
                         .metadata(
