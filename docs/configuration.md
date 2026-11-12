@@ -59,7 +59,12 @@ of the YAML file that `TESK_API_SERVICE_INFO_LOCATION` points to, e.g.
 `file:/etc/tesk/service-info.yaml` from a ConfigMap. The built-in file
 describes a test environment, so give your deployment its own: the ID, name,
 organisation, contact, documentation URL, environment and storage locations
-are yours to fill in. Service info is public by default, also with the `auth`
-profile; if it names anything that only your users should see, set
+are yours to fill in. `tesResources_backend_parameters` may be left out or
+set to `[]`: TESK supports no backend parameters (see [TES 1.1
+fields](api.md#tes-11-fields)), so service info always reports `[]`, and
+TESK API logs a warning if the file lists any.
+
+Service info is public by default, also with the `auth` profile; if it
+names anything that only your users should see, set
 `TESK_API_SERVICE_INFO_PUBLIC` to `false` (in the Helm chart of TESK:
 `auth.serviceInfoPublic`).

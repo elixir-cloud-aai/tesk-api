@@ -100,9 +100,19 @@ TESK accepts the fields that TES 1.1 added to tasks:
 - `executors[].ignore_error`: only `false` is accepted. TESK stops at the
   first executor that fails, so `true` is refused with `400 Bad Request`
   rather than run differently than asked.
-- `resources.backend_parameters`: TESK uses none, and ignores them, unless
-  `backend_parameters_strict` is `true`, for which TES asks to refuse the
-  task: such tasks are refused with `400 Bad Request`.
+- `resources.backend_parameters`: TESK supports none (service info lists
+  none, see [Service info](#service-info)).
+    - With `backend_parameters_strict` set to `true`, for which TES asks to
+      refuse the task, such tasks are refused with `400 Bad Request`.
+    - Otherwise TESK ignores them, as TES asks: they are neither stored nor
+      returned.
+    - TESK logs a warning that names their keys (not their values), and
+      returns it in `logs[0].system_logs` with the view `FULL`, after the
+      taskmaster's log, e.g. `Ignored backend_parameters, which TESK
+      doesn't support: ["VmSize"]`. The keys are kept for this in the
+      annotation `ignored-backend-parameters` of the taskmaster's job.
+    - Tasks created by earlier versions, which stored them, don't return
+      them either, but have no warning.
 
 Service info reports the TES version 1.1.0 (`type.version`).
 
@@ -225,12 +235,16 @@ Not Found`.
 `GET /service-info` describes the service, following the [GA4GH Service
 Info](https://github.com/ga4gh-discovery/ga4gh-service-info) schema: its ID,
 name, type (`org.ga4gh:tes`, version `1.1.0`: TESK API implements TES
-1.1.0), organisation, contact and documentation URLs, version and the storage
-locations it supports. The content comes from a YAML file, set by
+1.1.0), organisation, contact and documentation URLs, version, the storage
+locations it supports and, in `tesResources_backend_parameters`, the keys of
+`resources.backend_parameters` that it supports: none (`[]`, see [TES 1.1
+fields](#tes-11-fields)). The content comes from a YAML file, set by
 `TESK_API_SERVICE_INFO_LOCATION` (by default the built-in
 [`service-info.yaml`](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/resources/service-info.yaml)).
 Set it to a file of your deployment, e.g. from a ConfigMap: the built-in one
-describes a test environment.
+describes a test environment. Service info always reports
+`tesResources_backend_parameters: []`: TESK supports no backend parameters,
+whatever the file lists (it logs a warning if the file lists any).
 
 By default, service info is public, also with the `auth` profile, so that
 registries and clients can see what a service offers and how to get access.

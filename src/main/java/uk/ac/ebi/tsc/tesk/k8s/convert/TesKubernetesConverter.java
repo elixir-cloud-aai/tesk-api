@@ -505,6 +505,9 @@ public class TesKubernetesConverter {
             task = this.objectMapper.readValue(inputJson, TesTask.class);
             // logs sent with the task aren't TESK's: its own log must be the only one
             task.setLogs(null);
+            // tasks created before TESK dropped backend parameters may have them stored, but TES
+            // 1.1 says that unsupported keys aren't returned
+            IgnoredBackendParameters.removeFrom(task);
             if (nullifyInputContent && task.getInputs() != null) {
                 task.getInputs().forEach(input -> input.setContent(null));
             }

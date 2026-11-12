@@ -1,10 +1,14 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.Map;
 import org.junit.Test;
 
 /** Normalisation of CPU cores (issue #44) */
@@ -58,5 +62,27 @@ public class TesResourcesTest {
                     "0",
                     new TesResources().cpuCores(new BigDecimal(zero)).getCpuCores().toString());
         }
+    }
+
+    /** The backend parameters and their strictness count for equality (issue #145) */
+    @Test
+    public void backendParameters_accessorsAndEquality() {
+        Map<String, String> parameters = Collections.singletonMap("VmSize", "Standard_D64_v3");
+        TesResources resources = new TesResources();
+        assertSame(resources, resources.backendParameters(parameters));
+        assertSame(resources, resources.backendParametersStrict(true));
+        assertSame(parameters, resources.getBackendParameters());
+        assertEquals(Boolean.TRUE, resources.getBackendParametersStrict());
+        TesResources same = new TesResources();
+        same.setBackendParameters(parameters);
+        same.setBackendParametersStrict(true);
+        assertEquals(resources, same);
+        assertEquals(resources.hashCode(), same.hashCode());
+        assertEquals(resources.toString(), same.toString());
+        assertTrue(resources.toString().contains("backendParametersStrict: true"));
+        assertNotEquals(resources, new TesResources().backendParametersStrict(true));
+        assertNotEquals(resources, new TesResources().backendParameters(parameters));
+        assertNotEquals(
+                new TesResources(), new TesResources().zones(Collections.singletonList("z")));
     }
 }

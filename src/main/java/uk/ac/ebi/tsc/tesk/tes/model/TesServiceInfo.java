@@ -59,6 +59,10 @@ public class TesServiceInfo   {
   @Valid
   private List<String> storage = null;
 
+  @JsonProperty("tesResources_backend_parameters")
+  @Valid
+  private List<String> tesResourcesBackendParameters = null;
+
   public TesServiceInfo id(String id) {
     this.id = id;
     return this;
@@ -316,6 +320,28 @@ public class TesServiceInfo   {
     this.storage = storage;
   }
 
+  public TesServiceInfo tesResourcesBackendParameters(List<String> tesResourcesBackendParameters) {
+    this.tesResourcesBackendParameters = tesResourcesBackendParameters;
+    return this;
+  }
+
+  /**
+   * Lists all tesResources.backend_parameters keys supported by the service. In the YAML file of
+   * service info, the key is {@code tesResources_backend_parameters}, as in the JSON response
+   * (see {@code ServiceInfoService}).
+   * @return tesResourcesBackendParameters
+  */
+  @ApiModelProperty(example = "[\"VmSize\"]", value = "Lists all tesResources.backend_parameters keys supported by the service")
+
+
+  public List<String> getTesResourcesBackendParameters() {
+    return tesResourcesBackendParameters;
+  }
+
+  public void setTesResourcesBackendParameters(List<String> tesResourcesBackendParameters) {
+    this.tesResourcesBackendParameters = tesResourcesBackendParameters;
+  }
+
 
   @Override
   public boolean equals(Object o) {
@@ -337,12 +363,13 @@ public class TesServiceInfo   {
         Objects.equals(this.updatedAt, tesServiceInfo.updatedAt) &&
         Objects.equals(this.environment, tesServiceInfo.environment) &&
         Objects.equals(this.version, tesServiceInfo.version) &&
-        Objects.equals(this.storage, tesServiceInfo.storage);
+        Objects.equals(this.storage, tesServiceInfo.storage) &&
+        Objects.equals(this.tesResourcesBackendParameters, tesServiceInfo.tesResourcesBackendParameters);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, type, description, organization, contactUrl, documentationUrl, createdAt, updatedAt, environment, version, storage);
+    return Objects.hash(id, name, type, description, organization, contactUrl, documentationUrl, createdAt, updatedAt, environment, version, storage, tesResourcesBackendParameters);
   }
 
   @Override
@@ -362,6 +389,7 @@ public class TesServiceInfo   {
     sb.append("    environment: ").append(toIndentedString(environment)).append("\n");
     sb.append("    version: ").append(toIndentedString(version)).append("\n");
     sb.append("    storage: ").append(toIndentedString(storage)).append("\n");
+    sb.append("    tesResourcesBackendParameters: ").append(toIndentedString(tesResourcesBackendParameters)).append("\n");
     sb.append("}");
     return sb.toString();
   }
