@@ -1,0 +1,10 @@
+{
+  "outputs": [
+    {"url": "file:///mnt/results", "path": "/data/*.bam", "type": "FILE"},
+    {"url": "/mnt/results", "path": "/data/out?.txt", "type": "FILE"},
+    {"url": "s3://bucket/out.txt", "path": "/data/out.txt", "type": "FILE"}
+  ],
+  "executors": [
+    {"image": "ubuntu", "command": ["echo", "hello world"]}
+  ]
+}

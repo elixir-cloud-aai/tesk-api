@@ -144,4 +144,38 @@ public class Tes11FieldsTest {
         // without path_prefix, the path is a file name (TES 1.0), as before
         assertTrue(new TesOutput().path("/*.txt").isPatternBelowRoot());
     }
+
+    private static TesOutput output(String url, String path) {
+        return new TesOutput().url(url).path(path);
+    }
+
+    /**
+     * TES 1.1 requires path_prefix for a path with wildcards; file: URLs (and URLs without a
+     * scheme, which the filer takes as file:) keep TES 1.0's expansion (issue #148).
+     */
+    @Test
+    public void output_wildcardsNeedPathPrefixUnlessFileUrl() {
+        for (String wildcard : new String[] {"*", "?", "["}) {
+            String path = "/data/out" + wildcard + ".txt";
+            for (String url :
+                    new String[] {
+                        "s3://b/out", "http://h/out", "https://h/out", "ftp://h/out", "gs://b/out"
+                    }) {
+                assertFalse(url + " " + path, output(url, path).isPathPrefixGivenForPattern());
+                assertFalse(
+                        url + " " + path,
+                        output(url, path).pathPrefix("").isPathPrefixGivenForPattern());
+                assertTrue(
+                        url + " " + path,
+                        output(url, path).pathPrefix("/data").isPathPrefixGivenForPattern());
+            }
+            for (String url : new String[] {"file:///out", "FILE:///out", "/out", "out"}) {
+                assertTrue(url + " " + path, output(url, path).isPathPrefixGivenForPattern());
+            }
+        }
+        // no wildcards, or nothing to check yet: unchanged
+        assertTrue(output("s3://b/out", "/data/out.txt").isPathPrefixGivenForPattern());
+        assertTrue(new TesOutput().path("/data/*.txt").isPathPrefixGivenForPattern());
+        assertTrue(new TesOutput().url("s3://b/out").isPathPrefixGivenForPattern());
+    }
 }

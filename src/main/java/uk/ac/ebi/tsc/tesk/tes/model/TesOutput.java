@@ -125,11 +125,11 @@ public class TesOutput   {
 
   /**
    * Prefix to be removed from matching outputs if `path` contains wildcards (TES 1.1); output URLs
-   * are constructed by appending pruned paths to the directory specified in `url`. Without it, a
-   * `path` with wildcards is taken as before: expanded for `file:` URLs, a file name otherwise.
+   * are constructed by appending pruned paths to the directory specified in `url`. Required for a
+   * `path` with wildcards, except for `file:` URLs, which are expanded as before (TES 1.0).
    * @return pathPrefix
   */
-  @ApiModelProperty(example = "/data", value = "Prefix to be removed from matching outputs if `path` contains wildcards; output URLs are constructed by appending pruned paths to the directory specified in `url`. Ignored if `path` has no wildcards.")
+  @ApiModelProperty(example = "/data", value = "Prefix to be removed from matching outputs if `path` contains wildcards; output URLs are constructed by appending pruned paths to the directory specified in `url`. Required if `path` has wildcards, unless `url` is a `file:` URL; ignored if `path` has no wildcards.")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
   public String getPathPrefix() {
     return pathPrefix;
@@ -168,8 +168,34 @@ public class TesOutput   {
     return prefix.equals("/") || root.equals(prefix) || root.startsWith(prefix + "/");
   }
 
+  /**
+   * TES 1.1 requires `path_prefix` for a `path` with wildcards. Without it, TESK keeps TES 1.0's
+   * behaviour for `file:` URLs and URLs without a scheme (which the filer takes as `file:`): the
+   * pattern is expanded into the URL's directory. Other schemes would take the pattern as a file
+   * name and fail or upload nothing useful after the executors ran (issue #148).
+   *
+   * @return whether `path_prefix` is given, if `path` has wildcards and `url` isn't a file URL
+   */
+  @JsonIgnore
+  @AssertTrue(message = "path_prefix is required for a path with wildcards, unless url is a file: URL")
+  public boolean isPathPrefixGivenForPattern() {
+    if (path == null || url == null || !hasWildcards(path)) {
+      return true;
+    }
+    if (pathPrefix != null && !pathPrefix.isEmpty()) {
+      return true;
+    }
+    java.util.regex.Matcher scheme =
+        java.util.regex.Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*):").matcher(url);
+    return !scheme.find() || scheme.group(1).equalsIgnoreCase("file");
+  }
+
+  private static boolean hasWildcards(String path) {
+    return path.matches(".*[*?\\[].*");
+  }
+
   private boolean isPattern() {
-    return path != null && pathPrefix != null && !pathPrefix.isEmpty() && path.matches(".*[*?\\[].*");
+    return path != null && pathPrefix != null && !pathPrefix.isEmpty() && hasWildcards(path);
   }
 
   /** The directories of a pattern before its first component with wildcards, normalized. */
@@ -179,7 +205,7 @@ public class TesOutput   {
       if (part.isEmpty()) {
         continue;
       }
-      if (part.matches(".*[*?\\[].*")) {
+      if (hasWildcards(part)) {
         break;
       }
       root.append('/').append(part);
