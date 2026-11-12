@@ -295,6 +295,43 @@ class TesServiceImplCancelTest {
         verify(this.client, never()).labelJobAsCancelled(anyString());
     }
 
+    /**
+     * A canceling task's taskmaster pod that can't be labelled for another reason fails the
+     * request: the taskmaster would go on (issue #144).
+     */
+    @Test
+    void cancelingTaskFailsIfTaskmasterPodCantBeLabelled() {
+        this.cancelledRunningTaskmaster(false);
+        org.mockito.Mockito.doThrow(
+                        uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException.fromApiException(
+                                new io.kubernetes.client.openapi.ApiException(403, "forbidden")))
+                .when(this.client)
+                .labelPodAsCancelled(TASK + "-pod");
+        assertThatThrownBy(() -> this.service.cancelTask(TASK))
+                .isInstanceOf(uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException.class);
+    }
+
+    /**
+     * A canceling task's pending taskmaster pod (e.g. Kubernetes restarted the taskmaster) gets the
+     * label, too: the taskmaster sees it once it starts (issue #144).
+     */
+    @Test
+    void cancelingTaskLabelsPendingTaskmasterPod() {
+        this.cancelledRunningTaskmaster(true);
+        this.taskmasterPods.addItemsItem(
+                new V1Pod()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name(TASK + "-pod-2")
+                                        .putLabelsItem("job-name", TASK))
+                        .status(new V1PodStatus().phase("Pending")));
+        this.service.cancelTask(TASK);
+        verify(this.client).labelPodAsCancelled(TASK + "-pod-2");
+        verify(this.client, never()).labelPodAsCancelled(TASK + "-pod");
+        verify(this.client, never()).labelJobAsCancelled(anyString());
+        verify(this.client, never()).cancelJobBeforeStart(anyString());
+    }
+
     /** A taskmaster pod without a status yet isn't labelled again either (issue #144). */
     @Test
     void cancelingTaskSkipsTaskmasterPodWithoutStatus() {

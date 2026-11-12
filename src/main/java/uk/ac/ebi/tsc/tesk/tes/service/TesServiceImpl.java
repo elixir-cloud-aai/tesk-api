@@ -22,6 +22,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.PodPhase;
@@ -344,16 +345,14 @@ public class TesServiceImpl implements TesService {
             throw new CancelNotRunningTask(taskId);
         }
         if (state == TesState.CANCELING) {
-            // cancelled already, its pods are still stopping (issue #144); a running taskmaster
-            // pod without the label (e.g. labelling it failed, or Kubernetes restarted the
-            // taskmaster) gets it now, nothing else is patched again
+            // cancelled already, its pods are still stopping (issue #144); a pending or running
+            // taskmaster pod without the label (e.g. labelling it failed, or Kubernetes
+            // restarted the taskmaster) gets it now, as only the pod's label stops the
+            // taskmaster; nothing else is patched again
             task.getTaskmaster().getPods().stream()
-                    .filter(TesServiceImpl::isRunningAndNotLabelledCancelled)
+                    .filter(TesServiceImpl::isStartedAndNotLabelledCancelled)
                     .forEach(
-                            pod ->
-                                    this.labelPodAsCancelledIfPossible(
-                                            pod.getMetadata().getName(),
-                                            "its job is labelled already"));
+                            pod -> this.labelPodAsCancelledUnlessGone(pod.getMetadata().getName()));
             return;
         }
         V1PodList taskMasterPods = new V1PodList().items(task.getTaskmaster().getPods());
@@ -381,11 +380,27 @@ public class TesServiceImpl implements TesService {
                                         pod.getMetadata().getName(), "its job ends anyway"));
     }
 
-    private static boolean isRunningAndNotLabelledCancelled(V1Pod pod) {
-        boolean running =
+    private static boolean isStartedAndNotLabelledCancelled(V1Pod pod) {
+        boolean started =
                 pod.getStatus() != null
-                        && PodPhase.RUNNING.getCode().equals(pod.getStatus().getPhase());
-        return running && !TaskStateResolver.isLabelledCancelled(pod.getMetadata());
+                        && (PodPhase.PENDING.getCode().equals(pod.getStatus().getPhase())
+                                || PodPhase.RUNNING.getCode().equals(pod.getStatus().getPhase()));
+        return started && !TaskStateResolver.isLabelledCancelled(pod.getMetadata());
+    }
+
+    /**
+     * Labels a taskmaster pod of a canceling task as cancelled; a pod that is gone already (404)
+     * has nothing left to stop. Other errors fail the request: the taskmaster would go on.
+     */
+    private void labelPodAsCancelledUnlessGone(String podName) {
+        try {
+            this.kubernetesClientWrapper.labelPodAsCancelled(podName);
+        } catch (KubernetesException e) {
+            if (e.getApiException().getCode() != HttpStatus.NOT_FOUND.value()) {
+                throw e;
+            }
+            logger.info("Pod {} of a cancelled task is gone, not labelled", podName);
+        }
     }
 
     /**

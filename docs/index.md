@@ -172,9 +172,9 @@ The job's label gives the task the state `CANCELING`, and `CANCELED` once
 none of its jobs has a pod that hasn't ended (see the rules above). A task
 that has ended (`COMPLETE`, `EXECUTOR_ERROR`, `SYSTEM_ERROR`, `PREEMPTED`, or
 `CANCELED`) can't be cancelled (`400 Bad Request`). Cancelling a task that is
-`CANCELING` answers `200 OK`; it only labels a running taskmaster pod that
-doesn't have the label yet (e.g. labelling it failed before, or Kubernetes
-restarted the taskmaster). The pod's label reaches the taskmaster through the
+`CANCELING` answers `200 OK`; it only labels a pending or running
+taskmaster pod that doesn't have the label yet (e.g. labelling it failed
+before, or Kubernetes restarted the taskmaster). The pod's label reaches the taskmaster through the
 Downward API; when the taskmaster sees it, it stops the running executor and
 ends.
 
