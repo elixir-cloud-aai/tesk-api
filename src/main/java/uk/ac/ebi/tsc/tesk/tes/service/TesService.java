@@ -19,13 +19,14 @@ public interface TesService {
     /**
      * Creates new TES task, by converting input and calling create method. In case of detecting
      * duplicated task ID, retries with new generated ID (up to a limit of retries). Users
-     * authorised by the claim only (tesk.api.authorisation.claim) create tasks without a group.
+     * authorised by the claim only (tesk.api.authorisation.claim) and service clients
+     * (tesk.api.authorisation.service-clients) create tasks without a group.
      */
     @PreAuthorize(
             "(hasRole(@authorisationProperties.baseGroupFull) AND"
                     + "(#user.member OR #user.teskAdmin) AND"
                     + "(#task.tags?.get('GROUP_NAME') == null OR #user.isGroupMember(#task.tags['GROUP_NAME'])))"
-                    + " OR (#user.claimAuthorised AND #task.tags?.get('GROUP_NAME') == null)")
+                    + " OR (#user.authorisedWithoutGroup AND #task.tags?.get('GROUP_NAME') == null)")
     TesCreateTaskResponse createTask(TesTask task, User user);
 
     /**
@@ -40,7 +41,7 @@ public interface TesService {
             "(#user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupMember(returnObject.logs[0].metadata['GROUP_NAME']))"
                     + " OR (#user.teskAdmin)"
                     + " OR (returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupManager(returnObject.logs[0].metadata['GROUP_NAME']))"
-                    + " OR (#user.claimAuthorised AND #user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] == null)")
+                    + " OR (#user.authorisedWithoutGroup AND #user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] == null)")
     TesTask getTask(String taskId, TaskView view, User user);
 
     /**
@@ -56,7 +57,8 @@ public interface TesService {
      *     resulting task
      * @return - the page of tasks, with the continue token of the next page, if there is one
      */
-    @PreAuthorize("#user.teskAdmin OR #user.manager OR #user.member OR #user.claimAuthorised")
+    @PreAuthorize(
+            "#user.teskAdmin OR #user.manager OR #user.member OR #user.authorisedWithoutGroup")
     TesListTasksResponse listTasks(
             TaskFilter filter, Long pageSize, String pageToken, TaskView view, User user);
 
@@ -70,6 +72,6 @@ public interface TesService {
      */
     @PreAuthorize(
             "hasRole(@authorisationProperties.baseGroupFull)"
-                    + " OR (principal instanceof T(uk.ac.ebi.tsc.tesk.config.security.User) AND principal.claimAuthorised)")
+                    + " OR (principal instanceof T(uk.ac.ebi.tsc.tesk.config.security.User) AND principal.authorisedWithoutGroup)")
     void cancelTask(String taskId);
 }

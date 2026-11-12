@@ -46,6 +46,25 @@ public class UserCreatorTest {
         return User.builder(userId).legacyUserLabels(legacyUserLabels).build();
     }
 
+    /** A principal without groups (e.g. a service client) has no authorities, not an empty one */
+    @Test
+    public void authorities_withoutGroups_areNone() {
+        assertTrue(User.builder("123").build().getAuthorities().isEmpty());
+        assertTrue(
+                User.builder("123")
+                        .allGroups(Collections.emptySet())
+                        .build()
+                        .getAuthorities()
+                        .isEmpty());
+        assertEquals(
+                1,
+                User.builder("123")
+                        .allGroups(Collections.singleton("g"))
+                        .build()
+                        .getAuthorities()
+                        .size());
+    }
+
     @Test
     public void username_isTheFullId() {
         assertEquals("user@example.org", User.builder("user@example.org").build().getUsername());

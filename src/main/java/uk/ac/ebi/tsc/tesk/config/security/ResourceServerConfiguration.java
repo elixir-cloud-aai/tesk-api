@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
@@ -19,6 +20,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
+import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
 
 /**
  * This class (specifically the @EnableResourceServer annotation) + 2 dependencies:
@@ -50,19 +52,26 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
     };
     private final String baseUrl;
     private final boolean serviceInfoPublic;
+    /**
+     * The token services of the user info endpoint (auto-configured by Spring Boot), looked up only
+     * when the resource server is configured, as they need the extractors defined here
+     */
+    private final ObjectProvider<ResourceServerTokenServices> tokenServices;
 
     public ResourceServerConfiguration(
             ErrorAttributes errorAttributes,
             HttpMessageConverters messageConverters,
             AuthorisationProperties authorisationProperties,
             @Value("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}") String baseUrl,
-            @Value("${tesk.api.service-info.public:true}") boolean serviceInfoPublic) {
+            @Value("${tesk.api.service-info.public:true}") boolean serviceInfoPublic,
+            ObjectProvider<ResourceServerTokenServices> tokenServices) {
 
         this.errorAttributes = errorAttributes;
         this.messageConverters = messageConverters;
         this.authorisationProperties = authorisationProperties;
         this.baseUrl = baseUrl;
         this.serviceInfoPublic = serviceInfoPublic;
+        this.tokenServices = tokenServices;
     }
 
     /**
@@ -89,12 +98,19 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
     /**
      * Sets a custom entryPoint that returns json in our usual error format with the use of standard
      * Boot's errorAttributes and autoconfigured messageConverters (specifically with autoconfigured
-     * objectMapper for JacksonConverter)
+     * objectMapper for JacksonConverter). With tesk.api.authorisation.service-clients enabled,
+     * tokens of the listed service clients are checked locally, all others at the user info
+     * endpoint as before ({@link ServiceClientTokenServices}).
      */
     @Override
     public void configure(ResourceServerSecurityConfigurer resources) {
         resources.authenticationEntryPoint(
                 new CustomAuthenticationEntryPoint(errorAttributes, messageConverters));
+        if (authorisationProperties.getServiceClients().isEnabled()) {
+            resources.tokenServices(
+                    new ServiceClientTokenServices(
+                            tokenServices.getObject(), authorisationProperties));
+        }
     }
 
     /** Magic, that changes default role prefix from ROLE_ to (...)elixir: */

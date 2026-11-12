@@ -118,6 +118,12 @@
             <artifactId>spring-security-oauth2-autoconfigure</artifactId>
             <version>2.6.8</version>
         </dependency>
+        <!-- Checks the JWT access tokens of service clients (issue #153); also used by the
+             Kubernetes client, version managed above -->
+        <dependency>
+            <groupId>org.bitbucket.b_c</groupId>
+            <artifactId>jose4j</artifactId>
+        </dependency>
         <!--Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
