@@ -40,5 +40,19 @@ public enum TesFileType {
     //Backwards compatibility: need to return null for illegal state
     return null;
   }
+
+  /**
+   * Reads the type of an input or output from JSON. TES 1.1 doesn't require it (issue #146): an
+   * explicit {@code null} is {@code FILE}, as a left-out type is. Unknown values are {@code null},
+   * as with {@link #fromValue}, and fail validation. The models use a String setter for this,
+   * because Jackson sends nulls returned by an enum deserializer through the same null handling as
+   * JSON {@code null}.
+   *
+   * @param value the type as sent, or {@code null}
+   * @return the type, or {@code null} for unknown values
+   */
+  public static TesFileType fromJson(String value) {
+    return value == null ? FILE : fromValue(value);
+  }
 }
 

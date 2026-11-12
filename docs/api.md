@@ -38,8 +38,12 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
   filters nothing.
 - `state` lists only the tasks in that state. It accepts every `tesState`
   of TES 1.1, in capitals (e.g. `RUNNING`, also `CANCELING` and
+<<<<<<< HEAD
   `PREEMPTED`; see [Getting tasks](index.md#getting-tasks) for when TESK
   API reports them);
+=======
+  `PREEMPTED`, which TESK API doesn't report yet, so they list no tasks);
+>>>>>>> origin/dev
   other values are refused with `400 Bad Request`, and the message names
   `state`. An empty `state` filters nothing.
 - `tag_key` and `tag_value` list only the tasks with these tags. Repeat
@@ -95,6 +99,10 @@ TESK accepts the fields that TES 1.1 added to tasks:
   only. This needs a
   taskmaster and filer that support it (see
   [tesk-core#134](https://github.com/elixir-cloud-aai/tesk-core/pull/134)).
+- `inputs[].type` and `outputs[].type`: optional, as in TES 1.1. Left out
+  or `null`, the type is `FILE`; directories still need `type: DIRECTORY`,
+  as TESK doesn't infer it. Other values are refused with
+  `400 Bad Request`.
 - `inputs[].streamable`: accepted and ignored, as TES allows: inputs are
   always downloaded before the executors start.
 - `executors[].ignore_error`: only `false` is accepted. TESK stops at the
