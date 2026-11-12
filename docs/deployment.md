@@ -14,7 +14,7 @@ version tag, with
 [cosign](https://docs.sigstore.dev/cosign/system_config/installation/):
 
 ```bash
-cosign verify elixircloud/tesk-api:1.2.0 \
+cosign verify elixircloud/tesk-api:1.3.0 \
   --certificate-identity-regexp '^https://github\.com/elixir-cloud-aai/tesk-api/\.github/workflows/release\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
