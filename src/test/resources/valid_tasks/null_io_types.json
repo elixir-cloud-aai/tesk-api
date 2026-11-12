@@ -1,0 +1,22 @@
+{
+  "inputs": [
+    {
+      "url": "s3://bucket/in.txt",
+      "path": "/data/in.txt",
+      "type": null
+    }
+  ],
+  "outputs": [
+    {
+      "url": "s3://bucket/out.txt",
+      "path": "/data/out.txt",
+      "type": null
+    }
+  ],
+  "executors": [
+    {
+      "image": "ubuntu:24.04",
+      "command": ["cp", "/data/in.txt", "/data/out.txt"]
+    }
+  ]
+}

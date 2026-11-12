@@ -47,6 +47,7 @@ import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
+import uk.ac.ebi.tsc.tesk.tes.model.TesFileType;
 import uk.ac.ebi.tsc.tesk.tes.model.TesListTasksResponse;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
@@ -461,6 +462,32 @@ public class TasksApiControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * An explicit null type of inputs and outputs is accepted, as TES 1.1 doesn't require it, and
+     * treated as FILE (issue #146)
+     */
+    @Test
+    public void createTask_valid_nullInputAndOutputTypes() throws Exception {
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(
+                                        getFileContentFromResources(
+                                                "valid_tasks/null_io_types.json"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+        verify(this.tesService)
+                .createTask(
+                        argThat(
+                                task ->
+                                        task.getInputs().get(0).getType() == TesFileType.FILE
+                                                && task.getOutputs().get(0).getType()
+                                                        == TesFileType.FILE),
+                        any());
     }
 
     /** Strict backend parameters are refused: TESK uses none */

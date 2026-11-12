@@ -70,6 +70,10 @@ TESK accepts the fields that TES 1.1 added to tasks:
   only. This needs a
   taskmaster and filer that support it (see
   [tesk-core#134](https://github.com/elixir-cloud-aai/tesk-core/pull/134)).
+- `inputs[].type` and `outputs[].type`: optional, as in TES 1.1. Left out
+  or `null`, the type is `FILE`; directories still need `type: DIRECTORY`,
+  as TESK doesn't infer it. Other values are refused with
+  `400 Bad Request`.
 - `inputs[].streamable`: accepted and ignored, as TES allows: inputs are
   always downloaded before the executors start.
 - `executors[].ignore_error`: only `false` is accepted. TESK stops at the
