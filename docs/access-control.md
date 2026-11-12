@@ -45,7 +45,7 @@ with the authorisation code grant, and with the redirect URI
 provider must issue tokens to it without a client secret and without PKCE.
 
 ### Token validation
-TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint. If user info is returned without error, token is considered valid. Invalid token or lack of thereof in `authorisation: Bearer` header will result in `HTTP 401 Unauthorized` error. 
+TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint. If user info is returned without error, token is considered valid. Invalid token or lack of thereof in `authorisation: Bearer` header will result in `HTTP 401 Unauthorized` error. Tokens of allow-listed services are checked locally instead, if that is on (see [Tokens of services](#tokens-of-services)).
 
 ### Integrating with a different OIDC provider
 We have not tested TESK API integration with a different OIDC provider than Elixir AAI, but since standard Spring OAuth library is used, it should be possible (just point `security.oauth2.resource.user-info-uri`, or `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`, to a proper URL), provided that the other Authorization Server provides information about the user in the same format that Elixir does. Otherwise changes to [GroupNamesSecurityExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/GroupNamesSecurityExtractor.java) and [ElixirPrincipalExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/ElixirPrincipalExtractor.java) will be necessary.
@@ -207,3 +207,129 @@ the claim lists only their tasks without a team.
   are already running keep running.
 * Users are identified by `sub`, compared exactly, as for group members (see
   [Task creators](#task-creators)).
+
+## Tokens of services
+
+Gateways and other services call TESK API with access tokens of their own,
+obtained with the OAuth 2.0 client credentials grant ([RFC 6749, section
+4.4](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4)). Such
+tokens have no user: the user info endpoint may refuse them, and releases
+no groups if it answers. TESK API can accept the tokens of a list of such
+clients instead, and check them itself, without the user info endpoint. The
+setting is off by default; with it off, nothing changes. It needs the `auth`
+profile.
+
+### Which tokens are accepted
+
+With the setting on, TESK API looks at each bearer token first. If it is a
+signed JWT whose `iss` is the configured issuer (compared exactly, also a
+trailing `/`), whose client claim (by default `client_id`, as in [RFC
+9068](https://datatracker.ietf.org/doc/html/rfc9068)) is one of the listed
+client IDs, and whose `sub` is that same client ID (as in tokens of the
+client credentials grant; see `…_REQUIRE_CLIENT_SUBJECT` below), it is a
+service token, and TESK API checks it locally:
+
+* the signature, against the issuer's JSON Web Key Set: from the JWKS URI
+  in the issuer's OpenID Connect discovery document
+  (`<issuer>/.well-known/openid-configuration`, whose `issuer` must be the
+  configured issuer), or from `…_JWKS_URI`. Only asymmetric algorithms (RSA,
+  RSA-PSS, ECDSA) are accepted. The keys are cached, and fetched again for a
+  token with an unknown key ID, at most once every 10 seconds;
+* `exp`, which the token must have, and `nbf` and `iat`, if it has them, with
+  a leeway of `…_CLOCK_SKEW_SECONDS`;
+* the header `typ`, which must be `at+jwt` ([RFC 9068, section
+  4](https://datatracker.ietf.org/doc/html/rfc9068#section-4)), so that ID
+  tokens aren't accepted as access tokens (unless
+  `…_REQUIRE_ACCESS_TOKEN_TYPE` is `false`);
+* the audience: if `…_AUDIENCE` is set, `aud` must be or contain it.
+
+If all of these hold, the request is authenticated as that client, without
+a call to the user info endpoint. If one fails, the request is refused with
+`401 Unauthorized`, also without a call to the user info endpoint.
+
+All other tokens go the existing way, through the user info endpoint, so
+user tokens keep working as before: tokens that aren't JWTs, JWTs of other
+issuers or of clients that aren't listed, and tokens of users obtained
+through a listed client (their `sub` is the user's). A client that isn't
+listed is refused by the user info endpoint (`401 Unauthorized`) or, if the
+endpoint answers, gets the rights of a user without groups (usually none:
+`403 Forbidden`).
+
+TESK API logs the client ID (never the token) for each accepted (`INFO`) and
+refused (`WARN`) service token, with the reason of a refusal (e.g.
+`expired`, `invalid signature`, `wrong audience`). A service that polls
+often makes many such lines; to log refusals only, set the logger
+`uk.ac.ebi.tsc.tesk.config.security.ServiceClientTokenServices` to `WARN`
+(e.g. with the environment variable
+`LOGGING_LEVEL_UK_AC_EBI_TSC_TESK_CONFIG_SECURITY_SERVICECLIENTTOKENSERVICES=WARN`).
+
+### Settings
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED` | `true`: tokens of the clients below are accepted as described above. | `false`
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_ISSUER` | Issuer of the tokens, exactly as in their `iss` claim (e.g. `https://login.example.org/oidc/`). Required if the setting is on. | none
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS` | Comma-separated IDs of the clients whose tokens are accepted, compared exactly. Required if the setting is on. | none
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE` | If set, the token's `aud` must be or contain this value. Recommended: register the clients so that their tokens for TESK get an audience of their own (e.g. the URL of your TESK API), and set it here, so that tokens that a client got for other services aren't accepted. | none (any audience)
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_JWKS_URI` | JWKS URI of the issuer, if it shouldn't come from the discovery document. | from discovery
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_CLAIM` | Claim that names the client. Some providers use `azp`. | `client_id`
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_ACCESS_TOKEN_TYPE` | `true`: the header `typ` must be `at+jwt`. Set it to `false` only for providers that don't set it. | `true`
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_CLIENT_SUBJECT` | `true`: the token's `sub` must be the client ID, as in tokens of the client credentials grant; tokens of users obtained through a listed client go through the user info endpoint, as user tokens. `false`: any `sub`; then every token that a user gets through a listed client is accepted as the client's. | `true`
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLOCK_SKEW_SECONDS` | Leeway for `exp`, `nbf` and `iat`, in seconds. | `60`
+
+If the setting is on without an issuer or without a non-blank client ID, or
+with a negative leeway, TESK API doesn't start. The discovery document and
+the keys are fetched at the first service token, not at startup: while the
+issuer can't be reached, service tokens are refused.
+
+For example, [LS Login](https://lifescience-ri.eu/ls-login/) (issuer
+`https://login.aai.lifescience-ri.eu/oidc/`) issues access tokens of the
+client credentials grant with the header `typ` `at+jwt`, signed (`RS256`)
+with a key of the issuer's JWKS, and with the claims `iss`, `client_id` and
+`sub` (both the client ID), `exp` (an hour after `iat`), `iat`, `jti`,
+`scope` and `aud`, which is set per client when the client is registered.
+The defaults fit these tokens: set the issuer, the client IDs, and the
+audience that you registered for TESK.
+
+### Authorisation of service clients
+
+A listed client is a principal of its own: its ID is the client ID, and it
+has no groups, so no group rules apply. It:
+
+* may create tasks. The tasks belong to the client only, without a team: a
+  task with `tags['GROUP_NAME']` is refused (`403 Forbidden`).
+* may list, get and cancel the tasks that it created, and no others, also
+  none of other listed clients.
+
+Tasks of a client record it as their creator as for users (see [Task
+creators](#task-creators)): the label `creator-user-hash` has the hash of the
+client ID, the annotation `creator-user-id` and `logs[0].metadata.USER_ID`
+the client ID. Super admins see these tasks, as all tasks; team admins
+don't, as they belong to no team.
+
+User IDs (`sub` of the user info) and client IDs share this record: a user
+whose `sub` is a listed client's ID would see the client's tasks. Providers
+give clients and users IDs of different forms, so this matters only if the
+user info endpoint is of another provider, whose users could have such IDs.
+
+A gateway that runs tasks for its users runs all of them as its client:
+TESK API doesn't know the users behind it, and the gateway decides which of
+its users may see and cancel which task.
+
+### Trust implications
+
+* Everyone who holds a listed client's credentials (e.g. its client secret)
+  can get tokens and run any container image with any command on your
+  cluster, within the resources that tasks may request, and can see and
+  cancel all tasks of that client. Keep the credentials as safe as an
+  administrator's, list only clients of services that you trust, and remove
+  a client from the list (and rotate its credentials) if they may have been
+  disclosed.
+* Service tokens are checked locally, so a token stays valid until it
+  expires (`exp`), also if the client is disabled at the provider in the
+  meantime. Removing the client from the list (with a restart of TESK API)
+  takes effect at once.
+* Without `…_AUDIENCE`, TESK API accepts a listed client's tokens for any
+  audience, also tokens that the client got for other services: whoever
+  receives such a token (e.g. that other service) can use it at TESK API
+  until it expires. Set the audience if your provider lets you choose it.
