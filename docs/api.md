@@ -217,10 +217,9 @@ fields](#tes-11-fields)). The content comes from a YAML file, set by
 `TESK_API_SERVICE_INFO_LOCATION` (by default the built-in
 [`service-info.yaml`](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/resources/service-info.yaml)).
 Set it to a file of your deployment, e.g. from a ConfigMap: the built-in one
-describes a test environment. Keep `tesResources_backend_parameters: []` in
-it (files without the key leave it out of the answer): TESK supports no
-backend parameters whatever the file lists, and logs a warning if it lists
-any.
+describes a test environment. Service info always reports
+`tesResources_backend_parameters: []`: TESK supports no backend parameters,
+whatever the file lists (it logs a warning if the file lists any).
 
 By default, service info is public, also with the `auth` profile, so that
 registries and clients can see what a service offers and how to get access.

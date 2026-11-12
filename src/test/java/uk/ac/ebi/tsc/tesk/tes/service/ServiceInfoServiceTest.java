@@ -7,7 +7,7 @@ import static org.junit.Assert.assertThat;
 import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Arrays;
+import java.util.Collections;
 import org.junit.Rule;
 import org.junit.Test;
 import org.springframework.boot.test.system.OutputCaptureRule;
@@ -37,13 +37,18 @@ public class ServiceInfoServiceTest {
                         .createdAt(
                                 LocalDateTime.parse("2001-12-14T21:59:00").atOffset(ZoneOffset.UTC))
                         .organization(
-                                new ServiceOrganization().name("EBI").url("http://example.com"));
+                                new ServiceOrganization().name("EBI").url("http://example.com"))
+                        // TESK supports no backend parameters, also if the file doesn't say so
+                        .tesResourcesBackendParameters(Collections.emptyList());
         assertThat(result, is(expected));
         subject.loadYaml();
         assertThat(result, is(expected));
     }
 
-    /** A file of a deployment may list backend parameters, a field of TES 1.1 (issue #145) */
+    /**
+     * A file of a deployment may have the key of TES 1.1, but TESK supports no backend parameters:
+     * service info lists none, whatever the file lists, and a warning says so (issue #145)
+     */
     @Test
     public void getServiceInfo_backendParameters() {
         ServiceInfoService service =
@@ -52,8 +57,7 @@ public class ServiceInfoServiceTest {
         service.setUp();
         TesServiceInfo result = service.getServiceInfo();
         assertThat(result.getName(), is("example application"));
-        assertThat(result.getTesResourcesBackendParameters(), is(Arrays.asList("VmSize", "Queue")));
-        // TESK supports none, whatever the file lists
+        assertThat(result.getTesResourcesBackendParameters(), is(Collections.emptyList()));
         assertThat(output.getOut(), containsString("set it to []"));
     }
 }

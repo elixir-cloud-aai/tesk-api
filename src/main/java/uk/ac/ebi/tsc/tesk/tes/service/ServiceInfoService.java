@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 
 import java.io.InputStream;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import javax.annotation.PostConstruct;
@@ -51,13 +52,16 @@ public class ServiceInfoService {
     public void loadYaml() {
         Yaml yaml = new Yaml(new OffsetDateTimePropertyConstructor());
         try (InputStream is = resourceFile.getInputStream()) {
-            serviceInfo = yaml.loadAs(is, TesServiceInfo.class);
-            List<String> backendParameters = serviceInfo.getTesResourcesBackendParameters();
+            TesServiceInfo loaded = yaml.loadAs(is, TesServiceInfo.class);
+            List<String> backendParameters = loaded.getTesResourcesBackendParameters();
             if (backendParameters != null && !backendParameters.isEmpty()) {
                 log.warn(
                         "Service info lists tesResources_backend_parameters, but TESK supports"
-                                + " none and ignores them in tasks; set it to []");
+                                + " none and ignores them in tasks: it reports none; set it to []");
             }
+            // TESK supports no backend parameters, whatever the file lists (TES 1.1)
+            loaded.setTesResourcesBackendParameters(Collections.emptyList());
+            serviceInfo = loaded;
         } catch (Exception e) {
             log.error("Unable to parse Service Info Yaml", e);
         }
