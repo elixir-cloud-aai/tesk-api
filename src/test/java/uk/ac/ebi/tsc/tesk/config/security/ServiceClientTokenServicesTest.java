@@ -466,6 +466,47 @@ public class ServiceClientTokenServicesTest {
         refused(sign(claims(CLIENT)));
     }
 
+    /**
+     * After the keys were fetched, unknown key IDs refetch them at most once per interval, also
+     * while the issuer fails
+     */
+    @Test
+    public void failingRefresh_isThrottled() throws Exception {
+        ServiceClientTokenServices services =
+                new ServiceClientTokenServices(userInfo, properties, 300);
+        services.loadAuthentication(sign(claims(CLIENT)));
+        Thread.sleep(400);
+        idp.givenThat(get("/oidc/jwk").willReturn(aResponse().withStatus(503)));
+        String unknown = sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt");
+        for (int i = 0; i < 3; i++) {
+            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(unknown));
+        }
+        // the first fetch, and one refresh for the unknown key IDs
+        idp.verify(2, getRequestedFor(urlEqualTo("/oidc/jwk")));
+        // the known key still works
+        services.loadAuthentication(sign(claims(CLIENT)));
+    }
+
+    /** A failed or empty key set isn't fetched again within the interval, also without discovery */
+    @Test
+    public void failedKeySet_isNotRefetchedWithinTheInterval() throws Exception {
+        properties.getServiceClients().setJwksUri("http://localhost:" + idp.port() + "/oidc/jwk");
+        String token = sign(claims(CLIENT));
+        for (boolean empty : new boolean[] {false, true}) {
+            idp.resetRequests();
+            if (empty) {
+                jwks();
+            } else {
+                idp.givenThat(get("/oidc/jwk").willReturn(aResponse().withStatus(503)));
+            }
+            ServiceClientTokenServices services = services();
+            for (int i = 0; i < 3; i++) {
+                assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+            }
+            idp.verify(1, getRequestedFor(urlEqualTo("/oidc/jwk")));
+        }
+    }
+
     /** ECDSA signatures are accepted, as RSA ones */
     @Test
     public void ecdsaSignature_isAccepted() throws Exception {

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.jose4j.http.Get;
 import org.jose4j.http.SimpleResponse;
@@ -112,8 +113,11 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
     /** Checks the tokens of service clients; built on first use (it may need the discovery) */
     private volatile JwtConsumer verifier;
 
-    /** Until when (epoch milliseconds) a failed discovery isn't tried again */
+    /** Until when (epoch milliseconds) a failed discovery isn't tried again (under buildLock) */
     private long discoveryRetryAt = 0;
+
+    /** Held while the verifier is built */
+    private final ReentrantLock buildLock = new ReentrantLock();
 
     /**
      * @param userInfoTokenServices the token services of the user info endpoint, for all other
@@ -260,17 +264,21 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
      * The verifier, built on first use. If the discovery fails, it isn't tried again for the
      * refresh interval: tokens (which may be forged, as the claims that select this path are read
      * before the signature is checked) are refused at once until then, so that they can't make
-     * requests wait for the issuer one after another.
+     * requests wait for the issuer one after another. While one request builds it, the others are
+     * refused at once too.
      */
     private JwtConsumer verifier() throws IOException, JoseException {
         JwtConsumer consumer = this.verifier;
         if (consumer != null) {
             return consumer;
         }
-        synchronized (this) {
+        if (!this.buildLock.tryLock()) {
+            throw new IOException("keys of the issuer are being fetched");
+        }
+        try {
             if (this.verifier == null) {
                 if (System.currentTimeMillis() < this.discoveryRetryAt) {
-                    throw new IOException("discovery failed recently");
+                    throw new IOException("fetching the keys failed recently");
                 }
                 try {
                     this.verifier = buildVerifier(keyResolver());
@@ -280,12 +288,14 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
                 }
             }
             return this.verifier;
+        } finally {
+            this.buildLock.unlock();
         }
     }
 
     private VerificationKeyResolver keyResolver() throws IOException, JoseException {
         String uri = this.jwksUri != null ? this.jwksUri : discoverJwksUri();
-        HttpsJwks jwks = new HttpsJwks(uri);
+        HttpsJwks jwks = new ThrottledHttpsJwks(uri, this.jwksRefreshIntervalMs);
         jwks.setSimpleHttpGet(httpGet());
         jwks.setRefreshReprieveThreshold(this.jwksRefreshIntervalMs);
         // keeps the keys if fetching them again fails when the cache expires
@@ -296,6 +306,41 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
             throw new JoseException("The key set of the issuer has no keys");
         }
         return new HttpsJwksVerificationKeyResolver(jwks);
+    }
+
+    /**
+     * The issuer's key set, fetched at most once per interval, whether the last fetch succeeded or
+     * not, and by one request at a time: other requests use the keys at hand meanwhile. jose4j's
+     * own reprieve only applies after a successful fetch of a non-empty set, so tokens with made-up
+     * key IDs could otherwise make requests wait for an unreachable issuer one after another.
+     */
+    static final class ThrottledHttpsJwks extends HttpsJwks {
+        private final long intervalMs;
+        private final ReentrantLock refreshLock = new ReentrantLock();
+        /** When the last fetch started (epoch milliseconds); 0 for never */
+        private long lastAttempt = 0;
+
+        ThrottledHttpsJwks(String location, long intervalMs) {
+            super(location);
+            this.intervalMs = intervalMs;
+        }
+
+        @Override
+        public void refresh() throws JoseException, IOException {
+            if (!this.refreshLock.tryLock()) {
+                return;
+            }
+            try {
+                long now = System.currentTimeMillis();
+                if (this.lastAttempt != 0 && now - this.lastAttempt < this.intervalMs) {
+                    return;
+                }
+                this.lastAttempt = now;
+                super.refresh();
+            } finally {
+                this.refreshLock.unlock();
+            }
+        }
     }
 
     /** HTTP client of the discovery and the key set, with short timeouts */

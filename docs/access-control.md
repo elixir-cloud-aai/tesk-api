@@ -279,8 +279,12 @@ Environment variable | Meaning | Default
 
 If the setting is on without an issuer or without a non-blank client ID, or
 with a negative leeway, TESK API doesn't start. The discovery document and
-the keys are fetched at the first service token, not at startup: while the
-issuer can't be reached, service tokens are refused.
+the keys are fetched at the first service token, not at startup, with
+timeouts of 5 seconds. Until that succeeds, service tokens are refused; after
+a failure (also a key set without keys), TESK API refuses them at once for 10
+seconds before it asks the issuer again, so a recovered issuer can take up to
+10 seconds to be used. Once fetched, the keys are kept for up to 15 minutes
+past their cache time if fetching them again fails.
 
 For example, [LS Login](https://lifescience-ri.eu/ls-login/) (issuer
 `https://login.aai.lifescience-ri.eu/oidc/`) issues access tokens of the
