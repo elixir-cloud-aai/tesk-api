@@ -9,7 +9,7 @@ Method | Path | Operation
 --- | --- | ---
 `GET` | `/service-info` | Information about the service
 `POST` | `/tasks` | Create a task
-`GET` | `/tasks` | List tasks (in pages, optionally only those whose names start with a prefix; see [Listing tasks](#listing-tasks))
+`GET` | `/tasks` | List tasks (in pages, optionally only those with a name prefix, a state or tags; see [Listing tasks](#listing-tasks))
 `GET` | `/tasks/{id}` | Get a task
 `POST` | `/tasks/{id}:cancel` | Cancel a task (answers with an empty object, `{}`)
 
@@ -36,9 +36,26 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
 - `name_prefix` lists only the tasks whose names start with it
   (case-sensitive); tasks without a name are left out. An empty `name_prefix`
   filters nothing.
+- `state` lists only the tasks in that state. It accepts every `tesState`
+  of TES 1.1, in capitals (e.g. `RUNNING`, also `CANCELING` and
+  `PREEMPTED`, which TESK API doesn't report yet, so they list no tasks);
+  other values are refused with `400 Bad Request`, and the message names
+  `state`. An empty `state` filters nothing.
+- `tag_key` and `tag_value` list only the tasks with these tags. Repeat
+  them for more tags (`?tag_key=WORKFLOW_ID&tag_value=cwl-01234&tag_key=LAB`):
+  the n-th `tag_value` belongs to the n-th `tag_key`. A task matches if it
+  has every key, with the same value (case-sensitive); a key without a
+  value, or with an empty one, matches any value of that key, also `""`. A
+  task without the key never matches. If a key is repeated, its last value
+  counts. Each parameter is one key or value, commas included. More
+  `tag_value`s than `tag_key`s are refused with `400 Bad Request`.
 
-The task names aren't Kubernetes labels, so Kubernetes can't select them:
-TESK API filters each page after reading it. Pages can therefore be shorter
+All filters combine: a task must match each of them, in every view.
+
+Task names, tags and states aren't Kubernetes labels, so Kubernetes can't
+select them: TESK API reads the tags from the task stored with the
+taskmaster's job and derives the state from all the task's jobs, so it
+filters each page after reading it. Pages can therefore be shorter
 than `page_size`, even empty, while `next_page_token` is still set; the same
 happens already to users who manage some of their groups and are only
 members of others, whose pages TESK API filters, too. The TES specification

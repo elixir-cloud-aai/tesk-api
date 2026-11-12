@@ -7,9 +7,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_JSON_INPUT_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_VALUE_TASKM;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kubernetes.client.openapi.models.V1Job;
@@ -18,7 +21,10 @@ import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ListMeta;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,11 +33,12 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.model.TesListTasksResponse;
+import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 
 /**
- * Listing tasks filters them by the prefix of their names, after Kubernetes has returned a page of
- * taskmaster jobs.
+ * Listing tasks filters them by the prefix of their names, their states and their tags, after
+ * Kubernetes has returned a page of taskmaster jobs.
  */
 class TesServiceImplListTest {
 
@@ -93,7 +100,8 @@ class TesServiceImplListTest {
     void filtersByNamePrefix() {
         this.defaultPage();
         TesListTasksResponse response =
-                this.service.listTasks("align", null, null, TaskView.MINIMAL, USER);
+                this.service.listTasks(
+                        TaskFilter.byNamePrefix("align"), null, null, TaskView.MINIMAL, USER);
         assertThat(ids(response)).containsExactly("task-1", "task-4");
     }
 
@@ -101,9 +109,23 @@ class TesServiceImplListTest {
     @Test
     void prefixIsCaseSensitiveAndMayBeTheWholeName() {
         this.defaultPage();
-        assertThat(ids(this.service.listTasks("Align", null, null, TaskView.MINIMAL, USER)))
+        assertThat(
+                        ids(
+                                this.service.listTasks(
+                                        TaskFilter.byNamePrefix("Align"),
+                                        null,
+                                        null,
+                                        TaskView.MINIMAL,
+                                        USER)))
                 .isEmpty();
-        assertThat(ids(this.service.listTasks("call-1", null, null, TaskView.MINIMAL, USER)))
+        assertThat(
+                        ids(
+                                this.service.listTasks(
+                                        TaskFilter.byNamePrefix("call-1"),
+                                        null,
+                                        null,
+                                        TaskView.MINIMAL,
+                                        USER)))
                 .containsExactly("task-2");
     }
 
@@ -111,9 +133,23 @@ class TesServiceImplListTest {
     @Test
     void noOrEmptyPrefixListsAllTasks() {
         this.defaultPage();
-        assertThat(ids(this.service.listTasks(null, null, null, TaskView.MINIMAL, USER)))
+        assertThat(
+                        ids(
+                                this.service.listTasks(
+                                        TaskFilter.byNamePrefix(null),
+                                        null,
+                                        null,
+                                        TaskView.MINIMAL,
+                                        USER)))
                 .containsExactly("task-1", "task-2", "task-3", "task-4");
-        assertThat(ids(this.service.listTasks("", null, null, TaskView.MINIMAL, USER)))
+        assertThat(
+                        ids(
+                                this.service.listTasks(
+                                        TaskFilter.byNamePrefix(""),
+                                        null,
+                                        null,
+                                        TaskView.MINIMAL,
+                                        USER)))
                 .containsExactly("task-1", "task-2", "task-3", "task-4");
     }
 
@@ -121,7 +157,14 @@ class TesServiceImplListTest {
     @Test
     void filtersBasicView() {
         this.defaultPage();
-        assertThat(ids(this.service.listTasks("call", null, null, TaskView.BASIC, USER)))
+        assertThat(
+                        ids(
+                                this.service.listTasks(
+                                        TaskFilter.byNamePrefix("call"),
+                                        null,
+                                        null,
+                                        TaskView.BASIC,
+                                        USER)))
                 .containsExactly("task-2");
     }
 
@@ -136,12 +179,14 @@ class TesServiceImplListTest {
         this.page("token-2", 2, null, taskmaster("task-3", "align-1"), taskmaster("task-4", "x"));
 
         TesListTasksResponse first =
-                this.service.listTasks("align", 2L, null, TaskView.MINIMAL, USER);
+                this.service.listTasks(
+                        TaskFilter.byNamePrefix("align"), 2L, null, TaskView.MINIMAL, USER);
         assertThat(ids(first)).isEmpty();
         assertThat(first.getNextPageToken()).isEqualTo("token-2");
 
         TesListTasksResponse second =
-                this.service.listTasks("align", 2L, "token-2", TaskView.MINIMAL, USER);
+                this.service.listTasks(
+                        TaskFilter.byNamePrefix("align"), 2L, "token-2", TaskView.MINIMAL, USER);
         assertThat(ids(second)).containsExactly("task-3");
         assertThat(second.getNextPageToken()).isNull();
     }
@@ -154,11 +199,146 @@ class TesServiceImplListTest {
     void emptyFilteredPageSkipsOtherLists() {
         this.page(null, 2, "token-2", taskmaster("task-1", "call-1"));
         TesListTasksResponse response =
-                this.service.listTasks("align", 2L, null, TaskView.BASIC, USER);
+                this.service.listTasks(
+                        TaskFilter.byNamePrefix("align"), 2L, null, TaskView.BASIC, USER);
         assertThat(ids(response)).isEmpty();
         assertThat(response.getNextPageToken()).isEqualTo("token-2");
         verify(this.client, never()).listAllTaskExecutorJobs();
         verify(this.client, never()).listAllFilerJobs();
         verify(this.client, never()).listAllJobPods();
+    }
+
+    /** The taskmaster job of a task stored with the job (annotation) as this JSON. */
+    private static V1Job stored(String id, String taskJson) {
+        V1Job job = taskmaster(id, null);
+        job.getMetadata().putAnnotationsItem(ANN_JSON_INPUT_KEY, taskJson);
+        return job;
+    }
+
+    private static Map<String, String> tags(String... keysAndValues) {
+        Map<String, String> tags = new HashMap<>();
+        for (int i = 0; i < keysAndValues.length; i += 2) {
+            tags.put(keysAndValues[i], keysAndValues[i + 1]);
+        }
+        return tags;
+    }
+
+    private List<String> listByTags(Map<String, String> tags, TaskView view) {
+        return ids(
+                this.service.listTasks(new TaskFilter(null, null, tags), null, null, view, USER));
+    }
+
+    private List<String> listByState(TesState state, TaskView view) {
+        return ids(
+                this.service.listTasks(new TaskFilter(null, state, null), null, null, view, USER));
+    }
+
+    /**
+     * Tags are read from the task stored with the taskmaster's job; tasks without tags, or whose
+     * stored task can't be read, match no tag filter (issue #143).
+     */
+    @Test
+    void filtersByTags() {
+        this.page(
+                null,
+                null,
+                null,
+                stored("task-1", "{\"tags\":{\"WORKFLOW_ID\":\"cwl-01234\",\"LAB\":\"alice\"}}"),
+                stored("task-2", "{\"tags\":{\"WORKFLOW_ID\":\"cwl-56789\"}}"),
+                stored("task-3", "{\"tags\":{\"WORKFLOW_ID\":\"\"}}"),
+                stored("task-4", "{\"executors\":[]}"),
+                stored("task-5", "not JSON"),
+                stored("task-6", "{\"tags\":[\"WORKFLOW_ID\"]}"),
+                taskmaster("task-7", "not stored"));
+
+        assertThat(listByTags(tags("WORKFLOW_ID", "cwl-01234"), TaskView.MINIMAL))
+                .containsExactly("task-1");
+        assertThat(listByTags(tags("WORKFLOW_ID", ""), TaskView.MINIMAL))
+                .containsExactly("task-1", "task-2", "task-3");
+        assertThat(listByTags(tags("WORKFLOW_ID", "cwl-01234", "LAB", "alice"), TaskView.BASIC))
+                .containsExactly("task-1");
+        assertThat(listByTags(tags("WORKFLOW_ID", "cwl-01234", "LAB", "bob"), TaskView.FULL))
+                .isEmpty();
+        assertThat(listByTags(Collections.emptyMap(), TaskView.MINIMAL))
+                .containsExactly(
+                        "task-1", "task-2", "task-3", "task-4", "task-5", "task-6", "task-7");
+    }
+
+    /** Only tasks in the requested state are listed, in all views (issue #143). */
+    @Test
+    void filtersByState() {
+        V1Job cancelled = taskmaster("task-2", "b");
+        cancelled.getMetadata().putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
+        this.page(
+                null, null, null, taskmaster("task-1", "a"), cancelled, taskmaster("task-3", "c"));
+
+        for (TaskView view : TaskView.values()) {
+            assertThat(listByState(TesState.INITIALIZING, view))
+                    .containsExactly("task-1", "task-3");
+            assertThat(listByState(TesState.CANCELED, view)).containsExactly("task-2");
+            assertThat(listByState(TesState.COMPLETE, view)).isEmpty();
+        }
+    }
+
+    /** All filters must match, and a filtered page keeps the next page's token (issue #143). */
+    @Test
+    void combinesFiltersAndKeepsNextPageToken() {
+        V1Job cancelled = stored("task-2", "{\"tags\":{\"foo\":\"bar\"}}");
+        cancelled.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, "align-2");
+        cancelled.getMetadata().putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
+        V1Job running = stored("task-1", "{\"tags\":{\"foo\":\"bar\"}}");
+        running.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, "align-1");
+        V1Job otherName = stored("task-3", "{\"tags\":{\"foo\":\"bar\"}}");
+        otherName.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, "call-3");
+        otherName.getMetadata().putLabelsItem(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
+        this.page(null, 3, "token-2", running, cancelled, otherName);
+
+        TesListTasksResponse response =
+                this.service.listTasks(
+                        new TaskFilter("align", TesState.CANCELED, tags("foo", "bar")),
+                        3L,
+                        null,
+                        TaskView.MINIMAL,
+                        USER);
+        assertThat(ids(response)).containsExactly("task-2");
+        assertThat(response.getNextPageToken()).isEqualTo("token-2");
+    }
+
+    /**
+     * If the tags rule out every task of the page, the other jobs and the pods aren't listed (issue
+     * #143).
+     */
+    @Test
+    void tagFilterSparesOtherLists() {
+        this.page(null, 2, "token-2", stored("task-1", "{\"tags\":{\"foo\":\"bar\"}}"));
+
+        TesListTasksResponse response =
+                this.service.listTasks(
+                        new TaskFilter(null, null, tags("foo", "baz")),
+                        2L,
+                        null,
+                        TaskView.BASIC,
+                        USER);
+        assertThat(ids(response)).isEmpty();
+        assertThat(response.getNextPageToken()).isEqualTo("token-2");
+        verify(this.client, never()).listAllTaskExecutorJobs();
+        verify(this.client, never()).listAllFilerJobs();
+        verify(this.client, never()).listAllJobPods();
+    }
+
+    /** A state filter that matches no task of the page gives an empty page (issue #143). */
+    @Test
+    void stateFilterCanGiveEmptyPage() {
+        this.page(null, 2, "token-2", taskmaster("task-1", "a"));
+
+        TesListTasksResponse response =
+                this.service.listTasks(
+                        new TaskFilter(null, TesState.COMPLETE, null),
+                        2L,
+                        null,
+                        TaskView.FULL,
+                        USER);
+        assertThat(ids(response)).isEmpty();
+        assertThat(response.getNextPageToken()).isEqualTo("token-2");
     }
 }

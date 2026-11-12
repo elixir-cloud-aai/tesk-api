@@ -48,8 +48,8 @@ public interface TesService {
      * executors, all pods), combines them together into valid {@link Task} objects and converts to
      * result with means of the converter.
      *
-     * @param namePrefix - only tasks whose names start with it (case-sensitive); all tasks if null
-     *     or empty
+     * @param filter - only tasks that match it (name prefix, state and tags; see {@link
+     *     TaskFilter}); {@link TaskFilter#NONE} for all tasks
      * @param pageSize - maximum number of taskmaster jobs read for the page; all if null
      * @param pageToken - continue token of Kubernetes, from the previous page's next_page_token
      * @param view - one of {@link TaskView} values, decides on how much detail is put in each
@@ -58,7 +58,7 @@ public interface TesService {
      */
     @PreAuthorize("#user.teskAdmin OR #user.manager OR #user.member OR #user.claimAuthorised")
     TesListTasksResponse listTasks(
-            String namePrefix, Long pageSize, String pageToken, TaskView view, User user);
+            TaskFilter filter, Long pageSize, String pageToken, TaskView view, User user);
 
     /**
      * Cancels a task with a given id, by setting a label to taskmaster Job and Pod object. If not
