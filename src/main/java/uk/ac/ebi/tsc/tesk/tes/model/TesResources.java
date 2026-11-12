@@ -146,6 +146,46 @@ public class TesResources   {
     this.diskGb = diskGb;
   }
 
+  public TesResources backendParameters(Map<String, String> backendParameters) {
+    this.backendParameters = backendParameters;
+    return this;
+  }
+
+  /**
+   * Key-value pairs for the backend; TESK supports no keys, so it doesn't store them
+   * @return backendParameters
+  */
+  @ApiModelProperty(value = "Key-value pairs for the backend. TESK supports no keys: it ignores them, logs a warning naming them, and neither stores nor returns them.")
+
+
+  public Map<String, String> getBackendParameters() {
+    return backendParameters;
+  }
+
+  public void setBackendParameters(Map<String, String> backendParameters) {
+    this.backendParameters = backendParameters;
+  }
+
+  public TesResources backendParametersStrict(Boolean backendParametersStrict) {
+    this.backendParametersStrict = backendParametersStrict;
+    return this;
+  }
+
+  /**
+   * Whether the task must be refused if the backend doesn't support all its backend parameters
+   * @return backendParametersStrict
+  */
+  @ApiModelProperty(value = "Whether the task must be refused if the backend doesn't support all of its backend_parameters.")
+
+
+  public Boolean getBackendParametersStrict() {
+    return backendParametersStrict;
+  }
+
+  public void setBackendParametersStrict(Boolean backendParametersStrict) {
+    this.backendParametersStrict = backendParametersStrict;
+  }
+
   /**
    * TESK uses no backend parameters, so it refuses tasks that need them
    * (`backend_parameters_strict`), as TES 1.1 asks; without it, they are ignored.
@@ -201,12 +241,14 @@ public class TesResources   {
         Objects.equals(this.preemptible, tesResources.preemptible) &&
         Objects.equals(this.ramGb, tesResources.ramGb) &&
         Objects.equals(this.diskGb, tesResources.diskGb) &&
-        Objects.equals(this.zones, tesResources.zones);
+        Objects.equals(this.zones, tesResources.zones) &&
+        Objects.equals(this.backendParameters, tesResources.backendParameters) &&
+        Objects.equals(this.backendParametersStrict, tesResources.backendParametersStrict);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(cpuCores, preemptible, ramGb, diskGb, zones);
+    return Objects.hash(cpuCores, preemptible, ramGb, diskGb, zones, backendParameters, backendParametersStrict);
   }
 
   @Override
@@ -219,6 +261,8 @@ public class TesResources   {
     sb.append("    ramGb: ").append(toIndentedString(ramGb)).append("\n");
     sb.append("    diskGb: ").append(toIndentedString(diskGb)).append("\n");
     sb.append("    zones: ").append(toIndentedString(zones)).append("\n");
+    sb.append("    backendParameters: ").append(toIndentedString(backendParameters)).append("\n");
+    sb.append("    backendParametersStrict: ").append(toIndentedString(backendParametersStrict)).append("\n");
     sb.append("}");
     return sb.toString();
   }

@@ -1,0 +1,4 @@
+name: example application
+tesResources_backend_parameters:
+- VmSize
+- Queue
