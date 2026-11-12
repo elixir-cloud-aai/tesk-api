@@ -275,6 +275,10 @@ public class TasksApiControllerTest {
                     },
                     new String[] {
                         "path_prefix_below_pattern.json", "part of path before its first wildcard"
+                    },
+                    new String[] {
+                        "wildcards_without_path_prefix.json",
+                        "outputs[0].pathPrefixGivenForPattern' path_prefix is required"
                     }
                 };
         for (String[] file : files) {
@@ -473,6 +477,24 @@ public class TasksApiControllerTest {
                                 .content(
                                         getFileContentFromResources(
                                                 "valid_tasks/tes_1_1_fields.json"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+    }
+
+    /**
+     * Outputs with wildcards to file: URLs, or URLs without a scheme, still need no path_prefix, as
+     * in TES 1.0 (issue #148)
+     */
+    @Test
+    public void createTask_valid_fileWildcardsWithoutPathPrefix() throws Exception {
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(
+                                        getFileContentFromResources(
+                                                "valid_tasks/file_wildcards_without_path_prefix.json"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());

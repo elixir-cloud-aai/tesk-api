@@ -94,10 +94,14 @@ TESK accepts the fields that TES 1.1 added to tasks:
   its first wildcard or a directory above it (`/data` or `/` for
   `/data/*/out.bam`, not `/data/s1`); `path` must have no wildcards in its
   first component (`/*.bam` is refused), as the output is mounted at that
-  part. Both are refused with `400 Bad Request`. Without `path_prefix`,
-  outputs are taken as before: wildcards are expanded for `file:` URLs
-  only. This needs a
-  taskmaster and filer that support it (see
+  part. Both are refused with `400 Bad Request`. TES 1.1 requires
+  `path_prefix` for a `path` with wildcards: without it, outputs to other
+  URLs than `file:` ones are refused with `400 Bad Request` (they would
+  take the pattern as a file name and fail after the executors ran).
+  Outputs to `file:` URLs, and to URLs without a scheme, which the filer
+  takes as `file:`, keep TES 1.0's behaviour without `path_prefix`: the
+  matches are copied into the URL's directory. This needs a taskmaster and
+  filer that support it (see
   [tesk-core#134](https://github.com/elixir-cloud-aai/tesk-core/pull/134)).
 - `inputs[].type` and `outputs[].type`: optional, as in TES 1.1. Left out
   or `null`, the type is `FILE`; directories still need `type: DIRECTORY`,

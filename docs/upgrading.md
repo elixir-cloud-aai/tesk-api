@@ -1,5 +1,17 @@
 # Upgrading
 
+## To the next release
+
+From 1.2.0, clients may notice changed answers:
+
+- **Wildcards without `path_prefix`.** An output whose `path` has wildcards
+  (`*`, `?`, `[`) but no `path_prefix` is refused with `400 Bad Request`,
+  unless its `url` is a `file:` URL or has no scheme, as TES 1.1 requires
+  `path_prefix` for such outputs (see [TES 1.1 fields](api.md#tes-11-fields)).
+  Before, such a task ran, and its output then failed or uploaded nothing
+  useful. Clients that send such outputs to other URLs set `path_prefix`,
+  e.g. to the part of `path` before its first wildcard.
+
 ## To 1.2.0
 
 From 1.1.0, deployments may have to change their configuration, the rights
