@@ -126,10 +126,11 @@ public class TesOutput   {
   /**
    * Prefix to be removed from matching outputs if `path` contains wildcards (TES 1.1); output URLs
    * are constructed by appending pruned paths to the directory specified in `url`. Required for a
-   * `path` with wildcards, except for `file:` URLs, which are expanded as before (TES 1.0).
+   * `path` with wildcards, except for `file:` URLs and URLs without a scheme, which are expanded as
+   * before (TES 1.0).
    * @return pathPrefix
   */
-  @ApiModelProperty(example = "/data", value = "Prefix to be removed from matching outputs if `path` contains wildcards; output URLs are constructed by appending pruned paths to the directory specified in `url`. Required if `path` has wildcards, unless `url` is a `file:` URL; ignored if `path` has no wildcards.")
+  @ApiModelProperty(example = "/data", value = "Prefix to be removed from matching outputs if `path` contains wildcards; output URLs are constructed by appending pruned paths to the directory specified in `url`. Required if `path` has wildcards, unless `url` is a `file:` URL or has no scheme; ignored if `path` has no wildcards.")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
   public String getPathPrefix() {
     return pathPrefix;
@@ -200,7 +201,8 @@ public class TesOutput   {
   }
 
   private static boolean hasWildcards(String path) {
-    return path.matches(".*[*?\\[].*");
+    // a scan, not a match: `.` would stop at line breaks
+    return path.chars().anyMatch(c -> c == '*' || c == '?' || c == '[');
   }
 
   private boolean isPattern() {

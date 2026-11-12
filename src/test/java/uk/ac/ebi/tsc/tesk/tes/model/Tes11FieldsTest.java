@@ -150,7 +150,7 @@ public class Tes11FieldsTest {
     }
 
     private static final String[] WILDCARD_PATHS = {
-        "/data/out*.txt", "/data/out?.txt", "/data/out[12].txt"
+        "/data/out*.txt", "/data/out?.txt", "/data/out[12].txt", "/data/a\nb*.txt"
     };
 
     private static final String[] OTHER_URLS = {
