@@ -2,11 +2,13 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.entry;
+import static uk.ac.ebi.tsc.tesk.tes.service.TaskFilter.tag;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidTagFilterException;
@@ -15,7 +17,17 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 /** The filters of {@code GET /tasks} (issue #143). */
 class TaskFilterTest {
 
-    private static Map<String, String> tags(String... keysAndValues) {
+    /** Tags of a filter: key, value, key, value, ... */
+    static List<Map.Entry<String, String>> filterTags(String... keysAndValues) {
+        List<Map.Entry<String, String>> tags = new ArrayList<>();
+        for (int i = 0; i < keysAndValues.length; i += 2) {
+            tags.add(tag(keysAndValues[i], keysAndValues[i + 1]));
+        }
+        return tags;
+    }
+
+    /** Tags of a task: key, value, key, value, ... */
+    private static Map<String, String> taskTags(String... keysAndValues) {
         Map<String, String> tags = new HashMap<>();
         for (int i = 0; i < keysAndValues.length; i += 2) {
             tags.put(keysAndValues[i], keysAndValues[i + 1]);
@@ -23,38 +35,56 @@ class TaskFilterTest {
         return tags;
     }
 
-    private static boolean matches(Map<String, String> filterTags, Map<String, String> taskTags) {
+    private static boolean matches(
+            List<Map.Entry<String, String>> filterTags, Map<String, String> taskTags) {
         return new TaskFilter(null, null, filterTags).matchesTags(taskTags);
     }
 
     /** The table of tag filters and task tags of the TES 1.1 specification ({@code tag_key}). */
     @Test
     void tagsMatchAsInTheSpecification() {
-        assertThat(matches(tags("foo", "bar"), tags("foo", "bar"))).isTrue();
-        assertThat(matches(tags("foo", "bar"), tags("foo", "bat"))).isFalse();
-        assertThat(matches(tags("foo", ""), tags("foo", ""))).isTrue();
-        assertThat(matches(tags("foo", "bar", "baz", "bat"), tags("foo", "bar", "baz", "bat")))
+        assertThat(matches(filterTags("foo", "bar"), taskTags("foo", "bar"))).isTrue();
+        assertThat(matches(filterTags("foo", "bar"), taskTags("foo", "bat"))).isFalse();
+        assertThat(matches(filterTags("foo", ""), taskTags("foo", ""))).isTrue();
+        assertThat(
+                        matches(
+                                filterTags("foo", "bar", "baz", "bat"),
+                                taskTags("foo", "bar", "baz", "bat")))
                 .isTrue();
-        assertThat(matches(tags("foo", "bar"), tags("foo", "bar", "baz", "bat"))).isTrue();
-        assertThat(matches(tags("foo", "bar", "baz", "bat"), tags("foo", "bar"))).isFalse();
-        assertThat(matches(tags("foo", ""), tags("foo", "bar"))).isTrue();
-        assertThat(matches(tags("foo", ""), tags())).isFalse();
+        assertThat(matches(filterTags("foo", "bar"), taskTags("foo", "bar", "baz", "bat")))
+                .isTrue();
+        assertThat(matches(filterTags("foo", "bar", "baz", "bat"), taskTags("foo", "bar")))
+                .isFalse();
+        assertThat(matches(filterTags("foo", ""), taskTags("foo", "bar"))).isTrue();
+        assertThat(matches(filterTags("foo", ""), taskTags())).isFalse();
     }
 
     /** A task without tags matches only a filter without tags. */
     @Test
     void taskWithoutTags() {
-        assertThat(matches(tags(), null)).isTrue();
-        assertThat(matches(tags("foo", ""), null)).isFalse();
+        assertThat(matches(filterTags(), null)).isTrue();
+        assertThat(matches(filterTags("foo", ""), null)).isFalse();
         assertThat(TaskFilter.NONE.matchesTags(null)).isTrue();
     }
 
-    /** Values are compared exactly: case-sensitive, a null tag value is no match for "bar". */
+    /**
+     * Values are compared exactly: case-sensitive; a tag whose value is null matches only an empty
+     * filter value.
+     */
     @Test
     void tagValuesAreComparedExactly() {
-        assertThat(matches(tags("foo", "bar"), tags("foo", "Bar"))).isFalse();
-        assertThat(matches(tags("foo", "bar"), tags("foo", null))).isFalse();
-        assertThat(matches(tags("foo", ""), tags("foo", null))).isTrue();
+        assertThat(matches(filterTags("foo", "bar"), taskTags("foo", "Bar"))).isFalse();
+        assertThat(matches(filterTags("foo", "bar"), taskTags("foo", null))).isFalse();
+        assertThat(matches(filterTags("foo", ""), taskTags("foo", null))).isTrue();
+    }
+
+    /** Every tag of the filter must match, also those of a repeated key. */
+    @Test
+    void repeatedKeyMustMatchEveryValue() {
+        assertThat(matches(filterTags("foo", "bar", "foo", "baz"), taskTags("foo", "bar")))
+                .isFalse();
+        assertThat(matches(filterTags("foo", "bar", "foo", ""), taskTags("foo", "bar"))).isTrue();
+        assertThat(matches(filterTags("foo", "bar", "foo", ""), taskTags("foo", "baz"))).isFalse();
     }
 
     /** Values belong to the keys in order; keys without one match any value. */
@@ -64,17 +94,35 @@ class TaskFilterTest {
                         TaskFilter.zipTags(
                                 Arrays.asList("WORKFLOW_ID", "PROJECT"),
                                 Collections.singletonList("cwl-01234")))
-                .containsExactly(entry("WORKFLOW_ID", "cwl-01234"), entry("PROJECT", ""));
+                .containsExactly(tag("WORKFLOW_ID", "cwl-01234"), tag("PROJECT", ""));
         assertThat(TaskFilter.zipTags(Collections.singletonList("foo"), null))
-                .containsExactly(entry("foo", ""));
+                .containsExactly(tag("foo", ""));
         assertThat(TaskFilter.zipTags(null, null)).isEmpty();
     }
 
-    /** A repeated key keeps its last value, as in a map. */
+    /** A repeated key stays a tag of its own. */
     @Test
-    void zipTagsLastValueOfARepeatedKeyCounts() {
+    void zipTagsKeepsRepeatedKeys() {
         assertThat(TaskFilter.zipTags(Arrays.asList("foo", "foo"), Arrays.asList("bar", "baz")))
-                .containsExactly(entry("foo", "baz"));
+                .containsExactly(tag("foo", "bar"), tag("foo", "baz"));
+        assertThat(
+                        TaskFilter.zipTags(
+                                Arrays.asList("foo", "foo"), Collections.singletonList("bar")))
+                .containsExactly(tag("foo", "bar"), tag("foo", ""));
+    }
+
+    /**
+     * Empty keys filter nothing, like an empty name_prefix or state, and neither do empty values
+     * beyond the keys.
+     */
+    @Test
+    void zipTagsIgnoresEmptyParameters() {
+        assertThat(TaskFilter.zipTags(Collections.singletonList(""), null)).isEmpty();
+        assertThat(TaskFilter.zipTags(Arrays.asList("", "foo"), Arrays.asList("ignored", "bar")))
+                .containsExactly(tag("foo", "bar"));
+        assertThat(TaskFilter.zipTags(null, Collections.singletonList(""))).isEmpty();
+        assertThat(TaskFilter.zipTags(Collections.singletonList("foo"), Arrays.asList("bar", "")))
+                .containsExactly(tag("foo", "bar"));
     }
 
     /** More values than keys are refused. */
@@ -95,8 +143,10 @@ class TaskFilterTest {
     /** Without a state, every state matches; with one, only that state. */
     @Test
     void matchesState() {
+        assertThat(TaskFilter.NONE.hasState()).isFalse();
         assertThat(TaskFilter.NONE.matchesState(TesState.RUNNING)).isTrue();
         TaskFilter running = new TaskFilter(null, TesState.RUNNING, null);
+        assertThat(running.hasState()).isTrue();
         assertThat(running.matchesState(TesState.RUNNING)).isTrue();
         assertThat(running.matchesState(TesState.QUEUED)).isFalse();
     }

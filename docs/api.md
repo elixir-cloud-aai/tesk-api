@@ -46,9 +46,12 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
   the n-th `tag_value` belongs to the n-th `tag_key`. A task matches if it
   has every key, with the same value (case-sensitive); a key without a
   value, or with an empty one, matches any value of that key, also `""`. A
-  task without the key never matches. If a key is repeated, its last value
-  counts. Each parameter is one key or value, commas included. More
-  `tag_value`s than `tag_key`s are refused with `400 Bad Request`.
+  task without the key never matches. A repeated key is one more tag that
+  must match, so `foo=bar` and `foo=baz` together match no task. Each
+  parameter is one key or value, commas included. An empty `tag_key`
+  filters nothing (its `tag_value` is ignored). More `tag_value`s than
+  `tag_key`s are refused with `400 Bad Request`, unless the extra ones are
+  empty.
 
 All filters combine: a task must match each of them, in every view.
 

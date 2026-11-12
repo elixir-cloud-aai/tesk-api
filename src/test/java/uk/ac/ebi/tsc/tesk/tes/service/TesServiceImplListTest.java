@@ -22,7 +22,6 @@ import io.kubernetes.client.openapi.models.V1ListMeta;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -215,15 +214,11 @@ class TesServiceImplListTest {
         return job;
     }
 
-    private static Map<String, String> tags(String... keysAndValues) {
-        Map<String, String> tags = new HashMap<>();
-        for (int i = 0; i < keysAndValues.length; i += 2) {
-            tags.put(keysAndValues[i], keysAndValues[i + 1]);
-        }
-        return tags;
+    private static List<Map.Entry<String, String>> tags(String... keysAndValues) {
+        return TaskFilterTest.filterTags(keysAndValues);
     }
 
-    private List<String> listByTags(Map<String, String> tags, TaskView view) {
+    private List<String> listByTags(List<Map.Entry<String, String>> tags, TaskView view) {
         return ids(
                 this.service.listTasks(new TaskFilter(null, null, tags), null, null, view, USER));
     }
@@ -249,19 +244,26 @@ class TesServiceImplListTest {
                 stored("task-4", "{\"executors\":[]}"),
                 stored("task-5", "not JSON"),
                 stored("task-6", "{\"tags\":[\"WORKFLOW_ID\"]}"),
-                taskmaster("task-7", "not stored"));
+                taskmaster("task-7", "not stored"),
+                stored("task-8", "{\"tags\":{\"WORKFLOW_ID\":null}}"));
 
         assertThat(listByTags(tags("WORKFLOW_ID", "cwl-01234"), TaskView.MINIMAL))
                 .containsExactly("task-1");
         assertThat(listByTags(tags("WORKFLOW_ID", ""), TaskView.MINIMAL))
-                .containsExactly("task-1", "task-2", "task-3");
+                .containsExactly("task-1", "task-2", "task-3", "task-8");
         assertThat(listByTags(tags("WORKFLOW_ID", "cwl-01234", "LAB", "alice"), TaskView.BASIC))
                 .containsExactly("task-1");
         assertThat(listByTags(tags("WORKFLOW_ID", "cwl-01234", "LAB", "bob"), TaskView.FULL))
                 .isEmpty();
-        assertThat(listByTags(Collections.emptyMap(), TaskView.MINIMAL))
+        assertThat(
+                        listByTags(
+                                tags("WORKFLOW_ID", "cwl-01234", "WORKFLOW_ID", "cwl-56789"),
+                                TaskView.MINIMAL))
+                .isEmpty();
+        assertThat(listByTags(Collections.emptyList(), TaskView.MINIMAL))
                 .containsExactly(
-                        "task-1", "task-2", "task-3", "task-4", "task-5", "task-6", "task-7");
+                        "task-1", "task-2", "task-3", "task-4", "task-5", "task-6", "task-7",
+                        "task-8");
     }
 
     /** Only tasks in the requested state are listed, in all views (issue #143). */

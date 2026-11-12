@@ -1,14 +1,11 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_JSON_INPUT_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_JOB_TYPE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_VERSION;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobList;
@@ -16,12 +13,9 @@ import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1Secret;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -48,9 +42,6 @@ import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 public class TesServiceImpl implements TesService {
 
     private static Logger logger = LoggerFactory.getLogger(TesServiceImpl.class);
-
-    /** Reads the tags of the tasks stored with their taskmaster jobs, for listTasks' filter. */
-    private static final ObjectMapper TAGS_READER = new ObjectMapper();
 
     private final KubernetesClientWrapper kubernetesClientWrapper;
 
@@ -284,7 +275,11 @@ public class TesServiceImpl implements TesService {
         List<V1Job> matchingTaskmasterJobs =
                 taskmasterJobs.getItems().stream()
                         .filter(job -> filter.matchesName(taskName(job)))
-                        .filter(job -> !filter.hasTags() || filter.matchesTags(taskTags(job)))
+                        .filter(
+                                job ->
+                                        !filter.hasTags()
+                                                || filter.matchesTags(
+                                                        this.converter.extractTags(job)))
                         .collect(Collectors.toList());
         if (matchingTaskmasterJobs.isEmpty()) {
             // nothing to combine: spare the lists of all executors, filers and pods
@@ -303,7 +298,7 @@ public class TesServiceImpl implements TesService {
                 taskListBuilder.getTaskList().stream()
                         .filter(
                                 task ->
-                                        filter.getState() == null
+                                        !filter.hasState()
                                                 || filter.matchesState(
                                                         this.converter.extractStateFromK8sJobs(
                                                                 task)))
@@ -317,48 +312,6 @@ public class TesServiceImpl implements TesService {
         return Optional.ofNullable(taskmasterJob.getMetadata().getAnnotations())
                 .map(annotations -> annotations.get(ANN_TESTASK_NAME_KEY))
                 .orElse(null);
-    }
-
-    /**
-     * The tags of the task stored with a taskmaster job (annotation {@code json-input}), or null if
-     * the task has none, or isn't stored or can't be read. A tag whose value is JSON null has the
-     * value null.
-     */
-    private static Map<String, String> taskTags(V1Job taskmasterJob) {
-        String inputJson =
-                Optional.ofNullable(taskmasterJob.getMetadata().getAnnotations())
-                        .map(annotations -> annotations.get(ANN_JSON_INPUT_KEY))
-                        .orElse(null);
-        if (inputJson == null) {
-            return null;
-        }
-        try {
-            // readTree gives null or a missing node for empty input, depending on the Jackson
-            // version
-            JsonNode tags =
-                    Optional.ofNullable(TAGS_READER.readTree(inputJson))
-                            .map(tree -> tree.get("tags"))
-                            .orElse(null);
-            if (tags == null || !tags.isObject()) {
-                return null;
-            }
-            Map<String, String> result = new HashMap<>();
-            tags.fields()
-                    .forEachRemaining(
-                            tag ->
-                                    result.put(
-                                            tag.getKey(),
-                                            tag.getValue().isNull()
-                                                    ? null
-                                                    : tag.getValue().asText()));
-            return result;
-        } catch (IOException e) {
-            logger.info(
-                    "Reading the tags of task {} from JSON failed; {}",
-                    taskmasterJob.getMetadata().getName(),
-                    e.getMessage());
-            return null;
-        }
     }
 
     /**

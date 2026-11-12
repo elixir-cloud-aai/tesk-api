@@ -1,7 +1,8 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
+import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Value;
@@ -25,18 +26,18 @@ public class TaskFilter {
     TesState state;
 
     /**
-     * Tags the task must have: an empty value matches any value of the key, also an empty one.
-     * Never null.
+     * Tags (key and value) the task must all have: an empty value matches any value of the key,
+     * also an empty one. Never null.
      */
-    Map<String, String> tags;
+    List<Map.Entry<String, String>> tags;
 
-    public TaskFilter(String namePrefix, TesState state, Map<String, String> tags) {
+    public TaskFilter(String namePrefix, TesState state, List<Map.Entry<String, String>> tags) {
         this.namePrefix = namePrefix;
         this.state = state;
         this.tags =
                 tags == null
-                        ? Collections.emptyMap()
-                        : Collections.unmodifiableMap(new LinkedHashMap<>(tags));
+                        ? Collections.emptyList()
+                        : Collections.unmodifiableList(new ArrayList<>(tags));
     }
 
     /** A filter by the prefix of the task's name only. */
@@ -44,26 +45,40 @@ public class TaskFilter {
         return new TaskFilter(namePrefix, null, null);
     }
 
+    /** A tag of a filter. */
+    public static Map.Entry<String, String> tag(String key, String value) {
+        return new SimpleImmutableEntry<>(key, value);
+    }
+
     /**
      * Zips the {@code tag_key} and {@code tag_value} parameters into the tags of a filter, as the
      * TES specification asks: the n-th value belongs to the n-th key; keys without a value match
-     * any value. If a key repeats, its last value counts.
+     * any value. A repeated key is one more tag the task must have, so {@code foo=bar} and {@code
+     * foo=baz} match no task. Empty keys filter nothing (as an empty {@code name_prefix} or {@code
+     * state}), and neither do empty values beyond the keys.
      *
      * @param tagKeys - the keys; null or empty for no tag filter
      * @param tagValues - the values; null or empty for any value of every key
      * @return the tags, in the order of the keys
-     * @throws InvalidTagFilterException if there are more values than keys
+     * @throws InvalidTagFilterException if there are more values than keys, other than empty ones
      */
-    public static Map<String, String> zipTags(List<String> tagKeys, List<String> tagValues) {
-        int keyCount = tagKeys == null ? 0 : tagKeys.size();
-        int valueCount = tagValues == null ? 0 : tagValues.size();
-        if (valueCount > keyCount) {
-            throw new InvalidTagFilterException();
+    public static List<Map.Entry<String, String>> zipTags(
+            List<String> tagKeys, List<String> tagValues) {
+        List<String> keys = tagKeys == null ? Collections.emptyList() : tagKeys;
+        List<String> values = tagValues == null ? Collections.emptyList() : tagValues;
+        for (int i = keys.size(); i < values.size(); i++) {
+            if (values.get(i) != null && !values.get(i).isEmpty()) {
+                throw new InvalidTagFilterException();
+            }
         }
-        Map<String, String> tags = new LinkedHashMap<>();
-        for (int i = 0; i < keyCount; i++) {
-            String value = i < valueCount ? tagValues.get(i) : null;
-            tags.put(tagKeys.get(i), value == null ? "" : value);
+        List<Map.Entry<String, String>> tags = new ArrayList<>();
+        for (int i = 0; i < keys.size(); i++) {
+            String key = keys.get(i);
+            if (key == null || key.isEmpty()) {
+                continue;
+            }
+            String value = i < values.size() ? values.get(i) : null;
+            tags.add(tag(key, value == null ? "" : value));
         }
         return tags;
     }
@@ -90,7 +105,7 @@ public class TaskFilter {
      * filter has none.
      */
     public boolean matchesTags(Map<String, String> taskTags) {
-        for (Map.Entry<String, String> tag : this.tags.entrySet()) {
+        for (Map.Entry<String, String> tag : this.tags) {
             if (taskTags == null || !taskTags.containsKey(tag.getKey())) {
                 return false;
             }
@@ -99,6 +114,11 @@ public class TaskFilter {
             }
         }
         return true;
+    }
+
+    /** Whether the filter needs the tasks' states. */
+    public boolean hasState() {
+        return this.state != null;
     }
 
     /** Whether the filter needs the tasks' tags. */

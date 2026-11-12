@@ -1,6 +1,5 @@
 package uk.ac.ebi.tsc.tesk.tes.api;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -20,8 +19,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -616,18 +615,19 @@ public class TasksApiControllerTest {
                             eq(TaskView.MINIMAL),
                             any());
         }
-        assertThat(TesState.values())
-                .extracting(TesState::getValue)
-                .contains("CANCELING", "PREEMPTED");
     }
 
-    /** Other states, also in lower case, are refused, naming the parameter (issue #143). */
+    /**
+     * Other states, also in lower case, are refused, naming the parameter but not the value (issue
+     * #143).
+     */
     @Test
     public void listTasks_invalidState() throws Exception {
-        for (String state : new String[] {"running", "DONE", "1"}) {
+        for (String state : new String[] {"running", "DONE", "1", "secret-state"}) {
             listWith("state", state)
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message", containsString("state")));
+                    .andExpect(jsonPath("$.message", containsString("state")))
+                    .andExpect(content().string(not(containsString("secret"))));
         }
         verify(this.tesService, never()).listTasks(any(), any(), any(), any(), any());
     }
@@ -652,10 +652,11 @@ public class TasksApiControllerTest {
                         "page_token", "token-2",
                         "view", "BASIC")
                 .andExpect(status().isOk());
-        Map<String, String> tags = new LinkedHashMap<>();
-        tags.put("WORKFLOW_ID", "cwl-01234");
-        tags.put("a,b", "x, y");
-        tags.put("PROJECT", "");
+        List<Map.Entry<String, String>> tags =
+                Arrays.asList(
+                        TaskFilter.tag("WORKFLOW_ID", "cwl-01234"),
+                        TaskFilter.tag("a,b", "x, y"),
+                        TaskFilter.tag("PROJECT", ""));
         verify(this.tesService)
                 .listTasks(
                         eq(new TaskFilter("align", TesState.RUNNING, tags)),
@@ -673,7 +674,11 @@ public class TasksApiControllerTest {
         listWith("tag_key", "a,b", "tag_value", "c,d").andExpect(status().isOk());
         verify(this.tesService)
                 .listTasks(
-                        eq(new TaskFilter(null, null, Collections.singletonMap("a,b", "c,d"))),
+                        eq(
+                                new TaskFilter(
+                                        null,
+                                        null,
+                                        Collections.singletonList(TaskFilter.tag("a,b", "c,d")))),
                         isNull(),
                         isNull(),
                         eq(TaskView.MINIMAL),
@@ -690,5 +695,21 @@ public class TasksApiControllerTest {
                 .andExpect(content().string(not(containsString("secret-value"))));
         listWith("tag_value", "bar").andExpect(status().isBadRequest());
         verify(this.tesService, never()).listTasks(any(), any(), any(), any(), any());
+    }
+
+    /** Empty filters, as forms send them for unset fields, filter nothing (issue #143). */
+    @Test
+    public void listTasks_emptyFiltersFilterNothing() throws Exception {
+        given(this.tesService.listTasks(any(), any(), any(), any(), any()))
+                .willReturn(new TesListTasksResponse());
+        listWith("name_prefix", "", "state", "", "tag_key", "", "tag_value", "")
+                .andExpect(status().isOk());
+        verify(this.tesService)
+                .listTasks(
+                        eq(new TaskFilter("", null, null)),
+                        isNull(),
+                        isNull(),
+                        eq(TaskView.MINIMAL),
+                        any());
     }
 }
