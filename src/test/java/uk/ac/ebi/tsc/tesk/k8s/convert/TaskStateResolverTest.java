@@ -587,16 +587,19 @@ class TaskStateResolverTest {
     }
 
     /**
-     * A pod that is still listed after its deletion time (e.g. on a node that is gone) has ended;
-     * one within its grace period hasn't (issue #144).
+     * A pod that is still listed a minute after its deletion time (e.g. on a node that is gone) has
+     * ended; one within its grace period, or just after it, hasn't (issue #144).
      */
     @Test
     void podPastItsDeletionTimeHasEnded() {
         Task stuck = task(true, JobState.FAILED, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
         V1Pod pod = pod(TASK + "-ex-00-pod-2", new V1PodStatus().phase("Running"));
-        pod.getMetadata().deletionTimestamp(DateTime.now().minusMinutes(1));
+        int slack = TaskStateResolver.DELETION_SLACK_SECONDS;
+        pod.getMetadata().deletionTimestamp(DateTime.now().minusSeconds(slack + 10));
         stuck.getExecutors().get(0).addPod(pod);
         assertThat(TaskStateResolver.resolve(stuck, () -> 1)).isEqualTo(TesState.CANCELED);
+        pod.getMetadata().deletionTimestamp(DateTime.now().minusSeconds(slack - 10));
+        assertThat(TaskStateResolver.resolve(stuck, () -> 1)).isEqualTo(TesState.CANCELING);
         pod.getMetadata().deletionTimestamp(DateTime.now().plusMinutes(1));
         assertThat(TaskStateResolver.resolve(stuck, () -> 1)).isEqualTo(TesState.CANCELING);
     }

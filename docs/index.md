@@ -91,19 +91,12 @@ and combines them into the TES task.
 The task's state comes from these jobs. In this order, the first rule that
 applies gives the state:
 
-1. The taskmaster's job is labelled as cancelled: `CANCELING` while any job
-   of the task (taskmaster, executors, outputs filer) has a pod that hasn't
-   ended (pending, running, also while it terminates, without a status yet,
-   or in phase `Unknown`) or that Kubernetes still counts as active;
-   `CANCELED` once none has. A pod that is still listed after its deletion
-   time (the end of its grace period) counts as ended: it most likely ran
-   on a node that is gone, and Kubernetes removes it only once the node is
-   removed (or tainted `out-of-service`). The inputs filer's job isn't
-   read: a task cancelled while it downloads inputs can be `CANCELED`
-   before the inputs filer's pod has ended.
-2. An executor's job failed, whichever executor it is: `PREEMPTED` if
-   Kubernetes disrupted the pods of every failed executor (see below),
-   otherwise `EXECUTOR_ERROR`.
+1. The taskmaster's job is labelled as cancelled: `CANCELING` while a job
+   of the task has a pod that hasn't ended, or one that Kubernetes counts
+   as active (see below); `CANCELED` once none has.
+2. An executor's job failed, whichever executor it is: `PREEMPTED` if every
+   failed executor's job was disrupted (see below), otherwise
+   `EXECUTOR_ERROR`.
 3. The taskmaster's job or the outputs filer's job failed: `SYSTEM_ERROR`.
 4. The taskmaster's job completed: `COMPLETE` if the jobs of all the task's
    executors exist and completed, otherwise `SYSTEM_ERROR` (e.g., the inputs
@@ -134,6 +127,17 @@ taskmaster keeps the jobs that failed, so that their state and logs stay
 available, and it always ends with exit code 0; the state doesn't depend on
 it.
 
+For `CANCELING`, TESK API looks at the jobs of the taskmaster, the executors
+and the outputs filer. A pod hasn't ended while it is pending, running, also
+while it terminates, without a status yet, or in phase `Unknown`. A pod that
+is still listed a minute after its deletion time (the end of its grace
+period) counts as ended: it most likely ran on a node that is gone, and
+Kubernetes removes it only once the node is removed (or tainted
+`out-of-service`). The minute allows for clocks of TESK API and the
+Kubernetes API server that differ. The inputs
+filer's job isn't read: a task cancelled while it downloads inputs can be
+`CANCELED` before the inputs filer's pod has ended.
+
 Executor jobs aren't retried (`backoffLimit: 0`), so that the state and logs
 of an executor are those of its only run. The taskmaster's environment
 variable `EXECUTOR_BACKOFF_LIMIT` sets another limit (see
@@ -149,9 +153,8 @@ later) with the status `True` and one of the reasons
 priority), `TerminationByKubelet` (e.g. node shutdown or node pressure),
 `DeletionByTaintManager` (a `NoExecute` taint) or `EvictionByEvictionAPI`
 (e.g. `kubectl drain`), and every pod of the job in phase `Failed` has it. If
-one
-executor failed on its own, the task is `EXECUTOR_ERROR`. TESK API sees the
-condition only while the pod exists: Kubernetes deletes the pods that the
+one executor failed on its own, the task is `EXECUTOR_ERROR`. TESK API sees
+the condition only while the pod exists: Kubernetes deletes the pods that the
 scheduler preempts, the taint manager or the Eviction API evict, once the
 job controller has counted them, so such a pod is usually gone soon after
 the job failed (pods that the kubelet terminated stay). A failed executor
@@ -171,9 +174,9 @@ that has ended (`COMPLETE`, `EXECUTOR_ERROR`, `SYSTEM_ERROR`, `PREEMPTED`, or
 `CANCELED`) can't be cancelled (`400 Bad Request`). Cancelling a task that is
 `CANCELING` answers `200 OK`; it only labels a running taskmaster pod that
 doesn't have the label yet (e.g. labelling it failed before, or Kubernetes
-restarted the taskmaster). The pod's label reaches
-the taskmaster through the Downward API; when the taskmaster sees it, it
-stops the running executor and ends.
+restarted the taskmaster). The pod's label reaches the taskmaster through the
+Downward API; when the taskmaster sees it, it stops the running executor and
+ends.
 
 If the taskmaster doesn't run yet (its pod is pending, or Kubernetes hasn't
 created it yet), a label on a pod created later wouldn't reach it. TESK API
@@ -181,9 +184,8 @@ then labels the job as cancelled and sets its `parallelism` to 0 and its
 `activeDeadlineSeconds` to 1: Kubernetes creates no more pods for the job,
 removes the ones it has, and fails the job about a second later; it also
 labels any pending pod. The job's label keeps the task cancelled
-(`CANCELING`, then `CANCELED`). In tests
-on minikube (Kubernetes 1.28 and 1.34), no taskmaster cancelled this way
-started. A taskmaster whose container is starting at that very moment could
+(`CANCELING`, then `CANCELED`). In tests on minikube (Kubernetes 1.28 and
+1.34), no taskmaster cancelled this way started. A taskmaster whose container is starting at that very moment could
 still start until Kubernetes stops it;
 [tesk-core#132](https://github.com/elixir-cloud-aai/tesk-core/issues/132)
 tracks a check for cancellation in the taskmaster itself.

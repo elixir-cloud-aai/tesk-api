@@ -3,8 +3,6 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_JOB_TYPE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_VERSION;
 
@@ -203,8 +201,9 @@ public class TesServiceImpl implements TesService {
                         taskMasterJob.getMetadata().getName());
         if (outputFilerJob.isPresent()) {
             taskBuilder.addJob(outputFilerJob.get());
-            if (TaskStateResolver.isCancelled(taskMasterJob)) {
-                // its pods tell whether a cancelled task is still canceling (issue #144)
+            if (TaskStateResolver.isLabelledCancelled(taskMasterJob.getMetadata())) {
+                // its pods tell whether a cancelled task is still canceling, the only rule of
+                // TaskStateResolver that needs them; the list path reads all pods (issue #144)
                 taskBuilder.addPodList(
                         this.kubernetesClientWrapper
                                 .listSingleJobPods(outputFilerJob.get())
@@ -352,8 +351,9 @@ public class TesServiceImpl implements TesService {
                     .filter(TesServiceImpl::isRunningAndNotLabelledCancelled)
                     .forEach(
                             pod ->
-                                    this.kubernetesClientWrapper.labelPodAsCancelled(
-                                            pod.getMetadata().getName()));
+                                    this.labelPodAsCancelledIfPossible(
+                                            pod.getMetadata().getName(),
+                                            "its job is labelled already"));
             return;
         }
         V1PodList taskMasterPods = new V1PodList().items(task.getTaskmaster().getPods());
@@ -375,35 +375,35 @@ public class TesServiceImpl implements TesService {
                                         && PodPhase.PENDING
                                                 .getCode()
                                                 .equals(pod.getStatus().getPhase()))
-                .forEach(pod -> this.labelPendingPodAsCancelled(pod.getMetadata().getName()));
+                .forEach(
+                        pod ->
+                                this.labelPodAsCancelledIfPossible(
+                                        pod.getMetadata().getName(), "its job ends anyway"));
     }
 
     private static boolean isRunningAndNotLabelledCancelled(V1Pod pod) {
         boolean running =
                 pod.getStatus() != null
                         && PodPhase.RUNNING.getCode().equals(pod.getStatus().getPhase());
-        boolean labelled =
-                Optional.ofNullable(pod.getMetadata().getLabels())
-                        .map(
-                                labels ->
-                                        LABEL_TASKSTATE_VALUE_CANC.equals(
-                                                labels.get(LABEL_TASKSTATE_KEY)))
-                        .orElse(false);
-        return running && !labelled;
+        return running && !TaskStateResolver.isLabelledCancelled(pod.getMetadata());
     }
 
     /**
-     * Labels a pending pod as cancelled; a pod that is gone already (or can't be patched) is
-     * skipped.
+     * Labels a pod as cancelled where the task's job decides already; a pod that is gone already
+     * (or can't be patched) is skipped.
+     *
+     * @param podName the pod's name
+     * @param why why the task is cancelled anyway, for the log
      */
-    private void labelPendingPodAsCancelled(String podName) {
+    private void labelPodAsCancelledIfPossible(String podName, String why) {
         try {
             this.kubernetesClientWrapper.labelPodAsCancelled(podName);
         } catch (KubernetesException e) {
             logger.info(
-                    "Pending pod {} of a cancelled task not labelled (HTTP {}); its job ends anyway",
+                    "Pod {} of a cancelled task not labelled (HTTP {}); {}",
                     podName,
-                    e.getApiException().getCode());
+                    e.getApiException().getCode(),
+                    why);
         }
     }
 }

@@ -54,6 +54,9 @@ public final class TaskStateResolver {
                                     "DeletionByTaintManager",
                                     "EvictionByEvictionAPI")));
 
+    /** Seconds after a pod's deletion time from which it counts as ended. */
+    static final int DELETION_SLACK_SECONDS = 60;
+
     /** Pod phases of pods that have ended. */
     private static final Set<String> ENDED_POD_PHASES =
             Collections.unmodifiableSet(
@@ -83,10 +86,11 @@ public final class TaskStateResolver {
 
     /**
      * Whether a pod has ended: it is in phase {@code Succeeded} or {@code Failed}, or its deletion
-     * time (the end of its grace period) has passed. Any other pod (pending, running, terminating
-     * within its grace period, in phase {@code Unknown}, or without a status yet) hasn't. A pod
-     * still listed after its deletion time most likely ran on a node that is gone, and Kubernetes
-     * removes it only once that node is removed; it doesn't keep a cancelled task canceling.
+     * time (the end of its grace period) was more than {@link #DELETION_SLACK_SECONDS} ago. Any
+     * other pod (pending, running, terminating, in phase {@code Unknown}, or without a status yet)
+     * hasn't. A pod still listed after its deletion time most likely ran on a node that is gone,
+     * and Kubernetes removes it only once that node is removed; it doesn't keep a cancelled task
+     * canceling. The slack allows for clocks of TESK API and the API server that differ.
      */
     private static boolean hasEnded(V1Pod pod) {
         if (pod.getStatus() != null && ENDED_POD_PHASES.contains(pod.getStatus().getPhase())) {
@@ -96,7 +100,7 @@ public final class TaskStateResolver {
                 Optional.ofNullable(pod.getMetadata())
                         .map(V1ObjectMeta::getDeletionTimestamp)
                         .orElse(null);
-        return deletion != null && deletion.isBeforeNow();
+        return deletion != null && deletion.plusSeconds(DELETION_SLACK_SECONDS).isBeforeNow();
     }
 
     /**
@@ -205,9 +209,13 @@ public final class TaskStateResolver {
         return TesState.SYSTEM_ERROR;
     }
 
-    /** Whether a taskmaster's job is labelled as cancelled. */
-    public static boolean isCancelled(V1Job job) {
-        return Optional.ofNullable(job.getMetadata().getLabels())
+    private static boolean isCancelled(V1Job job) {
+        return isLabelledCancelled(job.getMetadata());
+    }
+
+    /** Whether a taskmaster's job or pod is labelled as cancelled. */
+    public static boolean isLabelledCancelled(V1ObjectMeta metadata) {
+        return Optional.ofNullable(metadata.getLabels())
                 .map(labels -> LABEL_TASKSTATE_VALUE_CANC.equals(labels.get(LABEL_TASKSTATE_KEY)))
                 .orElse(false);
     }

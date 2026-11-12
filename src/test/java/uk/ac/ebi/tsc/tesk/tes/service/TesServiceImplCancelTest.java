@@ -278,6 +278,23 @@ class TesServiceImplCancelTest {
         verify(this.client, never()).cancelJobBeforeStart(anyString());
     }
 
+    /**
+     * A canceling task's taskmaster pod that can't be labelled (e.g. gone in between) doesn't fail
+     * the request: the job's label keeps the task cancelled (issue #144).
+     */
+    @Test
+    void cancelingTaskSkipsTaskmasterPodThatIsGone() {
+        this.cancelledRunningTaskmaster(false);
+        org.mockito.Mockito.doThrow(
+                        uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException.fromApiException(
+                                new io.kubernetes.client.openapi.ApiException(404, "gone")))
+                .when(this.client)
+                .labelPodAsCancelled(TASK + "-pod");
+        this.service.cancelTask(TASK);
+        verify(this.client).labelPodAsCancelled(TASK + "-pod");
+        verify(this.client, never()).labelJobAsCancelled(anyString());
+    }
+
     /** A taskmaster pod without a status yet isn't labelled again either (issue #144). */
     @Test
     void cancelingTaskSkipsTaskmasterPodWithoutStatus() {
