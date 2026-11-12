@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 
@@ -212,7 +213,9 @@ public class TesOutput   {
    * Get type
    * @return type
   */
-  @ApiModelProperty(required = true, value = "")
+  @ApiModelProperty(
+      value = "FILE if left out or null; directories need DIRECTORY",
+      allowableValues = "DIRECTORY,FILE")
   @NotNull
 
   @Valid
@@ -223,6 +226,12 @@ public class TesOutput   {
 
   public void setType(TesFileType type) {
     this.type = type;
+  }
+
+  /** Reads the type from JSON, see {@link TesFileType#fromJson}; left out, it stays FILE. */
+  @JsonSetter("type")
+  private void setTypeFromJson(String type) {
+    this.type = TesFileType.fromJson(type);
   }
 
 
