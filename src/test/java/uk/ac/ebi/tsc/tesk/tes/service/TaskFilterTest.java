@@ -136,6 +136,9 @@ class TaskFilterTest {
         assertThat(TaskFilter.zipTags(Arrays.asList("", "foo"), Arrays.asList("ignored", "bar")))
                 .containsExactly(tag("foo", "bar"));
         assertThat(TaskFilter.zipTags(null, Collections.singletonList(""))).isEmpty();
+        assertThat(TaskFilter.zipTags(null, Collections.singletonList(null))).isEmpty();
+        assertThat(TaskFilter.zipTags(Arrays.asList(null, "foo"), Arrays.asList("x", null)))
+                .containsExactly(tag("foo", ""));
         assertThat(TaskFilter.zipTags(Collections.singletonList("foo"), Arrays.asList("bar", "")))
                 .containsExactly(tag("foo", "bar"));
     }
