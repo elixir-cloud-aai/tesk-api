@@ -296,6 +296,7 @@ public class TesServiceImpl implements TesService {
                         .addPodList(jobPods.getItems());
         List<TesTask> tasks =
                 taskListBuilder.getTaskList().stream()
+                        // the state is derived only if the filter needs it
                         .filter(
                                 task ->
                                         !filter.hasState()

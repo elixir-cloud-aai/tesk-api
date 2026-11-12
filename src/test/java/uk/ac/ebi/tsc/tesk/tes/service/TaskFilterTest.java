@@ -78,6 +78,21 @@ class TaskFilterTest {
         assertThat(matches(filterTags("foo", ""), taskTags("foo", null))).isTrue();
     }
 
+    /** A filter tag with a null value matches any value, as an empty one does. */
+    @Test
+    void nullFilterValueMatchesAnyValue() {
+        assertThat(tag("foo", null)).isEqualTo(tag("foo", ""));
+        assertThat(matches(Collections.singletonList(tag("foo", null)), taskTags("foo", "bar")))
+                .isTrue();
+        assertThat(
+                        matches(
+                                Collections.singletonList(
+                                        new java.util.AbstractMap.SimpleImmutableEntry<>(
+                                                "foo", (String) null)),
+                                taskTags("foo", "bar")))
+                .isTrue();
+    }
+
     /** Every tag of the filter must match, also those of a repeated key. */
     @Test
     void repeatedKeyMustMatchEveryValue() {

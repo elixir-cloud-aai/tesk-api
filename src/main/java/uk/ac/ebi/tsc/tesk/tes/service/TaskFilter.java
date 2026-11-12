@@ -45,9 +45,9 @@ public class TaskFilter {
         return new TaskFilter(namePrefix, null, null);
     }
 
-    /** A tag of a filter. */
+    /** A tag of a filter; a null value is empty (any value of the key). */
     public static Map.Entry<String, String> tag(String key, String value) {
-        return new SimpleImmutableEntry<>(key, value);
+        return new SimpleImmutableEntry<>(key, value == null ? "" : value);
     }
 
     /**
@@ -77,8 +77,7 @@ public class TaskFilter {
             if (key == null || key.isEmpty()) {
                 continue;
             }
-            String value = i < values.size() ? values.get(i) : null;
-            tags.add(tag(key, value == null ? "" : value));
+            tags.add(tag(key, i < values.size() ? values.get(i) : null));
         }
         return tags;
     }
@@ -109,7 +108,8 @@ public class TaskFilter {
             if (taskTags == null || !taskTags.containsKey(tag.getKey())) {
                 return false;
             }
-            if (!tag.getValue().isEmpty() && !tag.getValue().equals(taskTags.get(tag.getKey()))) {
+            String value = tag.getValue();
+            if (value != null && !value.isEmpty() && !value.equals(taskTags.get(tag.getKey()))) {
                 return false;
             }
         }
