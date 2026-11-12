@@ -68,8 +68,6 @@ public class ServiceInfoService {
     }
 
     // https://bitbucket.org/asomov/snakeyaml/wiki/Howto#markdown-header-how-to-parse-jodatime
-    // Also maps the keys of the service info schema that aren't Java property names: add new
-    // ones there
     class OffsetDateTimePropertyConstructor extends Constructor {
         public OffsetDateTimePropertyConstructor() {
             yamlClassConstructors.put(NodeId.scalar, new TimeStampConstruct());
