@@ -11,6 +11,7 @@ import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
+import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1Secret;
 import java.util.ArrayList;
@@ -21,10 +22,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.PodPhase;
 import uk.ac.ebi.tsc.tesk.k8s.convert.IgnoredBackendParameters;
+import uk.ac.ebi.tsc.tesk.k8s.convert.TaskStateResolver;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.*;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
@@ -209,7 +212,17 @@ public class TesServiceImpl implements TesService {
         Optional<V1Job> outputFilerJob =
                 this.kubernetesClientWrapper.getSingleTaskOutputFilerJob(
                         taskMasterJob.getMetadata().getName());
-        outputFilerJob.ifPresent(taskBuilder::addJob);
+        if (outputFilerJob.isPresent()) {
+            taskBuilder.addJob(outputFilerJob.get());
+            if (TaskStateResolver.isLabelledCancelled(taskMasterJob.getMetadata())) {
+                // its pods tell whether a cancelled task is still canceling, the only rule of
+                // TaskStateResolver that needs them; the list path reads all pods (issue #144)
+                taskBuilder.addPodList(
+                        this.kubernetesClientWrapper
+                                .listSingleJobPods(outputFilerJob.get())
+                                .getItems());
+            }
+        }
         return taskBuilder.getTask();
     }
 
@@ -264,12 +277,13 @@ public class TesServiceImpl implements TesService {
      * executors, all pods), combines them together into valid {@link Task} objects and converts to
      * result with means of the converter.
      *
-     * <p>Kubernetes can't select jobs by a prefix of an annotation, so the tasks are filtered by
-     * name after Kubernetes returned a page of taskmaster jobs: a page can be shorter than {@code
-     * pageSize}, even empty, while {@code next_page_token} still leads to the next page.
+     * <p>Kubernetes can't select jobs by a prefix of an annotation, by the tags of the task stored
+     * with the job, or by the state, which TESK derives from all the task's jobs. So the tasks are
+     * filtered after Kubernetes returned a page of taskmaster jobs: by name and tags first, by
+     * state once the other jobs are read. A page can be shorter than {@code pageSize}, even empty,
+     * while {@code next_page_token} still leads to the next page.
      *
-     * @param namePrefix - only tasks whose names start with it (case-sensitive); all tasks if null
-     *     or empty
+     * @param filter - only tasks that match it (name prefix, state and tags)
      * @param pageSize - maximum number of taskmaster jobs read for the page
      * @param pageToken - continue token of Kubernetes, from the previous page's next_page_token
      * @param view - one of {@link TaskView} values, decides on how much detail is put in each
@@ -278,7 +292,7 @@ public class TesServiceImpl implements TesService {
      */
     @Override
     public TesListTasksResponse listTasks(
-            String namePrefix, Long pageSize, String pageToken, TaskView view, User user) {
+            TaskFilter filter, Long pageSize, String pageToken, TaskView view, User user) {
 
         V1JobList taskmasterJobs =
                 this.kubernetesClientWrapper.listAllTaskmasterJobsForUser(
@@ -288,7 +302,12 @@ public class TesServiceImpl implements TesService {
         String nextPageToken = taskmasterJobs.getMetadata().getContinue();
         List<V1Job> matchingTaskmasterJobs =
                 taskmasterJobs.getItems().stream()
-                        .filter(job -> hasNamePrefix(job, namePrefix))
+                        .filter(job -> filter.matchesName(taskName(job)))
+                        .filter(
+                                job ->
+                                        !filter.hasTags()
+                                                || filter.matchesTags(
+                                                        this.converter.extractTags(job)))
                         .collect(Collectors.toList());
         if (matchingTaskmasterJobs.isEmpty()) {
             // nothing to combine: spare the lists of all executors, filers and pods
@@ -305,25 +324,23 @@ public class TesServiceImpl implements TesService {
                         .addPodList(jobPods.getItems());
         List<TesTask> tasks =
                 taskListBuilder.getTaskList().stream()
+                        // the state is derived only if the filter needs it
+                        .filter(
+                                task ->
+                                        !filter.hasState()
+                                                || filter.matchesState(
+                                                        this.converter.extractStateFromK8sJobs(
+                                                                task)))
                         .map(task -> this.getTask(task, view, true))
                         .collect(Collectors.toList());
         return new TesListTasksResponse().tasks(tasks).nextPageToken(nextPageToken);
     }
 
-    /**
-     * Whether the name of a taskmaster job's task (annotation {@code tes-task-name}) starts with
-     * the prefix. Every task matches a null or empty prefix; a task without a name matches no
-     * other.
-     */
-    private static boolean hasNamePrefix(V1Job taskmasterJob, String namePrefix) {
-        if (namePrefix == null || namePrefix.isEmpty()) {
-            return true;
-        }
-        String name =
-                Optional.ofNullable(taskmasterJob.getMetadata().getAnnotations())
-                        .map(annotations -> annotations.get(ANN_TESTASK_NAME_KEY))
-                        .orElse(null);
-        return name != null && name.startsWith(namePrefix);
+    /** The name of a taskmaster job's task (annotation {@code tes-task-name}), or null. */
+    private static String taskName(V1Job taskmasterJob) {
+        return Optional.ofNullable(taskmasterJob.getMetadata().getAnnotations())
+                .map(annotations -> annotations.get(ANN_TESTASK_NAME_KEY))
+                .orElse(null);
     }
 
     /**
@@ -341,6 +358,17 @@ public class TesServiceImpl implements TesService {
         TesState state = this.converter.extractStateFromK8sJobs(task);
         if (COMPLETED_STATES.contains(state)) {
             throw new CancelNotRunningTask(taskId);
+        }
+        if (state == TesState.CANCELING) {
+            // cancelled already, its pods are still stopping (issue #144); a pending or running
+            // taskmaster pod without the label (e.g. labelling it failed, or Kubernetes
+            // restarted the taskmaster) gets it now, as only the pod's label stops the
+            // taskmaster; nothing else is patched again
+            task.getTaskmaster().getPods().stream()
+                    .filter(TesServiceImpl::isStartedAndNotLabelledCancelled)
+                    .forEach(
+                            pod -> this.labelPodAsCancelledUnlessGone(pod.getMetadata().getName()));
+            return;
         }
         V1PodList taskMasterPods = new V1PodList().items(task.getTaskmaster().getPods());
         Optional<String> runningPod = this.converter.getNameOfFirstRunningPod(taskMasterPods);
@@ -361,21 +389,51 @@ public class TesServiceImpl implements TesService {
                                         && PodPhase.PENDING
                                                 .getCode()
                                                 .equals(pod.getStatus().getPhase()))
-                .forEach(pod -> this.labelPendingPodAsCancelled(pod.getMetadata().getName()));
+                .forEach(
+                        pod ->
+                                this.labelPodAsCancelledIfPossible(
+                                        pod.getMetadata().getName(), "its job ends anyway"));
+    }
+
+    private static boolean isStartedAndNotLabelledCancelled(V1Pod pod) {
+        boolean started =
+                pod.getStatus() != null
+                        && (PodPhase.PENDING.getCode().equals(pod.getStatus().getPhase())
+                                || PodPhase.RUNNING.getCode().equals(pod.getStatus().getPhase()));
+        return started && !TaskStateResolver.isLabelledCancelled(pod.getMetadata());
     }
 
     /**
-     * Labels a pending pod as cancelled; a pod that is gone already (or can't be patched) is
-     * skipped.
+     * Labels a taskmaster pod of a canceling task as cancelled; a pod that is gone already (404)
+     * has nothing left to stop. Other errors fail the request: the taskmaster would go on.
      */
-    private void labelPendingPodAsCancelled(String podName) {
+    private void labelPodAsCancelledUnlessGone(String podName) {
+        try {
+            this.kubernetesClientWrapper.labelPodAsCancelled(podName);
+        } catch (KubernetesException e) {
+            if (e.getApiException().getCode() != HttpStatus.NOT_FOUND.value()) {
+                throw e;
+            }
+            logger.info("Pod {} of a cancelled task is gone, not labelled", podName);
+        }
+    }
+
+    /**
+     * Labels a pod as cancelled where the task's job decides already; a pod that is gone already
+     * (or can't be patched) is skipped.
+     *
+     * @param podName the pod's name
+     * @param why why the task is cancelled anyway, for the log
+     */
+    private void labelPodAsCancelledIfPossible(String podName, String why) {
         try {
             this.kubernetesClientWrapper.labelPodAsCancelled(podName);
         } catch (KubernetesException e) {
             logger.info(
-                    "Pending pod {} of a cancelled task not labelled (HTTP {}); its job ends anyway",
+                    "Pod {} of a cancelled task not labelled (HTTP {}); {}",
                     podName,
-                    e.getApiException().getCode());
+                    e.getApiException().getCode(),
+                    why);
         }
     }
 }

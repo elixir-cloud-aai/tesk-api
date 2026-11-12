@@ -591,7 +591,7 @@ public class TesKubernetesConverterTest {
                 .getLabels()
                 .putIfAbsent(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
         TesTask expectedTask = this.prepareBaseExpectedTask();
-        expectedTask.setState(TesState.CANCELED);
+        expectedTask.setState(TesState.CANCELING);
         TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
         assertThat(outputTask, is(expectedTask));
     }
@@ -617,7 +617,7 @@ public class TesKubernetesConverterTest {
                 .putIfAbsent(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(1);
         TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
-        assertThat(state, is(TesState.CANCELED));
+        assertThat(state, is(TesState.CANCELING));
     }
 
     @Test
@@ -793,6 +793,40 @@ public class TesKubernetesConverterTest {
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         taskmaster.getMetadata().setAnnotations(null);
         assertNull(this.converter.extractExecutorCount(taskmaster));
+    }
+
+    /** The tags of the stored task, also with JSON null values (issue #143). */
+    @Test
+    public void extractTags_fromStoredTask() throws IOException {
+        Map<String, String> expected = new HashMap<>();
+        expected.put("WORKFLOW_ID", "cwl-01234");
+        expected.put("EMPTY", "");
+        expected.put("NULL", null);
+        assertThat(
+                this.tagsOf(
+                        "{\"tags\": {\"WORKFLOW_ID\": \"cwl-01234\", \"EMPTY\": \"\", \"NULL\": null}}"),
+                is(expected));
+        assertThat(this.tagsOf("{\"tags\": {}}"), is(new HashMap<String, String>()));
+    }
+
+    /** Without tags, or a stored task that can't be read, there are no tags (issue #143). */
+    @Test
+    public void extractTags_none() throws IOException {
+        for (String stored :
+                new String[] {
+                    "not JSON", "", "null", "[]", "{}", "{\"tags\": []}", "{\"tags\": null}", null
+                }) {
+            assertNull(stored, this.tagsOf(stored));
+        }
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().setAnnotations(null);
+        assertNull(this.converter.extractTags(taskmaster));
+    }
+
+    private Map<String, String> tagsOf(String storedTask) throws IOException {
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
+        return this.converter.extractTags(taskmaster);
     }
 
     private Integer executorCountOf(String storedTask) throws IOException {

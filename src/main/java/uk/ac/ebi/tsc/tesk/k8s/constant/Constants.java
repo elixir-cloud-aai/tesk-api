@@ -111,6 +111,7 @@ public class Constants {
     public static EnumSet<TesState> COMPLETED_STATES =
             EnumSet.of(
                     TesState.CANCELED,
+                    TesState.PREEMPTED,
                     TesState.COMPLETE,
                     TesState.EXECUTOR_ERROR,
                     TesState.SYSTEM_ERROR);

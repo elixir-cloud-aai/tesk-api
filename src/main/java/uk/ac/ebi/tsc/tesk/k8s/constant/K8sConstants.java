@@ -8,7 +8,10 @@ package uk.ac.ebi.tsc.tesk.k8s.constant;
 public class K8sConstants {
 
     public enum PodPhase {
-        PENDING("Pending");
+        PENDING("Pending"),
+        RUNNING("Running"),
+        SUCCEEDED("Succeeded"),
+        FAILED("Failed");
         private String code;
 
         PodPhase(String code) {

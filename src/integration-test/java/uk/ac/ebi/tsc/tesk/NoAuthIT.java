@@ -17,10 +17,16 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobStatus;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.util.Config;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -285,5 +291,118 @@ public class NoAuthIT {
         this.mvc.perform(get(SERVICE_INFO_URL)).andExpect(status().isOk());
         // .andExpect(jsonPath("$.name").value("TESK in EBI"))
         // .andExpect(jsonPath("$.doc").value("https://github.com/EMBL-EBI-TSI/TESK"));
+    }
+
+    /** A running taskmaster job of a task with these tags, stored with the job. */
+    private static V1Job taggedTaskmaster(String id, String tagsJson) {
+        return new V1Job()
+                .metadata(
+                        new V1ObjectMeta()
+                                .name(id)
+                                .putLabelsItem("job-type", "taskmaster")
+                                .putAnnotationsItem(
+                                        "json-input",
+                                        "{\"executors\":[],\"tags\":" + tagsJson + "}"))
+                .status(new V1JobStatus().active(1));
+    }
+
+    /** Lists tasks by state and tags, with Kubernetes mocked (issue #143). */
+    @Test
+    public void getListFilteredByStateAndTags() throws Exception {
+        V1Job cancelled = taggedTaskmaster("task-202", "{\"WORKFLOW_ID\":\"cwl-01234\"}");
+        cancelled.getMetadata().putLabelsItem("task-status", "Cancelled");
+        mockKubernetes.givenThat(
+                WireMock.get(
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster")
+                        .willReturn(
+                                okJson(
+                                        MockUtil.jobList(
+                                                taggedTaskmaster(
+                                                        "task-201",
+                                                        "{\"WORKFLOW_ID\":\"cwl-01234\",\"a,b\":\"c\"}"),
+                                                cancelled,
+                                                taggedTaskmaster(
+                                                        "task-203",
+                                                        "{\"WORKFLOW_ID\":\"other\"}")))));
+        mockKubernetes.givenThat(
+                WireMock.get(
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dexecutor")
+                        .willReturn(okJson("{\"items\": []}")));
+        mockKubernetes.givenThat(
+                WireMock.get("/apis/batch/v1/namespaces/default/jobs?labelSelector=%21job-type")
+                        .willReturn(okJson("{\"items\": []}")));
+        mockKubernetes.givenThat(
+                WireMock.get("/api/v1/namespaces/default/pods?labelSelector=job-name")
+                        .willReturn(okJson("{\"items\": []}")));
+
+        this.mvc
+                .perform(get(TASK_URL + "?tag_key=WORKFLOW_ID&tag_value=cwl-01234"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(2))
+                .andExpect(jsonPath("$.tasks[0].id").value("task-201"))
+                .andExpect(jsonPath("$.tasks[1].id").value("task-202"));
+        this.mvc
+                .perform(get(TASK_URL + "?tag_key=WORKFLOW_ID&state=CANCELING&view=BASIC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(1))
+                .andExpect(jsonPath("$.tasks[0].id").value("task-202"))
+                .andExpect(jsonPath("$.tasks[0].tags.WORKFLOW_ID").value("cwl-01234"));
+        // its taskmaster job is still active: canceling, not cancelled yet (issue #144)
+        this.mvc
+                .perform(get(TASK_URL + "?state=CANCELED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(0));
+        this.mvc
+                .perform(get(TASK_URL).param("tag_key", "a,b"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(1))
+                .andExpect(jsonPath("$.tasks[0].id").value("task-201"));
+        this.mvc
+                .perform(get(TASK_URL + "?state=INITIALIZING&view=FULL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(2));
+        this.mvc
+                .perform(get(TASK_URL + "?state=PREEMPTED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(0));
+        this.mvc.perform(get(TASK_URL + "?state=preempted")).andExpect(status().isBadRequest());
+        this.mvc
+                .perform(get(TASK_URL + "?tag_key=a&tag_value=b&tag_value=c"))
+                .andExpect(status().isBadRequest());
+    }
+
+    /** The API description has the filters of TES 1.1 (issue #143). */
+    @Test
+    public void apiDescriptionHasListFilters() throws Exception {
+        JsonNode parameters =
+                objectMapper
+                        .readTree(
+                                this.mvc
+                                        .perform(get("/v2/api-docs"))
+                                        .andExpect(status().isOk())
+                                        .andReturn()
+                                        .getResponse()
+                                        .getContentAsString())
+                        .path("paths")
+                        .path("/ga4gh/tes/v1/tasks")
+                        .path("get")
+                        .path("parameters");
+        Map<String, JsonNode> byName = new HashMap<>();
+        for (JsonNode parameter : parameters) {
+            byName.put(parameter.path("name").asText(), parameter);
+        }
+        JsonNode state = byName.get("state");
+        assertThat(state).isNotNull();
+        assertThat(state.path("in").asText()).isEqualTo("query");
+        List<String> states = new ArrayList<>();
+        state.path("enum").forEach(value -> states.add(value.asText()));
+        assertThat(states).contains("CANCELING", "PREEMPTED", "RUNNING");
+        for (String name : new String[] {"tag_key", "tag_value"}) {
+            JsonNode tagParameter = byName.get(name);
+            assertThat(tagParameter).as(name).isNotNull();
+            assertThat(tagParameter.path("in").asText()).isEqualTo("query");
+            assertThat(tagParameter.path("type").asText()).isEqualTo("array");
+            assertThat(tagParameter.path("collectionFormat").asText()).isEqualTo("multi");
+        }
     }
 }
