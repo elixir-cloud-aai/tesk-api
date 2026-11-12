@@ -182,11 +182,20 @@ public class TesOutput   {
     if (path == null || url == null || !hasWildcards(path)) {
       return true;
     }
-    if (pathPrefix != null && !pathPrefix.isEmpty()) {
-      return true;
-    }
-    java.util.regex.Matcher scheme =
-        java.util.regex.Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*):").matcher(url);
+    return (pathPrefix != null && !pathPrefix.isEmpty()) || isFileUrl(url);
+  }
+
+  /** The scheme of a URL (RFC 3986), as Python's urlsplit reads it: after leading blanks. */
+  private static final java.util.regex.Pattern URL_SCHEME =
+      java.util.regex.Pattern.compile("^[\\x00-\\x20]*([A-Za-z][A-Za-z0-9+.-]*):");
+
+  /**
+   * Whether the filer takes a URL as a file URL: its scheme is `file` (in any case), or it has
+   * none.
+   */
+  static boolean isFileUrl(String url) {
+    // urlsplit also deletes tabs and line breaks anywhere in the URL
+    java.util.regex.Matcher scheme = URL_SCHEME.matcher(url.replaceAll("[\\t\\n\\r]", ""));
     return !scheme.find() || scheme.group(1).equalsIgnoreCase("file");
   }
 
