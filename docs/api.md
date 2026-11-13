@@ -27,10 +27,12 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
 (the default), `BASIC` and `FULL`.
 
 - `page_size` sets how many tasks TESK API reads from Kubernetes for one
-  page, from 1 to 2048; without it, or if it is empty, 256, as TES
-  specifies. Other values, also those that aren't whole numbers, are
-  refused with `400 Bad Request`. `next_page_token` is the continue token of Kubernetes;
-  pass it as `page_token` to get the next page.
+  page, from 1 to 2048 (TES asks for less than 2048). Without it, or if it
+  is empty, a page has at most 256 tasks, the default of TES, so a request
+  without `page_size` can also return a `next_page_token`: follow it to get
+  all tasks. Other values, also those that aren't whole numbers, are
+  refused with `400 Bad Request`. `next_page_token` is the continue token
+  of Kubernetes; pass it as `page_token` to get the next page.
   It is left out on the last page. Kubernetes accepts it for a limited time
   only (by default about 5 minutes, until etcd compacts its history).
 - `name_prefix` lists only the tasks whose names start with it
