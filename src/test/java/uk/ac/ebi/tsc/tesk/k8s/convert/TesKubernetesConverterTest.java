@@ -657,6 +657,36 @@ public class TesKubernetesConverterTest {
         assertThat(state, is(TesState.EXECUTOR_ERROR));
     }
 
+    /**
+     * An ignored failure needs the outputs filer if the stored task has outputs, and none without
+     * outputs (issue #159).
+     */
+    @Test
+    public void test_status_ignored_failure_reads_outputs() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        V1Job executor = taskBuilder.getTask().getExecutors().get(0).getJob();
+        executor.getStatus().succeeded(0).failed(1);
+        executor.getMetadata()
+                .putAnnotationsItem(
+                        Constants.ANN_IGNORE_ERROR_KEY, Constants.ANN_IGNORE_ERROR_VALUE);
+        assertThat(
+                "stored task with outputs, no outputs filer",
+                this.converter.extractStateFromK8sJobs(taskBuilder.getTask()),
+                is(TesState.SYSTEM_ERROR));
+
+        taskBuilder
+                .getTask()
+                .getTaskmaster()
+                .getJob()
+                .getMetadata()
+                .getAnnotations()
+                .put(Constants.ANN_JSON_INPUT_KEY, "{\"executors\": [{}]}");
+        assertThat(
+                "stored task without outputs",
+                this.converter.extractStateFromK8sJobs(taskBuilder.getTask()),
+                is(TesState.COMPLETE));
+    }
+
     @Test
     public void test_status_complete_with_failed_executor() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider();

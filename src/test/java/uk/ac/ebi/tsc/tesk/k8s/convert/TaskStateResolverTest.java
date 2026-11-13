@@ -662,6 +662,24 @@ class TaskStateResolverTest {
     }
 
     /**
+     * An executor that ignores errors but whose job neither succeeded nor failed isn't done: once
+     * the taskmaster's job completed, the task has a system error (issue #159).
+     */
+    @Test
+    void ignoringExecutorNotEndedIsNotDone() {
+        Task task =
+                task(
+                        false,
+                        JobState.SUCCEEDED,
+                        JobState.RUNNING,
+                        JobState.SUCCEEDED,
+                        JobState.ABSENT);
+        ignoreError(task, 0, "true");
+        assertThat(TaskStateResolver.resolve(task, () -> 2, () -> false))
+                .isEqualTo(TesState.SYSTEM_ERROR);
+    }
+
+    /**
      * After an ignored failure of the last executor, a task with outputs (or unknown ones)
      * completed only if its outputs filer did, as the taskmaster may have stopped at the failure; a
      * task without outputs needs none (issue #159).
