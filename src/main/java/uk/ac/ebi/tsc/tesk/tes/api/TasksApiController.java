@@ -11,7 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.InitBinder;
@@ -151,12 +150,14 @@ public class TasksApiController implements TasksApi {
         return values == null ? null : Arrays.asList(values);
     }
 
+    /**
+     * The authenticated user (with the auth profile), or a user without groups named after the
+     * anonymous principal (noauth)
+     */
     private User getUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        OAuth2Authentication oauth = null;
-        if (authentication instanceof OAuth2Authentication) {
-            oauth = (OAuth2Authentication) authentication;
-            return (User) oauth.getPrincipal();
+        if (authentication.getPrincipal() instanceof User) {
+            return (User) authentication.getPrincipal();
         }
         return User.builder(authentication.getName()).build();
     }

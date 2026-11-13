@@ -8,19 +8,18 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.PrincipalExtractor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.util.StringUtils;
 
 /**
- * Custom principal extractor (puts all of the info from userinfo to custom {@link User} object)
+ * Custom principal extractor (puts all of the info from userinfo to custom {@link User} object;
+ * used by {@link UserInfoTokenIntrospector})
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
-public class ElixirPrincipalExtractor implements PrincipalExtractor {
+public class ElixirPrincipalExtractor {
 
-    private final AuthoritiesExtractor groupsExtractor;
+    private final GroupNamesSecurityExtractor groupsExtractor;
     private final AuthorisationProperties authorisationProperties;
     private final Pattern MEMBERED_GROUP;
     private final Pattern MANAGED_GROUP;
@@ -30,7 +29,8 @@ public class ElixirPrincipalExtractor implements PrincipalExtractor {
     private final Set<String> claimValues;
 
     ElixirPrincipalExtractor(
-            AuthoritiesExtractor groupsExtractor, AuthorisationProperties authorisationProperties) {
+            GroupNamesSecurityExtractor groupsExtractor,
+            AuthorisationProperties authorisationProperties) {
         this.groupsExtractor = groupsExtractor;
         this.authorisationProperties = authorisationProperties;
         // the configured parts are text, matched literally; only the team name is a pattern
@@ -94,8 +94,8 @@ public class ElixirPrincipalExtractor implements PrincipalExtractor {
                 .anyMatch(value -> value instanceof String && this.claimValues.contains(value));
     }
 
-    @Override
-    public Object extractPrincipal(Map<String, Object> map) {
+    /** The user of the user info, with its groups and rights */
+    public User extractPrincipal(Map<String, Object> map) {
         User.UserBuilder builder =
                 User.builder(map.get("sub").toString())
                         .preferredUsername(

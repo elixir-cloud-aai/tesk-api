@@ -46,11 +46,6 @@
         <dependencies>
             <!-- Transitive dependencies with known vulnerabilities in the versions they ask for -->
             <dependency>
-                <groupId>org.springframework.security.oauth</groupId>
-                <artifactId>spring-security-oauth2</artifactId>
-                <version>2.5.2.RELEASE</version>
-            </dependency>
-            <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
                 <version>4.36.2</version>
@@ -113,10 +108,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- Bearer tokens, validated at the user info endpoint (OpaqueTokenIntrospector) -->
         <dependency>
-            <groupId>org.springframework.security.oauth.boot</groupId>
-            <artifactId>spring-security-oauth2-autoconfigure</artifactId>
-            <version>2.6.8</version>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-resource-server</artifactId>
         </dependency>
         <!-- Checks the JWT access tokens of service clients (issue #153); also used by the
              Kubernetes client, version managed above -->

@@ -3,11 +3,8 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.PrincipalExtractor;
 import org.springframework.boot.web.servlet.error.ErrorAttributes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,32 +13,29 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.core.GrantedAuthorityDefaults;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
-import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
-import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
-import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * This class (specifically the @EnableResourceServer annotation) + 2 dependencies:
- * spring-boot-starter-security + spring-security-oauth2-autoconfigure +
- * security.oauth2.resource.user-info-uri property (which points to user info endpoint of the
- * authorisation server) switch on protection of (all minus Swagger) the endpoints via OAuth2 token
+ * With the auth profile, protects (all but the public) endpoints with OAuth2 bearer tokens, using
+ * the resource server of Spring Security: tokens are validated at the user info endpoint of the
+ * authorisation server ({@code security.oauth2.resource.user-info-uri}; {@link
+ * UserInfoTokenIntrospector}), or, with tesk.api.authorisation.service-clients enabled, the tokens
+ * of the listed service clients locally ({@link ServiceClientTokenServices}).
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
-@EnableResourceServer
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 @Profile("auth")
-public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter {
+public class ResourceServerConfiguration {
 
-    private final ErrorAttributes errorAttributes;
-    private final HttpMessageConverters messageConverters;
-    private final AuthorisationProperties authorisationProperties;
     // The API description, and the Swagger UI paths, which are only mapped (else 404) with
     // tesk.api.swagger-ui.enabled
-    private final String[] ALLOWED_URLS = {
+    private static final String[] ALLOWED_URLS = {
         "/",
         "/v2/api-docs",
         "/configuration/ui",
@@ -50,13 +44,13 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
         "/swagger-ui/**",
         "/webjars/**"
     };
+
+    private final ErrorAttributes errorAttributes;
+    private final HttpMessageConverters messageConverters;
+    private final AuthorisationProperties authorisationProperties;
     private final String baseUrl;
     private final boolean serviceInfoPublic;
-    /**
-     * The token services of the user info endpoint (auto-configured by Spring Boot), looked up only
-     * when the resource server is configured, as they need the extractors defined here
-     */
-    private final ObjectProvider<ResourceServerTokenServices> tokenServices;
+    private final String userInfoUri;
 
     public ResourceServerConfiguration(
             ErrorAttributes errorAttributes,
@@ -64,72 +58,83 @@ public class ResourceServerConfiguration extends ResourceServerConfigurerAdapter
             AuthorisationProperties authorisationProperties,
             @Value("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}") String baseUrl,
             @Value("${tesk.api.service-info.public:true}") boolean serviceInfoPublic,
-            ObjectProvider<ResourceServerTokenServices> tokenServices) {
+            @Value("${security.oauth2.resource.user-info-uri:}") String userInfoUri) {
 
         this.errorAttributes = errorAttributes;
         this.messageConverters = messageConverters;
         this.authorisationProperties = authorisationProperties;
         this.baseUrl = baseUrl;
         this.serviceInfoPublic = serviceInfoPublic;
-        this.tokenServices = tokenServices;
+        this.userInfoUri = userInfoUri;
     }
 
     /**
-     * We leave the sensible defaults only letting swagger UI requests in, and service info unless a
-     * token is required for it (tesk.api.service-info.public)
+     * Lets only the Swagger UI requests in without a token, and service info unless a token is
+     * required for it (tesk.api.service-info.public). A request with a token has it validated also
+     * on these. Requests without a valid token get the JSON error responses and {@code
+     * WWW-Authenticate} headers of {@link CustomAuthenticationEntryPoint}. Stateless and without
+     * CSRF protection (no cookies are used), as the resource server of Spring Security OAuth was.
      */
-    @Override
-    public void configure(HttpSecurity http) throws Exception {
-        List<String> allowedUrls = new ArrayList<>();
-        allowedUrls.addAll(Arrays.asList(ALLOWED_URLS));
+    @Bean
+    public SecurityFilterChain resourceServerFilterChain(
+            HttpSecurity http, OpaqueTokenIntrospector introspector) throws Exception {
+        List<String> allowedUrls = new ArrayList<>(Arrays.asList(ALLOWED_URLS));
         if (serviceInfoPublic) {
             allowedUrls.add(baseUrl + "/service-info");
         }
         String[] allowedUrlsArray = allowedUrls.toArray(new String[0]);
-        http.authorizeRequests()
+        AuthenticationEntryPoint entryPoint =
+                new CustomAuthenticationEntryPoint(errorAttributes, messageConverters);
+        http.csrf()
+                .disable()
+                .sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                .authorizeRequests()
                 .antMatchers(HttpMethod.GET, allowedUrlsArray)
                 .permitAll()
                 .antMatchers(HttpMethod.HEAD, allowedUrlsArray)
                 .permitAll()
                 .anyRequest()
-                .authenticated();
+                .authenticated()
+                .and()
+                .exceptionHandling()
+                .authenticationEntryPoint(entryPoint)
+                .and()
+                .oauth2ResourceServer()
+                .authenticationEntryPoint(entryPoint)
+                .opaqueToken()
+                .introspector(introspector)
+                .authenticationConverter(AuthenticatedUser::toAuthentication);
+        return http.build();
     }
 
     /**
-     * Sets a custom entryPoint that returns json in our usual error format with the use of standard
-     * Boot's errorAttributes and autoconfigured messageConverters (specifically with autoconfigured
-     * objectMapper for JacksonConverter). With tesk.api.authorisation.service-clients enabled,
-     * tokens of the listed service clients are checked locally, all others at the user info
-     * endpoint as before ({@link ServiceClientTokenServices}).
+     * Validates the tokens at the user info endpoint, and, with tesk.api.authorisation.service-
+     * clients enabled, the tokens of the listed service clients locally ({@link
+     * ServiceClientTokenServices})
      */
-    @Override
-    public void configure(ResourceServerSecurityConfigurer resources) {
-        resources.authenticationEntryPoint(
-                new CustomAuthenticationEntryPoint(errorAttributes, messageConverters));
+    @Bean
+    public OpaqueTokenIntrospector tokenIntrospector() {
+        GroupNamesSecurityExtractor authoritiesExtractor =
+                new GroupNamesSecurityExtractor(
+                        authorisationProperties.getGroupsClaim(),
+                        authorisationProperties.getGroupPrefix());
+        OpaqueTokenIntrospector userInfoIntrospector =
+                new UserInfoTokenIntrospector(
+                        userInfoUri,
+                        new ElixirPrincipalExtractor(authoritiesExtractor, authorisationProperties),
+                        authoritiesExtractor);
         if (authorisationProperties.getServiceClients().isEnabled()) {
-            resources.tokenServices(
-                    new ServiceClientTokenServices(
-                            tokenServices.getObject(), authorisationProperties));
+            return new ServiceClientTokenServices(userInfoIntrospector, authorisationProperties);
         }
+        return userInfoIntrospector;
     }
 
     /** Magic, that changes default role prefix from ROLE_ to (...)elixir: */
     @Bean
     public GrantedAuthorityDefaults grantedAuthorityDefaults() {
         return new GrantedAuthorityDefaults(this.authorisationProperties.getGroupPrefix());
-    }
-
-    /** Custom authorities extractor (we use Elixir roles as authorities) */
-    @Bean
-    public AuthoritiesExtractor authoritiesExtractor() {
-        return new GroupNamesSecurityExtractor(
-                authorisationProperties.getGroupsClaim(), authorisationProperties.getGroupPrefix());
-    }
-
-    /** Custom principal extractor (we use the whole userinfo response object as Principal */
-    @Bean
-    public PrincipalExtractor principalExtractor() {
-        return new ElixirPrincipalExtractor(authoritiesExtractor(), authorisationProperties);
     }
 
     /**

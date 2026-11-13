@@ -35,19 +35,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
-import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
-import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
-import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.OAuth2Request;
-import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -68,38 +63,41 @@ import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(TasksApiController.class)
+// the auth profile, as the security configuration below stands for it (and the noauth one, which
+// application.properties sets, has a security configuration of its own)
+@ActiveProfiles("auth")
 public class TasksApiControllerTest {
 
+    /**
+     * Accepts any bearer token, as the user admin, with the token as comma-separated authorities
+     */
     @TestConfiguration
-    @EnableResourceServer
-    static class ResourceServerConfiguration extends ResourceServerConfigurerAdapter {
+    static class ResourceServerConfiguration {
 
-        @Override
-        public void configure(ResourceServerSecurityConfigurer security) {
-            security.tokenServices(tokenServices());
-        }
-
-        ResourceServerTokenServices tokenServices() {
-            return new ResourceServerTokenServices() {
-
-                @Override
-                public OAuth2Authentication loadAuthentication(String accessToken)
-                        throws AuthenticationException, InvalidTokenException {
-                    Object principal = User.builder("admin").build();
-                    List<GrantedAuthority> authorities =
-                            AuthorityUtils.commaSeparatedStringToAuthorityList(accessToken);
-                    OAuth2Request request =
-                            new OAuth2Request(null, null, null, true, null, null, null, null, null);
-                    UsernamePasswordAuthenticationToken token =
-                            new UsernamePasswordAuthenticationToken(principal, "N/A", authorities);
-                    return new OAuth2Authentication(request, token);
-                }
-
-                @Override
-                public OAuth2AccessToken readAccessToken(String accessToken) {
-                    return null;
-                }
-            };
+        @Bean
+        SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+            http.csrf()
+                    .disable()
+                    .authorizeRequests()
+                    .anyRequest()
+                    .authenticated()
+                    .and()
+                    .oauth2ResourceServer()
+                    .opaqueToken()
+                    .introspector(
+                            token ->
+                                    new DefaultOAuth2AuthenticatedPrincipal(
+                                            "admin",
+                                            Collections.singletonMap("sub", "admin"),
+                                            AuthorityUtils.commaSeparatedStringToAuthorityList(
+                                                    token)))
+                    .authenticationConverter(
+                            (token, principal) ->
+                                    new UsernamePasswordAuthenticationToken(
+                                            User.builder("admin").build(),
+                                            "N/A",
+                                            principal.getAuthorities()));
+            return http.build();
         }
     }
 

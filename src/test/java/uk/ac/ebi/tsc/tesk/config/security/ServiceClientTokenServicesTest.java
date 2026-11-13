@@ -41,9 +41,9 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.springframework.boot.test.system.OutputCaptureRule;
-import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
+import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
 /**
@@ -61,8 +61,8 @@ public class ServiceClientTokenServicesTest {
     @Rule public WireMockRule idp = new WireMockRule(options().dynamicPort());
     @Rule public OutputCaptureRule output = new OutputCaptureRule();
 
-    private ResourceServerTokenServices userInfo;
-    private OAuth2Authentication userAuthentication;
+    private OpaqueTokenIntrospector userInfo;
+    private OAuth2AuthenticatedPrincipal userPrincipal;
     private AuthorisationProperties properties;
 
     @BeforeClass
@@ -75,9 +75,9 @@ public class ServiceClientTokenServicesTest {
 
     @Before
     public void setUp() {
-        userInfo = mock(ResourceServerTokenServices.class);
-        userAuthentication = mock(OAuth2Authentication.class);
-        when(userInfo.loadAuthentication(anyString())).thenReturn(userAuthentication);
+        userInfo = mock(OpaqueTokenIntrospector.class);
+        userPrincipal = mock(OAuth2AuthenticatedPrincipal.class);
+        when(userInfo.introspect(anyString())).thenReturn(userPrincipal);
         properties = new AuthorisationProperties();
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
         settings.setEnabled(true);
@@ -143,20 +143,22 @@ public class ServiceClientTokenServicesTest {
     }
 
     private User accepted(String token) {
-        OAuth2Authentication authentication = services().loadAuthentication(token);
-        verify(userInfo, never()).loadAuthentication(anyString());
-        return (User) authentication.getPrincipal();
+        OAuth2AuthenticatedPrincipal principal = services().introspect(token);
+        verify(userInfo, never()).introspect(anyString());
+        assertEquals(principal.getName(), ((AuthenticatedUser) principal).getUser().getUsername());
+        assertTrue(principal.getAuthorities().isEmpty());
+        return ((AuthenticatedUser) principal).getUser();
     }
 
     private void refused(String token) {
         ServiceClientTokenServices services = services();
-        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
-        verify(userInfo, never()).loadAuthentication(anyString());
+        assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
+        verify(userInfo, never()).introspect(anyString());
     }
 
     private void passedOn(String token) {
-        assertSame(userAuthentication, services().loadAuthentication(token));
-        verify(userInfo).loadAuthentication(token);
+        assertSame(userPrincipal, services().introspect(token));
+        verify(userInfo).introspect(token);
     }
 
     @Test
@@ -287,15 +289,14 @@ public class ServiceClientTokenServicesTest {
     public void unknownKeyId_refreshesTheKeys() throws Exception {
         ServiceClientTokenServices services =
                 new ServiceClientTokenServices(userInfo, properties, 0);
-        services.loadAuthentication(sign(claims(CLIENT)));
+        services.introspect(sign(claims(CLIENT)));
         // the issuer rotates its keys
         jwks(key, otherKey);
 
-        OAuth2Authentication authentication =
-                services.loadAuthentication(
-                        sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt"));
+        OAuth2AuthenticatedPrincipal principal =
+                services.introspect(sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt"));
 
-        assertEquals(CLIENT, ((User) authentication.getPrincipal()).getUsername());
+        assertEquals(CLIENT, ((AuthenticatedUser) principal).getUser().getUsername());
         idp.verify(2, getRequestedFor(urlEqualTo("/oidc/jwk")));
         // the discovery document is read once
         idp.verify(
@@ -312,10 +313,10 @@ public class ServiceClientTokenServicesTest {
     @Test
     public void unknownKeyIds_refreshTheKeysAtMostOncePerInterval() throws Exception {
         ServiceClientTokenServices services = services();
-        services.loadAuthentication(sign(claims(CLIENT)));
+        services.introspect(sign(claims(CLIENT)));
         String unknown = sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt");
         for (int i = 0; i < 3; i++) {
-            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(unknown));
+            assertThrows(BadOpaqueTokenException.class, () -> services.introspect(unknown));
         }
         idp.verify(1, getRequestedFor(urlEqualTo("/oidc/jwk")));
     }
@@ -395,12 +396,6 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
-    public void readAccessToken_isPassedOn() {
-        services().readAccessToken("token");
-        verify(userInfo).readAccessToken("token");
-    }
-
-    @Test
     public void settingsWithoutIssuer_failAtStartup() {
         properties.getServiceClients().setIssuer(" ");
         assertThrows(IllegalStateException.class, this::services);
@@ -438,7 +433,7 @@ public class ServiceClientTokenServicesTest {
         ServiceClientTokenServices services = services();
         String token = sign(claims(CLIENT));
         for (int i = 0; i < 3; i++) {
-            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+            assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
         }
         idp.verify(
                 1,
@@ -454,10 +449,10 @@ public class ServiceClientTokenServicesTest {
         ServiceClientTokenServices services =
                 new ServiceClientTokenServices(userInfo, properties, 0);
         String token = sign(claims(CLIENT));
-        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+        assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
         discovery(issuer());
 
-        services.loadAuthentication(token);
+        services.introspect(token);
     }
 
     @Test
@@ -474,17 +469,17 @@ public class ServiceClientTokenServicesTest {
     public void failingRefresh_isThrottled() throws Exception {
         ServiceClientTokenServices services =
                 new ServiceClientTokenServices(userInfo, properties, 300);
-        services.loadAuthentication(sign(claims(CLIENT)));
+        services.introspect(sign(claims(CLIENT)));
         Thread.sleep(400);
         idp.givenThat(get("/oidc/jwk").willReturn(aResponse().withStatus(503)));
         String unknown = sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt");
         for (int i = 0; i < 3; i++) {
-            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(unknown));
+            assertThrows(BadOpaqueTokenException.class, () -> services.introspect(unknown));
         }
         // the first fetch, and one refresh for the unknown key IDs
         idp.verify(2, getRequestedFor(urlEqualTo("/oidc/jwk")));
         // the known key still works
-        services.loadAuthentication(sign(claims(CLIENT)));
+        services.introspect(sign(claims(CLIENT)));
     }
 
     /** A failed or empty key set isn't fetched again within the interval, also without discovery */
@@ -501,7 +496,7 @@ public class ServiceClientTokenServicesTest {
             }
             ServiceClientTokenServices services = services();
             for (int i = 0; i < 3; i++) {
-                assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+                assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
             }
             idp.verify(1, getRequestedFor(urlEqualTo("/oidc/jwk")));
         }
@@ -534,17 +529,16 @@ public class ServiceClientTokenServicesTest {
     /** A user whose sub is a listed client's ID would share its tasks, so is refused */
     @Test
     public void userWithClientId_isRefused() {
-        when(userAuthentication.getPrincipal()).thenReturn(User.builder(CLIENT).build());
+        when(userPrincipal.getName()).thenReturn(CLIENT);
         ServiceClientTokenServices services = services();
 
-        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication("opaque"));
-        verify(userInfo).loadAuthentication("opaque");
+        assertThrows(BadOpaqueTokenException.class, () -> services.introspect("opaque"));
+        verify(userInfo).introspect("opaque");
     }
 
     @Test
     public void otherUser_isPassedOn() {
-        when(userAuthentication.getPrincipal())
-                .thenReturn(User.builder("user@example.org").build());
+        when(userPrincipal.getName()).thenReturn("user@example.org");
         passedOn("opaque");
     }
 
