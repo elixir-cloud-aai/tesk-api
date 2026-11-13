@@ -254,7 +254,8 @@ public class TesExecutor   {
 
   /**
    * Whether to run the next executor, and finish the task, after this executor fails (TES 1.1).
-   * TESK stops at the first executor that fails, so it accepts only `false`.
+   * With `true`, the executor's job gets the annotation `ignore-error`, so that the taskmaster goes
+   * on after it fails (see `TaskStateResolver`).
    * @return ignoreError
   */
   @ApiModelProperty(value = "Whether errors of this executor are ignored: if it fails, the next executor runs, and the task can still complete.")

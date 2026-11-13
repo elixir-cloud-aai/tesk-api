@@ -108,25 +108,26 @@ TESK accepts the fields that TES 1.1 added to tasks:
 - `inputs[].streamable`: accepted and ignored, as TES allows: inputs are
   always downloaded before the executors start.
 - `executors[].ignore_error`: with `true`, a failure of the executor
-  doesn't end the task. The executor's job gets the annotation
-  `ignore-error: "true"`, and the taskmaster goes on with the next executor
-  and the outputs filer, as if the executor had completed. The task ends
-  `COMPLETE` if the other jobs complete. Its executor log keeps the
-  executor's `exit_code` (and, with `FULL`, `stdout`), so clients see the
-  failure there. Failures that the executor's pods report count as the
-  executor's own and are ignored: a non-zero exit code, but also an
-  eviction, preemption or OOM kill. Some failures still end the task with
-  `EXECUTOR_ERROR`, because the executor may never have run: these are jobs
-  the taskmaster ended itself, e.g. as their pod couldn't start (an image
-  that can't be pulled) or wasn't scheduled in time. Kubernetes marks such
-  a job failed with the reason `DeadlineExceeded`. A job the taskmaster
-  deleted is missing, which gives `SYSTEM_ERROR`. This needs a taskmaster
-  that supports the annotation
-  ([tesk-core#142](https://github.com/elixir-cloud-aai/tesk-core/issues/142));
-  older ones stop at the failure, and the task then ends `SYSTEM_ERROR` (a
-  later executor is missing) or, if it was the last executor, `COMPLETE`
-  without its outputs uploaded. Upgrade the taskmaster first (see
-  [Upgrading](upgrading.md)).
+  doesn't end the task.
+    - The executor's job gets the annotation `ignore-error: "true"`, and
+      the taskmaster goes on with the next executor and the outputs filer,
+      as if the executor had completed. The task ends `COMPLETE` if the
+      other jobs complete, including the outputs filer if the task has
+      outputs: a taskmaster that stopped at the failure without uploading
+      them gives `SYSTEM_ERROR`. The executor log keeps the executor's
+      `exit_code` (and, with `FULL`, `stdout`), so clients see the failure
+      there.
+    - Failures that the executor's pods report are ignored: a non-zero exit
+      code, but also an eviction, preemption or OOM kill.
+    - Failures of jobs that the taskmaster ended itself aren't, as the
+      executor may never have run. A pod that couldn't start (e.g. an image
+      that can't be pulled) fails its job with the reason
+      `DeadlineExceeded`, which gives `EXECUTOR_ERROR`. An executor whose
+      pod wasn't scheduled in time usually has its job deleted, and the
+      missing executor gives `SYSTEM_ERROR`.
+    - It needs a taskmaster that supports the annotation
+      ([tesk-core#142](https://github.com/elixir-cloud-aai/tesk-core/issues/142));
+      see [Upgrading](upgrading.md) for what older ones do.
 - `resources.backend_parameters`: TESK supports none (service info lists
   none, see [Service info](#service-info)).
     - With `backend_parameters_strict` set to `true`, for which TES asks to

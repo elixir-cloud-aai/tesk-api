@@ -26,6 +26,7 @@ import org.joda.time.DateTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
@@ -626,19 +627,73 @@ class TaskStateResolverTest {
      * task fail: the task's state comes from the other jobs, whichever executor it is, also a
      * preempted one.
      */
-    @ParameterizedTest
-    @ValueSource(ints = {0, 1})
-    void ignoredExecutorFailureCountsAsDone(int ignored) {
-        for (JobState failure : EnumSet.of(JobState.FAILED, JobState.PREEMPTED)) {
-            JobState ex0 = ignored == 0 ? failure : JobState.SUCCEEDED;
-            JobState ex1 = ignored == 1 ? failure : JobState.SUCCEEDED;
-            Task done = task(false, JobState.SUCCEEDED, ex0, ex1, JobState.SUCCEEDED);
-            ignoreError(done, ignored, "true");
-            assertThat(TaskStateResolver.resolve(done, () -> 2)).isEqualTo(TesState.COMPLETE);
-            Task running = task(false, JobState.RUNNING, ex0, ex1, JobState.RUNNING);
-            ignoreError(running, ignored, "true");
-            assertThat(TaskStateResolver.resolve(running, () -> 2)).isEqualTo(TesState.RUNNING);
-        }
+    @ParameterizedTest(name = "executor {0} {1}, taskmaster {2}: {3}")
+    @CsvSource({
+        "0, FAILED, SUCCEEDED, COMPLETE",
+        "1, FAILED, SUCCEEDED, COMPLETE",
+        "0, PREEMPTED, SUCCEEDED, COMPLETE",
+        "1, PREEMPTED, SUCCEEDED, COMPLETE",
+        "0, FAILED, RUNNING, RUNNING",
+        "1, FAILED, RUNNING, RUNNING",
+        "0, FAILED_PODS, SUCCEEDED, COMPLETE",
+    })
+    void ignoredExecutorFailureCountsAsDone(
+            int ignored, JobState failure, JobState taskmaster, TesState expected) {
+        JobState ex0 = ignored == 0 ? failure : JobState.SUCCEEDED;
+        JobState ex1 = ignored == 1 ? failure : JobState.SUCCEEDED;
+        JobState filer = taskmaster == JobState.RUNNING ? JobState.RUNNING : JobState.SUCCEEDED;
+        Task task = task(false, taskmaster, ex0, ex1, filer);
+        ignoreError(task, ignored, "true");
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(expected);
+    }
+
+    /**
+     * An ignored failure doesn't make up for a missing executor: if a later executor's job is
+     * missing (e.g., a taskmaster without support for ignore_error stopped at the failure), the
+     * task has a system error (issue #159).
+     */
+    @Test
+    void ignoredFailureWithMissingLaterExecutor() {
+        Task missing =
+                task(false, JobState.SUCCEEDED, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
+        ignoreError(missing, 0, "true");
+        assertThat(TaskStateResolver.resolve(missing, () -> 2, () -> false))
+                .isEqualTo(TesState.SYSTEM_ERROR);
+    }
+
+    /**
+     * After an ignored failure of the last executor, a task with outputs (or unknown ones)
+     * completed only if its outputs filer did, as the taskmaster may have stopped at the failure; a
+     * task without outputs needs none (issue #159).
+     */
+    @ParameterizedTest(name = "outputs {0}, filer {1}: {2}")
+    @CsvSource({
+        "true, ABSENT, SYSTEM_ERROR",
+        ", ABSENT, SYSTEM_ERROR",
+        "false, ABSENT, COMPLETE",
+        "true, SUCCEEDED, COMPLETE",
+        ", SUCCEEDED, COMPLETE",
+        "true, NEW, SYSTEM_ERROR",
+    })
+    void ignoredFailureOfLastExecutorNeedsOutputsFiler(
+            Boolean hasOutputs, JobState filer, TesState expected) {
+        Task task = task(false, JobState.SUCCEEDED, JobState.SUCCEEDED, JobState.FAILED, filer);
+        ignoreError(task, 1, "true");
+        assertThat(TaskStateResolver.resolve(task, () -> 2, () -> hasOutputs)).isEqualTo(expected);
+    }
+
+    /** Without ignored failures, the outputs filer's job isn't needed for COMPLETE, as before. */
+    @Test
+    void completeWithoutIgnoredFailureNeedsNoOutputsFiler() {
+        Task task =
+                task(
+                        false,
+                        JobState.SUCCEEDED,
+                        JobState.SUCCEEDED,
+                        JobState.SUCCEEDED,
+                        JobState.ABSENT);
+        assertThat(TaskStateResolver.resolve(task, () -> 2, () -> true))
+                .isEqualTo(TesState.COMPLETE);
     }
 
     /** Errors of executors without the annotation value "true" aren't ignored (issue #159). */

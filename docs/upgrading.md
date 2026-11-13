@@ -21,9 +21,10 @@ From 1.2.0, clients may notice changed answers:
   fields](api.md#tes-11-fields)). It needs a taskmaster that goes on after
   such an executor fails
   ([tesk-core#142](https://github.com/elixir-cloud-aai/tesk-core/issues/142)):
-  upgrade the taskmaster image first. With an older taskmaster, the task
-  stops at the failure, and ends `SYSTEM_ERROR`, or `COMPLETE` without its
-  outputs if the executor was the last one.
+  upgrade the taskmaster image first (`TESK_API_TASKMASTER_IMAGE_VERSION`,
+  see [Configuration](configuration.md)). An older taskmaster stops at the
+  failure: the task then ends `SYSTEM_ERROR`, unless the failed executor was
+  the last one and the task has no outputs, which completes as asked.
 
 ## To 1.2.0
 

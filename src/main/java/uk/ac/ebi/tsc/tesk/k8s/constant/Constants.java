@@ -54,6 +54,9 @@ public class Constants {
      */
     public static final String ANN_IGNORE_ERROR_KEY = "ignore-error";
 
+    /** Value of the annotation {@link #ANN_IGNORE_ERROR_KEY} of an executor that ignores errors */
+    public static final String ANN_IGNORE_ERROR_VALUE = "true";
+
     /**
      * Key of the annotation of the taskmaster's job with the keys of the task's backend parameters,
      * which TESK doesn't support and therefore doesn't store (a JSON array of strings)

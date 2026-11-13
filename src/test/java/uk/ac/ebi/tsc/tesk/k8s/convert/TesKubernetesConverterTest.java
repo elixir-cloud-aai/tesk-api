@@ -830,6 +830,27 @@ public class TesKubernetesConverterTest {
         return this.converter.extractTags(taskmaster);
     }
 
+    /**
+     * Whether the stored task has outputs: unknown (null) without a readable stored task (issue
+     * #159).
+     */
+    @Test
+    public void extractHasOutputs() throws IOException {
+        String executors = "\"executors\": [{}]";
+        assertEquals(Boolean.TRUE, this.hasOutputsOf("{" + executors + ", \"outputs\": [{}]}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + ", \"outputs\": []}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + "}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + ", \"outputs\": {}}"));
+        assertNull(this.hasOutputsOf("not JSON"));
+        assertNull(this.hasOutputsOf(null));
+    }
+
+    private Boolean hasOutputsOf(String storedTask) throws IOException {
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
+        return this.converter.extractHasOutputs(taskmaster);
+    }
+
     private Integer executorCountOf(String storedTask) throws IOException {
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
@@ -889,7 +910,10 @@ public class TesKubernetesConverterTest {
                             null,
                             User.builder("test-user-id").build());
             String annotation = job.getMetadata().getAnnotations().get(ANN_IGNORE_ERROR_KEY);
-            assertEquals(Boolean.TRUE.equals(ignoreError) ? "true" : null, annotation);
+            assertEquals(
+                    "ignore_error: " + ignoreError,
+                    Boolean.TRUE.equals(ignoreError) ? "true" : null,
+                    annotation);
         }
     }
 
