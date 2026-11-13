@@ -252,7 +252,8 @@ public class NoAuthIT {
 
         mockKubernetes.givenThat(
                 WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster")
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
+                                        + "&limit=256")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
@@ -260,6 +261,12 @@ public class NoAuthIT {
                 .perform(get(TASK_URL).header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tasks.length()").value(4));
+        // without page_size, Kubernetes is asked for a page of 256 taskmaster jobs, the default
+        // of TES (issue #137)
+        mockKubernetes.verify(
+                getRequestedFor(urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs"))
+                        .withQueryParam("labelSelector", equalTo("job-type=taskmaster"))
+                        .withQueryParam("limit", equalTo("256")));
         this.mvc
                 .perform(get(TASK_URL + "?view=BASIC").header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
@@ -313,7 +320,8 @@ public class NoAuthIT {
         cancelled.getMetadata().putLabelsItem("task-status", "Cancelled");
         mockKubernetes.givenThat(
                 WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster")
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
+                                        + "&limit=256")
                         .willReturn(
                                 okJson(
                                         MockUtil.jobList(

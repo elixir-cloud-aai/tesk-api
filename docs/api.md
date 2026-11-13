@@ -27,9 +27,9 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
 (the default), `BASIC` and `FULL`.
 
 - `page_size` sets how many tasks TESK API reads from Kubernetes for one
-  page, from 1 to 2048; without it, it reads all of them at once. Other
-  values, also those that aren't whole numbers, are refused with
-  `400 Bad Request`. `next_page_token` is the continue token of Kubernetes;
+  page, from 1 to 2048; without it, or if it is empty, 256, as TES
+  specifies. Other values, also those that aren't whole numbers, are
+  refused with `400 Bad Request`. `next_page_token` is the continue token of Kubernetes;
   pass it as `page_token` to get the next page.
   It is left out on the last page. Kubernetes accepts it for a limited time
   only (by default about 5 minutes, until etcd compacts its history).
@@ -123,6 +123,28 @@ TESK accepts the fields that TES 1.1 added to tasks:
       them either, but have no warning.
 
 Service info reports the TES version 1.1.0 (`type.version`).
+
+## Differences from TES 1.1
+
+TESK API implements TES 1.1 with these differences, which clients should
+know about:
+
+- `executors[].ignore_error: true` is refused with `400 Bad Request` (see
+  [TES 1.1 fields](#tes-11-fields)).
+- `resources.preemptible` and `resources.zones` are accepted and returned,
+  but have no effect on where the task runs, as TES allows.
+- `inputs[].streamable` is accepted and ignored (see [TES 1.1
+  fields](#tes-11-fields)).
+- `page_size` may also be 2048, while TES asks for less (see [Listing
+  tasks](#listing-tasks)).
+- In executor logs, `exit_code` is left out until the executor's container
+  has terminated, and `stdout` holds both output streams of the executor,
+  while `stderr` is left out (see [Executor logs](#executor-logs)).
+- `logs[].outputs` is always empty (see [Output file
+  logs](#output-file-logs)).
+- TESK API sends no CORS headers. To use it from web pages of other origins,
+  as TES asks of such implementations, configure CORS where you expose it,
+  e.g. in your ingress controller.
 
 ## Resources
 

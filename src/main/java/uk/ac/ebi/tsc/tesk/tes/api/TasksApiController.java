@@ -40,6 +40,9 @@ public class TasksApiController implements TasksApi {
      */
     static final long MAX_PAGE_SIZE = 2048;
 
+    /** page_size of listTasks if it is left out or empty: 256, the default of TES (issue #137) */
+    static final long DEFAULT_PAGE_SIZE = 256;
+
     private final TesService tesService;
 
     /**
@@ -113,7 +116,9 @@ public class TasksApiController implements TasksApi {
                             value =
                                     "OPTIONAL. Number of tasks to return in one page, from 1 to "
                                             + MAX_PAGE_SIZE
-                                            + ". Without it, all tasks are returned in one page. Pages can be shorter, also with name_prefix.")
+                                            + ". Defaults to "
+                                            + DEFAULT_PAGE_SIZE
+                                            + ". Pages can be shorter, also with name_prefix.")
                     @RequestParam(value = "page_size", required = false)
                     Long pageSize,
             @ApiParam(
@@ -129,7 +134,8 @@ public class TasksApiController implements TasksApi {
                     @RequestParam(value = "view", required = false, defaultValue = "MINIMAL")
                     String view) {
 
-        if (pageSize != null && (pageSize < 1 || pageSize > MAX_PAGE_SIZE)) {
+        long size = pageSize == null ? DEFAULT_PAGE_SIZE : pageSize;
+        if (size < 1 || size > MAX_PAGE_SIZE) {
             throw new InvalidPageSizeException(MAX_PAGE_SIZE);
         }
         TaskFilter filter =
@@ -137,7 +143,7 @@ public class TasksApiController implements TasksApi {
                         namePrefix, state, TaskFilter.zipTags(asList(tagKey), asList(tagValue)));
         TesListTasksResponse response =
                 this.tesService.listTasks(
-                        filter, pageSize, pageToken, TaskView.fromString(view), this.getUser());
+                        filter, size, pageToken, TaskView.fromString(view), this.getUser());
         return new ResponseEntity<TesListTasksResponse>(response, HttpStatus.OK);
     }
 

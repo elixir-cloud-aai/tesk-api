@@ -561,7 +561,8 @@ public class AuthIT {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-hash%3Da665a45920422f9d417e4867efdc4fb8")
+                                        + "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-hash%3Da665a45920422f9d417e4867efdc4fb8"
+                                        + "&limit=256")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
@@ -580,7 +581,8 @@ public class AuthIT {
 
         mockKubernetes.givenThat(
                 WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster")
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
+                                        + "&limit=256")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
@@ -599,7 +601,8 @@ public class AuthIT {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-group-name%20in%20%28TEST%29")
+                                        + "%2Ccreator-group-name%20in%20%28TEST%29"
+                                        + "&limit=256")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
@@ -620,7 +623,8 @@ public class AuthIT {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-group-name%20in%20%28TEST%2CABC%29")
+                                        + "%2Ccreator-group-name%20in%20%28TEST%2CABC%29"
+                                        + "&limit=256")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 

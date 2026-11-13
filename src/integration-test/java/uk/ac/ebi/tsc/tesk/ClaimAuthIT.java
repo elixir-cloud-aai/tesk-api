@@ -217,7 +217,8 @@ public class ClaimAuthIT {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-user-hash%3Dd159ef624ed86697b4f1f3ff086aacdd%2C%21creator-group-name")
+                                        + "%2Ccreator-user-hash%3Dd159ef624ed86697b4f1f3ff086aacdd%2C%21creator-group-name"
+                                        + "&limit=256")
                         .willReturn(
                                 okJson(
                                         MockUtil.jobList(
@@ -236,7 +237,8 @@ public class ClaimAuthIT {
             userInfo("123", assurance, "GA4GH:GA4GH-CAP:EBI:ADMIN");
             mockKubernetes.givenThat(
                     WireMock.get(
-                                    "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster")
+                                    "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
+                                            + "&limit=256")
                             .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
             MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
@@ -252,7 +254,8 @@ public class ClaimAuthIT {
             mockKubernetes.givenThat(
                     WireMock.get(
                                     "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                            + "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-hash%3Da665a45920422f9d417e4867efdc4fb8")
+                                            + "%2Ccreator-group-name%20in%20%28TEST%29%2Ccreator-user-hash%3Da665a45920422f9d417e4867efdc4fb8"
+                                            + "&limit=256")
                             .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
             MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
