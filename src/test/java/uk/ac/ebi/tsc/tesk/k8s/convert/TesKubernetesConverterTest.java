@@ -8,7 +8,6 @@ import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_IGNORE_ERROR_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 
@@ -939,7 +938,7 @@ public class TesKubernetesConverterTest {
                             0,
                             null,
                             User.builder("test-user-id").build());
-            String annotation = job.getMetadata().getAnnotations().get(ANN_IGNORE_ERROR_KEY);
+            String annotation = job.getMetadata().getAnnotations().get("ignore-error");
             assertEquals(
                     "ignore_error: " + ignoreError,
                     Boolean.TRUE.equals(ignoreError) ? "true" : null,

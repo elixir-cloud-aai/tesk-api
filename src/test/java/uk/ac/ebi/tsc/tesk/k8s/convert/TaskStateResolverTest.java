@@ -1,7 +1,6 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_IGNORE_ERROR_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_FILER_SUF;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
@@ -780,7 +779,7 @@ class TaskStateResolverTest {
                 .get(executor)
                 .getJob()
                 .getMetadata()
-                .putAnnotationsItem(ANN_IGNORE_ERROR_KEY, value);
+                .putAnnotationsItem("ignore-error", value); // the contract with the taskmaster
     }
 
     private static Task task(
