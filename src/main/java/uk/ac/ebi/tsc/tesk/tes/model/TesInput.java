@@ -1,11 +1,11 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import org.hibernate.validator.constraints.ScriptAssert;
 
 import javax.validation.Valid;
 import javax.validation.constraints.*;
@@ -18,7 +18,6 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
  */
 @ApiModel(description = "Input describes Task input files.")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
-@ScriptAssert(lang = "javascript", script = "(_this.url != null && (_this.url.trim().length) > 0) || (_this.content != null && _this.content.length > 0)", message = "URL or content required")
 public class TesInput   {
   @JsonProperty("name")
   private String name;
@@ -189,6 +188,18 @@ public class TesInput   {
 
   public void setContent(String content) {
     this.content = content;
+  }
+
+  /**
+   * An input needs a source: a `url` that isn't blank, or a `content` that isn't empty. A plain
+   * method rather than a script (`@ScriptAssert`), as Java 15 and later have no JavaScript engine.
+   *
+   * @return whether `url` or `content` is given
+   */
+  @JsonIgnore
+  @AssertTrue(message = "URL or content required")
+  public boolean isUrlOrContentGiven() {
+    return (url != null && !url.trim().isEmpty()) || (content != null && !content.isEmpty());
   }
 
 
