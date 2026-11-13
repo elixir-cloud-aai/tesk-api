@@ -29,6 +29,25 @@ notice changed answers:
   are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned
   all tasks at once. Clients that don't pass `page_size` must follow
   `next_page_token`, or pass a `page_size` of up to 2048.
+- **Token validation.** TESK API validates access tokens with the resource
+  server of Spring Security instead of Spring Security OAuth, which is end
+  of life. Deployments need no change: `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`
+  keeps its name and meaning (and is required with the `auth` profile, as
+  before). TESK API reads none of the other `security.oauth2.*` settings of
+  Spring Security OAuth (e.g. `security.oauth2.resource.token-info-uri`),
+  which it never documented. Clients may notice (see [Token
+  validation](access-control.md#token-validation)):
+    - The token is taken from the `Authorization: Bearer` header only; an
+      `access_token` parameter in the URL or in a form is ignored, so such
+      requests get `401 Unauthorized`. Send the token in the header.
+    - For an invalid token, `error_description` and `message` of the
+      `401` say `Invalid access token` instead of repeating the token.
+    - A header with an empty token, or with characters that tokens can't
+      have (e.g. spaces), is refused with `401` (`invalid_token`,
+      `Bearer token is malformed`) without a call to the user info
+      endpoint. Before, it was passed on to the endpoint.
+    - A token whose user info has no `sub` is refused with `401` instead
+      of failing with `500 Internal Server Error`.
 
 ## To 1.2.0
 

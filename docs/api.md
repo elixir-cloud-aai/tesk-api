@@ -296,7 +296,7 @@ Status code | Meaning
 --- | ---
 200 | OK: successful request
 400 | Bad request: validation error, or cancellation of a task that doesn't run
-401 | Unauthorized: no access token in the request, or an invalid token
+401 | Unauthorized: no access token in the request, or an invalid token (see [Token validation](access-control.md#token-validation) for the `WWW-Authenticate` header and the body)
 403 | Forbidden: the user may not do this (usually, not in the required group, or without the required claim)
 404 | Not found: no task with this ID
 500 | Something else went wrong (possibly the configuration)
