@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -632,6 +633,20 @@ public class TasksApiControllerTest {
     }
 
     /**
+     * Without page_size, or with an empty one, a page has at most 256 tasks, the default of TES
+     * (issue #137)
+     */
+    @Test
+    public void listTasks_defaultPageSize() throws Exception {
+        given(this.tesService.listTasks(any(), any(), any(), any(), any()))
+                .willReturn(new TesListTasksResponse());
+        listWith().andExpect(status().isOk());
+        listWith("page_size", "").andExpect(status().isOk());
+        verify(this.tesService, times(2))
+                .listTasks(eq(TaskFilter.NONE), eq(256L), isNull(), eq(TaskView.MINIMAL), any());
+    }
+
+    /**
      * An expired or malformed page_token is a client error: 400 with a message that names the
      * parameter, never its value (issue #114)
      */
@@ -672,7 +687,7 @@ public class TasksApiControllerTest {
             verify(this.tesService)
                     .listTasks(
                             eq(new TaskFilter(null, state, null)),
-                            isNull(),
+                            eq(TasksApiController.DEFAULT_PAGE_SIZE),
                             isNull(),
                             eq(TaskView.MINIMAL),
                             any());
@@ -741,7 +756,7 @@ public class TasksApiControllerTest {
                                         null,
                                         null,
                                         Collections.singletonList(TaskFilter.tag("a,b", "c,d")))),
-                        isNull(),
+                        eq(TasksApiController.DEFAULT_PAGE_SIZE),
                         isNull(),
                         eq(TaskView.MINIMAL),
                         any());
@@ -769,7 +784,7 @@ public class TasksApiControllerTest {
         verify(this.tesService)
                 .listTasks(
                         eq(new TaskFilter("", null, null)),
-                        isNull(),
+                        eq(TasksApiController.DEFAULT_PAGE_SIZE),
                         isNull(),
                         eq(TaskView.MINIMAL),
                         any());

@@ -27,10 +27,12 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
 (the default), `BASIC` and `FULL`.
 
 - `page_size` sets how many tasks TESK API reads from Kubernetes for one
-  page, from 1 to 2048; without it, it reads all of them at once. Other
-  values, also those that aren't whole numbers, are refused with
-  `400 Bad Request`. `next_page_token` is the continue token of Kubernetes;
-  pass it as `page_token` to get the next page.
+  page, from 1 to 2048 (TES asks for less than 2048). Without it, or if it
+  is empty, a page has at most 256 tasks, the default of TES, so a request
+  without `page_size` can also return a `next_page_token`: follow it to get
+  all tasks. Other values, also those that aren't whole numbers, are
+  refused with `400 Bad Request`. `next_page_token` is the continue token
+  of Kubernetes; pass it as `page_token` to get the next page.
   It is left out on the last page. Kubernetes accepts it for a limited time
   only (by default about 5 minutes, until etcd compacts its history).
 - `name_prefix` lists only the tasks whose names start with it
@@ -38,12 +40,8 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
   filters nothing.
 - `state` lists only the tasks in that state. It accepts every `tesState`
   of TES 1.1, in capitals (e.g. `RUNNING`, also `CANCELING` and
-<<<<<<< HEAD
   `PREEMPTED`; see [Getting tasks](index.md#getting-tasks) for when TESK
   API reports them);
-=======
-  `PREEMPTED`, which TESK API doesn't report yet, so they list no tasks);
->>>>>>> origin/dev
   other values are refused with `400 Bad Request`, and the message names
   `state`. An empty `state` filters nothing.
 - `tag_key` and `tag_value` list only the tasks with these tags. Repeat
@@ -127,6 +125,32 @@ TESK accepts the fields that TES 1.1 added to tasks:
       them either, but have no warning.
 
 Service info reports the TES version 1.1.0 (`type.version`).
+
+## Differences from TES 1.1
+
+TESK API implements TES 1.1 with these differences, which clients should
+know about:
+
+- `executors[].ignore_error: true` is refused with `400 Bad Request` (see
+  [TES 1.1 fields](#tes-11-fields);
+  [#159](https://github.com/elixir-cloud-aai/tesk-api/issues/159) is about
+  supporting it).
+- `resources.preemptible` and `resources.zones` are accepted and returned,
+  but have no effect on where the task runs, as TES allows.
+- `inputs[].streamable` is accepted and ignored (see [TES 1.1
+  fields](#tes-11-fields)).
+- `page_size` may also be 2048, while TES asks for less (see [Listing
+  tasks](#listing-tasks)).
+- In executor logs, `exit_code` is left out until the executor's container
+  has terminated, and `stdout` holds both output streams of the executor,
+  while `stderr` is left out (see [Executor logs](#executor-logs)).
+- `logs[].outputs` is always empty (see [Output file
+  logs](#output-file-logs);
+  [#160](https://github.com/elixir-cloud-aai/tesk-api/issues/160) is about
+  reporting them).
+- TESK API sends no CORS headers. To use it from web pages of other origins,
+  as TES asks of such implementations, configure CORS where you expose it,
+  e.g. in your ingress controller.
 
 ## Resources
 

@@ -210,7 +210,8 @@ public class ServiceClientAuthIT {
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
                                         + "%2Ccreator-user-hash%3D"
                                         + CreatorLabels.hash(CLIENT)
-                                        + "%2C%21creator-group-name")
+                                        + "%2C%21creator-group-name"
+                                        + "&limit=256")
                         .willReturn(
                                 okJson(
                                         MockUtil.jobList(
@@ -309,7 +310,8 @@ public class ServiceClientAuthIT {
                                                 + "GA4GH:GA4GH-CAP:EBI:ADMIN#perun.elixir-czech.cz\"]}")));
         mockKubernetes.givenThat(
                 WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster")
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
+                                        + "&limit=256")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 

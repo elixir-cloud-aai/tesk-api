@@ -112,7 +112,8 @@ public class LegacyUserLabelsIT {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-group-name%20in%20%28TEST%29")
+                                        + "%2Ccreator-group-name%20in%20%28TEST%29"
+                                        + "&limit=256")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
