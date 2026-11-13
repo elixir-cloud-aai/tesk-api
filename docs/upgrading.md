@@ -2,8 +2,19 @@
 
 ## To the next release
 
-From 1.2.0, clients may notice changed answers:
+From 1.2.0, deployments may have to check their JVM options, and clients may
+notice changed answers:
 
+- **Java 21.** The image runs TESK API on Java 21 instead of Java 8 (see
+  [Deployment](deployment.md)). If you pass options to the JVM in
+  `JAVA_OPTS`, check that Java 21 still accepts them: options that it
+  removed (e.g. `-XX:MaxPermSize`, `-XX:+UseConcMarkSweepGC`) stop the JVM
+  at startup. Without `JAVA_OPTS`, nothing changes.
+- **Inputs without a source.** An input with neither a `url` (that isn't
+  blank) nor a `content` (that isn't empty) is still refused with `400 Bad
+  Request`, but the message now names the check:
+  `Field 'inputs[0].urlOrContentGiven' URL or content required` instead of
+  `Field 'inputs[0]' URL or content required`.
 - **Wildcards without `path_prefix`.** An output whose `path` has wildcards
   (`*`, `?`, `[`) but no `path_prefix` is refused with `400 Bad Request`,
   unless its `url` is a `file:` URL or has no scheme, as TES 1.1 requires

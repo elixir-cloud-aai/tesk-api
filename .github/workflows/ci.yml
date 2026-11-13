@@ -91,9 +91,10 @@ jobs:
           docker run --rm --volume "${PWD}:/repo" --workdir /repo \
             rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
             -color
-      # Java 8, as in `test`: the plugin versions are the last that run on it.
-      # No Maven cache: it would share the key of `test` and could be saved
-      # with only the lint plugins in it
+      # Java 8, unlike `test`: google-java-format 1.7 doesn't run on Java 21,
+      # and newer versions format the code differently (to be updated with the
+      # move to Spring Boot 3, #66). No Maven cache: it would share the key of
+      # `test` and could be saved with only the lint plugins in it
       - name: Set up Java
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
@@ -129,7 +130,7 @@ jobs:
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
-          java-version: "8"
+          java-version: "21"
           cache: maven
       - name: Build and run tests
         run: ./mvnw -B clean verify

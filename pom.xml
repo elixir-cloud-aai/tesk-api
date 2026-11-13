@@ -22,7 +22,7 @@
         <log4j2.version>2.17.1</log4j2.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <java.version>1.8</java.version>
+        <java.version>21</java.version>
         <!-- Dependency versions -->
         <springfox-swagger.version>3.0.0</springfox-swagger.version>
         <kubernetes.client-java.version>11.0.4</kubernetes.client-java.version>
@@ -293,6 +293,10 @@
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
                     <useSystemClassLoader>false</useSystemClassLoader>
+                    <!-- JaCoCo's agent (`argLine`, set by prepare-agent), and access to the JDK
+                         internals that system-rules' EnvironmentVariables changes, which Java 17
+                         and later close (TesKubernetesConverterTest) -->
+                    <argLine>@{argLine} --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
                 </configuration>
             </plugin>
             <plugin>
@@ -396,7 +400,8 @@
             </plugin>
             <!-- Formatting (google-java-format, AOSP style) and lint (checkstyle.xml):
                  ./mvnw spotless:apply to format, ./mvnw spotless:check checkstyle:check to check
-                 (CI job Lint). These versions are the last that run on Java 8. -->
+                 (CI job Lint), on Java 8: google-java-format 1.7 does not run on Java 21, and
+                 newer versions format differently (docs/development.md). -->
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
