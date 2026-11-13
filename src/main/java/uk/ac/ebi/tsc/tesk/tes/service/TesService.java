@@ -51,7 +51,8 @@ public interface TesService {
      *
      * @param filter - only tasks that match it (name prefix, state and tags; see {@link
      *     TaskFilter}); {@link TaskFilter#NONE} for all tasks
-     * @param pageSize - maximum number of taskmaster jobs read for the page; all if null
+     * @param pageSize - maximum number of taskmaster jobs read for the page; all if null (the API
+     *     passes its default of 256 instead, see TasksApiController)
      * @param pageToken - continue token of Kubernetes, from the previous page's next_page_token
      * @param view - one of {@link TaskView} values, decides on how much detail is put in each
      *     resulting task

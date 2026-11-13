@@ -22,6 +22,11 @@ and clients may notice changed answers:
   e.g. to the part of `path` before its first wildcard. Uploading the
   matches of a pattern needs a taskmaster whose filer supports `path_prefix`
   ([tesk-core#134](https://github.com/elixir-cloud-aai/tesk-core/pull/134)).
+- **Default page size.** `GET /tasks` without `page_size` returns at most
+  256 tasks per page, as TES specifies, with a `next_page_token` if there
+  are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned
+  all tasks at once. Clients that don't pass `page_size` must follow
+  `next_page_token`, or pass a `page_size` of up to 2048.
 - **`CANCELING` and `PREEMPTED`.** A cancelled task is `CANCELING` while a
   pod of its taskmaster, executors or outputs filer is still running, and
   `CANCELED` only once they have ended; a task whose failed executors were
