@@ -22,7 +22,10 @@ public class TesInputTest {
         assertFalse(new TesInput().isUrlOrContentGiven());
         assertFalse(new TesInput().url("  ").isUrlOrContentGiven());
         assertFalse(new TesInput().url("\u3000\t").isUrlOrContentGiven());
-        assertFalse(new TesInput().url("\t\n\u000b\f\r\u00a0\ufeff\u2007\u202f\u2028\u2029").isUrlOrContentGiven());
+        assertFalse(
+                new TesInput()
+                        .url("\t\n\u000b\f\r\u00a0\ufeff\u2007\u202f\u2028\u2029")
+                        .isUrlOrContentGiven());
         assertFalse(new TesInput().content("").isUrlOrContentGiven());
         assertFalse(new TesInput().url("").content("").isUrlOrContentGiven());
     }
