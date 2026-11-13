@@ -257,23 +257,13 @@ public class TesExecutor   {
    * TESK stops at the first executor that fails, so it accepts only `false`.
    * @return ignoreError
   */
-  @ApiModelProperty(value = "Whether errors of this executor are ignored, and the next one runs. TESK doesn't support it: only false is accepted.")
+  @ApiModelProperty(value = "Whether errors of this executor are ignored: if it fails, the next executor runs, and the task can still complete.")
   public Boolean getIgnoreError() {
     return ignoreError;
   }
 
   public void setIgnoreError(Boolean ignoreError) {
     this.ignoreError = ignoreError;
-  }
-
-  /**
-   * Refuses `ignore_error: true`, rather than running the task differently than asked.
-   * @return whether the executor doesn't ask to ignore its errors
-   */
-  @JsonIgnore
-  @AssertTrue(message = "ignore_error: true is not supported; TESK stops at the first executor that fails")
-  public boolean isIgnoreErrorUnset() {
-    return ignoreError == null || !ignoreError;
   }
 
   public TesExecutor env(Map<String, String> env) {

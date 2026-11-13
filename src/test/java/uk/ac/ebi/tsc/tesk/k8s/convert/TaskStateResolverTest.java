@@ -1,12 +1,14 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_IGNORE_ERROR_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_FILER_SUF;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobCondition;
+import io.kubernetes.client.openapi.models.V1JobSpec;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
@@ -617,6 +619,95 @@ class TaskStateResolverTest {
                                 .metadata(new V1ObjectMeta().name(TASK + JOB_NAME_FILER_SUF))
                                 .status(new V1JobStatus().active(1))));
         assertThat(TaskStateResolver.resolve(task, () -> 1)).isEqualTo(TesState.CANCELING);
+    }
+
+    /**
+     * An executor that ignores errors (TES ignore_error, issue #159) and failed doesn't make the
+     * task fail: the task's state comes from the other jobs, whichever executor it is, also a
+     * preempted one.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1})
+    void ignoredExecutorFailureCountsAsDone(int ignored) {
+        for (JobState failure : EnumSet.of(JobState.FAILED, JobState.PREEMPTED)) {
+            JobState ex0 = ignored == 0 ? failure : JobState.SUCCEEDED;
+            JobState ex1 = ignored == 1 ? failure : JobState.SUCCEEDED;
+            Task done = task(false, JobState.SUCCEEDED, ex0, ex1, JobState.SUCCEEDED);
+            ignoreError(done, ignored, "true");
+            assertThat(TaskStateResolver.resolve(done, () -> 2)).isEqualTo(TesState.COMPLETE);
+            Task running = task(false, JobState.RUNNING, ex0, ex1, JobState.RUNNING);
+            ignoreError(running, ignored, "true");
+            assertThat(TaskStateResolver.resolve(running, () -> 2)).isEqualTo(TesState.RUNNING);
+        }
+    }
+
+    /** Errors of executors without the annotation value "true" aren't ignored (issue #159). */
+    @ParameterizedTest
+    @ValueSource(strings = {"false", "True", ""})
+    void otherAnnotationValuesDontIgnoreErrors(String value) {
+        Task task =
+                task(
+                        false,
+                        JobState.SUCCEEDED,
+                        JobState.FAILED,
+                        JobState.SUCCEEDED,
+                        JobState.SUCCEEDED);
+        ignoreError(task, 0, value);
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.EXECUTOR_ERROR);
+    }
+
+    /** An executor that fails without ignoring errors still fails the task (issue #159). */
+    @Test
+    void laterExecutorErrorIsNotIgnored() {
+        Task task =
+                task(false, JobState.SUCCEEDED, JobState.FAILED, JobState.FAILED, JobState.ABSENT);
+        ignoreError(task, 0, "true");
+        assertThat(TaskStateResolver.resolve(task, () -> 2)).isEqualTo(TesState.EXECUTOR_ERROR);
+    }
+
+    /**
+     * An executor's job that the taskmaster ended itself (it set activeDeadlineSeconds, e.g. as the
+     * pod couldn't start; Kubernetes then fails the job with the reason DeadlineExceeded) isn't
+     * ignored: the executor may never have run, and the taskmaster stopped (issue #159).
+     */
+    @Test
+    void executorEndedByTaskmasterIsNotIgnored() {
+        Task deadline =
+                task(
+                        false,
+                        JobState.SUCCEEDED,
+                        JobState.FAILED,
+                        JobState.SUCCEEDED,
+                        JobState.SUCCEEDED);
+        ignoreError(deadline, 0, "true");
+        deadline.getExecutors().get(0).getJob().spec(new V1JobSpec().activeDeadlineSeconds(1L));
+        assertThat(TaskStateResolver.resolve(deadline, () -> 2)).isEqualTo(TesState.EXECUTOR_ERROR);
+
+        Task reason =
+                task(
+                        false,
+                        JobState.SUCCEEDED,
+                        JobState.FAILED,
+                        JobState.SUCCEEDED,
+                        JobState.SUCCEEDED);
+        ignoreError(reason, 0, "true");
+        reason.getExecutors()
+                .get(0)
+                .getJob()
+                .getStatus()
+                .getConditions()
+                .get(0)
+                .reason("DeadlineExceeded");
+        assertThat(TaskStateResolver.resolve(reason, () -> 2)).isEqualTo(TesState.EXECUTOR_ERROR);
+    }
+
+    /** Gives an executor's job the annotation with which TESK passes ignore_error. */
+    private static void ignoreError(Task task, int executor, String value) {
+        task.getExecutors()
+                .get(executor)
+                .getJob()
+                .getMetadata()
+                .putAnnotationsItem(ANN_IGNORE_ERROR_KEY, value);
     }
 
     private static Task task(

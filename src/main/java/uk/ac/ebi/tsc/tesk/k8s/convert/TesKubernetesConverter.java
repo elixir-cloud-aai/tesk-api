@@ -263,6 +263,10 @@ public class TesKubernetesConverter {
         job.getMetadata()
                 .putLabelsItem(LABEL_EXECNO_KEY, Integer.valueOf(executorIndex).toString());
         job.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, tesTaskName);
+        // The taskmaster goes on after such an executor fails (issue #159)
+        if (Boolean.TRUE.equals(executor.getIgnoreError())) {
+            job.getMetadata().putAnnotationsItem(ANN_IGNORE_ERROR_KEY, "true");
+        }
         CreatorLabels.put(job.getMetadata(), user.getUsername());
         V1Container container = job.getSpec().getTemplate().getSpec().getContainers().get(0);
         // Tries to convert potential TRS URI into docker image. If conversion unsuccessful ->

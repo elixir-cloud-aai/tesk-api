@@ -8,6 +8,7 @@ import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_IGNORE_ERROR_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 
@@ -864,6 +865,32 @@ public class TesKubernetesConverterTest {
                 job.getSpec().getTemplate().getSpec().getContainers().get(0).getResources();
         assertEquals("500m", requirements.getLimits().get("cpu").toSuffixedString());
         assertEquals("500m", requirements.getRequests().get("cpu").toSuffixedString());
+    }
+
+    /**
+     * An executor that ignores errors gets the annotation with which the taskmaster goes on after
+     * it fails; other executors get none (issue #159)
+     */
+    @Test
+    public void fromTesExecutorToK8sJob_ignoreError() {
+        Boolean[] values = {true, false, null};
+        for (Boolean ignoreError : values) {
+            TesExecutor executor =
+                    new TesExecutor()
+                            .image("alpine")
+                            .addCommandItem("true")
+                            .ignoreError(ignoreError);
+            V1Job job =
+                    this.converter.fromTesExecutorToK8sJob(
+                            "task-123",
+                            "name",
+                            executor,
+                            0,
+                            null,
+                            User.builder("test-user-id").build());
+            String annotation = job.getMetadata().getAnnotations().get(ANN_IGNORE_ERROR_KEY);
+            assertEquals(Boolean.TRUE.equals(ignoreError) ? "true" : null, annotation);
+        }
     }
 
     /**

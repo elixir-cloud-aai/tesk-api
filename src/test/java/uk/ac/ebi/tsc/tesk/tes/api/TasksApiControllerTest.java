@@ -221,7 +221,6 @@ public class TasksApiControllerTest {
                     new String[] {"no_image.json", "image"},
                     new String[] {"no_command.json", "command"},
                     new String[] {"invalid_stdin.json", "stdin"},
-                    new String[] {"ignore_error_true.json", "ignore_error: true is not supported"},
                 };
         for (String[] file : files) {
             this.mvc
@@ -478,6 +477,21 @@ public class TasksApiControllerTest {
                                 .content(
                                         getFileContentFromResources(
                                                 "valid_tasks/tes_1_1_fields.json"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+    }
+
+    /** Executors that ignore errors are accepted (issue #159) */
+    @Test
+    public void createTask_valid_ignoreErrorTrue() throws Exception {
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer BAR")
+                                .content(
+                                        getFileContentFromResources(
+                                                "valid_tasks/ignore_error_true.json"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());

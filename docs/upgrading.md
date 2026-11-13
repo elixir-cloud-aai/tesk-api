@@ -16,6 +16,14 @@ From 1.2.0, clients may notice changed answers:
   are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned
   all tasks at once. Clients that don't pass `page_size` must follow
   `next_page_token`, or pass a `page_size` of up to 2048.
+- **`ignore_error`.** `executors[].ignore_error: true` is accepted rather
+  than refused with `400 Bad Request` (see [TES 1.1
+  fields](api.md#tes-11-fields)). It needs a taskmaster that goes on after
+  such an executor fails
+  ([tesk-core#142](https://github.com/elixir-cloud-aai/tesk-core/issues/142)):
+  upgrade the taskmaster image first. With an older taskmaster, the task
+  stops at the failure, and ends `SYSTEM_ERROR`, or `COMPLETE` without its
+  outputs if the executor was the last one.
 
 ## To 1.2.0
 
