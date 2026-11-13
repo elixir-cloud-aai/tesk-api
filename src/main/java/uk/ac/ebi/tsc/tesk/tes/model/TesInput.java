@@ -200,7 +200,18 @@ public class TesInput   {
   @JsonIgnore
   @AssertTrue(message = "URL or content required")
   public boolean isUrlOrContentGiven() {
-    return (url != null && !url.isBlank()) || (content != null && !content.isEmpty());
+    return (url != null && !isJavaScriptBlank(url)) || (content != null && !content.isEmpty());
+  }
+
+  /**
+   * Whether a string holds only white space and line terminators as JavaScript's `trim` sees
+   * them (ECMAScript WhiteSpace and LineTerminator). Unlike {@link String#isBlank()}, this
+   * includes U+00A0, U+2007, U+202F and U+FEFF, and excludes U+001C to U+001F.
+   */
+  private static boolean isJavaScriptBlank(String s) {
+    return s.codePoints().allMatch(c -> c == '\t' || c == '\n' || c == 0x0B || c == '\f'
+        || c == '\r' || c == 0xFEFF || c == 0x2028 || c == 0x2029
+        || Character.getType(c) == Character.SPACE_SEPARATOR);
   }
 
 
