@@ -105,7 +105,9 @@ applies gives the state:
    executors exist and completed (or failed, for executors whose errors are
    ignored as in rule 2), otherwise `SYSTEM_ERROR` (e.g., the inputs
    filer failed, so that no executor ran, or an executor's job is missing).
-   The number of executors comes from the task stored with the taskmaster's
+   After an ignored failure, a task with outputs (or whose stored task
+   can't be read) also needs its outputs filer's job to have completed;
+   otherwise it's `SYSTEM_ERROR`. The number of executors comes from the task stored with the taskmaster's
    job; without it, the executor jobs that exist count as all executors.
 5. A pod of the taskmaster's job is pending: `QUEUED`.
 6. The taskmaster's job is active: `INITIALIZING` until the first executor's
