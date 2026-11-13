@@ -22,7 +22,7 @@ cosign verify elixircloud/tesk-api:1.2.0 \
 For `dev` images, the identity is
 `https://github.com/elixir-cloud-aai/tesk-api/.github/workflows/ci.yml@refs/heads/dev`.
 
-The image runs the application with Java 8 on [Eclipse
+The image runs the application with Java 21 on [Eclipse
 Temurin](https://adoptium.net/) and listens on port 8080. `JAVA_OPTS` passes
 options to the JVM. It runs as the non-root user `tesk` (UID 1000, group 0,
 home directory `/home/tesk`); any other UID in group 0 works too, as on
@@ -66,7 +66,7 @@ needs to manage jobs, pods and persistent volume claims.
 ## Running locally
 
 To run TESK API outside of Kubernetes, e.g. against a local cluster such as
-[kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/), with Java 8 and
+[kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/), with Java 21 and
 a `KUBECONFIG` file for that cluster:
 
 ```bash

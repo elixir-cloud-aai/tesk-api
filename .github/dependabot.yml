@@ -3,8 +3,8 @@ version: 2
 # whatever the default branch is (`main` only moves forward to releases);
 # security updates always target the default branch, though
 updates:
-  # Dependencies in `pom.xml`. Java 8 and Spring Boot 2 stay until the move to
-  # Spring Boot 3, which needs code changes
+  # Dependencies in `pom.xml`. Spring Boot 2 stays until the move to Spring
+  # Boot 3, which needs code changes
   - package-ecosystem: maven
     directory: /
     schedule:
@@ -38,8 +38,9 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
-  # Base images in the `Dockerfile` (tag and digest). Java 8 stays until the
-  # move to Spring Boot 3
+  # Base images in the `Dockerfile` (tag and digest). Java 21 (LTS), as in
+  # `pom.xml` and the CI job `Test`: a new major version of Java is a
+  # decision of its own
   - package-ecosystem: docker
     directory: /
     schedule:

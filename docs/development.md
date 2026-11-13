@@ -1,10 +1,9 @@
 # Development
 
 TESK API is a [Spring Boot](https://spring.io/projects/spring-boot) 2.7
-application on Java 8, built with Maven 3.9 (through the wrapper `./mvnw`,
-which downloads the version pinned in `.mvn/wrapper/maven-wrapper.properties`;
-Maven 3.9 still runs on Java 8). The server stub is generated from the TES
-specification with the [Swagger Codegen Maven
+application on Java 21, built with Maven 3.9 (through the wrapper `./mvnw`,
+which downloads the version pinned in `.mvn/wrapper/maven-wrapper.properties`).
+The server stub is generated from the TES specification with the [Swagger Codegen Maven
 plugin](https://github.com/swagger-api/swagger-codegen/tree/master/modules/swagger-codegen-maven-plugin),
 and the [Kubernetes Java client](https://github.com/kubernetes-client/java)
 talks to the Kubernetes API.
@@ -66,10 +65,15 @@ neither):
 ./mvnw spotless:check checkstyle:check
 ```
 
-The plugin versions (spotless-maven-plugin 2.30.0 with google-java-format 1.7,
-Checkstyle 9.3) are the last that run on Java 8; newer ones need a newer JDK
-(the move to Spring Boot 3,
-[#66](https://github.com/elixir-cloud-aai/tesk-api/issues/66)).
+These two commands need Java 8 (e.g. `JAVA_HOME` pointing to a Java 8 JDK),
+as the CI job `Lint` runs them: google-java-format 1.7 (with
+spotless-maven-plugin 2.30.0) doesn't run on Java 21, and the newer versions
+that do format the code differently. The update, with the reformat it brings,
+is part of the move to Spring Boot 3
+([#66](https://github.com/elixir-cloud-aai/tesk-api/issues/66)). Building and
+testing need Java 21. Until then, write code that Java 8 can parse (no
+records, text blocks, `switch` expressions or `instanceof` patterns), or the
+formatter fails.
 
 The commits that only reformatted the code are listed in
 `.git-blame-ignore-revs`. GitHub skips them in its blame view; for `git blame`,
@@ -218,7 +222,10 @@ Validation](https://beanvalidation.org/) annotations beyond those derived from
 the specification (e.g. `@Digits` and `@DecimalMin` on the resources of
 `TesResources`); restore them by hand in the generated code, and reconcile
 any other manual changes, e.g. the internal field `userIdFromLegacyLabel` of
-`TesTaskLog` (not serialized), which the access check of a task needs. Until
+`TesTaskLog` (not serialized), which the access check of a task needs, and
+the check `isUrlOrContentGiven` of `TesInput` (a generator that adds
+`@ScriptAssert(lang = "javascript")` instead brings back a check that fails
+on Java 15 and later, which have no JavaScript engine). Until
 the experimental private image credential workaround remains supported, also
 restore the `docker_registry`, `docker_login` and `docker_pass` fields,
 validation, write-only handling, and experimental API descriptions in
