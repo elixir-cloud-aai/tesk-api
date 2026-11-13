@@ -1,21 +1,58 @@
 # Upgrading
 
-## To the next release
+## To 1.3.0
 
-From 1.2.0, clients may notice changed answers:
+From 1.2.0, deployments need no changes: the new options are off by
+default. TESK API 1.3.0 accepts the task fields and list filters of TES 1.1,
+and clients may notice changed answers:
 
+- **TES 1.1 fields.** `outputs[].path_prefix`, `inputs[].streamable`,
+  `executors[].ignore_error` and `resources.backend_parameters_strict` are
+  accepted instead of being refused as unknown fields, with two exceptions
+  that are refused with `400 Bad Request`, as TESK can't do what they ask:
+  `ignore_error: true` (TESK stops at the first executor that fails) and
+  `backend_parameters_strict: true` with `backend_parameters` (see [TES 1.1
+  fields](api.md#tes-11-fields)).
 - **Wildcards without `path_prefix`.** An output whose `path` has wildcards
   (`*`, `?`, `[`) but no `path_prefix` is refused with `400 Bad Request`,
   unless its `url` is a `file:` URL or has no scheme, as TES 1.1 requires
   `path_prefix` for such outputs (see [TES 1.1 fields](api.md#tes-11-fields)).
   Before, such a task ran, and its output then failed or uploaded nothing
   useful. Clients that send such outputs to other URLs set `path_prefix`,
-  e.g. to the part of `path` before its first wildcard.
+  e.g. to the part of `path` before its first wildcard. Uploading the
+  matches of a pattern needs a taskmaster whose filer supports `path_prefix`
+  ([tesk-core#134](https://github.com/elixir-cloud-aai/tesk-core/pull/134)).
 - **Default page size.** `GET /tasks` without `page_size` returns at most
   256 tasks per page, as TES specifies, with a `next_page_token` if there
   are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned
   all tasks at once. Clients that don't pass `page_size` must follow
   `next_page_token`, or pass a `page_size` of up to 2048.
+- **`CANCELING` and `PREEMPTED`.** A cancelled task is `CANCELING` while a
+  pod of its taskmaster, executors or outputs filer is still running, and
+  `CANCELED` only once they have ended; a task whose failed executors were
+  all disrupted by Kubernetes (preemption, eviction, node pressure, taints) is
+  `PREEMPTED` instead of `EXECUTOR_ERROR` (see [Getting
+  tasks](index.md#getting-tasks)). Clients that wait for `CANCELED` after a
+  cancel request wait until the pods have ended; clients that know only the
+  states of TES 1.0 must accept the new ones.
+- **`backend_parameters`.** They are no longer stored or returned, also for
+  tasks created by earlier versions; with the view `FULL`, a task lists the
+  keys it ignored in `logs[0].system_logs` (only tasks created by 1.3.0 or
+  later: earlier versions recorded no ignored keys, so their tasks list
+  none).
+  Service info lists `tesResources_backend_parameters` (always `[]`); keep
+  it at `[]` in your own service info file, if you use one.
+- **Service info.** `type.version` is `1.1.0` instead of `1.0.0`. If you
+  use your own file (`TESK_API_SERVICE_INFO_LOCATION`), update `type.version`
+  and `version` there, too.
+
+New, off until you use them: tokens of allow-listed service clients
+(`TESK_API_AUTHORISATION_SERVICE_CLIENTS_*`, see [Tokens of
+services](access-control.md#tokens-of-services); in the Helm chart of TESK
+after 0.3.0: `auth.tokenClients`) and private executor images, an experimental
+workaround that needs `create` and `delete` on `secrets` (see [Private
+executor images](api.md#private-executor-images) and
+[Deployment](deployment.md)).
 
 ## To 1.2.0
 

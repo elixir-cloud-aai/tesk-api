@@ -12,7 +12,7 @@ contactUrl: https://github.com/elixir-cloud-aai/tesk-api/issues
 documentationUrl: https://tesk.readthedocs.io/en/latest/tesk-api/
 createdAt: 2021-04-06
 environment: dev
-version: 1.2.0
+version: 1.3.0
 storage:
 - ftp://ftp-private.ebi.ac.uk
 # TESK supports no backend parameters (TES 1.1)
