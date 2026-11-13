@@ -11,6 +11,11 @@ From 1.2.0, clients may notice changed answers:
   Before, such a task ran, and its output then failed or uploaded nothing
   useful. Clients that send such outputs to other URLs set `path_prefix`,
   e.g. to the part of `path` before its first wildcard.
+- **Default page size.** `GET /tasks` without `page_size` returns at most
+  256 tasks per page, as TES specifies, with a `next_page_token` if there
+  are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned
+  all tasks at once. Clients that don't pass `page_size` must follow
+  `next_page_token`, or pass a `page_size` of up to 2048.
 
 ## To 1.2.0
 

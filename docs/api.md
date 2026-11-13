@@ -132,7 +132,9 @@ TESK API implements TES 1.1 with these differences, which clients should
 know about:
 
 - `executors[].ignore_error: true` is refused with `400 Bad Request` (see
-  [TES 1.1 fields](#tes-11-fields)).
+  [TES 1.1 fields](#tes-11-fields);
+  [#159](https://github.com/elixir-cloud-aai/tesk-api/issues/159) is about
+  supporting it).
 - `resources.preemptible` and `resources.zones` are accepted and returned,
   but have no effect on where the task runs, as TES allows.
 - `inputs[].streamable` is accepted and ignored (see [TES 1.1
@@ -143,7 +145,9 @@ know about:
   has terminated, and `stdout` holds both output streams of the executor,
   while `stderr` is left out (see [Executor logs](#executor-logs)).
 - `logs[].outputs` is always empty (see [Output file
-  logs](#output-file-logs)).
+  logs](#output-file-logs);
+  [#160](https://github.com/elixir-cloud-aai/tesk-api/issues/160) is about
+  reporting them).
 - TESK API sends no CORS headers. To use it from web pages of other origins,
   as TES asks of such implementations, configure CORS where you expose it,
   e.g. in your ingress controller.
