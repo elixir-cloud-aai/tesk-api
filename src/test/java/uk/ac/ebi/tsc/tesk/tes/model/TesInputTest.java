@@ -1,0 +1,26 @@
+package uk.ac.ebi.tsc.tesk.tes.model;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+public class TesInputTest {
+
+    @Test
+    public void urlOrContentGiven() {
+        assertTrue(new TesInput().url("s3://bucket/file").isUrlOrContentGiven());
+        assertTrue(new TesInput().content("data").isUrlOrContentGiven());
+        assertTrue(new TesInput().url("s3://bucket/file").content("data").isUrlOrContentGiven());
+        assertTrue(new TesInput().url(" ").content(" ").isUrlOrContentGiven());
+    }
+
+    @Test
+    public void neitherUrlNorContentGiven() {
+        assertFalse(new TesInput().isUrlOrContentGiven());
+        assertFalse(new TesInput().url("  ").isUrlOrContentGiven());
+        assertFalse(new TesInput().url("\u3000\t").isUrlOrContentGiven());
+        assertFalse(new TesInput().content("").isUrlOrContentGiven());
+        assertFalse(new TesInput().url("").content("").isUrlOrContentGiven());
+    }
+}

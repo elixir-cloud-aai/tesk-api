@@ -191,15 +191,16 @@ public class TesInput   {
   }
 
   /**
-   * An input needs a source: a `url` that isn't blank, or a `content` that isn't empty. A plain
-   * method rather than a script (`@ScriptAssert`), as Java 15 and later have no JavaScript engine.
+   * An input needs a source: a `url` that isn't blank (white space as JavaScript's `trim` saw it
+   * before), or a `content` that isn't empty. A plain method rather than a script
+   * (`@ScriptAssert`), as Java 15 and later have no JavaScript engine.
    *
    * @return whether `url` or `content` is given
    */
   @JsonIgnore
   @AssertTrue(message = "URL or content required")
   public boolean isUrlOrContentGiven() {
-    return (url != null && !url.trim().isEmpty()) || (content != null && !content.isEmpty());
+    return (url != null && !url.isBlank()) || (content != null && !content.isEmpty());
   }
 
 
