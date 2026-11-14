@@ -24,6 +24,19 @@ notice changed answers:
   Before, such a task ran, and its output then failed or uploaded nothing
   useful. Clients that send such outputs to other URLs set `path_prefix`,
   e.g. to the part of `path` before its first wildcard.
+- **Output file logs.** `logs[0].outputs` lists the uploaded files (see
+  [Output file logs](api.md#output-file-logs)) once the taskmaster and the
+  filer are of a tesk-core release with
+  [tesk-core#144](https://github.com/elixir-cloud-aai/tesk-core/issues/144)
+  (set `TESK_API_TASKMASTER_IMAGE_VERSION` and
+  `TESK_API_TASKMASTER_FILER_IMAGE_VERSION` to it, if the default isn't
+  such a release). With older images, it stays empty, as before. TESK API
+  needs no new permissions. The taskmaster needs `patch` on `jobs` and
+  `get` on `pods/log` (see [Deployment](deployment.md)): TESK's Helm chart
+  grants both; if you manage the taskmaster's role yourself, check that it
+  has them, or the array stays empty. `GET /tasks` transfers more data in
+  namespaces with many finished tasks with many output files (see [Output
+  file logs](api.md#output-file-logs)).
 - **Default page size.** `GET /tasks` without `page_size` returns at most
   256 tasks per page, as TES specifies, with a `next_page_token` if there
   are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned
@@ -57,6 +70,15 @@ notice changed answers:
   `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` isn't an absolute `http` or
   `https` URL with a host; before, it started and refused every
   token.
+- **`ignore_error`.** `executors[].ignore_error: true` is accepted rather
+  than refused with `400 Bad Request` (see [TES 1.1
+  fields](api.md#tes-11-fields)). It needs a taskmaster that goes on after
+  such an executor fails
+  ([tesk-core#142](https://github.com/elixir-cloud-aai/tesk-core/issues/142)):
+  upgrade the taskmaster image first (`TESK_API_TASKMASTER_IMAGE_VERSION`,
+  see [Configuration](configuration.md)). An older taskmaster stops at the
+  failure: the task then ends `SYSTEM_ERROR`, unless the failed executor was
+  the last one and the task has no outputs, which completes as asked.
 
 ## To 1.2.0
 

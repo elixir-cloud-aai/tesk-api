@@ -39,6 +39,13 @@ public class Constants {
     public static final String JOB_NAME_FILER_SUF = "-outputs-filer";
 
     /**
+     * Key of the annotation of the outputs filer's job in which the taskmaster stores the uploaded
+     * files as JSON, with the keys of TES {@code tesOutputFileLog} (needs a taskmaster and filer
+     * with elixir-cloud-aai/tesk-core#144)
+     */
+    public static final String ANN_OUTPUT_FILE_LOGS_KEY = "output-file-logs";
+
+    /**
      * Key of the annotation, that stores name of TES task in both taskmaster's job and executor's
      * jobs.
      */
@@ -46,6 +53,16 @@ public class Constants {
 
     /** Key of the annotation, that stores whole input TES task serialized to JSON */
     public static final String ANN_JSON_INPUT_KEY = "json-input";
+
+    /**
+     * Key of the annotation of an executor's job that ignores errors (TES {@code ignore_error}),
+     * with the value {@code "true"}: the taskmaster goes on after the executor fails, and the
+     * failure doesn't fail the task (needs a taskmaster with elixir-cloud-aai/tesk-core#142)
+     */
+    public static final String ANN_IGNORE_ERROR_KEY = "ignore-error";
+
+    /** Value of the annotation {@link #ANN_IGNORE_ERROR_KEY} of an executor that ignores errors */
+    public static final String ANN_IGNORE_ERROR_VALUE = "true";
 
     /**
      * Key of the annotation of the taskmaster's job with the keys of the task's backend parameters,

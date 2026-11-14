@@ -18,7 +18,10 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.*;
 import java.io.*;
 import java.io.ByteArrayInputStream;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -46,8 +49,10 @@ import uk.ac.ebi.tsc.tesk.TestUtils;
 import uk.ac.ebi.tsc.tesk.config.GsonConfig;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
+import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
+import uk.ac.ebi.tsc.tesk.tes.model.TesOutputFileLog;
 import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
@@ -517,6 +522,155 @@ public class TesKubernetesConverterTest {
         assertThat(outputTask, is(expectedTask));
     }
 
+    /**
+     * The files that the taskmaster stored with the outputs filer's job are the task's output file
+     * logs (issue #160).
+     */
+    @Test
+    public void fromK8sToTask_outputFileLogs() throws IOException {
+        assertEquals(FILE_LOGS, this.outputsOf(STORED_FILE_LOGS));
+    }
+
+    /** Other keys of a stored file are ignored, e.g. ones that a later taskmaster adds. */
+    @Test
+    public void fromK8sToTask_outputFileLogsWithOtherKeys() throws IOException {
+        assertEquals(
+                FILE_LOGS.subList(0, 1),
+                this.outputsOf(
+                        "[{\"url\":\"s3://b/a\",\"path\":\"/out/a\",\"size_bytes\":\"1\","
+                                + "\"checksum\":\"x\"}]"));
+    }
+
+    /** In task lists (taskmasters added first), the outputs filer's job is matched by name. */
+    @Test
+    public void fromK8sToTask_outputFileLogsInTaskList() throws IOException {
+        Task single = this.prepareBaseTaskBuider().getTask();
+        Task listed =
+                TaskBuilder.newTaskList()
+                        .addJob(single.getTaskmaster().getJob())
+                        .addJob(single.getExecutors().get(0).getJob())
+                        .addJob(outputsFilerJob(STORED_FILE_LOGS))
+                        .getTaskList()
+                        .get(0);
+        assertEquals(
+                FILE_LOGS,
+                this.converter
+                        .fromK8sJobsToTesTaskBasic(listed, true)
+                        .getLogs()
+                        .get(0)
+                        .getOutputs());
+    }
+
+    /** Without an outputs filer's job, the task has no output file logs. */
+    @Test
+    public void fromK8sToTask_noOutputsFiler() throws IOException {
+        TesTask outputTask =
+                this.converter.fromK8sJobsToTesTaskBasic(
+                        this.prepareBaseTaskBuider().getTask(), true);
+        assertEquals(Collections.emptyList(), outputTask.getLogs().get(0).getOutputs());
+    }
+
+    /** Without the annotation (e.g. an older taskmaster), the task has no output file logs. */
+    @Test
+    public void fromK8sToTask_noOutputFileLogs() throws IOException {
+        assertEquals(Collections.emptyList(), this.outputsOf(null));
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        V1Job filer = outputsFilerJob(null);
+        filer.getMetadata().setAnnotations(null);
+        taskBuilder.addJob(filer);
+        assertEquals(
+                "no annotations",
+                Collections.emptyList(),
+                this.converter
+                        .fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true)
+                        .getLogs()
+                        .get(0)
+                        .getOutputs());
+    }
+
+    @Test
+    public void fromK8sToTask_outputFileLogsNotJson() throws IOException {
+        assertEquals(Collections.emptyList(), this.outputsOf("not JSON"));
+    }
+
+    @Test
+    public void fromK8sToTask_outputFileLogsNotList() throws IOException {
+        assertEquals(Collections.emptyList(), this.outputsOf("{}"));
+        // Jackson reads blank text as a missing node, not null
+        assertEquals("empty", Collections.emptyList(), this.outputsOf(""));
+        assertEquals("blank", Collections.emptyList(), this.outputsOf("  "));
+        assertEquals("JSON null", Collections.emptyList(), this.outputsOf("null"));
+    }
+
+    @Test
+    public void fromK8sToTask_outputFileLogsEmptyList() throws IOException {
+        assertEquals(Collections.emptyList(), this.outputsOf("[]"));
+    }
+
+    /** One stored entry that isn't a file drops all, rather than reporting a partial list. */
+    @Test
+    public void fromK8sToTask_outputFileLogsNotFile() throws IOException {
+        String valid = STORED_FILE_LOGS.substring(1, STORED_FILE_LOGS.length() - 1);
+        assertEquals(Collections.emptyList(), this.outputsOf("[" + valid + ", 1]"));
+        assertEquals(
+                "numeric URL",
+                Collections.emptyList(),
+                this.outputsOf("[{\"url\":1,\"path\":\"/p\",\"size_bytes\":\"1\"}]"));
+        assertEquals(
+                "missing path",
+                Collections.emptyList(),
+                this.outputsOf("[{\"url\":\"u\",\"size_bytes\":\"1\"}]"));
+        assertEquals(
+                "missing size",
+                Collections.emptyList(),
+                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\"}]"));
+        assertEquals(
+                "numeric size",
+                Collections.emptyList(),
+                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\",\"size_bytes\":1}]"));
+        assertEquals(
+                "negative size",
+                Collections.emptyList(),
+                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\",\"size_bytes\":\"-1\"}]"));
+    }
+
+    /** The files that the taskmaster stores, as JSON, and as TES reports them. */
+    private static final String STORED_FILE_LOGS =
+            "[{\"url\":\"s3://b/a\",\"path\":\"/out/a\",\"size_bytes\":\"1\"},"
+                    + "{\"url\":\"s3://b/b\",\"path\":\"/out/b\",\"size_bytes\":\"22\"}]";
+
+    private static final List<TesOutputFileLog> FILE_LOGS =
+            Arrays.asList(
+                    new TesOutputFileLog().url("s3://b/a").path("/out/a").sizeBytes("1"),
+                    new TesOutputFileLog().url("s3://b/b").path("/out/b").sizeBytes("22"));
+
+    /** The output file logs of the base task, with an outputs filer's job with the annotation. */
+    private List<TesOutputFileLog> outputsOf(String outputFileLogs) throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        taskBuilder.addJob(outputsFilerJob(outputFileLogs));
+        return this.converter
+                .fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true)
+                .getLogs()
+                .get(0)
+                .getOutputs();
+    }
+
+    /**
+     * The outputs filer's job of the base task, with the given output file logs, if any; the key is
+     * the contract with the taskmaster.
+     */
+    private static V1Job outputsFilerJob(String outputFileLogs) {
+        V1ObjectMeta metadata =
+                new V1ObjectMeta()
+                        .name("task-9ef9856b-outputs-filer")
+                        .labels(new HashMap<>())
+                        .annotations(new HashMap<>());
+        if (outputFileLogs != null) {
+            metadata.putAnnotationsItem("output-file-logs", outputFileLogs);
+        }
+        return new V1Job().metadata(metadata).status(new V1JobStatus().succeeded(1));
+    }
+
     /** Logs sent by the client with the task are dropped: the only task log is TESK's own. */
     @Test
     public void fromK8sToTask_ignoresStoredLogs() throws IOException {
@@ -654,6 +808,36 @@ public class TesKubernetesConverterTest {
         taskBuilder.getTask().getExecutors().get(0).getJob().getStatus().failed(1);
         TesState state = this.converter.extractStateFromK8sJobs(taskBuilder.getTask());
         assertThat(state, is(TesState.EXECUTOR_ERROR));
+    }
+
+    /**
+     * An ignored failure needs the outputs filer if the stored task has outputs, and none without
+     * outputs (issue #159).
+     */
+    @Test
+    public void test_status_ignored_failure_reads_outputs() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        V1Job executor = taskBuilder.getTask().getExecutors().get(0).getJob();
+        executor.getStatus().succeeded(0).failed(1);
+        executor.getMetadata()
+                .putAnnotationsItem(
+                        Constants.ANN_IGNORE_ERROR_KEY, Constants.ANN_IGNORE_ERROR_VALUE);
+        assertThat(
+                "stored task with outputs, no outputs filer",
+                this.converter.extractStateFromK8sJobs(taskBuilder.getTask()),
+                is(TesState.SYSTEM_ERROR));
+
+        taskBuilder
+                .getTask()
+                .getTaskmaster()
+                .getJob()
+                .getMetadata()
+                .getAnnotations()
+                .put(Constants.ANN_JSON_INPUT_KEY, "{\"executors\": [{}]}");
+        assertThat(
+                "stored task without outputs",
+                this.converter.extractStateFromK8sJobs(taskBuilder.getTask()),
+                is(TesState.COMPLETE));
     }
 
     @Test
@@ -829,6 +1013,27 @@ public class TesKubernetesConverterTest {
         return this.converter.extractTags(taskmaster);
     }
 
+    /**
+     * Whether the stored task has outputs: unknown (null) without a readable stored task (issue
+     * #159).
+     */
+    @Test
+    public void extractHasOutputs() throws IOException {
+        String executors = "\"executors\": [{}]";
+        assertEquals(Boolean.TRUE, this.hasOutputsOf("{" + executors + ", \"outputs\": [{}]}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + ", \"outputs\": []}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + "}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + ", \"outputs\": {}}"));
+        assertNull(this.hasOutputsOf("not JSON"));
+        assertNull(this.hasOutputsOf(null));
+    }
+
+    private Boolean hasOutputsOf(String storedTask) throws IOException {
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
+        return this.converter.extractHasOutputs(taskmaster);
+    }
+
     private Integer executorCountOf(String storedTask) throws IOException {
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
@@ -864,6 +1069,35 @@ public class TesKubernetesConverterTest {
                 job.getSpec().getTemplate().getSpec().getContainers().get(0).getResources();
         assertEquals("500m", requirements.getLimits().get("cpu").toSuffixedString());
         assertEquals("500m", requirements.getRequests().get("cpu").toSuffixedString());
+    }
+
+    /**
+     * An executor that ignores errors gets the annotation with which the taskmaster goes on after
+     * it fails; other executors get none (issue #159)
+     */
+    @Test
+    public void fromTesExecutorToK8sJob_ignoreError() {
+        Boolean[] values = {true, false, null};
+        for (Boolean ignoreError : values) {
+            TesExecutor executor =
+                    new TesExecutor()
+                            .image("alpine")
+                            .addCommandItem("true")
+                            .ignoreError(ignoreError);
+            V1Job job =
+                    this.converter.fromTesExecutorToK8sJob(
+                            "task-123",
+                            "name",
+                            executor,
+                            0,
+                            null,
+                            User.builder("test-user-id").build());
+            String annotation = job.getMetadata().getAnnotations().get("ignore-error");
+            assertEquals(
+                    "ignore_error: " + ignoreError,
+                    Boolean.TRUE.equals(ignoreError) ? "true" : null,
+                    annotation);
+        }
     }
 
     /**

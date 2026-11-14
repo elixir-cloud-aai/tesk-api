@@ -61,7 +61,12 @@ Passing private executor image credentials in TES requests is an
 not a feature for production clients.
 
 The taskmaster's service account (`TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME`)
-needs to manage jobs, pods and persistent volume claims.
+needs to manage jobs, pods and persistent volume claims, and to read pod
+logs. That includes `patch` on `jobs`, with which a taskmaster of
+elixir-cloud-aai/tesk-core
+[#144](https://github.com/elixir-cloud-aai/tesk-core/issues/144) or later
+stores the [output file logs](api.md#output-file-logs), and `get` on
+`pods/log`, from which it reads them; TESK's Helm chart grants both.
 
 ## Running locally
 

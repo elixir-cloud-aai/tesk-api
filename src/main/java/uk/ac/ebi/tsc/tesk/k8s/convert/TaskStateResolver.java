@@ -1,10 +1,13 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_IGNORE_ERROR_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_IGNORE_ERROR_VALUE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobCondition;
+import io.kubernetes.client.openapi.models.V1JobSpec;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
@@ -144,6 +147,24 @@ public final class TaskStateResolver {
      * @return the TES state of the task
      */
     public static TesState resolve(Task task, Supplier<Integer> expectedExecutors) {
+        return resolve(task, expectedExecutors, () -> null);
+    }
+
+    /**
+     * Derives the state of a task.
+     *
+     * @param task the task's jobs and their pods
+     * @param expectedExecutors supplies the number of executors of the task, or {@code null} if
+     *     unknown (then the executor jobs that exist count as all executors); only called once the
+     *     taskmaster's job completed
+     * @param hasOutputs supplies whether the task has outputs, or {@code null} if unknown; only
+     *     called once the taskmaster's job completed after an executor whose failure is ignored
+     *     (then, with outputs or if unknown, the task completed only if the outputs filer did, as a
+     *     taskmaster can stop at such a failure without uploading the outputs)
+     * @return the TES state of the task
+     */
+    public static TesState resolve(
+            Task task, Supplier<Integer> expectedExecutors, Supplier<Boolean> hasOutputs) {
         Job taskmaster = task.getTaskmaster();
         V1Job taskmasterJob = taskmaster.getJob();
         if (isCancelled(taskmasterJob)) {
@@ -161,6 +182,7 @@ public final class TaskStateResolver {
         List<Job> failedExecutors =
                 executors.stream()
                         .filter(executor -> hasFailed(executor.getJob(), taskmasterEnded))
+                        .filter(executor -> !ignoresError(executor.getJob()))
                         .collect(Collectors.toList());
         if (!failedExecutors.isEmpty()) {
             return failedExecutors.stream().allMatch(TaskStateResolver::wasDisrupted)
@@ -180,8 +202,18 @@ public final class TaskStateResolver {
             boolean allCompleted =
                     expected > 0
                             && executors.size() == expected
-                            && executors.stream()
-                                    .allMatch(executor -> hasSucceeded(executor.getJob()));
+                            && executors.stream().allMatch(executor -> isDone(executor.getJob()));
+            // After an ignored failure, a taskmaster can stop without uploading the outputs
+            // (one without support for ignore_error, or one whose failed executor's pods didn't
+            // end in time): the outputs filer must have completed, if there are outputs
+            boolean ignoredFailure =
+                    executors.stream().anyMatch(executor -> !hasSucceeded(executor.getJob()));
+            if (allCompleted
+                    && ignoredFailure
+                    && !Boolean.FALSE.equals(hasOutputs.get())
+                    && !outputFiler.map(filer -> hasSucceeded(filer.getJob())).orElse(false)) {
+                return TesState.SYSTEM_ERROR;
+            }
             return allCompleted ? TesState.COMPLETE : TesState.SYSTEM_ERROR;
         }
         if (hasPendingPod(taskmaster)) {
@@ -207,6 +239,55 @@ public final class TaskStateResolver {
             return TesState.QUEUED;
         }
         return TesState.SYSTEM_ERROR;
+    }
+
+    /**
+     * Whether a failure of an executor's job is ignored (TES {@code ignore_error}, issue #159): the
+     * job has the annotation {@code ignore-error} with the value {@code "true"}, and the taskmaster
+     * didn't end it itself. The taskmaster ends a job whose pod can't start or be scheduled by
+     * setting its {@code activeDeadlineSeconds}, so that Kubernetes fails it with the reason {@code
+     * DeadlineExceeded}; the executor may then never have run, and the taskmaster stops the task.
+     */
+    private static boolean ignoresError(V1Job job) {
+        boolean annotated =
+                Optional.ofNullable(job.getMetadata())
+                        .map(V1ObjectMeta::getAnnotations)
+                        .map(
+                                annotations ->
+                                        ANN_IGNORE_ERROR_VALUE.equals(
+                                                annotations.get(ANN_IGNORE_ERROR_KEY)))
+                        .orElse(false);
+        return annotated && !endedByDeadline(job);
+    }
+
+    /**
+     * Whether an executor's job is done, once the taskmaster's job has completed: it succeeded, or
+     * it failed and its failure is ignored ({@link #ignoresError}).
+     */
+    private static boolean isDone(V1Job job) {
+        // The taskmaster's job has ended, so failed pods alone count as a failure
+        boolean taskmasterEnded = true;
+        return hasSucceeded(job) || (ignoresError(job) && hasFailed(job, taskmasterEnded));
+    }
+
+    /**
+     * Whether the taskmaster ended the job itself: it fails a job whose pod can't start or be
+     * scheduled by setting {@code activeDeadlineSeconds} (to 1, {@code FAIL_DEADLINE} in
+     * tesk-core's {@code job.py}), so that Kubernetes fails it with the reason {@code
+     * DeadlineExceeded}. TESK API sets no deadline on executor jobs.
+     */
+    private static boolean endedByDeadline(V1Job job) {
+        boolean hasDeadline =
+                Optional.ofNullable(job.getSpec())
+                        .map(V1JobSpec::getActiveDeadlineSeconds)
+                        .isPresent();
+        List<V1JobCondition> conditions =
+                Optional.ofNullable(job.getStatus())
+                        .map(V1JobStatus::getConditions)
+                        .orElse(Collections.emptyList());
+        return hasDeadline
+                || conditions.stream()
+                        .anyMatch(condition -> "DeadlineExceeded".equals(condition.getReason()));
     }
 
     private static boolean isCancelled(V1Job job) {
