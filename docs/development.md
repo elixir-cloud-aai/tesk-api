@@ -14,10 +14,12 @@ Codec): `pom.xml` sets them to those of the client's parent POM
 (`io.kubernetes:client-java-parent`), so update them together with the
 client. It also keeps the older Bouncy Castle jars (`*-jdk15on`) of
 spring-security-jwt out, as the client brings the current ones
-(`*-jdk18on`), with the same classes. The models of the client refuse JSON with fields they don't know;
-`KubernetesJson` installs a Gson that ignores them (see
-[Deployment](deployment.md#kubernetes)), so test fixtures of Kubernetes
-objects may leave out fields that Kubernetes requires.
+(`*-jdk18on`), with the same classes. The models of the client refuse JSON
+with fields they don't know; `KubernetesJson` installs a Gson that ignores
+them (see [Deployment](deployment.md#kubernetes)), so test fixtures of
+Kubernetes objects may leave out fields that Kubernetes requires. The
+executors' jobs in the taskmaster's input are written without the empty
+lists and maps of the client's models (`GSON_WITHOUT_EMPTY_COLLECTIONS`).
 
 The wrapper is the `only-script` type of the Apache Maven Wrapper, so there is
 no binary `maven-wrapper.jar` in the repository. It needs `curl` or `wget` and
