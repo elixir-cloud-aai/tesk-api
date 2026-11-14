@@ -383,6 +383,61 @@ public class TesKubernetesConverter {
     }
 
     /**
+     * Reads the files that the outputs filer uploaded, which the taskmaster stores as the
+     * annotation {@code output-file-logs} of the outputs filer's job (issue #160).
+     *
+     * @param task the task's jobs
+     * @return the files, each with {@code url}, {@code path} and {@code size_bytes}; empty without
+     *     an outputs filer's job or the annotation (e.g. an older taskmaster), or if the annotation
+     *     isn't a list of such files
+     */
+    List<TesOutputFileLog> extractOutputFileLogs(Task task) {
+        String json =
+                task.getOutputFiler()
+                        .map(Job::getJob)
+                        .map(V1Job::getMetadata)
+                        .map(V1ObjectMeta::getAnnotations)
+                        .map(annotations -> annotations.get(ANN_OUTPUT_FILE_LOGS_KEY))
+                        .orElse(null);
+        List<TesOutputFileLog> logs = new ArrayList<>();
+        if (json == null) {
+            return logs;
+        }
+        try {
+            JsonNode files = this.objectMapper.readTree(json);
+            if (files == null || !files.isArray()) {
+                throw new IOException("not a list");
+            }
+            for (JsonNode file : files) {
+                if (!isOutputFileLog(file)) {
+                    throw new IOException("not a file: " + file);
+                }
+                logs.add(
+                        new TesOutputFileLog()
+                                .url(file.get("url").asText())
+                                .path(file.get("path").asText())
+                                .sizeBytes(file.get("size_bytes").asText()));
+            }
+        } catch (IOException ex) {
+            logger.info(
+                    "Reading the output file logs of task {} failed; {}",
+                    task.getTaskmaster().getJob().getMetadata().getName(),
+                    ex.getMessage());
+            return new ArrayList<>();
+        }
+        return logs;
+    }
+
+    /** Whether a stored file has exactly the text fields url, path and size_bytes. */
+    private static boolean isOutputFileLog(JsonNode file) {
+        return file.isObject()
+                && file.size() == 3
+                && file.path("url").isTextual()
+                && file.path("path").isTextual()
+                && file.path("size_bytes").isTextual();
+    }
+
+    /**
      * Reads a field of the task stored with the taskmaster's job (annotation {@code json-input}).
      *
      * @return the field, or null if the task isn't stored, can't be read, or has no such field
@@ -522,8 +577,8 @@ public class TesKubernetesConverter {
         task.setCreationTime(DATE_FORMATTER.print(taskMasterJobMetadata.getCreationTimestamp()));
         TesTaskLog log = new TesTaskLog();
         task.addLogsItem(log);
-        // TES requires outputs; TESK doesn't learn which files the outputs filer wrote
-        log.setOutputs(new ArrayList<>());
+        // the files that the outputs filer uploaded, as the taskmaster stored them (issue #160)
+        log.setOutputs(this.extractOutputFileLogs(taskmasterWithExecutors));
         putCreator(log, taskMasterJobMetadata);
         if (taskMasterJobMetadata.getLabels().containsKey(LABEL_GROUPNAME_KEY)) {
             log.putMetadataItem(

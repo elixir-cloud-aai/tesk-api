@@ -18,6 +18,8 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.*;
 import java.io.*;
 import java.io.ByteArrayInputStream;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -48,6 +50,7 @@ import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
+import uk.ac.ebi.tsc.tesk.tes.model.TesOutputFileLog;
 import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
@@ -515,6 +518,57 @@ public class TesKubernetesConverterTest {
         TesTask expectedTask = this.prepareBaseExpectedTask();
         TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
         assertThat(outputTask, is(expectedTask));
+    }
+
+    /**
+     * The files that the taskmaster stored with the outputs filer's job are the task's output file
+     * logs (issue #160).
+     */
+    @Test
+    public void fromK8sToTask_outputFileLogs() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        taskBuilder.addJob(
+                outputsFilerJob(
+                        "[{\"url\":\"s3://b/a\",\"path\":\"/out/a\",\"size_bytes\":\"1\"},"
+                                + "{\"url\":\"s3://b/b\",\"path\":\"/out/b\",\"size_bytes\":\"22\"}]"));
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
+        assertEquals(
+                Arrays.asList(
+                        new TesOutputFileLog().url("s3://b/a").path("/out/a").sizeBytes("1"),
+                        new TesOutputFileLog().url("s3://b/b").path("/out/b").sizeBytes("22")),
+                outputTask.getLogs().get(0).getOutputs());
+    }
+
+    /**
+     * Without the annotation, or with one that can't be read, the task has no output file logs
+     * (issue #160).
+     */
+    @Test
+    public void fromK8sToTask_noOutputFileLogs() throws IOException {
+        for (String annotation :
+                new String[] {null, "not JSON", "{}", "[1]", "[{\"url\":\"u\",\"x\":1}]"}) {
+            TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+            taskBuilder.addJob(outputsFilerJob(annotation));
+            TesTask outputTask =
+                    this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
+            assertEquals(
+                    "annotation " + annotation,
+                    Collections.emptyList(),
+                    outputTask.getLogs().get(0).getOutputs());
+        }
+    }
+
+    /** The outputs filer's job of the base task, with the given output file logs, if any. */
+    private static V1Job outputsFilerJob(String outputFileLogs) {
+        V1ObjectMeta metadata =
+                new V1ObjectMeta()
+                        .name("task-9ef9856b-outputs-filer")
+                        .labels(new HashMap<>())
+                        .annotations(new HashMap<>());
+        if (outputFileLogs != null) {
+            metadata.putAnnotationsItem("output-file-logs", outputFileLogs);
+        }
+        return new V1Job().metadata(metadata).status(new V1JobStatus().succeeded(1));
     }
 
     /** Logs sent by the client with the task are dropped: the only task log is TESK's own. */

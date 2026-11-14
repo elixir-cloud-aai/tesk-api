@@ -24,6 +24,14 @@ notice changed answers:
   Before, such a task ran, and its output then failed or uploaded nothing
   useful. Clients that send such outputs to other URLs set `path_prefix`,
   e.g. to the part of `path` before its first wildcard.
+- **Output file logs.** `logs[0].outputs` lists the uploaded files (see
+  [Output file logs](api.md#output-file-logs)) once the taskmaster and the
+  filer are of a tesk-core release with
+  elixir-cloud-aai/tesk-core#144 (set `TESK_API_TASKMASTER_IMAGE_VERSION` and
+  `TESK_API_TASKMASTER_FILER_IMAGE_VERSION` to it, if the default isn't
+  such a release).
+  With older images, it stays empty, as before. No new permissions are
+  needed.
 - **Default page size.** `GET /tasks` without `page_size` returns at most
   256 tasks per page, as TES specifies, with a `next_page_token` if there
   are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned

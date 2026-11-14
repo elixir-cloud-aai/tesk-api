@@ -144,10 +144,10 @@ know about:
 - In executor logs, `exit_code` is left out until the executor's container
   has terminated, and `stdout` holds both output streams of the executor,
   while `stderr` is left out (see [Executor logs](#executor-logs)).
-- `logs[].outputs` is always empty (see [Output file
-  logs](#output-file-logs);
-  [#160](https://github.com/elixir-cloud-aai/tesk-api/issues/160) is about
-  reporting them).
+- `logs[].outputs` is empty with a taskmaster and filer older than
+  elixir-cloud-aai/tesk-core#144, and may lack files of tasks with very
+  many outputs or of TES 1.0 wildcard outputs (see [Output file
+  logs](#output-file-logs)).
 - TESK API sends no CORS headers. To use it from web pages of other origins,
   as TES asks of such implementations, configure CORS where you expose it,
   e.g. in your ingress controller.
@@ -247,13 +247,25 @@ without it.
 
 ## Output file logs
 
-With the views `BASIC` and `FULL`, a task's `logs[0].outputs` is always an
-empty array (`[]`), also after the outputs filer has uploaded the task's
-outputs. The TES specification requires the field, with one entry per output
-file (directory outputs flattened into their files), but the outputs filer
-runs as a separate Kubernetes job and has no way to report the files it
-wrote back to TESK API. Clients that need the uploaded files must look them
-up at the outputs' `url`s.
+With the views `BASIC` and `FULL`, a task's `logs[0].outputs` lists the
+files that the outputs filer uploaded, one entry per file (directory
+outputs and wildcard matches flattened into their files), each with its
+`url`, its `path` in the executors and its `size_bytes`, as TES 1.1
+specifies. Until the outputs filer has completed, and for tasks without
+outputs, it's an empty array (`[]`).
+
+The taskmaster stores the files as the annotation `output-file-logs` of
+the outputs filer's job, from which TESK API reads them; this needs a
+taskmaster and filer with elixir-cloud-aai/tesk-core#144 (see the
+taskmaster's and filer's docs there). With older images, or if the
+taskmaster couldn't read or store the files (it logs a warning and the task
+completes anyway), the array stays empty, and clients that need the
+uploaded files must look them up at the outputs' `url`s. The list holds at
+most about 200,000 bytes of JSON: for tasks with very many files, the last
+ones are left out. Wildcard outputs without `path_prefix` (TES 1.0, only
+for `file:` URLs and URLs without a scheme) give no entries. The `url`s
+are those of the task's outputs, so they carry what those carry (e.g. the
+signature of a presigned URL), as `outputs[].url` in the same answer does.
 
 ## Swagger UI
 
