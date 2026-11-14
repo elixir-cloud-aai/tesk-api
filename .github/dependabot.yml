@@ -1,15 +1,15 @@
 version: 2
-# Every entry targets `dev` (`target-branch`), which takes all pull requests
-# whatever the default branch is (`main` only moves forward to releases);
-# security updates always target the default branch, though
+# No entry sets `target-branch`: pull requests go to the default branch
+# (`dev`) anyway, and while `target-branch` is set, GitHub doesn't apply
+# the entry's options (`labels`, `ignore`, ...) to security updates
 updates:
   # Dependencies in `pom.xml`. Spring Boot 2 stays until the move to Spring
   # Boot 3, which needs code changes
   - package-ecosystem: maven
+    labels: ["type: dependencies"]
     directory: /
     schedule:
       interval: monthly
-    target-branch: dev
     ignore:
       - dependency-name: org.springframework.boot:*
         update-types: ["version-update:semver-major"]
@@ -29,10 +29,10 @@ updates:
   # Actions in the workflows, including the pins of the shared actions of
   # `elixir-cloud-aai/.github`
   - package-ecosystem: github-actions
+    labels: ["type: dependencies"]
     directory: /
     schedule:
       interval: monthly
-    target-branch: dev
     groups:
       github-actions:
         patterns: ["*"]
@@ -40,10 +40,10 @@ updates:
   # `pom.xml` and the CI job `Test`: a new major version of Java is a
   # decision of its own
   - package-ecosystem: docker
+    labels: ["type: dependencies"]
     directory: /
     schedule:
       interval: monthly
-    target-branch: dev
     ignore:
       - dependency-name: eclipse-temurin
         update-types: ["version-update:semver-major"]
@@ -52,10 +52,10 @@ updates:
         patterns: ["*"]
   # Dependencies of the docs (`docs/requirements.txt`)
   - package-ecosystem: pip
+    labels: ["type: dependencies"]
     directory: /docs
     schedule:
       interval: monthly
-    target-branch: dev
     groups:
       docs-dependencies:
         patterns: ["*"]
