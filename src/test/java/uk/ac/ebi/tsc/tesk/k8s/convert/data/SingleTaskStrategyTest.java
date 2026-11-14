@@ -57,4 +57,14 @@ public class SingleTaskStrategyTest {
         assertSame(taskMaker.getTask().getOutputFiler().get(), output);
         assertThat(taskMaker.getTask().getOutputFiler().get().getJobName(), is("anything2"));
     }
+
+    /** The list of a single task has that task only */
+    @Test
+    public void getTaskList() {
+        BuildStrategy taskMaker = new SingleTaskStrategy();
+        Job taskmaster = new Job(new V1Job().metadata(new V1ObjectMeta().name("anything")));
+        taskMaker.addTaskMasterJob(taskmaster);
+        assertThat(taskMaker.getTaskList().size(), is(1));
+        assertSame(taskMaker.getTaskList().get(0), taskMaker.getTask());
+    }
 }
