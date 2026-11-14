@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -711,7 +712,9 @@ public class ServiceClientTokenServicesTest {
         String token = sign(claims(CLIENT));
         ServiceClientTokenServices other = services();
         other.introspect(token);
+        // depends on the fields verifier and buildLock of ServiceClientTokenServices
         Object built = ReflectionTestUtils.getField(other, "verifier");
+        assertNotNull(built);
         ServiceClientTokenServices services = services();
         // the other request finishes the build between this one's check and its lock
         ReflectionTestUtils.setField(

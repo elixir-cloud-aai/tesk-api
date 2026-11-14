@@ -142,7 +142,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           # the merged report of the unit and integration tests, as checked by
-          # `./mvnw verify` (separate reports can't combine branches of a line)
+          # `./mvnw verify` (from separate reports, Codecov would count a line
+          # whose branches the two suites cover in part each as partly covered)
           files: ./target/site/jacoco-merged/jacoco.xml
           fail_ci_if_error: ${{ github.event_name == 'push' && github.repository_owner == 'elixir-cloud-aai' }}
           verbose: true
