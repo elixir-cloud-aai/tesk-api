@@ -27,7 +27,7 @@ public class GroupNamesSecurityExtractor {
 
     /**
      * The group names in the groups claim of the user info, as authorities; without that claim, the
-     * authority {@code <group prefix>:USER}
+     * authority {@code <group prefix>:USER}; a null claim gives no authorities
      */
     public List<GrantedAuthority> extractAuthorities(Map<String, Object> map) {
         String authorities = this.groupPrefix + ":USER";
@@ -38,6 +38,10 @@ public class GroupNamesSecurityExtractor {
     }
 
     private String asAuthorities(Object object) {
+        if (object == null) {
+            // a null claim means no groups, not a group called "null"
+            return "";
+        }
         if (object instanceof Collection) {
             return StringUtils.collectionToCommaDelimitedString((Collection<?>) object);
         }
