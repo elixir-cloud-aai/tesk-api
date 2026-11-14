@@ -5,8 +5,7 @@
 # the affected package versions (`purls`), so that other packages with the same
 # vulnerability are still reported.
 #
-# All of these are fixed only in Spring Boot 3 / Spring Framework 6 and later
-# (or, for snakeyaml, in the 2.x line, which the Kubernetes client can't use),
+# All of these are fixed only in Spring Boot 3 / Spring Framework 6 and later,
 # while `pom.xml` has the last open source releases of the Spring Boot 2.7 line.
 #
 # See https://trivy.dev/latest/docs/configuration/filtering/#trivyignoreyaml
@@ -58,8 +57,4 @@ vulnerabilities:
   - id: CVE-2026-47884
     purls: ["pkg:maven/org.springframework/spring-webmvc@5.3.39"]
     statement: Concerns XsltView; the app has no views
-    expired_at: 2027-01-31
-  - id: CVE-2022-1471
-    purls: ["pkg:maven/org.yaml/snakeyaml@1.33"]
-    statement: Needs YAML from an attacker; the app only reads files and ConfigMaps of the deployer
     expired_at: 2027-01-31

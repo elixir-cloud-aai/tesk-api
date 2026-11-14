@@ -1,11 +1,11 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import org.hibernate.validator.constraints.ScriptAssert;
 
 import javax.validation.Valid;
 import javax.validation.constraints.*;
@@ -18,7 +18,6 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
  */
 @ApiModel(description = "Input describes Task input files.")
 @javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
-@ScriptAssert(lang = "javascript", script = "(_this.url != null && (_this.url.trim().length) > 0) || (_this.content != null && _this.content.length > 0)", message = "URL or content required")
 public class TesInput   {
   @JsonProperty("name")
   private String name;
@@ -189,6 +188,30 @@ public class TesInput   {
 
   public void setContent(String content) {
     this.content = content;
+  }
+
+  /**
+   * An input needs a source: a `url` that isn't blank (white space as JavaScript's `trim` saw it
+   * before), or a `content` that isn't empty. A plain method rather than a script
+   * (`@ScriptAssert`), as Java 15 and later have no JavaScript engine.
+   *
+   * @return whether `url` or `content` is given
+   */
+  @JsonIgnore
+  @AssertTrue(message = "URL or content required")
+  public boolean isUrlOrContentGiven() {
+    return (url != null && !isJavaScriptBlank(url)) || (content != null && !content.isEmpty());
+  }
+
+  /**
+   * Whether a string holds only white space and line terminators as JavaScript's `trim` sees
+   * them (ECMAScript WhiteSpace and LineTerminator). Unlike {@link String#isBlank()}, this
+   * includes U+00A0, U+2007, U+202F and U+FEFF, and excludes U+001C to U+001F.
+   */
+  private static boolean isJavaScriptBlank(String s) {
+    return s.codePoints().allMatch(c -> c == '\t' || c == '\n' || c == 0x0B || c == '\f'
+        || c == '\r' || c == 0xFEFF || c == 0x2028 || c == 0x2029
+        || Character.getType(c) == Character.SPACE_SEPARATOR);
   }
 
 

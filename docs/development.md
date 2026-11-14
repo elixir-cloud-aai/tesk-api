@@ -1,13 +1,23 @@
 # Development
 
 TESK API is a [Spring Boot](https://spring.io/projects/spring-boot) 2.7
-application on Java 8, built with Maven 3.9 (through the wrapper `./mvnw`,
-which downloads the version pinned in `.mvn/wrapper/maven-wrapper.properties`;
-Maven 3.9 still runs on Java 8). The server stub is generated from the TES
-specification with the [Swagger Codegen Maven
+application on Java 21, built with Maven 3.9 (through the wrapper `./mvnw`,
+which downloads the version pinned in `.mvn/wrapper/maven-wrapper.properties`).
+The server stub is generated from the TES specification with the [Swagger Codegen Maven
 plugin](https://github.com/swagger-api/swagger-codegen/tree/master/modules/swagger-codegen-maven-plugin),
 and the [Kubernetes Java client](https://github.com/kubernetes-client/java)
 talks to the Kubernetes API.
+
+The Kubernetes client needs newer versions of some libraries than Spring
+Boot 2.7 manages (SnakeYAML, OkHttp, Kotlin, Gson, Commons Lang and Commons
+Codec): `pom.xml` sets them to those of the client's parent POM
+(`io.kubernetes:client-java-parent`), so update them together with the
+client. The models of the client refuse JSON
+with fields they don't know; `KubernetesJson` installs a Gson that ignores
+them (see [Deployment](deployment.md#kubernetes)), so test fixtures of
+Kubernetes objects may leave out fields that Kubernetes requires. The
+executors' jobs in the taskmaster's input are written without the empty
+lists and maps of the client's models (`GSON_WITHOUT_EMPTY_COLLECTIONS`).
 
 The wrapper is the `only-script` type of the Apache Maven Wrapper, so there is
 no binary `maven-wrapper.jar` in the repository. It needs `curl` or `wget` and
@@ -39,13 +49,29 @@ provider are mocked with WireMock, so no cluster is needed):
 ./mvnw clean verify
 ```
 
-JaCoCo writes the coverage reports to `target/site/jacoco/` (unit tests) and
-`target/site/jacoco-it/` (integration tests). The build fails if the unit and
-integration tests together cover less than 60% of the lines or 45% of the
-branches (`check` of `jacoco-maven-plugin` in `pom.xml`; raise the floors as
-coverage grows). Codecov (`codecov.yml`) also checks each pull request: the
-project's coverage must not drop by more than 0.5 percentage points, and the
-changed lines must be covered completely.
+### Test coverage
+
+The unit and integration tests together must cover all lines and branches:
+`./mvnw clean verify` fails otherwise (`check` of `jacoco-maven-plugin` in
+`pom.xml`, on the merged data of both in `target/jacoco-merged.exec`), and so
+does Codecov (`codecov.yml`), to which CI sends the merged report. Not measured
+are only:
+
+- the files that openapi-generator generates from the TES specification (listed
+  in `src/main/java/.openapi-generator/FILES`, and excluded from formatting and
+  lint as well): data classes, and the API stubs, whose default methods the
+  controllers override. Keep the list in `pom.xml` the same as that file;
+- `TeskApplication`, whose `main` only starts Spring Boot, as the tests do.
+
+JaCoCo writes the reports of the unit tests to `target/site/jacoco/`, those
+of the integration tests to `target/site/jacoco-it/`, and that of both
+together, which the check uses and CI sends to Codecov, to
+`target/site/jacoco-merged/` (`index.html` for a browser, `jacoco.xml` for
+tools). To see what the tests miss, open
+`target/site/jacoco-merged/index.html` after `./mvnw clean verify`.
+
+Cover new code with tests that check its behaviour, rather than excluding it;
+code that no test can reach is usually dead and can go.
 
 ## Formatting and linting
 
@@ -66,10 +92,15 @@ neither):
 ./mvnw spotless:check checkstyle:check
 ```
 
-The plugin versions (spotless-maven-plugin 2.30.0 with google-java-format 1.7,
-Checkstyle 9.3) are the last that run on Java 8; newer ones need a newer JDK
-(the move to Spring Boot 3,
-[#66](https://github.com/elixir-cloud-aai/tesk-api/issues/66)).
+These two commands need Java 8 (e.g. `JAVA_HOME` pointing to a Java 8 JDK),
+as the CI job `Lint` runs them: google-java-format 1.7 (with
+spotless-maven-plugin 2.30.0) doesn't run on Java 21, and the newer versions
+that do format the code differently. The update, with the reformat it brings,
+is part of the move to Spring Boot 3
+([#66](https://github.com/elixir-cloud-aai/tesk-api/issues/66)). Building and
+testing need Java 21. Until then, write code that Java 8 can parse (no
+records, text blocks, `switch` expressions or `instanceof` patterns), or the
+formatter fails.
 
 The commits that only reformatted the code are listed in
 `.git-blame-ignore-revs`. GitHub skips them in its blame view; for `git blame`,
@@ -213,12 +244,18 @@ it to a new version of the specification, run:
 ```
 
 This generates new versions of the model (`uk.ac.ebi.tsc.tesk.tes.model`) and
-the API stub (`uk.ac.ebi.tsc.tesk.tes.api`). The model classes carry [Bean
+the API stub (`uk.ac.ebi.tsc.tesk.tes.api`). If the list of generated files
+(`src/main/java/.openapi-generator/FILES`) changes, change the exclusions of
+Spotless, Checkstyle (`checkstyle.xml`) and JaCoCo in `pom.xml` alike (see
+[Test coverage](#test-coverage)). The model classes carry [Bean
 Validation](https://beanvalidation.org/) annotations beyond those derived from
 the specification (e.g. `@Digits` and `@DecimalMin` on the resources of
 `TesResources`); restore them by hand in the generated code, and reconcile
 any other manual changes, e.g. the internal field `userIdFromLegacyLabel` of
-`TesTaskLog` (not serialized), which the access check of a task needs. Until
+`TesTaskLog` (not serialized), which the access check of a task needs, and
+the check `isUrlOrContentGiven` of `TesInput` (a generator that adds
+`@ScriptAssert(lang = "javascript")` instead brings back a check that fails
+on Java 15 and later, which have no JavaScript engine). Until
 the experimental private image credential workaround remains supported, also
 restore the `docker_registry`, `docker_login` and `docker_pass` fields,
 validation, write-only handling, and experimental API descriptions in

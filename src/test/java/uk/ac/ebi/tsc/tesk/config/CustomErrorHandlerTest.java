@@ -3,17 +3,24 @@ package uk.ac.ebi.tsc.tesk.config;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import java.util.Arrays;
 import java.util.Map;
 import javax.servlet.RequestDispatcher;
 import org.junit.Test;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.ServletWebRequest;
+import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 
 /** Messages of {@link CustomErrorHandler} for request parameters of the wrong type (issue #114) */
 public class CustomErrorHandlerTest {
@@ -45,4 +52,60 @@ public class CustomErrorHandlerTest {
         // Spring's message, as there is no parameter name to put in its place
         assertEquals(ex.getMessage(), body.get("message"));
     }
+
+    /** Exceptions get the status of their {@code @ResponseStatus}, the others 500 */
+    @Test
+    public void commonErrorHandler_statusOfTheException() {
+        CustomErrorHandler handler = new CustomErrorHandler(new DefaultErrorAttributes());
+
+        ResponseEntity<?> notFound =
+                handler.commonErrorHandler(
+                        new MockHttpServletRequest("GET", "/tasks/task-1"),
+                        new TaskNotFoundException("task-1"));
+        ResponseEntity<?> other =
+                handler.commonErrorHandler(
+                        new MockHttpServletRequest("GET", "/tasks"),
+                        new IllegalStateException("unexpected"));
+
+        assertEquals(HttpStatus.NOT_FOUND, notFound.getStatusCode());
+        assertEquals(404, ((Map<?, ?>) notFound.getBody()).get("status"));
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, other.getStatusCode());
+        assertEquals("/tasks", ((Map<?, ?>) other.getBody()).get("path"));
+    }
+
+    /** Invalid requests list the errors of the fields and of the object as a whole */
+    @Test
+    public void handleMethodArgumentNotValid_listsFieldAndObjectErrors() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/tasks");
+        BeanPropertyBindingResult result = new BeanPropertyBindingResult(new Object(), "tesTask");
+        result.addError(new FieldError("tesTask", "executors", "must not be null"));
+        result.addError(new ObjectError("tesTask", "needs an executor"));
+        MethodArgumentNotValidException ex =
+                new MethodArgumentNotValidException(
+                        new MethodParameter(
+                                CustomErrorHandlerTest.class.getDeclaredMethod(
+                                        "createTask", Object.class),
+                                0),
+                        result);
+
+        ResponseEntity<Object> response =
+                new CustomErrorHandler(new DefaultErrorAttributes())
+                        .handleMethodArgumentNotValid(
+                                ex,
+                                new HttpHeaders(),
+                                HttpStatus.BAD_REQUEST,
+                                new ServletWebRequest(request));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        Map<?, ?> body = (Map<?, ?>) response.getBody();
+        assertEquals(
+                Arrays.asList("Field 'executors' must not be null", "tesTask needs an executor"),
+                body.get("messages"));
+        assertNull(body.get("message"));
+        assertNull(body.get("errors"));
+    }
+
+    /** The parameter of the invalid request in the test above */
+    @SuppressWarnings("unused")
+    private static void createTask(Object task) {}
 }

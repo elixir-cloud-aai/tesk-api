@@ -85,6 +85,11 @@ public class CreatorLabelsTest {
         assertTrue(CreatorLabels.isLegacy(new V1ObjectMeta()));
         assertNull(CreatorLabels.legacyCreator(new V1ObjectMeta()));
         assertNull(CreatorLabels.creatorId(new V1ObjectMeta()));
+        // without maps at all
+        V1ObjectMeta withoutMaps = new V1ObjectMeta().labels(null).annotations(null);
+        assertTrue(CreatorLabels.isLegacy(withoutMaps));
+        assertNull(CreatorLabels.legacyCreator(withoutMaps));
+        assertNull(CreatorLabels.creatorId(withoutMaps));
     }
 
     /** An annotation without the hash label is neither old nor valid: it names no creator */

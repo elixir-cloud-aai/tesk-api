@@ -1,11 +1,13 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -13,6 +15,7 @@ import static org.mockito.Mockito.when;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -22,12 +25,15 @@ import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1LocalObjectReference;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
+import io.kubernetes.client.openapi.models.V1PodStatus;
 import io.kubernetes.client.openapi.models.V1Secret;
 import java.io.*;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.zip.GZIPInputStream;
@@ -54,8 +60,11 @@ import uk.ac.ebi.tsc.tesk.config.GsonConfig;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
+import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
+import uk.ac.ebi.tsc.tesk.tes.model.TesExecutorLog;
+import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
@@ -242,6 +251,45 @@ public class TesKubernetesConverterMinimalTest {
         taskMasterInputJson.isEqualToJson(
                 new ClassPathResource("fromTesToK8s_minimal/taskmaster_param.json"),
                 JSONCompareMode.NON_EXTENSIBLE);
+    }
+
+    /**
+     * An executor with memory but no CPU gets no limits in the taskmaster's input: not even empty
+     * ones, as the taskmaster sets the limits to the requests only if there are none (a pod without
+     * limits could use all memory of its node)
+     */
+    @Test
+    public void ramOnlyExecutorHasNoLimits() throws IOException {
+        given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-98605447");
+        TesTask task =
+                new TesTask()
+                        .addExecutorsItem(new TesExecutor().image("ubuntu").addCommandItem("true"))
+                        .resources(new TesResources().ramGb(2.0));
+        User user = User.builder("test-user-id").build();
+        V1Job taskmaster = this.converter.fromTesTaskToK8sJob(task, user);
+        V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, taskmaster);
+        try (InputStreamReader reader =
+                new InputStreamReader(
+                        new GZIPInputStream(
+                                new ByteArrayInputStream(
+                                        configMap.getBinaryData().get("JSON_INPUT.gz"))),
+                        StandardCharsets.UTF_8)) {
+            JsonObject resources =
+                    this.gson
+                            .fromJson(reader, JsonObject.class)
+                            .getAsJsonArray("executors")
+                            .get(0)
+                            .getAsJsonObject()
+                            .getAsJsonObject("spec")
+                            .getAsJsonObject("template")
+                            .getAsJsonObject("spec")
+                            .getAsJsonArray("containers")
+                            .get(0)
+                            .getAsJsonObject()
+                            .getAsJsonObject("resources");
+            assertThat(resources.has("limits")).isFalse();
+            assertThat(resources.getAsJsonObject("requests").has("memory")).isTrue();
+        }
     }
 
     @Test
@@ -557,6 +605,15 @@ public class TesKubernetesConverterMinimalTest {
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
+    /** Without a creation time of the taskmaster's job (Kubernetes sets one), the task has none */
+    @Test
+    public void fromK8sToTask_noCreationTime() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
+        taskBuilder.getTask().getTaskmaster().getJob().getMetadata().setCreationTimestamp(null);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), false);
+        org.assertj.core.api.Assertions.assertThat(outputTask.getCreationTime()).isNull();
+    }
+
     /** A taskmaster's job with failed pods counted, none active and no condition: an error */
     @Test
     public void fromK8sToTask_system_error_failed_pods() throws IOException {
@@ -630,5 +687,133 @@ public class TesKubernetesConverterMinimalTest {
         TesTask outputTask =
                 this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
         assertThat(outputTask, CoreMatchers.is(expectedTask));
+    }
+
+    /** Without a group in the tags, the task belongs to a group of its creator */
+    @Test
+    public void groupOfTheUser_ifTheTagsHaveNone() {
+        given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-1");
+        TesTask task =
+                new TesTask()
+                        .putTagsItem("project", "p1")
+                        .addExecutorsItem(
+                                new TesExecutor()
+                                        .image("ubuntu")
+                                        .command(Collections.singletonList("true")));
+        User user = User.builder("user-1").teskMemberedGroups(Collections.singleton("ABC")).build();
+
+        V1Job job = this.converter.fromTesTaskToK8sJob(task, user);
+        V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, job);
+
+        assertEquals("ABC", job.getMetadata().getLabels().get(Constants.LABEL_GROUPNAME_KEY));
+        assertEquals("ABC", configMap.getMetadata().getLabels().get(Constants.LABEL_GROUPNAME_KEY));
+    }
+
+    /**
+     * A task that can't be serialized isn't created: without its JSON, it could be neither run nor
+     * read
+     */
+    @Test
+    public void serializationFailure_failsTheConversion() throws IOException {
+        given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-1");
+        ObjectMapper failing = mock(ObjectMapper.class);
+        when(failing.writeValueAsString(any()))
+                .thenThrow(new JsonMappingException(null, "not serializable"));
+        TesKubernetesConverter failingConverter =
+                new TesKubernetesConverter(
+                        executorTemplateSupplier,
+                        taskmasterTemplateSupplier,
+                        failing,
+                        gson,
+                        trsToolClient);
+        TesTask task =
+                new TesTask()
+                        .addExecutorsItem(
+                                new TesExecutor()
+                                        .image("ubuntu")
+                                        .command(Collections.singletonList("true")));
+        User user = User.builder("user-1").build();
+
+        assertThatThrownBy(() -> failingConverter.fromTesTaskToK8sJob(task, user))
+                .isInstanceOf(UncheckedIOException.class)
+                .hasMessageContaining("not serializable");
+        V1Job job = this.converter.fromTesTaskToK8sJob(task, user);
+        assertThatThrownBy(() -> failingConverter.fromTesTaskToK8sConfigMap(task, user, job))
+                .isInstanceOf(UncheckedIOException.class);
+    }
+
+    /** An executor whose pod reports no containers yet has no exit code */
+    @Test
+    public void executorLog_podWithoutContainerStatuses() {
+        Job executor =
+                new Job(
+                        new V1Job()
+                                .metadata(new V1ObjectMeta().name("task-1-ex-00"))
+                                .status(new V1JobStatus()));
+        executor.addPod(
+                new V1Pod()
+                        .metadata(new V1ObjectMeta().name("task-1-ex-00-abcde"))
+                        .status(new V1PodStatus().containerStatuses(Collections.emptyList())));
+
+        TesExecutorLog log = this.converter.extractExecutorLogFromK8sJobAndPod(executor);
+
+        assertNull(log.getExitCode());
+        assertEquals("", log.getStdout());
+    }
+
+    /** The FULL view keeps the content of inputs, BASIC leaves it out */
+    @Test
+    public void inputContent_onlyInFullView() {
+        V1Job taskmaster =
+                new V1Job()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name("task-1")
+                                        .putLabelsItem(
+                                                Constants.LABEL_JOBTYPE_KEY,
+                                                Constants.LABEL_JOBTYPE_VALUE_TASKM)
+                                        .putAnnotationsItem(
+                                                Constants.ANN_JSON_INPUT_KEY,
+                                                "{\"inputs\":[{\"path\":\"/in\",\"content\":\"hi\"}]}"));
+        uk.ac.ebi.tsc.tesk.k8s.convert.data.Task task =
+                new uk.ac.ebi.tsc.tesk.k8s.convert.data.Task(new Job(taskmaster));
+
+        assertEquals(
+                "hi",
+                this.converter
+                        .fromK8sJobsToTesTaskBasic(task, false)
+                        .getInputs()
+                        .get(0)
+                        .getContent());
+        assertNull(
+                this.converter
+                        .fromK8sJobsToTesTaskBasic(task, true)
+                        .getInputs()
+                        .get(0)
+                        .getContent());
+    }
+
+    /** A task without inputs has none to clear in the BASIC view */
+    @Test
+    public void basicView_taskWithoutInputs() {
+        V1Job taskmaster =
+                new V1Job()
+                        .metadata(
+                                new V1ObjectMeta()
+                                        .name("task-1")
+                                        .putLabelsItem(
+                                                Constants.LABEL_JOBTYPE_KEY,
+                                                Constants.LABEL_JOBTYPE_VALUE_TASKM)
+                                        .putAnnotationsItem(
+                                                Constants.ANN_JSON_INPUT_KEY,
+                                                "{\"name\":\"no inputs\"}"));
+
+        TesTask task =
+                this.converter.fromK8sJobsToTesTaskBasic(
+                        new uk.ac.ebi.tsc.tesk.k8s.convert.data.Task(new Job(taskmaster)), true);
+
+        assertEquals("task-1", task.getId());
+        assertEquals("no inputs", task.getName());
+        assertNull(task.getInputs());
     }
 }

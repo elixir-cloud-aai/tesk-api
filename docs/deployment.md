@@ -22,7 +22,7 @@ cosign verify elixircloud/tesk-api:1.3.0 \
 For `dev` images, the identity is
 `https://github.com/elixir-cloud-aai/tesk-api/.github/workflows/ci.yml@refs/heads/dev`.
 
-The image runs the application with Java 8 on [Eclipse
+The image runs the application with Java 21 on [Eclipse
 Temurin](https://adoptium.net/) and listens on port 8080. `JAVA_OPTS` passes
 options to the JVM. It runs as the non-root user `tesk` (UID 1000, group 0,
 home directory `/home/tesk`); any other UID in group 0 works too, as on
@@ -56,17 +56,37 @@ Resource | Verbs | For
 `secrets` | `create`, `delete` | Private executor image credentials, as Secrets owned by the taskmaster Job (`delete` for `OwnerReferencesPermissionEnforcement`)
 `limitranges` | `list` | Raising requested memory to the namespace's minimum (without the right, it logs an error and goes on)
 
+TESK API has version 28 of the client, which supports Kubernetes 1.37. It
+also works with older and newer Kubernetes versions:
+
+- It reads jobs, pods, ConfigMaps and LimitRanges, and ignores the fields
+  that newer Kubernetes versions add to them. (The client itself would refuse
+  such objects, see
+  [kubernetes-client/java#4941](https://github.com/kubernetes-client/java/issues/4941).)
+- The jobs, ConfigMaps and Secrets that it creates, and its patches, use
+  only fields that Kubernetes has had for years.
+- The objects that it creates list empty fields, e.g. `args: []`, which
+  Kubernetes treats as unset. A Kubernetes version that doesn't know such a
+  field drops it, and may answer with a warning. The executors' jobs in the
+  taskmaster's input leave them out, as before: the taskmaster tells unset
+  fields (e.g. no limits, which it sets to the requests) by their absence.
+
 Passing private executor image credentials in TES requests is an
 [experimental workaround for proof-of-concept use only](api.md#private-executor-images),
 not a feature for production clients.
 
 The taskmaster's service account (`TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME`)
-needs to manage jobs, pods and persistent volume claims.
+needs to manage jobs, pods and persistent volume claims, and to read pod
+logs. That includes `patch` on `jobs`, with which a taskmaster of
+elixir-cloud-aai/tesk-core
+[#144](https://github.com/elixir-cloud-aai/tesk-core/issues/144) or later
+stores the [output file logs](api.md#output-file-logs), and `get` on
+`pods/log`, from which it reads them; TESK's Helm chart grants both.
 
 ## Running locally
 
 To run TESK API outside of Kubernetes, e.g. against a local cluster such as
-[kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/), with Java 8 and
+[kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/), with Java 21 and
 a `KUBECONFIG` file for that cluster:
 
 ```bash

@@ -1,10 +1,8 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.util.ObjectUtils;
@@ -12,12 +10,12 @@ import org.springframework.util.StringUtils;
 
 /**
  * Custom authorities extractor, that looks for groups element and transforms it into authorities.
- * Heavily inspired by {@link
- * org.springframework.boot.autoconfigure.security.oauth2.resource.FixedAuthoritiesExtractor}
+ * Inspired by {@code FixedAuthoritiesExtractor} of Spring Security OAuth. Used by {@link
+ * UserInfoTokenIntrospector}.
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
-public class GroupNamesSecurityExtractor implements AuthoritiesExtractor {
+public class GroupNamesSecurityExtractor {
 
     public GroupNamesSecurityExtractor(String authoritiesClaim, String groupPrefix) {
         this.authoritiesClaim = authoritiesClaim;
@@ -27,7 +25,10 @@ public class GroupNamesSecurityExtractor implements AuthoritiesExtractor {
     private final String authoritiesClaim;
     private final String groupPrefix;
 
-    @Override
+    /**
+     * The group names in the groups claim of the user info, as authorities; without that claim, the
+     * authority {@code <group prefix>:USER}; a null claim gives no authorities
+     */
     public List<GrantedAuthority> extractAuthorities(Map<String, Object> map) {
         String authorities = this.groupPrefix + ":USER";
         if (map.containsKey(this.authoritiesClaim)) {
@@ -37,23 +38,17 @@ public class GroupNamesSecurityExtractor implements AuthoritiesExtractor {
     }
 
     private String asAuthorities(Object object) {
-        List<Object> authorities = new ArrayList<>();
+        if (object == null) {
+            // a null claim means no groups, not a group called "null"
+            return "";
+        }
         if (object instanceof Collection) {
-            Collection<?> collection = (Collection<?>) object;
-            object = collection.toArray(new Object[0]);
+            return StringUtils.collectionToCommaDelimitedString((Collection<?>) object);
         }
         if (ObjectUtils.isArray(object)) {
-            Object[] array = (Object[]) object;
-            for (Object value : array) {
-                if (value instanceof String) {
-                    authorities.add(value);
-                } else {
-                    authorities.add(value);
-                }
-            }
-        } else {
-            authorities.add(object);
+            return StringUtils.arrayToCommaDelimitedString((Object[]) object);
         }
-        return StringUtils.collectionToCommaDelimitedString(authorities);
+        // a single group, e.g. a string of comma-separated names
+        return String.valueOf(object);
     }
 }

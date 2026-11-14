@@ -91,7 +91,7 @@ class IgnoredBackendParametersTest {
 
         IgnoredBackendParameters.annotate(metadata, Collections.emptyList());
 
-        assertThat(metadata.getAnnotations()).isNull();
+        assertThat(metadata.getAnnotations()).isNullOrEmpty();
         assertThat(IgnoredBackendParameters.systemLog(metadata)).isEmpty();
     }
 

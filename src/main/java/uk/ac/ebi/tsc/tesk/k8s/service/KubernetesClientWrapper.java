@@ -12,7 +12,6 @@ import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1LimitRange;
 import io.kubernetes.client.openapi.models.V1LimitRangeItem;
-import io.kubernetes.client.openapi.models.V1LimitRangeList;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1Secret;
@@ -64,7 +63,7 @@ public class KubernetesClientWrapper {
 
     public V1Job createJob(V1Job job) {
         try {
-            return this.batchApi.createNamespacedJob(namespace, job, null, null, null);
+            return this.batchApi.createNamespacedJob(namespace, job).execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }
@@ -77,8 +76,10 @@ public class KubernetesClientWrapper {
      */
     public void deleteJob(String name) {
         try {
-            this.batchApi.deleteNamespacedJob(
-                    name, namespace, null, null, null, null, PROPAGATION_POLICY_BACKGROUND, null);
+            this.batchApi
+                    .deleteNamespacedJob(name, namespace)
+                    .propagationPolicy(PROPAGATION_POLICY_BACKGROUND)
+                    .execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }
@@ -95,7 +96,7 @@ public class KubernetesClientWrapper {
      */
     public void checkConfigMap(V1ConfigMap map) {
         try {
-            this.coreApi.createNamespacedConfigMap(namespace, map, null, DRY_RUN_ALL, null);
+            this.coreApi.createNamespacedConfigMap(namespace, map).dryRun(DRY_RUN_ALL).execute();
         } catch (ApiException e) {
             if (isDryRunUnsupported(e)) {
                 logger.warn(
@@ -120,7 +121,7 @@ public class KubernetesClientWrapper {
 
     public V1ConfigMap createConfigMap(V1ConfigMap map) {
         try {
-            return this.coreApi.createNamespacedConfigMap(namespace, map, null, null, null);
+            return this.coreApi.createNamespacedConfigMap(namespace, map).execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }
@@ -129,7 +130,7 @@ public class KubernetesClientWrapper {
     /** Checks the Secret's admission and permissions before creating the taskmaster job. */
     public void checkSecret(V1Secret secret) {
         try {
-            this.coreApi.createNamespacedSecret(namespace, secret, null, DRY_RUN_ALL, null);
+            this.coreApi.createNamespacedSecret(namespace, secret).dryRun(DRY_RUN_ALL).execute();
         } catch (ApiException e) {
             if (isDryRunUnsupported(e)) {
                 logger.warn(
@@ -143,7 +144,7 @@ public class KubernetesClientWrapper {
 
     public V1Secret createSecret(V1Secret secret) {
         try {
-            return this.coreApi.createNamespacedSecret(namespace, secret, null, null, null);
+            return this.coreApi.createNamespacedSecret(namespace, secret).execute();
         } catch (ApiException e) {
             throw KubernetesException.fromSecretApiException(e);
         }
@@ -159,7 +160,7 @@ public class KubernetesClientWrapper {
      */
     public V1Job readTaskmasterJob(String taskId) {
         try {
-            V1Job job = this.batchApi.readNamespacedJob(taskId, namespace, null, null, null);
+            V1Job job = this.batchApi.readNamespacedJob(taskId, namespace).execute();
             // a job without metadata or labels isn't a taskmaster's job either
             V1ObjectMeta metadata = job.getMetadata();
             Map<String, String> labels = metadata == null ? null : metadata.getLabels();
@@ -178,42 +179,12 @@ public class KubernetesClientWrapper {
 
     private V1JobList listJobs(String _continue, String labelSelector, Integer limit) {
         try {
-            return this.batchApi.listNamespacedJob(
-                    namespace,
-                    null,
-                    null,
-                    _continue,
-                    null,
-                    labelSelector,
-                    limit,
-                    null,
-                    null,
-                    null,
-                    null);
-        } catch (ApiException e) {
-            throw KubernetesException.fromApiException(e);
-        }
-    }
-
-    /**
-     * Wrapper to call Kubernetes API and retrieve all available LimitRange objects in the namespace
-     *
-     * @return The V1LimitRangeList object with all the LimitRanges
-     */
-    private V1LimitRangeList listLimits(String _continue, String labelSelector, Integer limit) {
-        try {
-            return this.coreApi.listNamespacedLimitRange(
-                    namespace,
-                    (String) null,
-                    (Boolean) null,
-                    _continue,
-                    (String) null,
-                    labelSelector,
-                    limit,
-                    (String) null,
-                    (String) null,
-                    (Integer) null,
-                    (Boolean) null);
+            return this.batchApi
+                    .listNamespacedJob(namespace)
+                    ._continue(_continue)
+                    .labelSelector(labelSelector)
+                    .limit(limit)
+                    .execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }
@@ -221,14 +192,16 @@ public class KubernetesClientWrapper {
 
     /**
      * Queries the API to get the minimum memory requirements to launch a Pod (and a Container).
-     * Returns the highest
+     * Returns the highest minimum of the namespace's LimitRanges, or 0 if Kubernetes can't list
+     * them
      *
      * @return Memory in Gigabytes (Double)
      */
     public Double minimumRamGb() {
         try {
             BigDecimal returnValue = BigDecimal.ZERO;
-            for (V1LimitRange limit : listLimits(null, null, null).getItems()) {
+            for (V1LimitRange limit :
+                    this.coreApi.listNamespacedLimitRange(namespace).execute().getItems()) {
                 for (V1LimitRangeItem item : limit.getSpec().getLimits()) {
                     if (item.getMin() != null && item.getMin().get(RESOURCE_MEM_KEY) != null) {
                         Quantity quantity = item.getMin().get(RESOURCE_MEM_KEY);
@@ -340,17 +313,26 @@ public class KubernetesClientWrapper {
                 && body.toLowerCase(Locale.ROOT).contains("continue");
     }
 
+    /**
+     * Lists the executors' jobs of a task: its jobs with the label {@code job-type=executor}.
+     * Taskmasters with tesk-core#147 also give the filers' jobs the label {@code taskmaster-name},
+     * so it alone would select them too (issue #182).
+     */
     public V1JobList listSingleTaskExecutorJobs(String taskId) {
         String labelSelector =
-                new StringJoiner("=").add(LABEL_TESTASK_ID_KEY).add(taskId).toString();
+                new StringJoiner(",")
+                        .add(LABEL_TESTASK_ID_KEY + "=" + taskId)
+                        .add(LABEL_JOBTYPE_KEY + "=" + LABEL_JOBTYPE_VALUE_EXEC)
+                        .toString();
         return this.listJobs(null, labelSelector, null);
     }
 
     public Optional<V1Job> getSingleTaskOutputFilerJob(String taskId) {
         try {
             V1Job job =
-                    this.batchApi.readNamespacedJob(
-                            taskId + JOB_NAME_FILER_SUF, namespace, null, null, null);
+                    this.batchApi
+                            .readNamespacedJob(taskId + JOB_NAME_FILER_SUF, namespace)
+                            .execute();
             return Optional.of(job);
         } catch (ApiException e) {
             if (e.getCode() != HttpStatus.NOT_FOUND.value()) {
@@ -380,8 +362,7 @@ public class KubernetesClientWrapper {
                         .map(entry -> entry.getKey() + "=" + entry.getValue())
                         .collect(Collectors.joining(","));
         try {
-            return this.coreApi.listNamespacedPod(
-                    namespace, null, null, null, null, labelSelector, null, null, null, null, null);
+            return this.coreApi.listNamespacedPod(namespace).labelSelector(labelSelector).execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }
@@ -390,8 +371,7 @@ public class KubernetesClientWrapper {
     public V1PodList listAllJobPods() {
         String labelSelector = "job-name";
         try {
-            return this.coreApi.listNamespacedPod(
-                    namespace, null, null, null, null, labelSelector, null, null, null, null, null);
+            return this.coreApi.listNamespacedPod(namespace).labelSelector(labelSelector).execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }
@@ -399,8 +379,7 @@ public class KubernetesClientWrapper {
 
     public String readPodLog(String podName) {
         try {
-            return this.coreApi.readNamespacedPodLog(
-                    podName, namespace, null, null, null, null, null, null, null, null, null);
+            return this.coreApi.readNamespacedPodLog(podName, namespace).execute();
         } catch (ApiException e) {
             logger.info("Getting logs for pod " + podName + " failed.", e);
         }
@@ -409,8 +388,7 @@ public class KubernetesClientWrapper {
 
     public void labelJobAsCancelled(String taskId) {
         try {
-            this.patchBatchApi.patchNamespacedJob(
-                    taskId, namespace, CANCEL_PATCH, null, null, null, null);
+            this.patchBatchApi.patchNamespacedJob(taskId, namespace, CANCEL_PATCH).execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }
@@ -423,8 +401,9 @@ public class KubernetesClientWrapper {
      */
     public void cancelJobBeforeStart(String taskId) {
         try {
-            this.patchBatchApi.patchNamespacedJob(
-                    taskId, namespace, CANCEL_BEFORE_START_PATCH, null, null, null, null);
+            this.patchBatchApi
+                    .patchNamespacedJob(taskId, namespace, CANCEL_BEFORE_START_PATCH)
+                    .execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }
@@ -432,8 +411,7 @@ public class KubernetesClientWrapper {
 
     public void labelPodAsCancelled(String podName) {
         try {
-            this.patchCoreApi.patchNamespacedPod(
-                    podName, namespace, CANCEL_PATCH, null, null, null, null);
+            this.patchCoreApi.patchNamespacedPod(podName, namespace, CANCEL_PATCH).execute();
         } catch (ApiException e) {
             throw KubernetesException.fromApiException(e);
         }

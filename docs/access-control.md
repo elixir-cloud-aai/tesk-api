@@ -45,10 +45,28 @@ with the authorisation code grant, and with the redirect URI
 provider must issue tokens to it without a client secret and without PKCE.
 
 ### Token validation
-TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint. If user info is returned without error, token is considered valid. Invalid token or lack of thereof in `authorisation: Bearer` header will result in `HTTP 401 Unauthorized` error. Tokens of allow-listed services are checked locally instead, if that is on (see [Tokens of services](#tokens-of-services)).
+TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint, using the resource server of Spring Security. A token is valid if the endpoint answers it (`200 OK`) with a JSON object that has a `sub` (not blank) and no `error`. TESK API waits at most 10 seconds to connect to the endpoint and 30 seconds for each read of its answer (these limits don't cover the name lookup of its host, nor the answer as a whole); if the endpoint can't be reached or doesn't answer in time, the token is refused like an invalid one. An invalid token, or lack of thereof in the `Authorization: Bearer` header, will result in `HTTP 401 Unauthorized` error. Tokens of allow-listed services are checked locally instead, if that is on (see [Tokens of services](#tokens-of-services)).
+
+TESK API takes the token from the `Authorization` header only (`Bearer <token>`, as in [RFC 6750, section 2.1](https://datatracker.ietf.org/doc/html/rfc6750#section-2.1)), not from an `access_token` parameter in the URL or in a form. A header whose token is empty or has characters that bearer tokens can't have (anything but letters, digits and `-._~+/`, with `=` only at the end; e.g. spaces) is refused without a call to the user info endpoint.
+
+The answer `401 Unauthorized` has a `WWW-Authenticate` header and a JSON body with the OAuth 2.0 error code and description:
+
+* without a token: `WWW-Authenticate: Bearer realm="oauth", error="unauthorized", error_description="Full authentication is required to access this resource"`;
+* with an invalid token: `error="invalid_token"`, with the description `Invalid access token` (`Bearer token is malformed` for a header as above; `Invalid access token of a service client` or `User ID of a service client` for [tokens of services](#tokens-of-services)). The token itself is never part of the answer.
+
+```json
+{
+  "timestamp" : "2026-11-14T10:00:00.000+00:00",
+  "status" : 401,
+  "error" : "invalid_token",
+  "message" : "Invalid access token",
+  "path" : "/ga4gh/tes/v1/tasks",
+  "error_description" : "Invalid access token"
+}
+```
 
 ### Integrating with a different OIDC provider
-We have not tested TESK API integration with a different OIDC provider than Elixir AAI, but since standard Spring OAuth library is used, it should be possible (just point `security.oauth2.resource.user-info-uri`, or `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`, to a proper URL), provided that the other Authorization Server provides information about the user in the same format that Elixir does. Otherwise changes to [GroupNamesSecurityExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/GroupNamesSecurityExtractor.java) and [ElixirPrincipalExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/ElixirPrincipalExtractor.java) will be necessary.
+We have not tested TESK API integration with a different OIDC provider than Elixir AAI, but since tokens are validated at the standard user info endpoint of OpenID Connect, it should be possible (just point `security.oauth2.resource.user-info-uri`, or `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`, to a proper URL), provided that the other Authorization Server provides information about the user in the same format that Elixir does. Otherwise changes to [GroupNamesSecurityExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/GroupNamesSecurityExtractor.java) and [ElixirPrincipalExtractor](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/src/main/java/uk/ac/ebi/tsc/tesk/config/security/ElixirPrincipalExtractor.java) will be necessary.
 
 ## Authorisation
 TESK API uses Elixir AAI group membership to authorise users (and optionally a claim, see [Authorisation without groups](#authorisation-without-groups)). Elixir recognises group managers and members, but only includes information about the latter in `user_info` endpoint response. Therefore a nested structure of groups is used by us to reflect different roles of users.

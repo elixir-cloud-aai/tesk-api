@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.empty;
 import static org.junit.Assert.assertThat;
 
 import java.util.Arrays;
@@ -47,5 +48,30 @@ public class GroupNamesSecurityExtractorTest {
         authorities.put("sthElse", new String[] {"abc", "xyz"});
         List<GrantedAuthority> result = extractor.extractAuthorities(authorities);
         assertThat(result, containsInAnyOrder(new SimpleGrantedAuthority("prefix:USER")));
+    }
+
+    /** A single value is one group, or several if it lists them separated by commas */
+    @Test
+    public void extractAuthorities_singleValue() {
+        GroupNamesSecurityExtractor extractor =
+                new GroupNamesSecurityExtractor("groupNames", "prefix");
+        Map<String, Object> authorities = new HashMap<>();
+        authorities.put("groupNames", "abc,xyz");
+        List<GrantedAuthority> result = extractor.extractAuthorities(authorities);
+        assertThat(
+                result,
+                containsInAnyOrder(
+                        new SimpleGrantedAuthority("abc"), new SimpleGrantedAuthority("xyz")));
+    }
+
+    /** A null groups claim means no groups, not a group called "null" */
+    @Test
+    public void extractAuthorities_nullClaim() {
+        GroupNamesSecurityExtractor extractor =
+                new GroupNamesSecurityExtractor("groupNames", "prefix");
+        Map<String, Object> authorities = new HashMap<>();
+        authorities.put("groupNames", null);
+        List<GrantedAuthority> result = extractor.extractAuthorities(authorities);
+        assertThat(result, empty());
     }
 }

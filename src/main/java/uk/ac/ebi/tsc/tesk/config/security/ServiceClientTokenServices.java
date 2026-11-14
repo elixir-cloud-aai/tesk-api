@@ -29,20 +29,16 @@ import org.jose4j.keys.resolvers.VerificationKeyResolver;
 import org.jose4j.lang.JoseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.OAuth2Request;
-import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
+import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.util.StringUtils;
 
 /**
  * Accepts access tokens of allow-listed service clients (issue #153; settings in {@link
- * AuthorisationProperties.ServiceClients}), and passes all other tokens on to the token services of
- * the user info endpoint.
+ * AuthorisationProperties.ServiceClients}), and passes all other tokens on to the user info
+ * endpoint ({@link UserInfoTokenIntrospector}).
  *
  * <p>A token is a service client's if it is a signed JWT whose {@code iss} is the configured
  * issuer, whose client claim (by default {@code client_id}) names a listed client, and (unless that
@@ -58,8 +54,11 @@ import org.springframework.util.StringUtils;
  * User} of its own (the client's ID, no groups, {@link User#isServiceClient()}).
  *
  * <p>Logs the client's ID for accepted and refused tokens, never the token.
+ *
+ * <p>An {@link OpaqueTokenIntrospector}; the name stays from before, so that the documented logger
+ * name ({@code uk.ac.ebi.tsc.tesk.config.security.ServiceClientTokenServices}) keeps working.
  */
-public class ServiceClientTokenServices implements ResourceServerTokenServices {
+public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
 
     private static final Logger logger = LoggerFactory.getLogger(ServiceClientTokenServices.class);
 
@@ -95,7 +94,7 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
     /** How long the keys are kept if fetching them again fails, in seconds */
     private static final long RETAIN_KEYS_ON_ERROR_SECONDS = 15 * 60;
 
-    private final ResourceServerTokenServices userInfoTokenServices;
+    private final OpaqueTokenIntrospector userInfoIntrospector;
     private final String issuer;
     private final String jwksUri;
     private final String clientClaim;
@@ -125,19 +124,18 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
     private final ReentrantLock buildLock = new ReentrantLock();
 
     /**
-     * @param userInfoTokenServices the token services of the user info endpoint, for all other
-     *     tokens
+     * @param userInfoIntrospector validates all other tokens, at the user info endpoint
      * @param properties the settings; {@code service-clients} must be enabled
      * @throws IllegalStateException if the settings lack the issuer or a client ID
      */
     public ServiceClientTokenServices(
-            ResourceServerTokenServices userInfoTokenServices, AuthorisationProperties properties) {
-        this(userInfoTokenServices, properties, JWKS_REFRESH_INTERVAL_MS);
+            OpaqueTokenIntrospector userInfoIntrospector, AuthorisationProperties properties) {
+        this(userInfoIntrospector, properties, JWKS_REFRESH_INTERVAL_MS);
     }
 
     /** As above, with the least time between two fetches of the key set (for tests) */
     ServiceClientTokenServices(
-            ResourceServerTokenServices userInfoTokenServices,
+            OpaqueTokenIntrospector userInfoIntrospector,
             AuthorisationProperties properties,
             long jwksRefreshIntervalMs) {
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
@@ -162,7 +160,7 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
                     "tesk.api.authorisation.service-clients.clock-skew-seconds must not be"
                             + " negative");
         }
-        this.userInfoTokenServices = Objects.requireNonNull(userInfoTokenServices);
+        this.userInfoIntrospector = Objects.requireNonNull(userInfoIntrospector);
         this.issuer = settings.getIssuer().trim();
         this.jwksUri =
                 StringUtils.hasText(settings.getJwksUri()) ? settings.getJwksUri().trim() : null;
@@ -204,47 +202,40 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
     }
 
     @Override
-    public OAuth2Authentication loadAuthentication(String accessToken)
-            throws AuthenticationException, InvalidTokenException {
+    public OAuth2AuthenticatedPrincipal introspect(String accessToken) {
         String clientId = listedClient(accessToken);
         if (clientId == null) {
-            OAuth2Authentication authentication =
-                    this.userInfoTokenServices.loadAuthentication(accessToken);
-            Object principal = authentication == null ? null : authentication.getPrincipal();
-            if (principal instanceof User
-                    && this.clientIds.contains(((User) principal).getUsername())) {
+            OAuth2AuthenticatedPrincipal principal =
+                    this.userInfoIntrospector.introspect(accessToken);
+            if (this.clientIds.contains(principal.getName())) {
                 // a user with a listed client's ID would share the client's tasks
                 logger.warn(
                         "Refused user token: its sub is the ID of service client {}",
-                        ((User) principal).getUsername());
-                throw new InvalidTokenException("User ID of a service client");
+                        principal.getName());
+                throw new BadOpaqueTokenException("User ID of a service client");
             }
-            return authentication;
+            return principal;
         }
+        JwtClaims claims;
         try {
-            verifier().process(accessToken);
+            claims = verifier().process(accessToken).getJwtClaims();
         } catch (InvalidJwtException e) {
             logger.warn("Refused token of service client {}: {}", clientId, reasons(e));
-            throw new InvalidTokenException("Invalid access token of a service client");
+            throw new BadOpaqueTokenException("Invalid access token of a service client");
         } catch (IOException | JoseException e) {
             // the discovery document can't be read or has no JWKS URI
             logger.warn(
                     "Refused token of service client {}: keys of the issuer unavailable ({})",
                     clientId,
                     e.getMessage());
-            throw new InvalidTokenException("Invalid access token of a service client");
+            throw new BadOpaqueTokenException("Invalid access token of a service client");
         } catch (RuntimeException e) {
             // unexpected: logged with its stack trace (which doesn't hold the token)
             logger.warn("Refused token of service client {}: unexpected error", clientId, e);
-            throw new InvalidTokenException("Invalid access token of a service client");
+            throw new BadOpaqueTokenException("Invalid access token of a service client");
         }
         logger.info("Accepted token of service client {}", clientId);
-        return authentication(clientId);
-    }
-
-    @Override
-    public OAuth2AccessToken readAccessToken(String accessToken) {
-        return this.userInfoTokenServices.readAccessToken(accessToken);
+        return principal(clientId, claims);
     }
 
     /**
@@ -276,19 +267,15 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
         return (String) client;
     }
 
-    /** The authentication of the client, as a principal of its own without groups */
-    private OAuth2Authentication authentication(String clientId) {
+    /** The client, as a principal of its own without groups, with the claims of its token */
+    private static OAuth2AuthenticatedPrincipal principal(String clientId, JwtClaims claims) {
         User user =
                 User.builder(clientId)
                         .allGroups(Collections.emptySet())
                         .serviceClient(true)
                         .legacyUserLabels(false)
                         .build();
-        UsernamePasswordAuthenticationToken userAuthentication =
-                new UsernamePasswordAuthenticationToken(user, "N/A", AuthorityUtils.NO_AUTHORITIES);
-        OAuth2Request request =
-                new OAuth2Request(null, clientId, null, true, null, null, null, null, null);
-        return new OAuth2Authentication(request, userAuthentication);
+        return new AuthenticatedUser(user, claims.getClaimsMap(), AuthorityUtils.NO_AUTHORITIES);
     }
 
     /**
@@ -296,7 +283,8 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
      * refresh interval: tokens (which may be forged, as the claims that select this path are read
      * before the signature is checked) are refused at once until then, so that they can't make
      * requests wait for the issuer one after another. While one request builds it, the others are
-     * refused at once too.
+     * refused at once too. A request that found no verifier just before another one finished
+     * building it uses that one.
      */
     private JwtConsumer verifier() throws IOException, JoseException {
         JwtConsumer consumer = this.verifier;
@@ -307,18 +295,21 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
             throw new IOException("keys of the issuer are being fetched");
         }
         try {
-            if (this.verifier == null) {
-                if (System.currentTimeMillis() < this.discoveryRetryAt) {
-                    throw new IOException("fetching the keys failed recently");
-                }
-                try {
-                    this.verifier = buildVerifier(keyResolver());
-                } catch (IOException | JoseException | RuntimeException e) {
-                    this.discoveryRetryAt = System.currentTimeMillis() + this.jwksRefreshIntervalMs;
-                    throw e;
-                }
+            consumer = this.verifier;
+            if (consumer != null) {
+                return consumer;
             }
-            return this.verifier;
+            if (System.currentTimeMillis() < this.discoveryRetryAt) {
+                throw new IOException("fetching the keys failed recently");
+            }
+            try {
+                consumer = buildVerifier(keyResolver());
+            } catch (IOException | JoseException | RuntimeException e) {
+                this.discoveryRetryAt = System.currentTimeMillis() + this.jwksRefreshIntervalMs;
+                throw e;
+            }
+            this.verifier = consumer;
+            return consumer;
         } finally {
             this.buildLock.unlock();
         }
@@ -389,10 +380,8 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
      */
     private String discoverJwksUri() throws IOException, JoseException {
         String url = this.issuer.replaceAll("/+$", "") + DISCOVERY_PATH;
+        // throws an IOException unless the status is 200
         SimpleResponse response = httpGet().get(url);
-        if (response.getStatusCode() != 200) {
-            throw new IOException("Discovery answered with status " + response.getStatusCode());
-        }
         Map<String, Object> document = JsonUtil.parseJson(response.getBody());
         Object jwks = document.get("jwks_uri");
         if (!this.issuer.equals(document.get("issuer")) || !(jwks instanceof String)) {
@@ -428,7 +417,7 @@ public class ServiceClientTokenServices implements ResourceServerTokenServices {
     }
 
     /** Why a token was refused, without the token or its claims */
-    private static String reasons(InvalidJwtException e) {
+    static String reasons(InvalidJwtException e) {
         List<String> reasons =
                 e.getErrorDetails().stream()
                         .map(ErrorCodeValidator.Error::getErrorCode)

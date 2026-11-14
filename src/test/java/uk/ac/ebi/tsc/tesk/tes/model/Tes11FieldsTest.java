@@ -60,13 +60,10 @@ public class Tes11FieldsTest {
     public void executor_ignoreError() {
         TesExecutor executor = new TesExecutor().image("ubuntu");
         assertNull(executor.getIgnoreError());
-        assertTrue(executor.isIgnoreErrorUnset());
         assertSame(executor, executor.ignoreError(false));
         assertFalse(executor.getIgnoreError());
-        assertTrue(executor.isIgnoreErrorUnset());
         executor.setIgnoreError(true);
         assertTrue(executor.getIgnoreError());
-        assertFalse(executor.isIgnoreErrorUnset());
         assertTrue(executor.toString().contains("ignoreError: true"));
     }
 

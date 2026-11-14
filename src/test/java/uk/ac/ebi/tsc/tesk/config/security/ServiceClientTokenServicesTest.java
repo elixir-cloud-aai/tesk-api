@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -23,6 +24,10 @@ import static org.mockito.Mockito.when;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantLock;
 import org.jose4j.jwa.AlgorithmConstraints;
 import org.jose4j.jwk.EcJwkGenerator;
 import org.jose4j.jwk.EllipticCurveJsonWebKey;
@@ -33,6 +38,10 @@ import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.NumericDate;
+import org.jose4j.jwt.consumer.ErrorCodeValidator;
+import org.jose4j.jwt.consumer.ErrorCodes;
+import org.jose4j.jwt.consumer.InvalidJwtException;
+import org.jose4j.jwt.consumer.JwtConsumer;
 import org.jose4j.keys.EllipticCurves;
 import org.jose4j.keys.HmacKey;
 import org.jose4j.lang.JoseException;
@@ -41,9 +50,10 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.springframework.boot.test.system.OutputCaptureRule;
-import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
+import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
+import org.springframework.test.util.ReflectionTestUtils;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
 /**
@@ -61,8 +71,8 @@ public class ServiceClientTokenServicesTest {
     @Rule public WireMockRule idp = new WireMockRule(options().dynamicPort());
     @Rule public OutputCaptureRule output = new OutputCaptureRule();
 
-    private ResourceServerTokenServices userInfo;
-    private OAuth2Authentication userAuthentication;
+    private OpaqueTokenIntrospector userInfo;
+    private OAuth2AuthenticatedPrincipal userPrincipal;
     private AuthorisationProperties properties;
 
     @BeforeClass
@@ -75,9 +85,9 @@ public class ServiceClientTokenServicesTest {
 
     @Before
     public void setUp() {
-        userInfo = mock(ResourceServerTokenServices.class);
-        userAuthentication = mock(OAuth2Authentication.class);
-        when(userInfo.loadAuthentication(anyString())).thenReturn(userAuthentication);
+        userInfo = mock(OpaqueTokenIntrospector.class);
+        userPrincipal = mock(OAuth2AuthenticatedPrincipal.class);
+        when(userInfo.introspect(anyString())).thenReturn(userPrincipal);
         properties = new AuthorisationProperties();
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
         settings.setEnabled(true);
@@ -94,13 +104,26 @@ public class ServiceClientTokenServicesTest {
     private void discovery(String documentIssuer) {
         idp.givenThat(
                 get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
-                        .willReturn(
-                                okJson(
-                                        "{\"issuer\":\""
-                                                + documentIssuer
-                                                + "\",\"jwks_uri\":\"http://localhost:"
-                                                + idp.port()
-                                                + "/oidc/jwk\"}")));
+                        .willReturn(okJson(discoveryDocument(documentIssuer))));
+    }
+
+    private String discoveryDocument(String documentIssuer) {
+        return "{\"issuer\":\""
+                + documentIssuer
+                + "\",\"jwks_uri\":\"http://localhost:"
+                + idp.port()
+                + "/oidc/jwk\"}";
+    }
+
+    /** Waits (up to 5 seconds) until the issuer received a request for the URL */
+    private void awaitRequest(String url) throws InterruptedException {
+        for (int i = 0; i < 500; i++) {
+            if (!idp.findAll(getRequestedFor(urlEqualTo(url))).isEmpty()) {
+                return;
+            }
+            Thread.sleep(10);
+        }
+        throw new AssertionError("no request for " + url);
     }
 
     private void jwks(RsaJsonWebKey... keys) {
@@ -143,20 +166,22 @@ public class ServiceClientTokenServicesTest {
     }
 
     private User accepted(String token) {
-        OAuth2Authentication authentication = services().loadAuthentication(token);
-        verify(userInfo, never()).loadAuthentication(anyString());
-        return (User) authentication.getPrincipal();
+        OAuth2AuthenticatedPrincipal principal = services().introspect(token);
+        verify(userInfo, never()).introspect(anyString());
+        assertEquals(principal.getName(), ((AuthenticatedUser) principal).getUser().getUsername());
+        assertTrue(principal.getAuthorities().isEmpty());
+        return ((AuthenticatedUser) principal).getUser();
     }
 
     private void refused(String token) {
         ServiceClientTokenServices services = services();
-        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
-        verify(userInfo, never()).loadAuthentication(anyString());
+        assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
+        verify(userInfo, never()).introspect(anyString());
     }
 
     private void passedOn(String token) {
-        assertSame(userAuthentication, services().loadAuthentication(token));
-        verify(userInfo).loadAuthentication(token);
+        assertSame(userPrincipal, services().introspect(token));
+        verify(userInfo).introspect(token);
     }
 
     @Test
@@ -287,15 +312,14 @@ public class ServiceClientTokenServicesTest {
     public void unknownKeyId_refreshesTheKeys() throws Exception {
         ServiceClientTokenServices services =
                 new ServiceClientTokenServices(userInfo, properties, 0);
-        services.loadAuthentication(sign(claims(CLIENT)));
+        services.introspect(sign(claims(CLIENT)));
         // the issuer rotates its keys
         jwks(key, otherKey);
 
-        OAuth2Authentication authentication =
-                services.loadAuthentication(
-                        sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt"));
+        OAuth2AuthenticatedPrincipal principal =
+                services.introspect(sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt"));
 
-        assertEquals(CLIENT, ((User) authentication.getPrincipal()).getUsername());
+        assertEquals(CLIENT, ((AuthenticatedUser) principal).getUser().getUsername());
         idp.verify(2, getRequestedFor(urlEqualTo("/oidc/jwk")));
         // the discovery document is read once
         idp.verify(
@@ -312,10 +336,10 @@ public class ServiceClientTokenServicesTest {
     @Test
     public void unknownKeyIds_refreshTheKeysAtMostOncePerInterval() throws Exception {
         ServiceClientTokenServices services = services();
-        services.loadAuthentication(sign(claims(CLIENT)));
+        services.introspect(sign(claims(CLIENT)));
         String unknown = sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt");
         for (int i = 0; i < 3; i++) {
-            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(unknown));
+            assertThrows(BadOpaqueTokenException.class, () -> services.introspect(unknown));
         }
         idp.verify(1, getRequestedFor(urlEqualTo("/oidc/jwk")));
     }
@@ -395,12 +419,6 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
-    public void readAccessToken_isPassedOn() {
-        services().readAccessToken("token");
-        verify(userInfo).readAccessToken("token");
-    }
-
-    @Test
     public void settingsWithoutIssuer_failAtStartup() {
         properties.getServiceClients().setIssuer(" ");
         assertThrows(IllegalStateException.class, this::services);
@@ -411,6 +429,12 @@ public class ServiceClientTokenServicesTest {
         properties.getServiceClients().setClientIds(Collections.singletonList(" "));
         assertThrows(IllegalStateException.class, this::services);
         properties.getServiceClients().setClientIds(null);
+        assertThrows(IllegalStateException.class, this::services);
+    }
+
+    @Test
+    public void settingsWithoutClientClaim_failAtStartup() {
+        properties.getServiceClients().setClientClaim(" ");
         assertThrows(IllegalStateException.class, this::services);
     }
 
@@ -438,7 +462,7 @@ public class ServiceClientTokenServicesTest {
         ServiceClientTokenServices services = services();
         String token = sign(claims(CLIENT));
         for (int i = 0; i < 3; i++) {
-            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+            assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
         }
         idp.verify(
                 1,
@@ -454,10 +478,10 @@ public class ServiceClientTokenServicesTest {
         ServiceClientTokenServices services =
                 new ServiceClientTokenServices(userInfo, properties, 0);
         String token = sign(claims(CLIENT));
-        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+        assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
         discovery(issuer());
 
-        services.loadAuthentication(token);
+        services.introspect(token);
     }
 
     @Test
@@ -474,17 +498,17 @@ public class ServiceClientTokenServicesTest {
     public void failingRefresh_isThrottled() throws Exception {
         ServiceClientTokenServices services =
                 new ServiceClientTokenServices(userInfo, properties, 300);
-        services.loadAuthentication(sign(claims(CLIENT)));
+        services.introspect(sign(claims(CLIENT)));
         Thread.sleep(400);
         idp.givenThat(get("/oidc/jwk").willReturn(aResponse().withStatus(503)));
         String unknown = sign(claims(CLIENT), otherKey, otherKey.getKeyId(), "at+jwt");
         for (int i = 0; i < 3; i++) {
-            assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(unknown));
+            assertThrows(BadOpaqueTokenException.class, () -> services.introspect(unknown));
         }
         // the first fetch, and one refresh for the unknown key IDs
         idp.verify(2, getRequestedFor(urlEqualTo("/oidc/jwk")));
         // the known key still works
-        services.loadAuthentication(sign(claims(CLIENT)));
+        services.introspect(sign(claims(CLIENT)));
     }
 
     /** A failed or empty key set isn't fetched again within the interval, also without discovery */
@@ -501,7 +525,7 @@ public class ServiceClientTokenServicesTest {
             }
             ServiceClientTokenServices services = services();
             for (int i = 0; i < 3; i++) {
-                assertThrows(InvalidTokenException.class, () -> services.loadAuthentication(token));
+                assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
             }
             idp.verify(1, getRequestedFor(urlEqualTo("/oidc/jwk")));
         }
@@ -534,18 +558,30 @@ public class ServiceClientTokenServicesTest {
     /** A user whose sub is a listed client's ID would share its tasks, so is refused */
     @Test
     public void userWithClientId_isRefused() {
-        when(userAuthentication.getPrincipal()).thenReturn(User.builder(CLIENT).build());
+        when(userPrincipal.getName()).thenReturn(CLIENT);
         ServiceClientTokenServices services = services();
 
-        assertThrows(InvalidTokenException.class, () -> services.loadAuthentication("opaque"));
-        verify(userInfo).loadAuthentication("opaque");
+        assertThrows(BadOpaqueTokenException.class, () -> services.introspect("opaque"));
+        verify(userInfo).introspect("opaque");
     }
 
     @Test
     public void otherUser_isPassedOn() {
-        when(userAuthentication.getPrincipal())
-                .thenReturn(User.builder("user@example.org").build());
+        when(userPrincipal.getName()).thenReturn("user@example.org");
         passedOn("opaque");
+    }
+
+    /** An unexpected error while checking a service client's token refuses it */
+    @Test
+    public void unexpectedError_isRefused() throws Exception {
+        JwtConsumer failing = mock(JwtConsumer.class);
+        when(failing.process(anyString())).thenThrow(new IllegalStateException("unexpected"));
+        ServiceClientTokenServices services = services();
+        ReflectionTestUtils.setField(services, "verifier", failing);
+
+        assertThrows(
+                BadOpaqueTokenException.class, () -> services.introspect(sign(claims(CLIENT))));
+        verify(userInfo, never()).introspect(anyString());
     }
 
     @Test
@@ -581,6 +617,7 @@ public class ServiceClientTokenServicesTest {
         assertTrue(ServiceClientTokenServices.isSecure("https://login.example.org/oidc/"));
         assertTrue(ServiceClientTokenServices.isSecure("http://localhost:8080/oidc/"));
         assertTrue(ServiceClientTokenServices.isSecure("http://127.0.0.1/jwk"));
+        assertTrue(ServiceClientTokenServices.isSecure("http://[::1]:8080/oidc/"));
         assertFalse(ServiceClientTokenServices.isSecure("http://login.example.org/oidc/"));
         assertFalse(ServiceClientTokenServices.isSecure("http://localhost.example.org/"));
         assertFalse(ServiceClientTokenServices.isSecure("ftp://login.example.org/"));
@@ -617,5 +654,133 @@ public class ServiceClientTokenServicesTest {
     public void serviceClient_ignoresLegacyUserLabels() throws Exception {
         properties.setLegacyUserLabels(true);
         assertFalse(accepted(sign(claims(CLIENT))).isLegacyUserLabels());
+    }
+
+    /** A JWT nested in another isn't a service client's token, whatever its claims */
+    @Test
+    public void nestedToken_isPassedOn() throws Exception {
+        JsonWebSignature outer = new JsonWebSignature();
+        outer.setPayload(sign(claims(CLIENT)));
+        outer.setContentTypeHeaderValue("JWT");
+        outer.setKey(key.getPrivateKey());
+        outer.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
+        passedOn(outer.getCompactSerialization());
+    }
+
+    @Test
+    public void discoveryWithoutJwksUri_isRefused() throws Exception {
+        idp.givenThat(
+                get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
+                        .willReturn(okJson("{\"issuer\":\"" + issuer() + "\"}")));
+        refused(sign(claims(CLIENT)));
+        assertThat(output.getOut(), containsString("keys of the issuer unavailable"));
+    }
+
+    /**
+     * While one request fetches the keys of the issuer, the tokens of other requests are refused at
+     * once, instead of waiting for the issuer or fetching the keys again
+     */
+    @Test
+    public void whileTheKeysAreFetched_otherTokensAreRefused() throws Exception {
+        String discoveryPath = "/oidc" + ServiceClientTokenServices.DISCOVERY_PATH;
+        idp.givenThat(
+                get(discoveryPath)
+                        .willReturn(okJson(discoveryDocument(issuer())).withFixedDelay(3000)));
+        ServiceClientTokenServices services = services();
+        String token = sign(claims(CLIENT));
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<OAuth2AuthenticatedPrincipal> first =
+                    executor.submit(() -> services.introspect(token));
+            awaitRequest(discoveryPath);
+
+            assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
+
+            assertEquals(CLIENT, first.get().getName());
+            idp.verify(1, getRequestedFor(urlEqualTo(discoveryPath)));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /**
+     * A request that found no verifier just before another one finished building it uses that
+     * verifier, instead of fetching the keys again
+     */
+    @Test
+    public void verifierBuiltMeanwhile_isUsed() throws Exception {
+        String token = sign(claims(CLIENT));
+        ServiceClientTokenServices other = services();
+        other.introspect(token);
+        // depends on the fields verifier and buildLock of ServiceClientTokenServices
+        Object built = ReflectionTestUtils.getField(other, "verifier");
+        assertNotNull(built);
+        ServiceClientTokenServices services = services();
+        // the other request finishes the build between this one's check and its lock
+        ReflectionTestUtils.setField(
+                services,
+                "buildLock",
+                new ReentrantLock() {
+                    @Override
+                    public boolean tryLock() {
+                        ReflectionTestUtils.setField(services, "verifier", built);
+                        return super.tryLock();
+                    }
+                });
+
+        assertEquals(CLIENT, services.introspect(token).getName());
+
+        idp.verify(
+                1,
+                getRequestedFor(urlEqualTo("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)));
+    }
+
+    /** While one request refreshes the key set, the others don't fetch it again */
+    @Test
+    public void whileTheKeysAreRefreshed_otherRefreshesAreSkipped() throws Exception {
+        idp.givenThat(
+                get("/oidc/jwk")
+                        .willReturn(okJson(new JsonWebKeySet(key).toJson()).withFixedDelay(3000)));
+        ServiceClientTokenServices.ThrottledHttpsJwks jwks =
+                new ServiceClientTokenServices.ThrottledHttpsJwks(
+                        "http://localhost:" + idp.port() + "/oidc/jwk", 0);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> first =
+                    executor.submit(
+                            () -> {
+                                jwks.refresh();
+                                return null;
+                            });
+            awaitRequest("/oidc/jwk");
+
+            jwks.refresh();
+
+            first.get();
+            idp.verify(1, getRequestedFor(urlEqualTo("/oidc/jwk")));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /** The log says why a token was refused, once per reason */
+    @Test
+    public void refusalReasons() {
+        assertEquals(
+                "invalid token",
+                ServiceClientTokenServices.reasons(
+                        new InvalidJwtException("refused", Collections.emptyList(), null)));
+        assertEquals(
+                "wrong issuer, not signed, invalid token (code 999)",
+                ServiceClientTokenServices.reasons(
+                        new InvalidJwtException(
+                                "refused",
+                                Arrays.asList(
+                                        new ErrorCodeValidator.Error(ErrorCodes.ISSUER_MISSING, ""),
+                                        new ErrorCodeValidator.Error(ErrorCodes.ISSUER_INVALID, ""),
+                                        new ErrorCodeValidator.Error(
+                                                ErrorCodes.SIGNATURE_MISSING, ""),
+                                        new ErrorCodeValidator.Error(999, "")),
+                                null)));
     }
 }
