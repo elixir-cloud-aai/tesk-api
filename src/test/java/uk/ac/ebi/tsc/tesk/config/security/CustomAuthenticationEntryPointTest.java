@@ -135,6 +135,17 @@ public class CustomAuthenticationEntryPointTest {
                 response.getHeader("WWW-Authenticate"));
     }
 
+    /** A media type with quality 0 is not acceptable */
+    @Test
+    public void refusedJson_hasNoBody() throws Exception {
+        MockHttpServletResponse response =
+                commence(
+                        "application/json;q=0, text/html",
+                        new InsufficientAuthenticationException("no token"));
+        assertEquals(401, response.getStatus());
+        assertEquals("", response.getContentAsString());
+    }
+
     @Test
     public void invalidAccept_isTakenAsAll() throws Exception {
         MockHttpServletResponse response =

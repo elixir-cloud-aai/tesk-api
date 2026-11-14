@@ -124,6 +124,8 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         if (accepted.isEmpty()) {
             accepted.add(MediaType.ALL);
         }
+        // q=0: not acceptable
+        accepted.removeIf(mediaType -> mediaType.getQualityValue() == 0);
         MediaType.sortBySpecificityAndQuality(accepted);
         for (MediaType mediaType : accepted) {
             for (HttpMessageConverter<?> converter : this.messageConverters) {

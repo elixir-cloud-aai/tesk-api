@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -80,6 +81,18 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
         return new RestTemplate(requestFactory);
     }
 
+    /**
+     * Whether the URL names a host, as the HTTP client reads it (also names that {@link URI}
+     * doesn't parse as hosts, e.g. with {@code _}, as in Docker Compose)
+     */
+    static boolean hasHost(URI uri) {
+        try {
+            return StringUtils.hasText(uri.toURL().getHost());
+        } catch (MalformedURLException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     /** As above, with the client of the user info endpoint (for tests) */
     UserInfoTokenIntrospector(
             String userInfoUri,
@@ -94,7 +107,7 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
         this.userInfoUri = URI.create(userInfoUri.trim());
         String scheme = this.userInfoUri.getScheme();
         if (!("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme))
-                || this.userInfoUri.getRawAuthority() == null) {
+                || !hasHost(this.userInfoUri)) {
             throw new IllegalStateException(
                     "security.oauth2.resource.user-info-uri (SECURITY_OAUTH2_RESOURCE_USER_INFO_URI)"
                             + " must be an absolute http(s) URL");
@@ -111,7 +124,8 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
             logger.warn("Refused token: the user info has an error");
             throw new BadOpaqueTokenException(INVALID_TOKEN);
         }
-        if (userInfo.get("sub") == null) {
+        Object sub = userInfo.get("sub");
+        if (sub == null || !StringUtils.hasText(sub.toString())) {
             logger.warn("Refused token: the user info has no sub");
             throw new BadOpaqueTokenException(INVALID_TOKEN);
         }

@@ -46,13 +46,13 @@ notice changed answers:
       have (e.g. spaces), is refused with `401` (`invalid_token`,
       `Bearer token is malformed`) without a call to the user info
       endpoint. Before, it was passed on to the endpoint.
-    - A token whose user info has no `sub` is refused with `401` instead
+    - A token whose user info has no `sub` (or a blank one) is refused with `401` instead
       of failing with `500 Internal Server Error`.
     - Without a valid token, a request that accepts no JSON (e.g.
       `Accept: text/plain`) gets `401` with the `WWW-Authenticate`
       header and no body.
 - **User info endpoint.** TESK API waits at most 10 seconds to connect to
-  the user info endpoint and 30 seconds for its answer, and then refuses
+  the user info endpoint and 30 seconds for each read of its answer, and then refuses
   the token (before, it waited without limit). It doesn't start if
   `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` isn't an absolute `http` or
   `https` URL with a host; before, it started and refused every

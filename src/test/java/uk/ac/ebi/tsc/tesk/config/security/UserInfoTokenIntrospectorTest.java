@@ -20,6 +20,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.junit.Before;
@@ -148,6 +149,12 @@ public class UserInfoTokenIntrospectorTest {
     }
 
     @Test
+    public void userInfoWithBlankSub_isRefused() {
+        answer("{\"sub\":\" \"}");
+        refused();
+    }
+
+    @Test
     public void userInfoNotAnObject_isRefused() {
         answer("[\"sub\"]");
         refused();
@@ -247,13 +254,27 @@ public class UserInfoTokenIntrospectorTest {
     }
 
     @Test
+    public void hasHost() {
+        assertTrue(UserInfoTokenIntrospector.hasHost(URI.create("https://login.example.org/")));
+        assertTrue(UserInfoTokenIntrospector.hasHost(URI.create("http://my_idp:8080/")));
+        assertFalse(UserInfoTokenIntrospector.hasHost(URI.create("http://:8080/")));
+        // not a URL that Java can open
+        assertFalse(UserInfoTokenIntrospector.hasHost(URI.create("unknown://host/")));
+        assertFalse(UserInfoTokenIntrospector.hasHost(URI.create("relative/path")));
+    }
+
+    @Test
     public void userInfoUriNotAbsoluteHttp_doesNotStart() {
         GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
         ElixirPrincipalExtractor extractor =
                 new ElixirPrincipalExtractor(groups, new AuthorisationProperties());
         for (String uri :
                 new String[] {
-                    "login.example.org/oidc/userinfo", "ftp://login.example.org/", "http:userinfo"
+                    "login.example.org/oidc/userinfo",
+                    "ftp://login.example.org/",
+                    "http:userinfo",
+                    "http://:8080/userinfo",
+                    "http://user@/userinfo"
                 }) {
             IllegalStateException e =
                     assertThrows(
