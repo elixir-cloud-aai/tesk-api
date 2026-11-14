@@ -387,7 +387,7 @@ class TesServiceImplCreateTest {
 
         ArgumentCaptor<V1Job> job = ArgumentCaptor.forClass(V1Job.class);
         verify(this.client).createJob(job.capture());
-        assertThat(job.getValue().getMetadata().getAnnotations()).isNull();
+        assertThat(job.getValue().getMetadata().getAnnotations()).isNullOrEmpty();
         assertThat(output.getOut()).doesNotContain("backend_parameters");
     }
 }

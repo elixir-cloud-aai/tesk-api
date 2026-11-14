@@ -14,6 +14,7 @@ import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodCondition;
 import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.openapi.models.V1PodStatus;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -21,7 +22,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
-import org.joda.time.DateTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -597,12 +597,12 @@ class TaskStateResolverTest {
         Task stuck = task(true, JobState.FAILED, JobState.FAILED, JobState.ABSENT, JobState.ABSENT);
         V1Pod pod = pod(TASK + "-ex-00-pod-2", new V1PodStatus().phase("Running"));
         int slack = TaskStateResolver.DELETION_SLACK_SECONDS;
-        pod.getMetadata().deletionTimestamp(DateTime.now().minusSeconds(slack + 10));
+        pod.getMetadata().deletionTimestamp(OffsetDateTime.now().minusSeconds(slack + 10));
         stuck.getExecutors().get(0).addPod(pod);
         assertThat(TaskStateResolver.resolve(stuck, () -> 1)).isEqualTo(TesState.CANCELED);
-        pod.getMetadata().deletionTimestamp(DateTime.now().minusSeconds(slack - 10));
+        pod.getMetadata().deletionTimestamp(OffsetDateTime.now().minusSeconds(slack - 10));
         assertThat(TaskStateResolver.resolve(stuck, () -> 1)).isEqualTo(TesState.CANCELING);
-        pod.getMetadata().deletionTimestamp(DateTime.now().plusMinutes(1));
+        pod.getMetadata().deletionTimestamp(OffsetDateTime.now().plusMinutes(1));
         assertThat(TaskStateResolver.resolve(stuck, () -> 1)).isEqualTo(TesState.CANCELING);
     }
 

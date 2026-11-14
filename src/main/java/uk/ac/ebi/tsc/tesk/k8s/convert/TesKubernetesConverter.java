@@ -12,13 +12,13 @@ import io.kubernetes.client.openapi.models.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.zip.GZIPOutputStream;
-import org.joda.time.format.DateTimeFormatter;
-import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -49,8 +49,9 @@ public class TesKubernetesConverter {
 
     private final TrsToolClient trsClient;
 
+    /** Times in UTC, with milliseconds (e.g. 2018-05-31T09:21:57.000Z) */
     private static final DateTimeFormatter DATE_FORMATTER =
-            ISODateTimeFormat.dateTime().withZoneUTC();
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX").withZone(ZoneOffset.UTC);
 
     public TesKubernetesConverter(
             @Qualifier("executor") Supplier<V1Job> executorTemplateSupplier,
@@ -512,12 +513,12 @@ public class TesKubernetesConverter {
         log.setStartTime(
                 Optional.ofNullable(executorJob.getStatus())
                         .map(V1JobStatus::getStartTime)
-                        .map(DATE_FORMATTER::print)
+                        .map(DATE_FORMATTER::format)
                         .orElse(null));
         log.setEndTime(
                 Optional.ofNullable(executorJob.getStatus())
                         .map(V1JobStatus::getCompletionTime)
-                        .map(DATE_FORMATTER::print)
+                        .map(DATE_FORMATTER::format)
                         .orElse(null));
         // workaround for py-tes compatibility. py-tes breaks for ExecutorLogs that can unmarshal to
         // TaskLogs. Non-null stdout prevents that.
@@ -605,7 +606,11 @@ public class TesKubernetesConverter {
         }
         task.setId(taskMasterJobMetadata.getName());
         task.setState(this.extractStateFromK8sJobs(taskmasterWithExecutors));
-        task.setCreationTime(DATE_FORMATTER.print(taskMasterJobMetadata.getCreationTimestamp()));
+        // Kubernetes sets it for every job it stores
+        task.setCreationTime(
+                Optional.ofNullable(taskMasterJobMetadata.getCreationTimestamp())
+                        .map(DATE_FORMATTER::format)
+                        .orElse(null));
         TesTaskLog log = new TesTaskLog();
         task.addLogsItem(log);
         // the files that the outputs filer uploaded, as the taskmaster stored them (issue #160)
@@ -618,12 +623,12 @@ public class TesKubernetesConverter {
         log.setStartTime(
                 Optional.ofNullable(taskMasterJob.getStatus())
                         .map(V1JobStatus::getStartTime)
-                        .map(DATE_FORMATTER::print)
+                        .map(DATE_FORMATTER::format)
                         .orElse(null));
         log.setEndTime(
                 Optional.ofNullable(taskMasterJob.getStatus())
                         .map(V1JobStatus::getCompletionTime)
-                        .map(DATE_FORMATTER::print)
+                        .map(DATE_FORMATTER::format)
                         .orElse(null));
         for (Job executorJob : taskmasterWithExecutors.getExecutors()) {
             TesExecutorLog executorLog = this.extractExecutorLogFromK8sJobAndPod(executorJob);

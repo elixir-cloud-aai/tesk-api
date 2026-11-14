@@ -65,8 +65,8 @@ public class KubernetesObjectsSupplier {
             confmap_namespace = System.getenv(envConfigMapNamespace);
         }
         V1ConfigMap config =
-                coreApi.readNamespacedConfigMap(
-                        System.getenv(envConfigMap), confmap_namespace, null, false, false);
+                coreApi.readNamespacedConfigMap(System.getenv(envConfigMap), confmap_namespace)
+                        .execute();
 
         String config_key = "securityContext";
         if (System.getenv(envConfigMapKey) != null) {

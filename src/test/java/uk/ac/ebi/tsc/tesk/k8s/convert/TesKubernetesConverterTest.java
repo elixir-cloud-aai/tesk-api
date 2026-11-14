@@ -120,8 +120,11 @@ public class TesKubernetesConverterTest {
                 configMapKey, "fsGroup: 1000\nrunAsUser: 1001\nnonRoot: true\nrunAsGroup: 1002");
         V1ConfigMap testConfigMap = new V1ConfigMap();
         testConfigMap.setData(testConfigMapData);
-        when(coreApi.readNamespacedConfigMap(configMapName, configMapNamespace, null, false, false))
-                .thenReturn(testConfigMap);
+        CoreV1Api.APIreadNamespacedConfigMapRequest readConfigMap =
+                mock(CoreV1Api.APIreadNamespacedConfigMapRequest.class);
+        when(coreApi.readNamespacedConfigMap(configMapName, configMapNamespace))
+                .thenReturn(readConfigMap);
+        when(readConfigMap.execute()).thenReturn(testConfigMap);
         KubernetesObjectsSupplier objectsSupplier =
                 new KubernetesObjectsSupplier(
                         gson, jobNameGenerator, taskmasterEnvProperties, "test-namespace", coreApi);
@@ -400,10 +403,12 @@ public class TesKubernetesConverterTest {
                 .containsOnly("16106127360")
                 .hasSize(2);
 
-        taskMasterInputJson
+        JsonContentAssert withoutEmpty =
+                new JsonContentAssert(this.getClass(), TestUtils.withoutEmpty(jsonString));
+        withoutEmpty
                 .extractingJsonPathMapValue("executors[0].spec.template.spec.containers[0]")
                 .containsOnlyKeys("name", "image", "command", "resources", "volumeMounts");
-        taskMasterInputJson
+        withoutEmpty
                 .extractingJsonPathMapValue("executors[1].spec.template.spec.containers[0]")
                 .containsOnlyKeys(
                         "name",
@@ -442,8 +447,10 @@ public class TesKubernetesConverterTest {
 
         taskMasterInputJson.extractingJsonPathNumberValue("resources.disk_gb").isEqualTo(100.0);
 
-        taskMasterInputJson.isEqualToJson(
-                new ClassPathResource("fromTesToK8s/taskmaster_param.json"),
+        withoutEmpty.isEqualToJson(
+                TestUtils.withoutEmpty(
+                        TestUtils.getFileContentFromResources(
+                                "fromTesToK8s/taskmaster_param.json")),
                 JSONCompareMode.NON_EXTENSIBLE);
     }
 

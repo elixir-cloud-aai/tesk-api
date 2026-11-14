@@ -219,9 +219,14 @@ public class TesKubernetesConverterMinimalTest {
                 .extractingJsonPathArrayValue("executors[*].spec.template.spec.restartPolicy")
                 .containsOnly("Never")
                 .hasSize(1);
+        // no requests or limits (the Kubernetes client writes empty collections)
         taskMasterInputJson
                 .extractingJsonPathMapValue(
-                        "executors[0].spec.template.spec.containers[0].resources")
+                        "executors[0].spec.template.spec.containers[0].resources.requests")
+                .isEmpty();
+        taskMasterInputJson
+                .extractingJsonPathMapValue(
+                        "executors[0].spec.template.spec.containers[0].resources.limits")
                 .isEmpty();
 
         taskMasterInputJson
@@ -233,14 +238,20 @@ public class TesKubernetesConverterMinimalTest {
                         "executors[0].spec.template.spec.containers[0].image")
                 .isEqualTo("ubuntu");
 
-        taskMasterInputJson
+        // without the empty collections that the Kubernetes client writes: the resources (no
+        // requests or limits, see above) are gone too
+        JsonContentAssert withoutEmpty =
+                new JsonContentAssert(this.getClass(), TestUtils.withoutEmpty(jsonString));
+        withoutEmpty
                 .extractingJsonPathMapValue("executors[0].spec.template.spec.containers[0]")
-                .containsOnlyKeys("name", "image", "command", "resources");
+                .containsOnlyKeys("name", "image", "command");
 
         taskMasterInputJson.extractingJsonPathNumberValue("resources.disk_gb").isEqualTo(0.1);
 
-        taskMasterInputJson.isEqualToJson(
-                new ClassPathResource("fromTesToK8s_minimal/taskmaster_param.json"),
+        withoutEmpty.isEqualToJson(
+                TestUtils.withoutEmpty(
+                        TestUtils.getFileContentFromResources(
+                                "fromTesToK8s_minimal/taskmaster_param.json")),
                 JSONCompareMode.NON_EXTENSIBLE);
     }
 
@@ -288,6 +299,8 @@ public class TesKubernetesConverterMinimalTest {
             String serialized = input.toString();
             org.assertj.core.api.Assertions.assertThat(serialized)
                     .doesNotContain(credentialRepresentations);
+            // no image pull Secrets for the public image (the Kubernetes client writes the
+            // empty list)
             org.assertj.core.api.Assertions.assertThat(
                             input.getAsJsonArray("executors")
                                     .get(0)
@@ -295,8 +308,8 @@ public class TesKubernetesConverterMinimalTest {
                                     .getAsJsonObject("spec")
                                     .getAsJsonObject("template")
                                     .getAsJsonObject("spec")
-                                    .has("imagePullSecrets"))
-                    .isFalse();
+                                    .getAsJsonArray("imagePullSecrets"))
+                    .isEmpty();
             org.assertj.core.api.Assertions.assertThat(
                             input.getAsJsonArray("executors")
                                     .get(1)
@@ -555,6 +568,15 @@ public class TesKubernetesConverterMinimalTest {
         TesTask outputTask =
                 this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
         assertThat(outputTask, CoreMatchers.is(expectedTask));
+    }
+
+    /** Without a creation time of the taskmaster's job (Kubernetes sets one), the task has none */
+    @Test
+    public void fromK8sToTask_noCreationTime() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
+        taskBuilder.getTask().getTaskmaster().getJob().getMetadata().setCreationTimestamp(null);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), false);
+        org.assertj.core.api.Assertions.assertThat(outputTask.getCreationTime()).isNull();
     }
 
     /** A taskmaster's job with failed pods counted, none active and no condition: an error */
