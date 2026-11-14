@@ -97,6 +97,18 @@ public class KubernetesJsonTest {
                                 + "\"volumes\":[{\"emptyDir\":{},\"name\":\"v\"}]}");
     }
 
+    /** Without empty collections, reading is as with {@link KubernetesJson#GSON} */
+    @Test
+    public void withoutEmptyCollectionsReads() {
+        V1PodSpec spec =
+                KubernetesJson.GSON_WITHOUT_EMPTY_COLLECTIONS.fromJson(
+                        "{\"containers\":[{\"name\":\"c\",\"args\":[]}],\"unknown\":1}",
+                        V1PodSpec.class);
+        assertThat(spec.getContainers()).hasSize(1);
+        assertThat(spec.getContainers().get(0).getName()).isEqualTo("c");
+        assertThat(spec.getContainers().get(0).getArgs()).isEmpty();
+    }
+
     /** Binary data of Secrets and ConfigMaps (Base64), both ways */
     @Test
     public void binaryData() {
