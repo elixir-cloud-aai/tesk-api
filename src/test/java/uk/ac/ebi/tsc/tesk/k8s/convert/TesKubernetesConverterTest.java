@@ -596,6 +596,10 @@ public class TesKubernetesConverterTest {
     @Test
     public void fromK8sToTask_outputFileLogsNotList() throws IOException {
         assertEquals(Collections.emptyList(), this.outputsOf("{}"));
+        // Jackson reads blank text as a missing node, not null
+        assertEquals("empty", Collections.emptyList(), this.outputsOf(""));
+        assertEquals("blank", Collections.emptyList(), this.outputsOf("  "));
+        assertEquals("JSON null", Collections.emptyList(), this.outputsOf("null"));
     }
 
     @Test
