@@ -284,7 +284,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      * before the signature is checked) are refused at once until then, so that they can't make
      * requests wait for the issuer one after another. While one request builds it, the others are
      * refused at once too. A request that found no verifier just before another one finished
-     * building it builds it again: one more fetch of the keys, in a window of nanoseconds.
+     * building it uses that one.
      */
     private JwtConsumer verifier() throws IOException, JoseException {
         JwtConsumer consumer = this.verifier;
@@ -295,6 +295,10 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             throw new IOException("keys of the issuer are being fetched");
         }
         try {
+            consumer = this.verifier;
+            if (consumer != null) {
+                return consumer;
+            }
             if (System.currentTimeMillis() < this.discoveryRetryAt) {
                 throw new IOException("fetching the keys failed recently");
             }

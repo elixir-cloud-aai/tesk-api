@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantLock;
 import org.jose4j.jwa.AlgorithmConstraints;
 import org.jose4j.jwk.EcJwkGenerator;
 import org.jose4j.jwk.EllipticCurveJsonWebKey;
@@ -683,7 +684,7 @@ public class ServiceClientTokenServicesTest {
         String discoveryPath = "/oidc" + ServiceClientTokenServices.DISCOVERY_PATH;
         idp.givenThat(
                 get(discoveryPath)
-                        .willReturn(okJson(discoveryDocument(issuer())).withFixedDelay(1000)));
+                        .willReturn(okJson(discoveryDocument(issuer())).withFixedDelay(3000)));
         ServiceClientTokenServices services = services();
         String token = sign(claims(CLIENT));
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -701,12 +702,42 @@ public class ServiceClientTokenServicesTest {
         }
     }
 
+    /**
+     * A request that found no verifier just before another one finished building it uses that
+     * verifier, instead of fetching the keys again
+     */
+    @Test
+    public void verifierBuiltMeanwhile_isUsed() throws Exception {
+        String token = sign(claims(CLIENT));
+        ServiceClientTokenServices other = services();
+        other.introspect(token);
+        Object built = ReflectionTestUtils.getField(other, "verifier");
+        ServiceClientTokenServices services = services();
+        // the other request finishes the build between this one's check and its lock
+        ReflectionTestUtils.setField(
+                services,
+                "buildLock",
+                new ReentrantLock() {
+                    @Override
+                    public boolean tryLock() {
+                        ReflectionTestUtils.setField(services, "verifier", built);
+                        return super.tryLock();
+                    }
+                });
+
+        assertEquals(CLIENT, services.introspect(token).getName());
+
+        idp.verify(
+                1,
+                getRequestedFor(urlEqualTo("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)));
+    }
+
     /** While one request refreshes the key set, the others don't fetch it again */
     @Test
     public void whileTheKeysAreRefreshed_otherRefreshesAreSkipped() throws Exception {
         idp.givenThat(
                 get("/oidc/jwk")
-                        .willReturn(okJson(new JsonWebKeySet(key).toJson()).withFixedDelay(1000)));
+                        .willReturn(okJson(new JsonWebKeySet(key).toJson()).withFixedDelay(3000)));
         ServiceClientTokenServices.ThrottledHttpsJwks jwks =
                 new ServiceClientTokenServices.ThrottledHttpsJwks(
                         "http://localhost:" + idp.port() + "/oidc/jwk", 0);
