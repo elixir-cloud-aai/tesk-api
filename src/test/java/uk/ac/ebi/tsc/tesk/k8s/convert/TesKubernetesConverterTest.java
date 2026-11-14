@@ -120,8 +120,11 @@ public class TesKubernetesConverterTest {
                 configMapKey, "fsGroup: 1000\nrunAsUser: 1001\nnonRoot: true\nrunAsGroup: 1002");
         V1ConfigMap testConfigMap = new V1ConfigMap();
         testConfigMap.setData(testConfigMapData);
-        when(coreApi.readNamespacedConfigMap(configMapName, configMapNamespace, null, false, false))
-                .thenReturn(testConfigMap);
+        CoreV1Api.APIreadNamespacedConfigMapRequest readConfigMap =
+                mock(CoreV1Api.APIreadNamespacedConfigMapRequest.class);
+        when(coreApi.readNamespacedConfigMap(configMapName, configMapNamespace))
+                .thenReturn(readConfigMap);
+        when(readConfigMap.execute()).thenReturn(testConfigMap);
         KubernetesObjectsSupplier objectsSupplier =
                 new KubernetesObjectsSupplier(
                         gson, jobNameGenerator, taskmasterEnvProperties, "test-namespace", coreApi);

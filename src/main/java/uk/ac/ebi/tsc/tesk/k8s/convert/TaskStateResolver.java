@@ -13,6 +13,7 @@ import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodCondition;
 import io.kubernetes.client.openapi.models.V1PodStatus;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -23,7 +24,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.joda.time.DateTime;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
@@ -99,11 +99,12 @@ public final class TaskStateResolver {
         if (pod.getStatus() != null && ENDED_POD_PHASES.contains(pod.getStatus().getPhase())) {
             return true;
         }
-        DateTime deletion =
+        OffsetDateTime deletion =
                 Optional.ofNullable(pod.getMetadata())
                         .map(V1ObjectMeta::getDeletionTimestamp)
                         .orElse(null);
-        return deletion != null && deletion.plusSeconds(DELETION_SLACK_SECONDS).isBeforeNow();
+        return deletion != null
+                && deletion.plusSeconds(DELETION_SLACK_SECONDS).isBefore(OffsetDateTime.now());
     }
 
     /**

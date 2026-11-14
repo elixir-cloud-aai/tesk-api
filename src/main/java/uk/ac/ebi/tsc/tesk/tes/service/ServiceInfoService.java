@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Construct;
@@ -74,6 +75,8 @@ public class ServiceInfoService {
     // https://bitbucket.org/asomov/snakeyaml/wiki/Howto#markdown-header-how-to-parse-jodatime
     class OffsetDateTimePropertyConstructor extends Constructor {
         public OffsetDateTimePropertyConstructor() {
+            // SnakeYAML 2 has no constructor without options; these are its defaults
+            super(new LoaderOptions());
             yamlClassConstructors.put(NodeId.scalar, new TimeStampConstruct());
             // keys of the service info schema that aren't Java property names (TES 1.1)
             TypeDescription serviceInfo = new TypeDescription(TesServiceInfo.class);

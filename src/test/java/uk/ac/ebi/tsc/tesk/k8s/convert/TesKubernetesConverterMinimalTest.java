@@ -56,6 +56,7 @@ import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
+import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
@@ -242,6 +243,45 @@ public class TesKubernetesConverterMinimalTest {
         taskMasterInputJson.isEqualToJson(
                 new ClassPathResource("fromTesToK8s_minimal/taskmaster_param.json"),
                 JSONCompareMode.NON_EXTENSIBLE);
+    }
+
+    /**
+     * An executor with memory but no CPU gets no limits in the taskmaster's input: not even empty
+     * ones, as the taskmaster sets the limits to the requests only if there are none (a pod without
+     * limits could use all memory of its node)
+     */
+    @Test
+    public void ramOnlyExecutorHasNoLimits() throws IOException {
+        given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-98605447");
+        TesTask task =
+                new TesTask()
+                        .addExecutorsItem(new TesExecutor().image("ubuntu").addCommandItem("true"))
+                        .resources(new TesResources().ramGb(2.0));
+        User user = User.builder("test-user-id").build();
+        V1Job taskmaster = this.converter.fromTesTaskToK8sJob(task, user);
+        V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, taskmaster);
+        try (InputStreamReader reader =
+                new InputStreamReader(
+                        new GZIPInputStream(
+                                new ByteArrayInputStream(
+                                        configMap.getBinaryData().get("JSON_INPUT.gz"))),
+                        StandardCharsets.UTF_8)) {
+            JsonObject resources =
+                    this.gson
+                            .fromJson(reader, JsonObject.class)
+                            .getAsJsonArray("executors")
+                            .get(0)
+                            .getAsJsonObject()
+                            .getAsJsonObject("spec")
+                            .getAsJsonObject("template")
+                            .getAsJsonObject("spec")
+                            .getAsJsonArray("containers")
+                            .get(0)
+                            .getAsJsonObject()
+                            .getAsJsonObject("resources");
+            assertThat(resources.has("limits")).isFalse();
+            assertThat(resources.getAsJsonObject("requests").has("memory")).isTrue();
+        }
     }
 
     @Test
@@ -555,6 +595,15 @@ public class TesKubernetesConverterMinimalTest {
         TesTask outputTask =
                 this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
         assertThat(outputTask, CoreMatchers.is(expectedTask));
+    }
+
+    /** Without a creation time of the taskmaster's job (Kubernetes sets one), the task has none */
+    @Test
+    public void fromK8sToTask_noCreationTime() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
+        taskBuilder.getTask().getTaskmaster().getJob().getMetadata().setCreationTimestamp(null);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), false);
+        org.assertj.core.api.Assertions.assertThat(outputTask.getCreationTime()).isNull();
     }
 
     /** A taskmaster's job with failed pods counted, none active and no condition: an error */

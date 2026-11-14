@@ -15,6 +15,14 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 public class KubernetesClientConfig {
 
+    /**
+     * Lets the Kubernetes client read objects of Kubernetes versions newer than itself, before any
+     * of the API clients below is used
+     */
+    public KubernetesClientConfig() {
+        KubernetesJson.install();
+    }
+
     @Bean
     @Primary
     public ApiClient kubernetesApiClient() throws IOException {
@@ -38,13 +46,13 @@ public class KubernetesClientConfig {
 
     /**
      * Workaround to enable merge patching (Kube client does JSON patch only - headers hardcoded)
-     * Separate instance of ApiClient only for running PATCH calls
+     * Separate instance of ApiClient only for running PATCH calls, with the connection and
+     * credentials of the default one
      */
     @Bean(name = "patchApiClient")
-    public ApiClient patchApiClient() throws IOException {
+    public ApiClient patchApiClient(ApiClient kubernetesApiClient) {
 
-        ApiClient defaultClient = Config.defaultClient();
-        return new ApiClientWithMergePatching(defaultClient);
+        return new ApiClientWithMergePatching(kubernetesApiClient);
     }
 
     /** Separate object to perform merge-patching of Jobs */
@@ -71,7 +79,11 @@ public class KubernetesClientConfig {
         ApiClientWithMergePatching(ApiClient apiClient) {
             this.setBasePath(apiClient.getBasePath());
             this.setHttpClient(apiClient.getHttpClient());
-            this.setApiKey(((ApiKeyAuth) apiClient.getAuthentication("BearerToken")).getApiKey());
+            // the token (from a kubeconfig file; in a cluster, the HTTP client adds it) with its
+            // prefix ("Bearer"), without which Kubernetes refuses it
+            ApiKeyAuth auth = (ApiKeyAuth) apiClient.getAuthentication("BearerToken");
+            this.setApiKeyPrefix(auth.getApiKeyPrefix());
+            this.setApiKey(auth.getApiKey());
         }
 
         @Override
