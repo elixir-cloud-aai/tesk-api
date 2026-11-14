@@ -384,12 +384,13 @@ public class TesKubernetesConverter {
 
     /**
      * Reads the files that the outputs filer uploaded, which the taskmaster stores as the
-     * annotation {@code output-file-logs} of the outputs filer's job (issue #160).
+     * annotation {@link uk.ac.ebi.tsc.tesk.k8s.constant.Constants#ANN_OUTPUT_FILE_LOGS_KEY} of the
+     * outputs filer's job (issue #160).
      *
      * @param task the task's jobs
      * @return the files, each with {@code url}, {@code path} and {@code size_bytes}; empty without
      *     an outputs filer's job or the annotation (e.g. an older taskmaster), or if the annotation
-     *     isn't a list of such files
+     *     isn't a list of such files (other keys of a file are ignored)
      */
     List<TesOutputFileLog> extractOutputFileLogs(Task task) {
         String json =
@@ -403,38 +404,47 @@ public class TesKubernetesConverter {
         if (json == null) {
             return logs;
         }
+        // the reasons name no values: the URLs may carry credentials, e.g. presigned ones
+        String reason = null;
         try {
             JsonNode files = this.objectMapper.readTree(json);
-            if (files == null || !files.isArray()) {
-                throw new IOException("not a list");
-            }
-            for (JsonNode file : files) {
-                if (!isOutputFileLog(file)) {
-                    throw new IOException("not a file: " + file);
+            if (!files.isArray()) {
+                reason = "not a list";
+            } else {
+                for (JsonNode file : files) {
+                    if (!isOutputFileLog(file)) {
+                        reason = "entry " + logs.size() + " isn't a file";
+                        break;
+                    }
+                    logs.add(
+                            new TesOutputFileLog()
+                                    .url(file.get("url").asText())
+                                    .path(file.get("path").asText())
+                                    .sizeBytes(file.get("size_bytes").asText()));
                 }
-                logs.add(
-                        new TesOutputFileLog()
-                                .url(file.get("url").asText())
-                                .path(file.get("path").asText())
-                                .sizeBytes(file.get("size_bytes").asText()));
             }
         } catch (IOException ex) {
+            reason = "not JSON";
+        }
+        if (reason != null) {
             logger.info(
-                    "Reading the output file logs of task {} failed; {}",
+                    "Reading the output file logs of task {} failed: {}",
                     task.getTaskmaster().getJob().getMetadata().getName(),
-                    ex.getMessage());
+                    reason);
             return new ArrayList<>();
         }
         return logs;
     }
 
-    /** Whether a stored file has exactly the text fields url, path and size_bytes. */
+    /**
+     * Whether a stored file has the text fields url, path and size_bytes, the last a whole number.
+     */
     private static boolean isOutputFileLog(JsonNode file) {
         return file.isObject()
-                && file.size() == 3
                 && file.path("url").isTextual()
                 && file.path("path").isTextual()
-                && file.path("size_bytes").isTextual();
+                && file.path("size_bytes").isTextual()
+                && file.path("size_bytes").asText().matches("[0-9]+");
     }
 
     /**
