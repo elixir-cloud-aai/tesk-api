@@ -33,6 +33,7 @@ import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.NumericDate;
+import org.jose4j.jwt.consumer.JwtConsumer;
 import org.jose4j.keys.EllipticCurves;
 import org.jose4j.keys.HmacKey;
 import org.jose4j.lang.JoseException;
@@ -44,6 +45,7 @@ import org.springframework.boot.test.system.OutputCaptureRule;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
+import org.springframework.test.util.ReflectionTestUtils;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
 /**
@@ -540,6 +542,19 @@ public class ServiceClientTokenServicesTest {
     public void otherUser_isPassedOn() {
         when(userPrincipal.getName()).thenReturn("user@example.org");
         passedOn("opaque");
+    }
+
+    /** An unexpected error while checking a service client's token refuses it */
+    @Test
+    public void unexpectedError_isRefused() throws Exception {
+        JwtConsumer failing = mock(JwtConsumer.class);
+        when(failing.process(anyString())).thenThrow(new IllegalStateException("unexpected"));
+        ServiceClientTokenServices services = services();
+        ReflectionTestUtils.setField(services, "verifier", failing);
+
+        assertThrows(
+                BadOpaqueTokenException.class, () -> services.introspect(sign(claims(CLIENT))));
+        verify(userInfo, never()).introspect(anyString());
     }
 
     @Test

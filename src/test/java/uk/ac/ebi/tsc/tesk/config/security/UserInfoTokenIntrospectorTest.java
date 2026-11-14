@@ -252,7 +252,9 @@ public class UserInfoTokenIntrospectorTest {
         ElixirPrincipalExtractor extractor =
                 new ElixirPrincipalExtractor(groups, new AuthorisationProperties());
         for (String uri :
-                new String[] {"login.example.org/oidc/userinfo", "ftp://login.example.org/"}) {
+                new String[] {
+                    "login.example.org/oidc/userinfo", "ftp://login.example.org/", "http:userinfo"
+                }) {
             IllegalStateException e =
                     assertThrows(
                             IllegalStateException.class,

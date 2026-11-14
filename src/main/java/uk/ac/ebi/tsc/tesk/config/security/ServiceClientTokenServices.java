@@ -207,7 +207,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
         if (clientId == null) {
             OAuth2AuthenticatedPrincipal principal =
                     this.userInfoIntrospector.introspect(accessToken);
-            if (principal != null && this.clientIds.contains(principal.getName())) {
+            if (this.clientIds.contains(principal.getName())) {
                 // a user with a listed client's ID would share the client's tasks
                 logger.warn(
                         "Refused user token: its sub is the ID of service client {}",

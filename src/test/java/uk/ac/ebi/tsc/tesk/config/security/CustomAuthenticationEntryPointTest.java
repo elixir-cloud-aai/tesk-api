@@ -17,6 +17,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 
 /** The answers to requests without a valid token */
@@ -60,6 +62,19 @@ public class CustomAuthenticationEntryPointTest {
             assertEquals("unauthorized", body(response).get("error"));
             assertEquals("Unauthorized", body(response).get("error_description"));
         }
+    }
+
+    /** An OAuth 2.0 error without a description is described by the exception's message */
+    @Test
+    public void oauth2ErrorWithoutDescription_hasTheMessage() throws Exception {
+        MockHttpServletResponse response =
+                commence(
+                        null,
+                        new OAuth2AuthenticationException(
+                                new OAuth2Error("invalid_token"), "Token refused"));
+        assertEquals(
+                "Bearer realm=\"oauth\", error=\"invalid_token\", error_description=\"Token refused\"",
+                response.getHeader("WWW-Authenticate"));
     }
 
     @Test

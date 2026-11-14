@@ -74,11 +74,10 @@ public class TasksApiControllerTest {
     @TestConfiguration
     static class ResourceServerConfiguration {
 
+        // CSRF protection stays on: the resource server exempts requests with a bearer token
         @Bean
         SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-            http.csrf()
-                    .disable()
-                    .authorizeRequests()
+            http.authorizeRequests()
                     .anyRequest()
                     .authenticated()
                     .and()

@@ -136,7 +136,7 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
             throw new BadOpaqueTokenException(INVALID_TOKEN);
         } catch (ResourceAccessException e) {
             // e.g. connection refused; its own message has the URI, which may hold credentials
-            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            Throwable cause = e.getMostSpecificCause();
             logger.warn(
                     "Could not fetch user details: {}: {}",
                     cause.getClass().getSimpleName(),
