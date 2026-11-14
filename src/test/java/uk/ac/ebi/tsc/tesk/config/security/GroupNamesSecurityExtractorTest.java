@@ -48,4 +48,18 @@ public class GroupNamesSecurityExtractorTest {
         List<GrantedAuthority> result = extractor.extractAuthorities(authorities);
         assertThat(result, containsInAnyOrder(new SimpleGrantedAuthority("prefix:USER")));
     }
+
+    /** A single value is one group, or several if it lists them separated by commas */
+    @Test
+    public void extractAuthorities_singleValue() {
+        GroupNamesSecurityExtractor extractor =
+                new GroupNamesSecurityExtractor("groupNames", "prefix");
+        Map<String, Object> authorities = new HashMap<>();
+        authorities.put("groupNames", "abc,xyz");
+        List<GrantedAuthority> result = extractor.extractAuthorities(authorities);
+        assertThat(
+                result,
+                containsInAnyOrder(
+                        new SimpleGrantedAuthority("abc"), new SimpleGrantedAuthority("xyz")));
+    }
 }

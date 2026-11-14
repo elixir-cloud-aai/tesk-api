@@ -1,6 +1,5 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -39,23 +38,13 @@ public class GroupNamesSecurityExtractor {
     }
 
     private String asAuthorities(Object object) {
-        List<Object> authorities = new ArrayList<>();
         if (object instanceof Collection) {
-            Collection<?> collection = (Collection<?>) object;
-            object = collection.toArray(new Object[0]);
+            return StringUtils.collectionToCommaDelimitedString((Collection<?>) object);
         }
         if (ObjectUtils.isArray(object)) {
-            Object[] array = (Object[]) object;
-            for (Object value : array) {
-                if (value instanceof String) {
-                    authorities.add(value);
-                } else {
-                    authorities.add(value);
-                }
-            }
-        } else {
-            authorities.add(object);
+            return StringUtils.arrayToCommaDelimitedString((Object[]) object);
         }
-        return StringUtils.collectionToCommaDelimitedString(authorities);
+        // a single group, e.g. a string of comma-separated names
+        return String.valueOf(object);
     }
 }
