@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.AuthoritiesExtractor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.util.ObjectUtils;
@@ -12,12 +11,12 @@ import org.springframework.util.StringUtils;
 
 /**
  * Custom authorities extractor, that looks for groups element and transforms it into authorities.
- * Heavily inspired by {@link
- * org.springframework.boot.autoconfigure.security.oauth2.resource.FixedAuthoritiesExtractor}
+ * Inspired by {@code FixedAuthoritiesExtractor} of Spring Security OAuth. Used by {@link
+ * UserInfoTokenIntrospector}.
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
-public class GroupNamesSecurityExtractor implements AuthoritiesExtractor {
+public class GroupNamesSecurityExtractor {
 
     public GroupNamesSecurityExtractor(String authoritiesClaim, String groupPrefix) {
         this.authoritiesClaim = authoritiesClaim;
@@ -27,7 +26,10 @@ public class GroupNamesSecurityExtractor implements AuthoritiesExtractor {
     private final String authoritiesClaim;
     private final String groupPrefix;
 
-    @Override
+    /**
+     * The group names in the groups claim of the user info, as authorities; without that claim, the
+     * authority {@code <group prefix>:USER}
+     */
     public List<GrantedAuthority> extractAuthorities(Map<String, Object> map) {
         String authorities = this.groupPrefix + ":USER";
         if (map.containsKey(this.authoritiesClaim)) {
