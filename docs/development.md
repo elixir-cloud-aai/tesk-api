@@ -8,6 +8,15 @@ plugin](https://github.com/swagger-api/swagger-codegen/tree/master/modules/swagg
 and the [Kubernetes Java client](https://github.com/kubernetes-client/java)
 talks to the Kubernetes API.
 
+The Kubernetes client needs newer versions of some libraries than Spring
+Boot 2.7 manages (SnakeYAML, OkHttp, Kotlin, Gson, Commons Lang and Commons
+Codec): `pom.xml` sets them to those of the client's parent POM
+(`io.kubernetes:client-java-parent`), so update them together with the
+client. The models of the client refuse JSON with fields they don't know;
+`KubernetesJson` installs a Gson that ignores them (see
+[Deployment](deployment.md#kubernetes)), so test fixtures of Kubernetes
+objects may leave out fields that Kubernetes requires.
+
 The wrapper is the `only-script` type of the Apache Maven Wrapper, so there is
 no binary `maven-wrapper.jar` in the repository. It needs `curl` or `wget` and
 `unzip` (without `unzip` it would fetch the `.tar.gz`, which does not match the

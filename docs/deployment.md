@@ -56,6 +56,17 @@ Resource | Verbs | For
 `secrets` | `create`, `delete` | Private executor image credentials, as Secrets owned by the taskmaster Job (`delete` for `OwnerReferencesPermissionEnforcement`)
 `limitranges` | `list` | Raising requested memory to the namespace's minimum (without the right, it logs an error and goes on)
 
+TESK API has version 28 of the client, made for Kubernetes 1.37. It also
+works with older and newer Kubernetes versions: the jobs, ConfigMaps and
+Secrets that it creates, and its patches, use only fields that Kubernetes has
+had for years, and it ignores the fields that newer versions add to the
+objects that it reads (jobs, pods, ConfigMaps and LimitRanges), which the
+client itself would refuse
+([kubernetes-client/java#4941](https://github.com/kubernetes-client/java/issues/4941)).
+The objects that it creates list empty fields, e.g. `args: []`, which
+Kubernetes treats as unset; Kubernetes versions that don't know such a field
+drop it, and may answer with a warning.
+
 Passing private executor image credentials in TES requests is an
 [experimental workaround for proof-of-concept use only](api.md#private-executor-images),
 not a feature for production clients.
