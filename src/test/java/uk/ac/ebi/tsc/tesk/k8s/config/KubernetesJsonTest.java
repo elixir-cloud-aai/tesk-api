@@ -2,8 +2,11 @@ package uk.ac.ebi.tsc.tesk.k8s.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.google.gson.Gson;
 import io.kubernetes.client.openapi.JSON;
 import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1Secret;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.junit.Test;
@@ -40,10 +43,35 @@ public class KubernetesJsonTest {
                 .contains("\"creationTimestamp\":\"2018-05-31T09:21:57.000000Z\"");
     }
 
-    /** The client deserializes responses with the same Gson */
+    /**
+     * The configuration of the Kubernetes client lets it deserialize responses with the same Gson
+     * (it is global)
+     */
     @Test
     public void installed() {
-        KubernetesJson.install();
-        assertThat(JSON.getGson()).isSameAs(KubernetesJson.GSON);
+        Gson before = JSON.getGson();
+        try {
+            JSON.setGson(new Gson());
+            new KubernetesClientConfig();
+            assertThat(JSON.getGson()).isSameAs(KubernetesJson.GSON);
+        } finally {
+            JSON.setGson(before);
+        }
+    }
+
+    /** Required fields may be missing (e.g. in test fixtures) */
+    @Test
+    public void missingRequiredFields() {
+        V1Job job = KubernetesJson.GSON.fromJson("{\"spec\":{\"parallelism\":1}}", V1Job.class);
+        assertThat(job.getSpec().getParallelism()).isEqualTo(1);
+    }
+
+    /** Binary data of Secrets and ConfigMaps (Base64), both ways */
+    @Test
+    public void binaryData() {
+        V1Secret secret =
+                KubernetesJson.GSON.fromJson("{\"data\":{\"key\":\"aGVsbG8=\"}}", V1Secret.class);
+        assertThat(secret.getData().get("key")).isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
+        assertThat(KubernetesJson.GSON.toJson(secret)).contains("\"key\":\"aGVsbG8=\"");
     }
 }

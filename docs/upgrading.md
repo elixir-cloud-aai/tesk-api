@@ -56,10 +56,12 @@ notice changed answers:
   SnakeYAML 2 instead of 1.33. Nothing changes for deployments: it needs the
   same rights, and works with the same Kubernetes versions. The jobs and the
   taskmaster's input that it creates list empty fields (e.g. `args: []`),
-  which Kubernetes treats as unset. Run outside a cluster with a token in the
-  kubeconfig file (e.g. after `oc login`), TESK API can now cancel tasks:
-  it sent the token without its `Bearer` prefix in the patches, which
-  Kubernetes refused.
+  which Kubernetes treats as unset. Run outside a cluster with a token in its
+  kubeconfig file (e.g. after `oc login`; not with client certificates),
+  TESK API can now cancel tasks: it sent the token without its `Bearer`
+  prefix in the patches, which Kubernetes refused. A task whose taskmaster
+  job has no creation time has no `creation_time`, instead of the current
+  time; Kubernetes sets it for every job, so this only matters for tests.
 
 ## To 1.2.0
 

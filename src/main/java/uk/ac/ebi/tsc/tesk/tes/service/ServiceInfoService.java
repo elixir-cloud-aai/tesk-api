@@ -75,6 +75,7 @@ public class ServiceInfoService {
     // https://bitbucket.org/asomov/snakeyaml/wiki/Howto#markdown-header-how-to-parse-jodatime
     class OffsetDateTimePropertyConstructor extends Constructor {
         public OffsetDateTimePropertyConstructor() {
+            // SnakeYAML 2 has no constructor without options; these are its defaults
             super(new LoaderOptions());
             yamlClassConstructors.put(NodeId.scalar, new TimeStampConstruct());
             // keys of the service info schema that aren't Java property names (TES 1.1)

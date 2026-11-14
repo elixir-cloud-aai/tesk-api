@@ -241,7 +241,8 @@ public class TesKubernetesConverterMinimalTest {
         // without the empty collections that the Kubernetes client writes: the resources (no
         // requests or limits, see above) are gone too
         JsonContentAssert withoutEmpty =
-                new JsonContentAssert(this.getClass(), TestUtils.withoutEmpty(jsonString));
+                new JsonContentAssert(
+                        this.getClass(), TestUtils.withoutEmptyInExecutors(jsonString));
         withoutEmpty
                 .extractingJsonPathMapValue("executors[0].spec.template.spec.containers[0]")
                 .containsOnlyKeys("name", "image", "command");
@@ -249,7 +250,7 @@ public class TesKubernetesConverterMinimalTest {
         taskMasterInputJson.extractingJsonPathNumberValue("resources.disk_gb").isEqualTo(0.1);
 
         withoutEmpty.isEqualToJson(
-                TestUtils.withoutEmpty(
+                TestUtils.withoutEmptyInExecutors(
                         TestUtils.getFileContentFromResources(
                                 "fromTesToK8s_minimal/taskmaster_param.json")),
                 JSONCompareMode.NON_EXTENSIBLE);

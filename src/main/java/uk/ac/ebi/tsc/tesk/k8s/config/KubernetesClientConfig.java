@@ -15,8 +15,11 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 public class KubernetesClientConfig {
 
-    static {
-        // read objects of Kubernetes versions newer than the client
+    /**
+     * Lets the Kubernetes client read objects of Kubernetes versions newer than itself, before any
+     * of the API clients below is used
+     */
+    public KubernetesClientConfig() {
         KubernetesJson.install();
     }
 

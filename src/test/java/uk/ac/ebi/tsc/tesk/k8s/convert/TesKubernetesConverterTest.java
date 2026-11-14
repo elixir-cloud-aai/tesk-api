@@ -404,7 +404,8 @@ public class TesKubernetesConverterTest {
                 .hasSize(2);
 
         JsonContentAssert withoutEmpty =
-                new JsonContentAssert(this.getClass(), TestUtils.withoutEmpty(jsonString));
+                new JsonContentAssert(
+                        this.getClass(), TestUtils.withoutEmptyInExecutors(jsonString));
         withoutEmpty
                 .extractingJsonPathMapValue("executors[0].spec.template.spec.containers[0]")
                 .containsOnlyKeys("name", "image", "command", "resources", "volumeMounts");
@@ -448,7 +449,7 @@ public class TesKubernetesConverterTest {
         taskMasterInputJson.extractingJsonPathNumberValue("resources.disk_gb").isEqualTo(100.0);
 
         withoutEmpty.isEqualToJson(
-                TestUtils.withoutEmpty(
+                TestUtils.withoutEmptyInExecutors(
                         TestUtils.getFileContentFromResources(
                                 "fromTesToK8s/taskmaster_param.json")),
                 JSONCompareMode.NON_EXTENSIBLE);

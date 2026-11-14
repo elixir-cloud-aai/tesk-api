@@ -20,17 +20,25 @@ public class TestUtils {
     }
 
     /**
-     * The JSON without the members of objects (at any depth) that are empty arrays or objects, or
-     * become empty without them: the Kubernetes client writes the lists and maps of its models also
-     * if they are empty
+     * The taskmaster's input without the empty arrays and objects in its executors' jobs: the
+     * Kubernetes client writes the lists and maps of its models also if they are empty. Lossy: an
+     * empty field that TESK API sets on purpose is gone too, so tests check those separately. The
+     * rest of the input (e.g. its {@code inputs}, {@code outputs} and {@code volumes}) is kept.
      */
-    public static String withoutEmpty(String json) {
-        JsonElement element = JsonParser.parseString(json);
-        removeEmpty(element);
-        return element.toString();
+    public static String withoutEmptyInExecutors(String json) {
+        JsonObject input = JsonParser.parseString(json).getAsJsonObject();
+        JsonElement executors = input.get("executors");
+        if (executors != null && executors.isJsonArray()) {
+            executors.getAsJsonArray().forEach(TestUtils::removeEmpty);
+        }
+        return input.toString();
     }
 
-    /** Removes the empty members, and tells whether the element is (then) empty */
+    /**
+     * Removes the members of objects that are empty arrays or objects, or become empty without
+     * their own empty members, at any depth, and tells whether the element is (then) empty.
+     * Elements of arrays are cleaned, but kept even if they become empty.
+     */
     private static boolean removeEmpty(JsonElement element) {
         if (element.isJsonObject()) {
             JsonObject object = element.getAsJsonObject();
