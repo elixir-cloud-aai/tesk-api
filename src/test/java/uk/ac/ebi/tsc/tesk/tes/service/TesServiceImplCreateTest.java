@@ -390,4 +390,52 @@ class TesServiceImplCreateTest {
         assertThat(job.getValue().getMetadata().getAnnotations()).isNullOrEmpty();
         assertThat(output.getOut()).doesNotContain("backend_parameters");
     }
+
+    /** Name collisions are retried up to the limit; the last collision fails the request. */
+    @Test
+    void nameCollisionsUpToTheLimitFail() {
+        this.converts("task-1");
+        KubernetesException conflict = kubernetesError(HttpStatus.CONFLICT);
+        when(this.client.createJob(any(V1Job.class))).thenThrow(conflict);
+
+        assertThatThrownBy(() -> this.service.createTask(this.task, USER)).isSameAs(conflict);
+
+        verify(this.client, times(Constants.JOB_CREATE_ATTEMPTS_NO)).createJob(any(V1Job.class));
+    }
+
+    /** Tasks get at least the minimum memory of the namespace's LimitRanges */
+    @Test
+    void memoryBelowTheMinimumIsRaised() {
+        this.converts("task-1");
+        this.task.resources(new TesResources().ramGb(0.5));
+        when(this.client.minimumRamGb()).thenReturn(2.0);
+
+        this.service.createTask(this.task, USER);
+
+        assertThat(this.task.getResources().getRamGb()).isEqualTo(2.0);
+    }
+
+    /** Memory above the minimum is kept */
+    @Test
+    void memoryAboveTheMinimumIsKept() {
+        this.converts("task-1");
+        this.task.resources(new TesResources().ramGb(4.0));
+        when(this.client.minimumRamGb()).thenReturn(2.0);
+
+        this.service.createTask(this.task, USER);
+
+        assertThat(this.task.getResources().getRamGb()).isEqualTo(4.0);
+    }
+
+    /** Without memory in the resources, the LimitRanges aren't read */
+    @Test
+    void withoutMemoryTheMinimumIsNotRead() {
+        this.converts("task-1");
+        this.task.resources(new TesResources().diskGb(1.0));
+
+        this.service.createTask(this.task, USER);
+
+        assertThat(this.task.getResources().getRamGb()).isNull();
+        verify(this.client, never()).minimumRamGb();
+    }
 }

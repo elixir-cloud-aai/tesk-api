@@ -1,11 +1,9 @@
 package uk.ac.ebi.tsc.tesk.tes.api;
 
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.context.request.NativeWebRequest;
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 
@@ -17,13 +15,7 @@ import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 @RequestMapping("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}")
 public class ServiceInfoApiController implements ServiceInfoApi {
 
-    private final NativeWebRequest request;
     private final ServiceInfoService serviceInfoService;
-
-    @Override
-    public Optional<NativeWebRequest> getRequest() {
-        return Optional.ofNullable(request);
-    }
 
     @Override
     public ResponseEntity<TesServiceInfo> getServiceInfo() {

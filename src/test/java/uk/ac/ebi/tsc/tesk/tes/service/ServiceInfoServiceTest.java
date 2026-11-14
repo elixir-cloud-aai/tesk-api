@@ -5,14 +5,20 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.springframework.boot.test.system.OutputCaptureRule;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import uk.ac.ebi.tsc.tesk.tes.model.ServiceOrganization;
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
@@ -24,6 +30,8 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
 public class ServiceInfoServiceTest {
 
     @Rule public OutputCaptureRule output = new OutputCaptureRule();
+
+    @Rule public TemporaryFolder folder = new TemporaryFolder(new File("target"));
 
     private Resource serviceInfoFile = new ClassPathResource("service-info.yaml");
     private ServiceInfoService subject = new ServiceInfoService(serviceInfoFile);
@@ -74,5 +82,34 @@ public class ServiceInfoServiceTest {
         assertThat(info.toString(), containsString("tesResourcesBackendParameters: []"));
         assertThat(info, is(not(new TesServiceInfo())));
         assertThat(info, is(not(new TesServiceInfo().storage(Collections.emptyList()))));
+    }
+
+    /** The file is read again periodically, so that changes need no restart */
+    @Test
+    public void reload_readsTheChangedFile() throws IOException {
+        File file = folder.newFile("service-info.yaml");
+        Files.write(file.toPath(), "name: first\n".getBytes(StandardCharsets.UTF_8));
+        ServiceInfoService service = new ServiceInfoService(new FileSystemResource(file));
+        service.setUp();
+        Files.write(file.toPath(), "name: second\n".getBytes(StandardCharsets.UTF_8));
+
+        service.reload();
+
+        assertThat(service.getServiceInfo().getName(), is("second"));
+    }
+
+    /** A file that can't be parsed is logged, and the service info read before is kept */
+    @Test
+    public void reload_keepsTheServiceInfoIfTheFileIsInvalid() throws IOException {
+        File file = folder.newFile("service-info.yaml");
+        Files.write(file.toPath(), "name: first\n".getBytes(StandardCharsets.UTF_8));
+        ServiceInfoService service = new ServiceInfoService(new FileSystemResource(file));
+        service.setUp();
+        Files.write(file.toPath(), "name: [unclosed\n".getBytes(StandardCharsets.UTF_8));
+
+        service.reload();
+
+        assertThat(service.getServiceInfo().getName(), is("first"));
+        assertThat(output.getOut(), containsString("Unable to parse Service Info Yaml"));
     }
 }
