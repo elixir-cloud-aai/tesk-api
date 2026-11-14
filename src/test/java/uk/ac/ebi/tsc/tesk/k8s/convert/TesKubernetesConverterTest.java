@@ -609,6 +609,14 @@ public class TesKubernetesConverterTest {
         String valid = STORED_FILE_LOGS.substring(1, STORED_FILE_LOGS.length() - 1);
         assertEquals(Collections.emptyList(), this.outputsOf("[" + valid + ", 1]"));
         assertEquals(
+                "numeric URL",
+                Collections.emptyList(),
+                this.outputsOf("[{\"url\":1,\"path\":\"/p\",\"size_bytes\":\"1\"}]"));
+        assertEquals(
+                "missing path",
+                Collections.emptyList(),
+                this.outputsOf("[{\"url\":\"u\",\"size_bytes\":\"1\"}]"));
+        assertEquals(
                 "missing size",
                 Collections.emptyList(),
                 this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\"}]"));
