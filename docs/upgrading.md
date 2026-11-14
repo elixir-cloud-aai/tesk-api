@@ -54,9 +54,9 @@ notice changed answers:
 - **Kubernetes client.** TESK API has version 28 of the Kubernetes Java
   client instead of 11 (see [Deployment](deployment.md#kubernetes)), and
   SnakeYAML 2 instead of 1.33. Nothing changes for deployments: it needs the
-  same rights, and works with the same Kubernetes versions. The jobs and the
-  taskmaster's input that it creates list empty fields (e.g. `args: []`),
-  which Kubernetes treats as unset. Run outside a cluster with a token in its
+  same rights, and works with the same Kubernetes versions. The jobs,
+  ConfigMaps and Secrets that it creates list empty fields (e.g. `args: []`),
+  which Kubernetes treats as unset; the taskmaster's input stays as it was. Run outside a cluster with a token in its
   kubeconfig file (e.g. after `oc login`; not with client certificates),
   TESK API can now cancel tasks: it sent the token without its `Bearer`
   prefix in the patches, which Kubernetes refused. A task whose taskmaster

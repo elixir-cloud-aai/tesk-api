@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.config.KubernetesJson;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
 import uk.ac.ebi.tsc.tesk.tes.model.*;
@@ -180,7 +181,13 @@ public class TesKubernetesConverter {
                             taskMasterConfigMap.getMetadata().getName()),
                     e);
         }
-        taskMasterInput.put(TASKMASTER_INPUT_EXEC_KEY, executorsAsJobs);
+        // without the empty lists and maps of the client's models, as before (see
+        // KubernetesJson)
+        taskMasterInput.put(
+                TASKMASTER_INPUT_EXEC_KEY,
+                executorsAsJobs.stream()
+                        .map(KubernetesJson.GSON_WITHOUT_EMPTY_COLLECTIONS::toJsonTree)
+                        .collect(Collectors.toList()));
         String taskMasterInputAsJSON = this.gson.toJson(taskMasterInput);
 
         try {

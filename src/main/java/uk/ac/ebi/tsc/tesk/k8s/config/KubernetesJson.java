@@ -1,9 +1,17 @@
 package uk.ac.ebi.tsc.tesk.k8s.config;
 
 import com.google.gson.Gson;
+import com.google.gson.TypeAdapter;
+import com.google.gson.TypeAdapterFactory;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 import io.kubernetes.client.openapi.JSON;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.Map;
 
 /**
  * Gson for the objects of the Kubernetes API that ignores fields it doesn't know, as the Kubernetes
@@ -30,7 +38,46 @@ public final class KubernetesJson {
                     .registerTypeAdapter(byte[].class, CLIENT_GSON.getAdapter(byte[].class))
                     .create();
 
+    /**
+     * {@link #GSON}, but leaving out lists and maps that are empty, as the Kubernetes client did up
+     * to version 19: its models now start with empty lists and maps instead of none. For the
+     * executors' jobs in the taskmaster's input, as the taskmaster tells "no limits" (which it sets
+     * to the requests) from limits by whether the key is there. Objects without fields (e.g. {@code
+     * emptyDir: {}}) are kept.
+     */
+    public static final Gson GSON_WITHOUT_EMPTY_COLLECTIONS =
+            GSON.newBuilder().registerTypeAdapterFactory(new WithoutEmptyCollections()).create();
+
     private KubernetesJson() {}
+
+    /** Writes empty lists and maps as null, which Gson leaves out of objects */
+    private static final class WithoutEmptyCollections implements TypeAdapterFactory {
+
+        @Override
+        public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
+            Class<?> raw = type.getRawType();
+            if (!Collection.class.isAssignableFrom(raw) && !Map.class.isAssignableFrom(raw)) {
+                return null;
+            }
+            TypeAdapter<T> delegate = gson.getDelegateAdapter(this, type);
+            return new TypeAdapter<T>() {
+                @Override
+                public void write(JsonWriter out, T value) throws IOException {
+                    if (value instanceof Collection && ((Collection<?>) value).isEmpty()
+                            || value instanceof Map && ((Map<?, ?>) value).isEmpty()) {
+                        out.nullValue();
+                    } else {
+                        delegate.write(out, value);
+                    }
+                }
+
+                @Override
+                public T read(JsonReader in) throws IOException {
+                    return delegate.read(in);
+                }
+            };
+        }
+    }
 
     /**
      * Lets the Kubernetes client read responses with {@link #GSON}: its Gson is global (static),

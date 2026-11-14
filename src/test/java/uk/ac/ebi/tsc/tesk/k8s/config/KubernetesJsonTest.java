@@ -3,9 +3,15 @@ package uk.ac.ebi.tsc.tesk.k8s.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.gson.Gson;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.JSON;
+import io.kubernetes.client.openapi.models.V1Container;
+import io.kubernetes.client.openapi.models.V1EmptyDirVolumeSource;
 import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1PodSpec;
+import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import io.kubernetes.client.openapi.models.V1Secret;
+import io.kubernetes.client.openapi.models.V1Volume;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -64,6 +70,31 @@ public class KubernetesJsonTest {
     public void missingRequiredFields() {
         V1Job job = KubernetesJson.GSON.fromJson("{\"spec\":{\"parallelism\":1}}", V1Job.class);
         assertThat(job.getSpec().getParallelism()).isEqualTo(1);
+    }
+
+    /**
+     * Without empty collections: empty lists and maps are left out, objects without fields (e.g. an
+     * emptyDir volume) and non-empty collections are kept
+     */
+    @Test
+    public void withoutEmptyCollections() {
+        V1PodSpec spec =
+                new V1PodSpec()
+                        .addContainersItem(
+                                new V1Container()
+                                        .name("c")
+                                        .resources(
+                                                new V1ResourceRequirements()
+                                                        .putRequestsItem(
+                                                                "memory", new Quantity("1Gi"))))
+                        .addVolumesItem(
+                                new V1Volume().name("v").emptyDir(new V1EmptyDirVolumeSource()));
+        assertThat(KubernetesJson.GSON.toJson(spec)).contains("\"limits\":{}");
+        assertThat(KubernetesJson.GSON_WITHOUT_EMPTY_COLLECTIONS.toJson(spec))
+                .isEqualTo(
+                        "{\"containers\":[{\"name\":\"c\",\"resources\":{\"requests\":"
+                                + "{\"memory\":\"1Gi\"}}}],"
+                                + "\"volumes\":[{\"emptyDir\":{},\"name\":\"v\"}]}");
     }
 
     /** Binary data of Secrets and ConfigMaps (Base64), both ways */

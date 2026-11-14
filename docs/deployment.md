@@ -67,7 +67,9 @@ also works with older and newer Kubernetes versions:
   only fields that Kubernetes has had for years.
 - The objects that it creates list empty fields, e.g. `args: []`, which
   Kubernetes treats as unset. A Kubernetes version that doesn't know such a
-  field drops it, and may answer with a warning.
+  field drops it, and may answer with a warning. The executors' jobs in the
+  taskmaster's input leave them out, as before: the taskmaster tells unset
+  fields (e.g. no limits, which it sets to the requests) by their absence.
 
 Passing private executor image credentials in TES requests is an
 [experimental workaround for proof-of-concept use only](api.md#private-executor-images),
