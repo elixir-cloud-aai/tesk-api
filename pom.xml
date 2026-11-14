@@ -44,7 +44,6 @@
         <commons-lang3.version>3.21.0</commons-lang3.version>
         <commons-codec.version>1.23.0</commons-codec.version>
         <maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
-        <apache.commons.lang3.version>3.12.0</apache.commons.lang3.version>
         <apache.commons.collections4.version>4.6.0</apache.commons.collections4.version>
     </properties>
 
@@ -60,23 +59,6 @@
                 <groupId>org.bitbucket.b_c</groupId>
                 <artifactId>jose4j</artifactId>
                 <version>0.9.7</version>
-            </dependency>
-            <dependency>
-                <groupId>org.bouncycastle</groupId>
-                <artifactId>bcprov-jdk15on</artifactId>
-                <version>1.70</version>
-            </dependency>
-            <!-- For spring-security-jwt (of spring-security-oauth2-autoconfigure); bcpkix must
-                 match bcprov, and needs bcutil since 1.69 -->
-            <dependency>
-                <groupId>org.bouncycastle</groupId>
-                <artifactId>bcpkix-jdk15on</artifactId>
-                <version>1.70</version>
-            </dependency>
-            <dependency>
-                <groupId>org.bouncycastle</groupId>
-                <artifactId>bcutil-jdk15on</artifactId>
-                <version>1.70</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -104,6 +86,14 @@
             <groupId>org.springframework.security.oauth.boot</groupId>
             <artifactId>spring-security-oauth2-autoconfigure</artifactId>
             <version>2.6.8</version>
+            <exclusions>
+                <!-- Bouncy Castle once, as the Kubernetes client has it (bcprov-jdk18on): the
+                     jdk15on jars of spring-security-jwt have the same classes in older versions -->
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcpkix-jdk15on</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- Checks the JWT access tokens of service clients (issue #153); also used by the
              Kubernetes client, version managed above -->
