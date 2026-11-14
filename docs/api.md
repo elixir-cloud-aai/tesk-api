@@ -280,6 +280,8 @@ a finished task with outputs can be up to about 200 KB larger. In
 namespaces with many finished tasks with many output files, delete
 finished tasks (e.g. with the taskmaster's TTL, see [Deleting
 tasks](index.md#deleting-tasks)) to keep listing cheap.
+[#177](https://github.com/elixir-cloud-aai/tesk-api/issues/177) is about
+reading only the outputs filers' jobs of the page's tasks.
 
 ## Swagger UI
 
