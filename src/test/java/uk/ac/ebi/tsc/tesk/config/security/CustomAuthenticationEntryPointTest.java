@@ -46,16 +46,20 @@ public class CustomAuthenticationEntryPointTest {
                         response.getContentAsString(), new TypeReference<Map<String, Object>>() {});
     }
 
-    /** Without an OAuth 2.0 error or a message, the description is the message (null) */
+    /** Without a message (null or blank), the description is the reason phrase of 401 */
     @Test
-    public void blankMessage_isUnauthorized() throws Exception {
-        MockHttpServletResponse response =
-                commence(null, new InsufficientAuthenticationException(null));
-        assertEquals(401, response.getStatus());
-        assertEquals(
-                "Bearer realm=\"oauth\", error=\"unauthorized\", error_description=\"null\"",
-                response.getHeader("WWW-Authenticate"));
-        assertEquals("unauthorized", body(response).get("error"));
+    public void blankMessage_isDescribedAsUnauthorized() throws Exception {
+        for (String message : new String[] {null, "", " "}) {
+            MockHttpServletResponse response =
+                    commence(null, new InsufficientAuthenticationException(message));
+            assertEquals(401, response.getStatus());
+            assertEquals(
+                    "Bearer realm=\"oauth\", error=\"unauthorized\","
+                            + " error_description=\"Unauthorized\"",
+                    response.getHeader("WWW-Authenticate"));
+            assertEquals("unauthorized", body(response).get("error"));
+            assertEquals("Unauthorized", body(response).get("error_description"));
+        }
     }
 
     @Test

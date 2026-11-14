@@ -18,17 +18,20 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import java.util.Arrays;
-import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.springframework.boot.test.system.OutputCaptureRule;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
 
 /** Validation of tokens at the user info endpoint (WireMocked) */
 public class UserInfoTokenIntrospectorTest {
@@ -59,18 +62,19 @@ public class UserInfoTokenIntrospectorTest {
         userInfo.givenThat(get("/userinfo").willReturn(okJson(json)));
     }
 
+    /** What this class logged (other loggers, e.g. of WireMock, log requests and answers) */
+    private String logged() {
+        return Arrays.stream(output.getOut().split("\n"))
+                .filter(line -> line.contains(UserInfoTokenIntrospector.class.getSimpleName()))
+                .collect(Collectors.joining("\n"));
+    }
+
     private void refused() {
         assertThrows(BadOpaqueTokenException.class, () -> introspector.introspect(TOKEN));
         // the refusal is logged, without the token (other loggers, e.g. of WireMock, may log it)
-        List<String> logged =
-                Arrays.stream(output.getOut().split("\n"))
-                        .filter(
-                                line ->
-                                        line.contains(
-                                                UserInfoTokenIntrospector.class.getSimpleName()))
-                        .collect(Collectors.toList());
+        String logged = logged();
         assertFalse(logged.isEmpty());
-        assertThat(String.join("\n", logged), not(containsString(TOKEN)));
+        assertThat(logged, not(containsString(TOKEN)));
     }
 
     @Test
@@ -181,6 +185,65 @@ public class UserInfoTokenIntrospectorTest {
                         IllegalStateException.class,
                         () -> new UserInfoTokenIntrospector(" ", extractor, groups));
         assertThat(e.getMessage(), containsString("security.oauth2.resource.user-info-uri"));
+    }
+
+    /** A refused call is logged with its status, without the answer (which may be personal) */
+    @Test
+    public void refusedCall_logsStatusNotAnswer() {
+        userInfo.givenThat(
+                get("/userinfo").willReturn(aResponse().withStatus(500).withBody("ANSWER-MARKER")));
+        refused();
+        String logged = logged();
+        assertThat(logged, containsString("Could not fetch user details: status 500"));
+        assertThat(logged, not(containsString("ANSWER-MARKER")));
+    }
+
+    @Test
+    public void connectionReset_isRefused() {
+        userInfo.givenThat(
+                get("/userinfo").willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+        refused();
+    }
+
+    /** A user info endpoint that doesn't answer in time refuses the token */
+    @Test
+    public void slowUserInfo_isRefused() {
+        userInfo.givenThat(
+                get("/userinfo").willReturn(okJson("{\"sub\":\"123\"}").withFixedDelay(2_000)));
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setReadTimeout(200);
+        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
+        introspector =
+                new UserInfoTokenIntrospector(
+                        "http://localhost:" + userInfo.port() + "/userinfo",
+                        new ElixirPrincipalExtractor(groups, new AuthorisationProperties()),
+                        groups,
+                        new RestTemplate(factory));
+        refused();
+    }
+
+    /** The client of the user info endpoint has timeouts */
+    @Test
+    public void restTemplate_hasTimeouts() {
+        SimpleClientHttpRequestFactory factory =
+                (SimpleClientHttpRequestFactory)
+                        UserInfoTokenIntrospector.restTemplate().getRequestFactory();
+        assertEquals(
+                UserInfoTokenIntrospector.CONNECT_TIMEOUT_MS,
+                ReflectionTestUtils.getField(factory, "connectTimeout"));
+        assertEquals(
+                UserInfoTokenIntrospector.READ_TIMEOUT_MS,
+                ReflectionTestUtils.getField(factory, "readTimeout"));
+    }
+
+    /** Host names that URI doesn't parse as hosts (e.g. with _, as in Docker Compose) work */
+    @Test
+    public void userInfoUriWithUnderscore_starts() {
+        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
+        new UserInfoTokenIntrospector(
+                "http://my_idp:8080/userinfo",
+                new ElixirPrincipalExtractor(groups, new AuthorisationProperties()),
+                groups);
     }
 
     @Test

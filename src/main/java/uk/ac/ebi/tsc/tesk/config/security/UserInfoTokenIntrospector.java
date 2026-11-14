@@ -73,7 +73,7 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
      * The client of the user info endpoint, with timeouts, so that a hanging endpoint doesn't hold
      * request threads (a timeout refuses the token)
      */
-    private static RestTemplate restTemplate() {
+    static RestTemplate restTemplate() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(CONNECT_TIMEOUT_MS);
         requestFactory.setReadTimeout(READ_TIMEOUT_MS);
@@ -94,7 +94,7 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
         this.userInfoUri = URI.create(userInfoUri.trim());
         String scheme = this.userInfoUri.getScheme();
         if (!("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme))
-                || this.userInfoUri.getHost() == null) {
+                || this.userInfoUri.getRawAuthority() == null) {
             throw new IllegalStateException(
                     "security.oauth2.resource.user-info-uri (SECURITY_OAUTH2_RESOURCE_USER_INFO_URI)"
                             + " must be an absolute http(s) URL");
@@ -135,8 +135,12 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
             logger.warn("Could not fetch user details: status {}", e.getRawStatusCode());
             throw new BadOpaqueTokenException(INVALID_TOKEN);
         } catch (ResourceAccessException e) {
-            // e.g. connection refused
-            logger.warn("Could not fetch user details: {}", e.getMessage());
+            // e.g. connection refused; its own message has the URI, which may hold credentials
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            logger.warn(
+                    "Could not fetch user details: {}: {}",
+                    cause.getClass().getSimpleName(),
+                    cause.getMessage());
             throw new BadOpaqueTokenException(INVALID_TOKEN);
         } catch (RuntimeException e) {
             // e.g. an answer that isn't a JSON object: its message may quote the answer

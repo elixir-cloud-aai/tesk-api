@@ -31,9 +31,9 @@ notice changed answers:
   `next_page_token`, or pass a `page_size` of up to 2048.
 - **Token validation.** TESK API validates access tokens with the resource
   server of Spring Security instead of Spring Security OAuth, which is end
-  of life. Deployments need no change: `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`
-  keeps its name and meaning (and is required with the `auth` profile, as
-  before). TESK API reads none of the other `security.oauth2.*` settings of
+  of life. Deployments need no change if
+  `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` is an absolute `http` or
+  `https` URL: it keeps its name and meaning. TESK API reads none of the other `security.oauth2.*` settings of
   Spring Security OAuth (e.g. `security.oauth2.resource.token-info-uri`),
   which it never documented. Clients may notice (see [Token
   validation](access-control.md#token-validation)):
@@ -48,14 +48,15 @@ notice changed answers:
       endpoint. Before, it was passed on to the endpoint.
     - A token whose user info has no `sub` is refused with `401` instead
       of failing with `500 Internal Server Error`.
-    - Without a token, a request that accepts no JSON (e.g. `Accept:
-      text/plain`) gets `401` with the `WWW-Authenticate` header and no
-      body, instead of another error status (e.g. `406 Not Acceptable`).
-  Operators may notice that TESK API waits at most 10 seconds to connect to
+    - Without a valid token, a request that accepts no JSON (e.g.
+      `Accept: text/plain`) gets `401` with the `WWW-Authenticate`
+      header and no body.
+- **User info endpoint.** TESK API waits at most 10 seconds to connect to
   the user info endpoint and 30 seconds for its answer, and then refuses
-  the token (before, it waited without limit), and that it doesn't start
-  if `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` isn't an absolute `http` or
-  `https` URL.
+  the token (before, it waited without limit). It doesn't start if
+  `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` isn't an absolute `http` or
+  `https` URL with a host; before, it started and refused every
+  token.
 
 ## To 1.2.0
 

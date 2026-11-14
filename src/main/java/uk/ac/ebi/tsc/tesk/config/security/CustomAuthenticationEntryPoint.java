@@ -75,6 +75,9 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
                 description = oauth2Error.getDescription();
             }
         }
+        if (!StringUtils.hasText(description)) {
+            description = HttpStatus.UNAUTHORIZED.getReasonPhrase();
+        }
         WebUtils.exposeErrorRequestAttributes(request, authException, null);
         request.setAttribute(WebUtils.ERROR_STATUS_CODE_ATTRIBUTE, HttpStatus.UNAUTHORIZED.value());
         Map<String, Object> body =
