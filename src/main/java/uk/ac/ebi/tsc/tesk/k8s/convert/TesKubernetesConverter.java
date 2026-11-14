@@ -263,6 +263,10 @@ public class TesKubernetesConverter {
         job.getMetadata()
                 .putLabelsItem(LABEL_EXECNO_KEY, Integer.valueOf(executorIndex).toString());
         job.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, tesTaskName);
+        // The taskmaster goes on after such an executor fails (issue #159)
+        if (Boolean.TRUE.equals(executor.getIgnoreError())) {
+            job.getMetadata().putAnnotationsItem(ANN_IGNORE_ERROR_KEY, ANN_IGNORE_ERROR_VALUE);
+        }
         CreatorLabels.put(job.getMetadata(), user.getUsername());
         V1Container container = job.getSpec().getTemplate().getSpec().getContainers().get(0);
         // Tries to convert potential TRS URI into docker image. If conversion unsuccessful ->
@@ -342,9 +346,26 @@ public class TesKubernetesConverter {
      */
     public TesState extractStateFromK8sJobs(Task taskmasterWithExecutors) {
         // the stored task is read only if needed: once the taskmaster's job completed
+        V1Job taskmasterJob = taskmasterWithExecutors.getTaskmaster().getJob();
         return TaskStateResolver.resolve(
                 taskmasterWithExecutors,
-                () -> this.extractExecutorCount(taskmasterWithExecutors.getTaskmaster().getJob()));
+                () -> this.extractExecutorCount(taskmasterJob),
+                () -> this.extractHasOutputs(taskmasterJob));
+    }
+
+    /**
+     * Reads whether the task stored with the taskmaster's job (annotation {@code json-input}) has
+     * outputs.
+     *
+     * @param taskMasterJob - taskmaster's job
+     * @return whether the task has outputs, or null if the task isn't stored or can't be read
+     */
+    Boolean extractHasOutputs(V1Job taskMasterJob) {
+        if (this.readStoredTaskField(taskMasterJob, "executors") == null) {
+            return null;
+        }
+        JsonNode outputs = this.readStoredTaskField(taskMasterJob, "outputs");
+        return outputs != null && outputs.isArray() && outputs.size() > 0;
     }
 
     /**
