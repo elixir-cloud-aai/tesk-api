@@ -242,7 +242,15 @@ public class TasksApiControllerTest {
         String[][] files =
                 new String[][] {
                     new String[] {"no_path.json", "inputs[0].path"},
-                    new String[] {"no_source.json", "URL or content required"},
+                    new String[] {
+                        "no_source.json", "inputs[0].urlOrContentGiven' URL or content required"
+                    },
+                    new String[] {
+                        "blank_url.json", "inputs[0].urlOrContentGiven' URL or content required"
+                    },
+                    new String[] {
+                        "empty_content.json", "inputs[0].urlOrContentGiven' URL or content required"
+                    },
                     new String[] {"wrong_type.json", "inputs[0].type"},
                     new String[] {"empty_type.json", "inputs[0].type"}
                 };
