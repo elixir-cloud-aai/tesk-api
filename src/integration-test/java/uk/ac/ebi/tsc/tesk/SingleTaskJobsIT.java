@@ -39,8 +39,8 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * Reading a single task whose filer jobs carry the label {@code taskmaster-name}, as taskmasters
  * with tesk-core#147 label them: only the executors' jobs count as executors, and only the job
- * {@code <task>-outputs-filer} as the outputs filer (issue #182). The Kubernetes API is WireMocked
- * and answers label selectors as Kubernetes does: by the labels of the jobs.
+ * {@code <task>-outputs-filer} as the outputs filer (issue #182). The Kubernetes API is WireMocked;
+ * its job lists are stubbed per label selector with the jobs that Kubernetes would select by it.
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest

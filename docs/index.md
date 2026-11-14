@@ -86,7 +86,10 @@ For a single task or a list of tasks, TESK API reads the Kubernetes jobs of
 their taskmasters, executors and filers and the pods of those jobs, and the
 logs of the taskmaster and executor pods. It matches these objects to tasks by
 their [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
-and combines them into the TES task.
+and combines them into the TES task. A single task's executors are its jobs
+labelled `job-type=executor` and `taskmaster-name=<task>`, and its outputs filer
+is the job `<task>-outputs-filer`; the filers' jobs are never taken as
+executors, also when they carry the label `taskmaster-name`.
 
 The task's state comes from these jobs. In this order, the first rule that
 applies gives the state:
