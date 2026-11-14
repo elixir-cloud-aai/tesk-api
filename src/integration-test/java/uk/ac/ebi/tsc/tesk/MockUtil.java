@@ -26,7 +26,7 @@ class MockUtil {
     static void mockGetTaskKubernetesResponses(WireMockRule mockKubernetes) {
         mockKubernetes.givenThat(
                 WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=taskmaster-name%3Dtask-123")
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=taskmaster-name%3Dtask-123%2Cjob-type%3Dexecutor")
                         .willReturn(aResponse().withBodyFile("task-123/executor.json")));
         mockKubernetes.givenThat(
                 WireMock.get("/apis/batch/v1/namespaces/default/jobs/task-123")

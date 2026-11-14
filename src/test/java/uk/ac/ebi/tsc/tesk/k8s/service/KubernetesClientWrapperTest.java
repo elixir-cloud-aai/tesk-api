@@ -431,7 +431,7 @@ public class KubernetesClientWrapperTest {
         ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
         wrapper.listSingleTaskExecutorJobs("123");
         verifyListJobs("test-namespace", argument);
-        assertThat(argument.getValue(), is("taskmaster-name=123"));
+        assertThat(argument.getValue(), is("taskmaster-name=123,job-type=executor"));
     }
 
     @Test
