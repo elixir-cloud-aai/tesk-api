@@ -151,8 +151,8 @@ public class TasksApiController implements TasksApi {
     }
 
     /**
-     * The authenticated user (with the auth profile), or a user without groups named after the
-     * anonymous principal (noauth)
+     * The {@link User} principal of the request, or, without one (noauth), a user without groups
+     * named after the authentication
      */
     private User getUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

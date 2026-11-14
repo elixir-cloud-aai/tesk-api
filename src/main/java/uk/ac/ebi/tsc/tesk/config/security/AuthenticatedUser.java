@@ -58,14 +58,17 @@ public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
 
     /**
      * The authentication of a request with a valid access token (an {@code
-     * OpaqueTokenAuthenticationConverter}): the {@link User} as principal, with the authorities;
-     * the token isn't kept in it
+     * OpaqueTokenAuthenticationConverter}): the {@link User} as principal, with the authorities
+     *
+     * @param accessToken the token, which that interface passes; deliberately not kept in the
+     *     authentication
+     * @param principal the result of the introspector
      */
     static Authentication toAuthentication(
             String accessToken, OAuth2AuthenticatedPrincipal principal) {
         if (!(principal instanceof AuthenticatedUser)) {
             // not expected: both introspectors return an AuthenticatedUser
-            throw new InvalidBearerTokenException("Invalid access token");
+            throw new InvalidBearerTokenException(UserInfoTokenIntrospector.INVALID_TOKEN);
         }
         AuthenticatedUser authenticated = (AuthenticatedUser) principal;
         return new UsernamePasswordAuthenticationToken(

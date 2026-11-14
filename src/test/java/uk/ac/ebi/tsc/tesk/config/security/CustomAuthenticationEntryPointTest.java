@@ -3,7 +3,12 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
 import org.junit.Test;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
@@ -35,6 +40,24 @@ public class CustomAuthenticationEntryPointTest {
         return response;
     }
 
+    private static Map<String, Object> body(MockHttpServletResponse response) throws Exception {
+        return new ObjectMapper()
+                .readValue(
+                        response.getContentAsString(), new TypeReference<Map<String, Object>>() {});
+    }
+
+    /** Without an OAuth 2.0 error or a message, the description is the message (null) */
+    @Test
+    public void blankMessage_isUnauthorized() throws Exception {
+        MockHttpServletResponse response =
+                commence(null, new InsufficientAuthenticationException(null));
+        assertEquals(401, response.getStatus());
+        assertEquals(
+                "Bearer realm=\"oauth\", error=\"unauthorized\", error_description=\"null\"",
+                response.getHeader("WWW-Authenticate"));
+        assertEquals("unauthorized", body(response).get("error"));
+    }
+
     @Test
     public void wwwAuthenticate_escapesQuotes() {
         assertEquals(
@@ -52,10 +75,22 @@ public class CustomAuthenticationEntryPointTest {
                 "Bearer realm=\"oauth\", error=\"invalid_token\","
                         + " error_description=\"Invalid access token\"",
                 response.getHeader("WWW-Authenticate"));
-        assertTrue(response.getContentAsString().contains("\"error\":\"invalid_token\""));
-        assertTrue(
-                response.getContentAsString()
-                        .contains("\"error_description\":\"Invalid access token\""));
+        Map<String, Object> body = body(response);
+        assertEquals(
+                new HashSet<>(
+                        Arrays.asList(
+                                "timestamp",
+                                "status",
+                                "error",
+                                "message",
+                                "path",
+                                "error_description")),
+                body.keySet());
+        assertEquals(401, body.get("status"));
+        assertEquals("invalid_token", body.get("error"));
+        assertEquals("Invalid access token", body.get("message"));
+        assertEquals("Invalid access token", body.get("error_description"));
+        assertEquals("/tasks", body.get("path"));
     }
 
     @Test
@@ -66,7 +101,7 @@ public class CustomAuthenticationEntryPointTest {
                         new InsufficientAuthenticationException("no token"));
         assertEquals(401, response.getStatus());
         assertTrue(response.getContentType().startsWith("application/json"));
-        assertTrue(response.getContentAsString().contains("\"error\":\"unauthorized\""));
+        assertEquals("unauthorized", body(response).get("error"));
     }
 
     /** Without a converter for an accepted type, the answer has the status and headers only */
@@ -86,6 +121,6 @@ public class CustomAuthenticationEntryPointTest {
         MockHttpServletResponse response =
                 commence("not a media type", new InsufficientAuthenticationException("no token"));
         assertEquals(401, response.getStatus());
-        assertTrue(response.getContentAsString().contains("\"error\":\"unauthorized\""));
+        assertEquals("unauthorized", body(response).get("error"));
     }
 }

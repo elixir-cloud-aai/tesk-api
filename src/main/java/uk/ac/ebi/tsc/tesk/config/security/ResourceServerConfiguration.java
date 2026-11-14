@@ -73,7 +73,7 @@ public class ResourceServerConfiguration {
      * required for it (tesk.api.service-info.public). A request with a token has it validated also
      * on these. Requests without a valid token get the JSON error responses and {@code
      * WWW-Authenticate} headers of {@link CustomAuthenticationEntryPoint}. Stateless and without
-     * CSRF protection (no cookies are used), as the resource server of Spring Security OAuth was.
+     * CSRF protection, as no cookies are used.
      */
     @Bean
     public SecurityFilterChain resourceServerFilterChain(

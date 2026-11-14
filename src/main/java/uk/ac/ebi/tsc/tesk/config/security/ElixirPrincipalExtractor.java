@@ -12,8 +12,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.util.StringUtils;
 
 /**
- * Custom principal extractor (puts all of the info from userinfo to custom {@link User} object;
- * used by {@link UserInfoTokenIntrospector})
+ * Custom principal extractor (puts all of the info from userinfo to custom {@link User} object).
+ * Used by {@link UserInfoTokenIntrospector}.
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */

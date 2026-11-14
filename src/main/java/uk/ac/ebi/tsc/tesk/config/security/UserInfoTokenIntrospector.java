@@ -13,22 +13,26 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
 /**
  * Validates access tokens at the user info endpoint of the OpenID Connect provider ({@code
- * security.oauth2.resource.user-info-uri}), on each request, as Spring Security OAuth's {@code
- * UserInfoTokenServices} did before: a token is valid if the endpoint answers it with a JSON object
- * that has a {@code sub} and no {@code error}. The user ({@link ElixirPrincipalExtractor}) and its
- * authorities, the group names ({@link GroupNamesSecurityExtractor}), are taken from that answer.
+ * security.oauth2.resource.user-info-uri}), on each request: a token is valid if the endpoint
+ * answers it with a JSON object that has a {@code sub} and no {@code error}. Any failure (an error
+ * status, an unreachable endpoint, an answer that isn't such an object) refuses the token. The user
+ * ({@link ElixirPrincipalExtractor}) and its authorities, the group names ({@link
+ * GroupNamesSecurityExtractor}), are taken from that answer.
  *
- * <p>Logs why a token was refused, never the token.
+ * <p>Logs why a token was refused, never the token or the answer of the endpoint.
  */
 public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
 
@@ -36,6 +40,12 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
 
     /** Description of the error for all tokens that the user info endpoint doesn't accept */
     static final String INVALID_TOKEN = "Invalid access token";
+
+    /** Timeout of connections to the user info endpoint, in milliseconds */
+    static final int CONNECT_TIMEOUT_MS = 10_000;
+
+    /** Timeout of reading the answer of the user info endpoint, in milliseconds */
+    static final int READ_TIMEOUT_MS = 30_000;
 
     private static final ParameterizedTypeReference<Map<String, Object>> USER_INFO =
             new ParameterizedTypeReference<Map<String, Object>>() {};
@@ -49,14 +59,25 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
      * @param userInfoUri the user info endpoint
      * @param principalExtractor builds the user from the user info
      * @param authoritiesExtractor takes the authorities (group names) from the user info
-     * @throws IllegalStateException if the user info endpoint isn't set
+     * @throws IllegalStateException if the user info endpoint isn't an absolute http(s) URL
      * @throws IllegalArgumentException if it isn't a URI
      */
     public UserInfoTokenIntrospector(
             String userInfoUri,
             ElixirPrincipalExtractor principalExtractor,
             GroupNamesSecurityExtractor authoritiesExtractor) {
-        this(userInfoUri, principalExtractor, authoritiesExtractor, new RestTemplate());
+        this(userInfoUri, principalExtractor, authoritiesExtractor, restTemplate());
+    }
+
+    /**
+     * The client of the user info endpoint, with timeouts, so that a hanging endpoint doesn't hold
+     * request threads (a timeout refuses the token)
+     */
+    private static RestTemplate restTemplate() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        requestFactory.setReadTimeout(READ_TIMEOUT_MS);
+        return new RestTemplate(requestFactory);
     }
 
     /** As above, with the client of the user info endpoint (for tests) */
@@ -71,6 +92,13 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
                             + " (SECURITY_OAUTH2_RESOURCE_USER_INFO_URI)");
         }
         this.userInfoUri = URI.create(userInfoUri.trim());
+        String scheme = this.userInfoUri.getScheme();
+        if (!("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme))
+                || this.userInfoUri.getHost() == null) {
+            throw new IllegalStateException(
+                    "security.oauth2.resource.user-info-uri (SECURITY_OAUTH2_RESOURCE_USER_INFO_URI)"
+                            + " must be an absolute http(s) URL");
+        }
         this.principalExtractor = Objects.requireNonNull(principalExtractor);
         this.authoritiesExtractor = Objects.requireNonNull(authoritiesExtractor);
         this.restOperations = Objects.requireNonNull(restOperations);
@@ -102,9 +130,17 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
         Map<String, Object> body;
         try {
             body = this.restOperations.exchange(request, USER_INFO).getBody();
+        } catch (RestClientResponseException e) {
+            // its message holds the answer, which may have personal data: the status only
+            logger.warn("Could not fetch user details: status {}", e.getRawStatusCode());
+            throw new BadOpaqueTokenException(INVALID_TOKEN);
+        } catch (ResourceAccessException e) {
+            // e.g. connection refused
+            logger.warn("Could not fetch user details: {}", e.getMessage());
+            throw new BadOpaqueTokenException(INVALID_TOKEN);
         } catch (RuntimeException e) {
-            // the message of a client error can hold the answer, but never the token
-            logger.warn("Could not fetch user details: {}, {}", e.getClass(), e.getMessage());
+            // e.g. an answer that isn't a JSON object: its message may quote the answer
+            logger.warn("Could not read user details: {}", e.getClass().getName());
             throw new BadOpaqueTokenException(INVALID_TOKEN);
         }
         if (body == null) {

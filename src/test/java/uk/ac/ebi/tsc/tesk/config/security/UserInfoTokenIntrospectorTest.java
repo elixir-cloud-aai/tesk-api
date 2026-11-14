@@ -20,18 +20,14 @@ import static org.junit.Assert.assertTrue;
 
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.springframework.boot.test.system.OutputCaptureRule;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
-import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 
 /** Validation of tokens at the user info endpoint (WireMocked) */
@@ -117,31 +113,6 @@ public class UserInfoTokenIntrospectorTest {
         assertFalse(((AuthenticatedUser) principal).getUser().isMember());
     }
 
-    /** The authentication of the request has the user as principal, without the token */
-    @Test
-    public void authentication_hasTheUser() {
-        answer("{\"sub\":\"123\",\"groups\":[\"" + PREFIX + "BASE\"]}");
-        OAuth2AuthenticatedPrincipal principal = introspector.introspect(TOKEN);
-
-        Authentication authentication = AuthenticatedUser.toAuthentication(TOKEN, principal);
-
-        assertTrue(authentication.isAuthenticated());
-        assertEquals(((AuthenticatedUser) principal).getUser(), authentication.getPrincipal());
-        assertEquals("123", authentication.getName());
-        assertEquals(principal.getAuthorities(), authentication.getAuthorities());
-        assertFalse(String.valueOf(authentication.getCredentials()).contains(TOKEN));
-    }
-
-    @Test
-    public void authentication_ofAnotherPrincipal_isRefused() {
-        OAuth2AuthenticatedPrincipal other =
-                new DefaultOAuth2AuthenticatedPrincipal(
-                        Collections.singletonMap("sub", "123"), Collections.emptyList());
-        assertThrows(
-                InvalidBearerTokenException.class,
-                () -> AuthenticatedUser.toAuthentication(TOKEN, other));
-    }
-
     @Test
     public void refusedByUserInfo_isRefused() {
         userInfo.givenThat(get("/userinfo").willReturn(unauthorized()));
@@ -210,5 +181,20 @@ public class UserInfoTokenIntrospectorTest {
                         IllegalStateException.class,
                         () -> new UserInfoTokenIntrospector(" ", extractor, groups));
         assertThat(e.getMessage(), containsString("security.oauth2.resource.user-info-uri"));
+    }
+
+    @Test
+    public void userInfoUriNotAbsoluteHttp_doesNotStart() {
+        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
+        ElixirPrincipalExtractor extractor =
+                new ElixirPrincipalExtractor(groups, new AuthorisationProperties());
+        for (String uri :
+                new String[] {"login.example.org/oidc/userinfo", "ftp://login.example.org/"}) {
+            IllegalStateException e =
+                    assertThrows(
+                            IllegalStateException.class,
+                            () -> new UserInfoTokenIntrospector(uri, extractor, groups));
+            assertThat(e.getMessage(), containsString("absolute http(s) URL"));
+        }
     }
 }

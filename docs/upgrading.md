@@ -48,6 +48,14 @@ notice changed answers:
       endpoint. Before, it was passed on to the endpoint.
     - A token whose user info has no `sub` is refused with `401` instead
       of failing with `500 Internal Server Error`.
+    - Without a token, a request that accepts no JSON (e.g. `Accept:
+      text/plain`) gets `401` with the `WWW-Authenticate` header and no
+      body, instead of another error status (e.g. `406 Not Acceptable`).
+  Operators may notice that TESK API waits at most 10 seconds to connect to
+  the user info endpoint and 30 seconds for its answer, and then refuses
+  the token (before, it waited without limit), and that it doesn't start
+  if `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` isn't an absolute `http` or
+  `https` URL.
 
 ## To 1.2.0
 

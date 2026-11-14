@@ -11,8 +11,8 @@ import org.springframework.util.StringUtils;
 
 /**
  * Custom authorities extractor, that looks for groups element and transforms it into authorities.
- * Heavily inspired by {@code FixedAuthoritiesExtractor} of Spring Security OAuth (used by {@link
- * UserInfoTokenIntrospector})
+ * Inspired by {@code FixedAuthoritiesExtractor} of Spring Security OAuth. Used by {@link
+ * UserInfoTokenIntrospector}.
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */

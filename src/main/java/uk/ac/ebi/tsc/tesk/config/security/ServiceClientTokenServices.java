@@ -54,6 +54,9 @@ import org.springframework.util.StringUtils;
  * User} of its own (the client's ID, no groups, {@link User#isServiceClient()}).
  *
  * <p>Logs the client's ID for accepted and refused tokens, never the token.
+ *
+ * <p>An {@link OpaqueTokenIntrospector}; the name stays from before, so that the documented logger
+ * name ({@code uk.ac.ebi.tsc.tesk.config.security.ServiceClientTokenServices}) keeps working.
  */
 public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
 
