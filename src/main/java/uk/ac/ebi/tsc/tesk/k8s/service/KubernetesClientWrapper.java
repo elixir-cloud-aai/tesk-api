@@ -313,9 +313,17 @@ public class KubernetesClientWrapper {
                 && body.toLowerCase(Locale.ROOT).contains("continue");
     }
 
+    /**
+     * Lists the executors' jobs of a task: its jobs with the label {@code job-type=executor}.
+     * Taskmasters with tesk-core#147 also give the filers' jobs the label {@code taskmaster-name},
+     * so it alone would select them too (issue #182).
+     */
     public V1JobList listSingleTaskExecutorJobs(String taskId) {
         String labelSelector =
-                new StringJoiner("=").add(LABEL_TESTASK_ID_KEY).add(taskId).toString();
+                new StringJoiner(",")
+                        .add(LABEL_TESTASK_ID_KEY + "=" + taskId)
+                        .add(LABEL_JOBTYPE_KEY + "=" + LABEL_JOBTYPE_VALUE_EXEC)
+                        .toString();
         return this.listJobs(null, labelSelector, null);
     }
 

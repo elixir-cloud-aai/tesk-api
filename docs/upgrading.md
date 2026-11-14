@@ -75,10 +75,30 @@ notice changed answers:
   fields](api.md#tes-11-fields)). It needs a taskmaster that goes on after
   such an executor fails
   ([tesk-core#142](https://github.com/elixir-cloud-aai/tesk-core/issues/142)):
-  upgrade the taskmaster image first (`TESK_API_TASKMASTER_IMAGE_VERSION`,
-  see [Configuration](configuration.md)). An older taskmaster stops at the
+  set the taskmaster image to such a release
+  (`TESK_API_TASKMASTER_IMAGE_VERSION`, see
+  [Configuration](configuration.md)) once this TESK API runs, not before
+  (see "Upgrade order for filer labels" below, as such a release may also
+  label the filers' jobs). An older taskmaster stops at the
   failure: the task then ends `SYSTEM_ERROR`, unless the failed executor was
   the last one and the task has no outputs, which completes as asked.
+- **Upgrade order for filer labels.** A single task's executors are its
+  jobs with both labels `taskmaster-name=<task>` and `job-type=executor`
+  (before: `taskmaster-name` only). Taskmasters of tesk-core releases with
+  [tesk-core#147](https://github.com/elixir-cloud-aai/tesk-core/issues/147)
+  also give the filers' jobs the label `taskmaster-name`. Upgrade TESK API
+  to this release first, and set the taskmaster to such a release
+  (`TESK_API_TASKMASTER_IMAGE_VERSION`, see
+  [Configuration](configuration.md)) only once no older replica of TESK API
+  serves requests: in a second deployment after the rollout has finished,
+  or in the same one with the `Recreate` strategy. An older TESK API with
+  such a
+  taskmaster takes the inputs filer's job for the outputs filer's job on
+  `GET /tasks/{id}` and `POST /tasks/{id}:cancel`: a task whose taskmaster
+  stopped before the outputs filer after an ignored executor failure is
+  `COMPLETE` instead of `SYSTEM_ERROR`, and a task whose inputs filer
+  failed is `SYSTEM_ERROR` while its taskmaster still runs. `GET /tasks`
+  isn't affected. With older taskmasters, nothing changes.
 - **Kubernetes client.** TESK API has version 28 of the Kubernetes Java
   client instead of 11 (see [Deployment](deployment.md#kubernetes)), and
   SnakeYAML 2 instead of 1.33. Nothing changes for deployments: it needs the
