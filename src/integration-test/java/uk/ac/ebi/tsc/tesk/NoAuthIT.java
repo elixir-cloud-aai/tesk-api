@@ -218,7 +218,7 @@ public class NoAuthIT {
         MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
 
         this.mvc.perform(get(TASK_URL + "/{id}", "task-123")).andExpect(status().isOk());
-        // logs[].outputs is required by TES: an empty array, as TESK doesn't report output files
+        // logs[].outputs is required by TES: an empty array, as the mock has no outputs filer job
         this.mvc
                 .perform(get(TASK_URL + "/{id}?view=BASIC", "task-123"))
                 .andExpect(status().isOk())

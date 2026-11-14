@@ -31,8 +31,10 @@ notice changed answers:
   (set `TESK_API_TASKMASTER_IMAGE_VERSION` and
   `TESK_API_TASKMASTER_FILER_IMAGE_VERSION` to it, if the default isn't
   such a release). With older images, it stays empty, as before. TESK API
-  needs no new permissions; the taskmaster's are listed in
-  [Deployment](deployment.md). `GET /tasks` transfers more data in
+  needs no new permissions. The taskmaster needs `patch` on `jobs` and
+  `get` on `pods/log` (see [Deployment](deployment.md)): TESK's Helm chart
+  grants both; if you manage the taskmaster's role yourself, check that it
+  has them, or the array stays empty. `GET /tasks` transfers more data in
   namespaces with many finished tasks with many output files (see [Output
   file logs](api.md#output-file-logs)).
 - **Default page size.** `GET /tasks` without `page_size` returns at most

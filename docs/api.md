@@ -261,8 +261,10 @@ the outputs filer's job, from which TESK API reads them; this needs a
 taskmaster and filer of a tesk-core release with
 [tesk-core#144](https://github.com/elixir-cloud-aai/tesk-core/issues/144)
 (see the taskmaster's and the filer's docs there). Other keys of a stored
-file are ignored; an annotation that isn't a list of files with `url`,
-`path` and `size_bytes` gives an empty array. With older images, or if the
+file are ignored; an annotation that isn't a list of files with the text
+fields `url`, `path` and `size_bytes` (a string of digits, as in TES)
+gives an empty array, also if only one entry isn't such a file. With older
+images, or if the
 taskmaster couldn't read or store the files (it logs a warning and the task
 completes anyway), the array stays empty, and clients that need the
 uploaded files must look them up at the outputs' `url`s. The list holds at
