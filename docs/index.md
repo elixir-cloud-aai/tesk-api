@@ -96,12 +96,18 @@ applies gives the state:
    as active (see below); `CANCELED` once none has.
 2. An executor's job failed, whichever executor it is: `PREEMPTED` if every
    failed executor's job was disrupted (see below), otherwise
-   `EXECUTOR_ERROR`.
+   `EXECUTOR_ERROR`. Executors that ignore errors (`ignore_error: true`,
+   see [TES 1.1 fields](api.md#tes-11-fields)) don't count here, unless the
+   taskmaster ended their job itself (it has `activeDeadlineSeconds`, or
+   the reason `DeadlineExceeded`).
 3. The taskmaster's job or the outputs filer's job failed: `SYSTEM_ERROR`.
 4. The taskmaster's job completed: `COMPLETE` if the jobs of all the task's
-   executors exist and completed, otherwise `SYSTEM_ERROR` (e.g., the inputs
+   executors exist and completed (or failed, for executors whose errors are
+   ignored as in rule 2), otherwise `SYSTEM_ERROR` (e.g., the inputs
    filer failed, so that no executor ran, or an executor's job is missing).
-   The number of executors comes from the task stored with the taskmaster's
+   After an ignored failure, a task with outputs (or whose stored task
+   can't be read) also needs its outputs filer's job to have completed;
+   otherwise it's `SYSTEM_ERROR`. The number of executors comes from the task stored with the taskmaster's
    job; without it, the executor jobs that exist count as all executors.
 5. A pod of the taskmaster's job is pending: `QUEUED`.
 6. The taskmaster's job is active: `INITIALIZING` until the first executor's

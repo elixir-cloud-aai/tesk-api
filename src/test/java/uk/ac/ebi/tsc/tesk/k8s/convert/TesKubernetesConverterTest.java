@@ -810,6 +810,36 @@ public class TesKubernetesConverterTest {
         assertThat(state, is(TesState.EXECUTOR_ERROR));
     }
 
+    /**
+     * An ignored failure needs the outputs filer if the stored task has outputs, and none without
+     * outputs (issue #159).
+     */
+    @Test
+    public void test_status_ignored_failure_reads_outputs() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        V1Job executor = taskBuilder.getTask().getExecutors().get(0).getJob();
+        executor.getStatus().succeeded(0).failed(1);
+        executor.getMetadata()
+                .putAnnotationsItem(
+                        Constants.ANN_IGNORE_ERROR_KEY, Constants.ANN_IGNORE_ERROR_VALUE);
+        assertThat(
+                "stored task with outputs, no outputs filer",
+                this.converter.extractStateFromK8sJobs(taskBuilder.getTask()),
+                is(TesState.SYSTEM_ERROR));
+
+        taskBuilder
+                .getTask()
+                .getTaskmaster()
+                .getJob()
+                .getMetadata()
+                .getAnnotations()
+                .put(Constants.ANN_JSON_INPUT_KEY, "{\"executors\": [{}]}");
+        assertThat(
+                "stored task without outputs",
+                this.converter.extractStateFromK8sJobs(taskBuilder.getTask()),
+                is(TesState.COMPLETE));
+    }
+
     @Test
     public void test_status_complete_with_failed_executor() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
@@ -983,6 +1013,27 @@ public class TesKubernetesConverterTest {
         return this.converter.extractTags(taskmaster);
     }
 
+    /**
+     * Whether the stored task has outputs: unknown (null) without a readable stored task (issue
+     * #159).
+     */
+    @Test
+    public void extractHasOutputs() throws IOException {
+        String executors = "\"executors\": [{}]";
+        assertEquals(Boolean.TRUE, this.hasOutputsOf("{" + executors + ", \"outputs\": [{}]}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + ", \"outputs\": []}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + "}"));
+        assertEquals(Boolean.FALSE, this.hasOutputsOf("{" + executors + ", \"outputs\": {}}"));
+        assertNull(this.hasOutputsOf("not JSON"));
+        assertNull(this.hasOutputsOf(null));
+    }
+
+    private Boolean hasOutputsOf(String storedTask) throws IOException {
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
+        return this.converter.extractHasOutputs(taskmaster);
+    }
+
     private Integer executorCountOf(String storedTask) throws IOException {
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
@@ -1018,6 +1069,35 @@ public class TesKubernetesConverterTest {
                 job.getSpec().getTemplate().getSpec().getContainers().get(0).getResources();
         assertEquals("500m", requirements.getLimits().get("cpu").toSuffixedString());
         assertEquals("500m", requirements.getRequests().get("cpu").toSuffixedString());
+    }
+
+    /**
+     * An executor that ignores errors gets the annotation with which the taskmaster goes on after
+     * it fails; other executors get none (issue #159)
+     */
+    @Test
+    public void fromTesExecutorToK8sJob_ignoreError() {
+        Boolean[] values = {true, false, null};
+        for (Boolean ignoreError : values) {
+            TesExecutor executor =
+                    new TesExecutor()
+                            .image("alpine")
+                            .addCommandItem("true")
+                            .ignoreError(ignoreError);
+            V1Job job =
+                    this.converter.fromTesExecutorToK8sJob(
+                            "task-123",
+                            "name",
+                            executor,
+                            0,
+                            null,
+                            User.builder("test-user-id").build());
+            String annotation = job.getMetadata().getAnnotations().get("ignore-error");
+            assertEquals(
+                    "ignore_error: " + ignoreError,
+                    Boolean.TRUE.equals(ignoreError) ? "true" : null,
+                    annotation);
+        }
     }
 
     /**

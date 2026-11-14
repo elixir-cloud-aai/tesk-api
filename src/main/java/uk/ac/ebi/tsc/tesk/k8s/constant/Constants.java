@@ -55,6 +55,16 @@ public class Constants {
     public static final String ANN_JSON_INPUT_KEY = "json-input";
 
     /**
+     * Key of the annotation of an executor's job that ignores errors (TES {@code ignore_error}),
+     * with the value {@code "true"}: the taskmaster goes on after the executor fails, and the
+     * failure doesn't fail the task (needs a taskmaster with elixir-cloud-aai/tesk-core#142)
+     */
+    public static final String ANN_IGNORE_ERROR_KEY = "ignore-error";
+
+    /** Value of the annotation {@link #ANN_IGNORE_ERROR_KEY} of an executor that ignores errors */
+    public static final String ANN_IGNORE_ERROR_VALUE = "true";
+
+    /**
      * Key of the annotation of the taskmaster's job with the keys of the task's backend parameters,
      * which TESK doesn't support and therefore doesn't store (a JSON array of strings)
      */
