@@ -49,13 +49,32 @@ provider are mocked with WireMock, so no cluster is needed):
 ./mvnw clean verify
 ```
 
-JaCoCo writes the coverage reports to `target/site/jacoco/` (unit tests) and
-`target/site/jacoco-it/` (integration tests). The build fails if the unit and
-integration tests together cover less than 60% of the lines or 45% of the
-branches (`check` of `jacoco-maven-plugin` in `pom.xml`; raise the floors as
-coverage grows). Codecov (`codecov.yml`) also checks each pull request: the
-project's coverage must not drop by more than 0.5 percentage points, and the
-changed lines must be covered completely.
+### Test coverage
+
+The unit and integration tests together must cover all lines and branches:
+`./mvnw clean verify` fails otherwise (`check` of `jacoco-maven-plugin` in
+`pom.xml`, on the merged data of both in `target/jacoco-merged.exec`), and so
+does Codecov (`codecov.yml`), which CI sends the reports of both. Not measured
+are only:
+
+- the files that openapi-generator generates from the TES specification (listed
+  in `src/main/java/.openapi-generator/FILES`, and excluded from formatting and
+  lint as well): data classes, and the API stubs, whose default methods the
+  controllers override. Keep the list in `pom.xml` the same as that file;
+- `TeskApplication`, whose `main` only starts Spring Boot, as the tests do.
+
+JaCoCo writes the reports of the unit tests to `target/site/jacoco/` and those
+of the integration tests to `target/site/jacoco-it/` (`index.html` for a
+browser, `jacoco.xml` for tools). To see what the two miss together, write a
+report of the merged data after `./mvnw clean verify` (it replaces the report
+of the unit tests):
+
+```bash
+./mvnw jacoco:report -Djacoco.dataFile=target/jacoco-merged.exec
+```
+
+Cover new code with tests that check its behaviour, rather than excluding it;
+code that no test can reach is usually dead and can go.
 
 ## Formatting and linting
 
@@ -228,7 +247,10 @@ it to a new version of the specification, run:
 ```
 
 This generates new versions of the model (`uk.ac.ebi.tsc.tesk.tes.model`) and
-the API stub (`uk.ac.ebi.tsc.tesk.tes.api`). The model classes carry [Bean
+the API stub (`uk.ac.ebi.tsc.tesk.tes.api`). If the list of generated files
+(`src/main/java/.openapi-generator/FILES`) changes, change the exclusions of
+Spotless, Checkstyle (`checkstyle.xml`) and JaCoCo in `pom.xml` alike (see
+[Test coverage](#test-coverage)). The model classes carry [Bean
 Validation](https://beanvalidation.org/) annotations beyond those derived from
 the specification (e.g. `@Digits` and `@DecimalMin` on the resources of
 `TesResources`); restore them by hand in the generated code, and reconcile
