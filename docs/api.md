@@ -162,10 +162,11 @@ know about:
 - In executor logs, `exit_code` is left out until the executor's container
   has terminated, and `stdout` holds both output streams of the executor,
   while `stderr` is left out (see [Executor logs](#executor-logs)).
-- `logs[].outputs` is always empty (see [Output file
-  logs](#output-file-logs);
-  [#160](https://github.com/elixir-cloud-aai/tesk-api/issues/160) is about
-  reporting them).
+- `logs[].outputs` is empty with a taskmaster and filer older than
+  [tesk-core#144](https://github.com/elixir-cloud-aai/tesk-core/issues/144),
+  and may lack files of tasks with very
+  many outputs or of TES 1.0 wildcard outputs (see [Output file
+  logs](#output-file-logs)).
 - TESK API sends no CORS headers. To use it from web pages of other origins,
   as TES asks of such implementations, configure CORS where you expose it,
   e.g. in your ingress controller.
@@ -265,13 +266,40 @@ without it.
 
 ## Output file logs
 
-With the views `BASIC` and `FULL`, a task's `logs[0].outputs` is always an
-empty array (`[]`), also after the outputs filer has uploaded the task's
-outputs. The TES specification requires the field, with one entry per output
-file (directory outputs flattened into their files), but the outputs filer
-runs as a separate Kubernetes job and has no way to report the files it
-wrote back to TESK API. Clients that need the uploaded files must look them
-up at the outputs' `url`s.
+With the views `BASIC` and `FULL`, a task's `logs[0].outputs` lists the
+files that the outputs filer uploaded, one entry per file (directory
+outputs and wildcard matches flattened into their files), each with its
+`url`, its `path` in the executors and its `size_bytes`, as TES 1.1
+specifies. For tasks without outputs, and until the taskmaster has stored
+the files after the outputs filer completed (the task is `RUNNING` until
+then), it's an empty array (`[]`).
+
+The taskmaster stores the files as the annotation `output-file-logs` of
+the outputs filer's job, from which TESK API reads them; this needs a
+taskmaster and filer of a tesk-core release with
+[tesk-core#144](https://github.com/elixir-cloud-aai/tesk-core/issues/144)
+(see the taskmaster's and the filer's docs there). Other keys of a stored
+file are ignored; an annotation that isn't a list of files with the text
+fields `url`, `path` and `size_bytes` (a string of digits, as in TES)
+gives an empty array, also if only one entry isn't such a file. With older
+images, or if the
+taskmaster couldn't read or store the files (it logs a warning and the task
+completes anyway), the array stays empty, and clients that need the
+uploaded files must look them up at the outputs' `url`s. The list holds at
+most about 200,000 bytes of JSON: for tasks with very many files, the last
+ones are left out. Wildcard outputs without `path_prefix` (TES 1.0, only
+for `file:` URLs and URLs without a scheme) give no entries. The `url`s
+are those of the task's outputs, so they carry what those carry (e.g. the
+signature of a presigned URL), as `outputs[].url` in the same answer does.
+
+`GET /tasks` reads the jobs of all outputs filers in the namespace, as
+before, to match them to the page's tasks; with the annotation, each job of
+a finished task with outputs can be up to about 200 KB larger. In
+namespaces with many finished tasks with many output files, delete
+finished tasks (e.g. with the taskmaster's TTL, see [Deleting
+tasks](index.md#deleting-tasks)) to keep listing cheap.
+[#177](https://github.com/elixir-cloud-aai/tesk-api/issues/177) is about
+reading only the outputs filers' jobs of the page's tasks.
 
 ## Swagger UI
 

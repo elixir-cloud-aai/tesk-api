@@ -39,6 +39,13 @@ public class Constants {
     public static final String JOB_NAME_FILER_SUF = "-outputs-filer";
 
     /**
+     * Key of the annotation of the outputs filer's job in which the taskmaster stores the uploaded
+     * files as JSON, with the keys of TES {@code tesOutputFileLog} (needs a taskmaster and filer
+     * with elixir-cloud-aai/tesk-core#144)
+     */
+    public static final String ANN_OUTPUT_FILE_LOGS_KEY = "output-file-logs";
+
+    /**
      * Key of the annotation, that stores name of TES task in both taskmaster's job and executor's
      * jobs.
      */
