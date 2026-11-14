@@ -12,7 +12,6 @@ import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1LimitRange;
 import io.kubernetes.client.openapi.models.V1LimitRangeItem;
-import io.kubernetes.client.openapi.models.V1LimitRangeList;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1Secret;
@@ -192,33 +191,17 @@ public class KubernetesClientWrapper {
     }
 
     /**
-     * Wrapper to call Kubernetes API and retrieve all available LimitRange objects in the namespace
-     *
-     * @return The V1LimitRangeList object with all the LimitRanges
-     */
-    private V1LimitRangeList listLimits(String _continue, String labelSelector, Integer limit) {
-        try {
-            return this.coreApi
-                    .listNamespacedLimitRange(namespace)
-                    ._continue(_continue)
-                    .labelSelector(labelSelector)
-                    .limit(limit)
-                    .execute();
-        } catch (ApiException e) {
-            throw KubernetesException.fromApiException(e);
-        }
-    }
-
-    /**
      * Queries the API to get the minimum memory requirements to launch a Pod (and a Container).
-     * Returns the highest
+     * Returns the highest minimum of the namespace's LimitRanges, or 0 if Kubernetes can't list
+     * them
      *
      * @return Memory in Gigabytes (Double)
      */
     public Double minimumRamGb() {
         try {
             BigDecimal returnValue = BigDecimal.ZERO;
-            for (V1LimitRange limit : listLimits(null, null, null).getItems()) {
+            for (V1LimitRange limit :
+                    this.coreApi.listNamespacedLimitRange(namespace).execute().getItems()) {
                 for (V1LimitRangeItem item : limit.getSpec().getLimits()) {
                     if (item.getMin() != null && item.getMin().get(RESOURCE_MEM_KEY) != null) {
                         Quantity quantity = item.getMin().get(RESOURCE_MEM_KEY);

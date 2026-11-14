@@ -10,8 +10,13 @@ import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1ConfigMap;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobSpec;
+import io.kubernetes.client.openapi.models.V1LabelSelector;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.util.ClientBuilder;
+import java.util.Collections;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -182,5 +187,79 @@ public class KubernetesClientWrapperHttpTest {
                                         "{\"metadata\":{\"labels\":{\"task-status\":\"Cancelled\"}},"
                                                 + "\"spec\":{\"parallelism\":0,"
                                                 + "\"activeDeadlineSeconds\":1}}")));
+    }
+
+    /**
+     * The highest minimum memory of all LimitRanges, in GB, skipping limits without a minimum or
+     * without a minimum of memory
+     */
+    @Test
+    public void minimumRamGb_highestOfAll() {
+        kubernetes.givenThat(
+                get(urlPathEqualTo("/api/v1/namespaces/tesk/limitranges"))
+                        .willReturn(
+                                okJson(
+                                        "{\"items\":[{\"spec\":{\"limits\":["
+                                                + "{\"type\":\"Pod\",\"min\":null},"
+                                                + "{\"type\":\"Container\",\"min\":{\"cpu\":\"1\"}},"
+                                                + "{\"type\":\"Container\",\"min\":{\"memory\":\"3Gi\"}}]}},"
+                                                + "{\"spec\":{\"limits\":[{\"type\":\"Pod\","
+                                                + "\"min\":{\"memory\":\"1Gi\"}}]}}]}")));
+        assertThat(wrapper.minimumRamGb()).isEqualTo(3.0);
+    }
+
+    /** Without the LimitRanges, there is no minimum: tasks are created with the memory they ask */
+    @Test
+    public void minimumRamGb_zeroIfKubernetesRefuses() {
+        kubernetes.givenThat(
+                get(urlPathEqualTo("/api/v1/namespaces/tesk/limitranges"))
+                        .willReturn(aResponse().withStatus(403).withBody("{}")));
+        assertThat(wrapper.minimumRamGb()).isEqualTo(0.0);
+    }
+
+    /**
+     * A job without labels (also explicitly null) has no group: only its creator could see it, and
+     * this user isn't
+     */
+    @Test
+    public void listTaskmasterJobs_jobWithoutLabels() {
+        kubernetes.givenThat(
+                get(urlPathEqualTo(JOBS))
+                        .willReturn(
+                                okJson(
+                                        "{\"items\":[{\"metadata\":{\"name\":\"task-1\"}},"
+                                                + "{\"metadata\":{\"name\":\"task-2\",\"labels\":null}}]}")));
+        User member =
+                User.builder("123").teskMemberedGroups(Collections.singleton("group-1")).build();
+        assertThat(wrapper.listAllTaskmasterJobsForUser(null, null, member).getItems()).isEmpty();
+    }
+
+    /** Every other call turns the errors of Kubernetes into KubernetesExceptions */
+    @Test
+    public void errorsOfAllCalls() {
+        kubernetes.givenThat(any(anyUrl()).willReturn(aResponse().withStatus(500).withBody("{}")));
+        V1Job job =
+                new V1Job()
+                        .spec(
+                                new V1JobSpec()
+                                        .selector(
+                                                new V1LabelSelector()
+                                                        .putMatchLabelsItem("job-name", "task-1")));
+        assertStatus500(() -> wrapper.createJob(job));
+        assertStatus500(() -> wrapper.createConfigMap(new V1ConfigMap()));
+        assertStatus500(() -> wrapper.readTaskmasterJob("task-1"));
+        assertStatus500(() -> wrapper.getSingleTaskOutputFilerJob("task-1"));
+        assertStatus500(() -> wrapper.listSingleJobPods(job));
+        assertStatus500(() -> wrapper.listAllJobPods());
+        assertStatus500(() -> wrapper.labelJobAsCancelled("task-1"));
+        assertStatus500(() -> wrapper.cancelJobBeforeStart("task-1"));
+        assertStatus500(() -> wrapper.labelPodAsCancelled("pod-1"));
+    }
+
+    private static void assertStatus500(ThrowingCallable call) {
+        assertThatThrownBy(call)
+                .isInstanceOfSatisfying(
+                        KubernetesException.class,
+                        e -> assertThat(e.getApiException().getCode()).isEqualTo(500));
     }
 }

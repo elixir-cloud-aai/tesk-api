@@ -1,6 +1,5 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +27,7 @@ public class GroupNamesSecurityExtractor {
 
     /**
      * The group names in the groups claim of the user info, as authorities; without that claim, the
-     * authority {@code <group prefix>:USER}
+     * authority {@code <group prefix>:USER}; a null claim gives no authorities
      */
     public List<GrantedAuthority> extractAuthorities(Map<String, Object> map) {
         String authorities = this.groupPrefix + ":USER";
@@ -39,23 +38,17 @@ public class GroupNamesSecurityExtractor {
     }
 
     private String asAuthorities(Object object) {
-        List<Object> authorities = new ArrayList<>();
+        if (object == null) {
+            // a null claim means no groups, not a group called "null"
+            return "";
+        }
         if (object instanceof Collection) {
-            Collection<?> collection = (Collection<?>) object;
-            object = collection.toArray(new Object[0]);
+            return StringUtils.collectionToCommaDelimitedString((Collection<?>) object);
         }
         if (ObjectUtils.isArray(object)) {
-            Object[] array = (Object[]) object;
-            for (Object value : array) {
-                if (value instanceof String) {
-                    authorities.add(value);
-                } else {
-                    authorities.add(value);
-                }
-            }
-        } else {
-            authorities.add(object);
+            return StringUtils.arrayToCommaDelimitedString((Object[]) object);
         }
-        return StringUtils.collectionToCommaDelimitedString(authorities);
+        // a single group, e.g. a string of comma-separated names
+        return String.valueOf(object);
     }
 }

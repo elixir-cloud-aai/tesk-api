@@ -104,4 +104,15 @@ public class TaskListStrategyTest {
         BuildStrategy taskListMaker = new TaskListStrategy();
         taskListMaker.getTask();
     }
+
+    /** The outputs filer of a task that isn't in the list (e.g. on another page) is left out */
+    @Test
+    public void addOutputFilerJob_ofAnotherTask() {
+        BuildStrategy taskListMaker = new TaskListStrategy();
+        taskListMaker.addTaskMasterJob(
+                new Job(new V1Job().metadata(new V1ObjectMeta().name("tm1"))));
+        taskListMaker.addOutputFilerJob(
+                new Job(new V1Job().metadata(new V1ObjectMeta().name("tm9-outputs-filer"))));
+        assertThat(taskListMaker.getTaskList().get(0).getOutputFiler().isPresent(), is(false));
+    }
 }

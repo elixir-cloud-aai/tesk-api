@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -72,8 +73,6 @@ public class User implements Serializable, UserDetails, Principal {
      */
     private Set<String> teskManagedGroups;
 
-    public User() {}
-
     public String getName() {
         return name;
     }
@@ -137,11 +136,11 @@ public class User implements Serializable, UserDetails, Principal {
     }
 
     public boolean isGroupMember(String groupName) {
-        return teskMemberedGroups != null && teskMemberedGroups.contains(groupName);
+        return teskMemberedGroups.contains(groupName);
     }
 
     public boolean isMember() {
-        return teskMemberedGroups != null && teskMemberedGroups.size() > 0;
+        return !teskMemberedGroups.isEmpty();
     }
 
     public String getAnyGroup() {
@@ -152,11 +151,11 @@ public class User implements Serializable, UserDetails, Principal {
     }
 
     public boolean isGroupManager(String groupName) {
-        return teskManagedGroups != null && teskManagedGroups.contains(groupName);
+        return teskManagedGroups.contains(groupName);
     }
 
     public boolean isManager() {
-        return teskManagedGroups != null && teskManagedGroups.size() > 0;
+        return !teskManagedGroups.isEmpty();
     }
 
     /**
@@ -171,13 +170,8 @@ public class User implements Serializable, UserDetails, Principal {
      * only selects by group.
      */
     public String getLabelSelector() {
-        Set<String> allTeskGroups = new LinkedHashSet<>();
-        if (this.teskMemberedGroups != null) {
-            allTeskGroups.addAll(this.teskMemberedGroups);
-        }
-        if (this.teskManagedGroups != null) {
-            allTeskGroups.addAll(this.teskManagedGroups);
-        }
+        Set<String> allTeskGroups = new LinkedHashSet<>(this.teskMemberedGroups);
+        allTeskGroups.addAll(this.teskManagedGroups);
         if (isTeskAdmin()) {
             return null;
         }
@@ -236,7 +230,7 @@ public class User implements Serializable, UserDetails, Principal {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        if (this.allGroups == null || this.allGroups.isEmpty()) {
+        if (this.allGroups.isEmpty()) {
             // no groups (e.g. service clients): no authorities, rather than an empty one
             return AuthorityUtils.NO_AUTHORITIES;
         }
@@ -328,70 +322,38 @@ public class User implements Serializable, UserDetails, Principal {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-
         User user = (User) o;
-
-        if (teskAdmin != user.teskAdmin) {
-            return false;
-        }
-        if (claimAuthorised != user.claimAuthorised) {
-            return false;
-        }
-        if (serviceClient != user.serviceClient) {
-            return false;
-        }
-        if (legacyUserLabels != user.legacyUserLabels) {
-            return false;
-        }
-        if (userId != null ? !userId.equals(user.userId) : user.userId != null) {
-            return false;
-        }
-        if (preferredUsername != null
-                ? !preferredUsername.equals(user.preferredUsername)
-                : user.preferredUsername != null) {
-            return false;
-        }
-        if (name != null ? !name.equals(user.name) : user.name != null) {
-            return false;
-        }
-        if (givenName != null ? !givenName.equals(user.givenName) : user.givenName != null) {
-            return false;
-        }
-        if (familyName != null ? !familyName.equals(user.familyName) : user.familyName != null) {
-            return false;
-        }
-        if (email != null ? !email.equals(user.email) : user.email != null) {
-            return false;
-        }
-        if (allGroups != null ? !allGroups.equals(user.allGroups) : user.allGroups != null) {
-            return false;
-        }
-        if (teskMemberedGroups != null
-                ? !teskMemberedGroups.equals(user.teskMemberedGroups)
-                : user.teskMemberedGroups != null) {
-            return false;
-        }
-        return teskManagedGroups != null
-                ? teskManagedGroups.equals(user.teskManagedGroups)
-                : user.teskManagedGroups == null;
+        return teskAdmin == user.teskAdmin
+                && claimAuthorised == user.claimAuthorised
+                && serviceClient == user.serviceClient
+                && legacyUserLabels == user.legacyUserLabels
+                && Objects.equals(userId, user.userId)
+                && Objects.equals(preferredUsername, user.preferredUsername)
+                && Objects.equals(name, user.name)
+                && Objects.equals(givenName, user.givenName)
+                && Objects.equals(familyName, user.familyName)
+                && Objects.equals(email, user.email)
+                && allGroups.equals(user.allGroups)
+                && teskMemberedGroups.equals(user.teskMemberedGroups)
+                && teskManagedGroups.equals(user.teskManagedGroups);
     }
 
     @Override
     public int hashCode() {
-        int result = userId != null ? userId.hashCode() : 0;
-        result = 31 * result + (preferredUsername != null ? preferredUsername.hashCode() : 0);
-        result = 31 * result + (name != null ? name.hashCode() : 0);
-        result = 31 * result + (givenName != null ? givenName.hashCode() : 0);
-        result = 31 * result + (familyName != null ? familyName.hashCode() : 0);
-        result = 31 * result + (email != null ? email.hashCode() : 0);
-        result = 31 * result + (allGroups != null ? allGroups.hashCode() : 0);
-        result = 31 * result + (teskAdmin ? 1 : 0);
-        result = 31 * result + (claimAuthorised ? 1 : 0);
-        result = 31 * result + (serviceClient ? 1 : 0);
-        result = 31 * result + (legacyUserLabels ? 1 : 0);
-        result = 31 * result + (teskMemberedGroups != null ? teskMemberedGroups.hashCode() : 0);
-        result = 31 * result + (teskManagedGroups != null ? teskManagedGroups.hashCode() : 0);
-        return result;
+        return Objects.hash(
+                userId,
+                preferredUsername,
+                name,
+                givenName,
+                familyName,
+                email,
+                allGroups,
+                teskAdmin,
+                claimAuthorised,
+                serviceClient,
+                legacyUserLabels,
+                teskMemberedGroups,
+                teskManagedGroups);
     }
 
     public static class UserBuilder {
@@ -401,9 +363,9 @@ public class User implements Serializable, UserDetails, Principal {
         private String givenName;
         private String familyName;
         private String email;
-        private Set<String> allGroups;
-        private Set<String> teskMemberedGroups;
-        private Set<String> teskManagedGroups;
+        private Set<String> allGroups = new HashSet<>();
+        private Set<String> teskMemberedGroups = new HashSet<>();
+        private Set<String> teskManagedGroups = new HashSet<>();
         private boolean teskAdmin = false;
         private boolean claimAuthorised = false;
         private boolean serviceClient = false;
@@ -411,7 +373,6 @@ public class User implements Serializable, UserDetails, Principal {
 
         UserBuilder(String userId) {
             this.userId = userId;
-            this.teskMemberedGroups = new HashSet<>();
         }
 
         public UserBuilder preferredUsername(String preferredUsername) {

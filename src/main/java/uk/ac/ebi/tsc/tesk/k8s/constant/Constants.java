@@ -11,6 +11,8 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesState;
  */
 public class Constants {
 
+    private Constants() {}
+
     /** ENV var that serves as taskmaster script input (JSON format) */
     public static final String TASKMASTER_INPUT = "JSON_INPUT";
 

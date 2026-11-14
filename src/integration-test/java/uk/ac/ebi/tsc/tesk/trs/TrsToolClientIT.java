@@ -3,6 +3,9 @@ package uk.ac.ebi.tsc.tesk.trs;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withNoContent;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.client.RestClientTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -117,5 +121,51 @@ public class TrsToolClientIT {
         Optional<String> result =
                 subject.getDockerImageForToolVersion("trsHost", "toolId2", "toolVersion2");
         assertThat(result, is(Optional.empty()));
+    }
+
+    /** If the TRS fails, the URI is kept as the image (and the executor fails to pull it) */
+    @Test
+    public void getDockerImageForToolVersion_trsError() {
+        this.server
+                .expect(requestTo("https://trsHost/trs/toolId/versions/toolVersion"))
+                .andRespond(withServerError());
+        assertThat(
+                subject.getDockerImageForToolVersionURI("trs://trsHost/trs-id/toolId/toolVersion"),
+                is("trs://trsHost/trs-id/toolId/toolVersion"));
+    }
+
+    /** A response without a body, or without images, gives no image */
+    @Test
+    public void getDockerImageForToolVersion_noImages() throws Exception {
+        this.server
+                .expect(requestTo("https://trsHost/trs/toolId/versions/toolVersion"))
+                .andRespond(withNoContent());
+        assertThat(
+                subject.getDockerImageForToolVersion("trsHost", "toolId", "toolVersion"),
+                is(Optional.empty()));
+        this.server.reset();
+        this.server
+                .expect(requestTo("https://trsHost/trs/toolId/versions/toolVersion"))
+                .andRespond(
+                        withSuccess(
+                                objectMapper.writeValueAsString(new ToolVersion()),
+                                MediaType.APPLICATION_JSON));
+        assertThat(
+                subject.getDockerImageForToolVersion("trsHost", "toolId", "toolVersion"),
+                is(Optional.empty()));
+    }
+
+    /** Responses other than success (which don't fail the request, e.g. 304) give no image */
+    @Test
+    public void getDockerImageForToolVersion_notSuccessful() {
+        this.server
+                .expect(requestTo("https://trsHost/trs/toolId/versions/toolVersion"))
+                .andRespond(
+                        withStatus(HttpStatus.NOT_MODIFIED)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(detailsStringWithDocker));
+        assertThat(
+                subject.getDockerImageForToolVersion("trsHost", "toolId", "toolVersion"),
+                is(Optional.empty()));
     }
 }

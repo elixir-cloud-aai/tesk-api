@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert.data;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.collection.IsEmptyCollection.empty;
 import static org.junit.Assert.assertThat;
 
@@ -61,5 +62,24 @@ public class TaskTest {
         Task task = new Task("123");
         assertThat(task.getExecutorName(5), is("123-ex-05"));
         assertThat(task.getExecutorName(125), is("123-ex-125"));
+    }
+
+    /** A job that isn't one of the task's numbered executors comes after them */
+    @Test
+    public void getExecutors_unnumberedLast() {
+        Task task = new Task("123");
+        task.addExecutor(new Job(new V1Job().metadata(new V1ObjectMeta().name("other"))));
+        for (Job exec : prepareExecutors()) {
+            task.addExecutor(exec);
+        }
+        assertThat(task.getLastExecutor().get().getJobName(), is("other"));
+    }
+
+    /** A job without pods has no first pod */
+    @Test
+    public void getFirstPod_noPods() {
+        Job job = new Job(new V1Job().metadata(new V1ObjectMeta().name("123")));
+        assertThat(job.hasPods(), is(false));
+        assertThat(job.getFirstPod(), is(nullValue()));
     }
 }

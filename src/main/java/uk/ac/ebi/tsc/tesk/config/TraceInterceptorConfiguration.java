@@ -1,8 +1,6 @@
 package uk.ac.ebi.tsc.tesk.config;
 
 import org.apache.commons.logging.Log;
-import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.aop.Advisor;
 import org.springframework.aop.aspectj.AspectJExpressionPointcut;
 import org.springframework.aop.interceptor.CustomizableTraceInterceptor;
@@ -12,17 +10,40 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 
-/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
+/**
+ * Traces the calls of {@link uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper} to Kubernetes
+ * at level TRACE: arguments and results of the writing calls (except {@code createSecret}, whose
+ * argument holds credentials), and arguments of the reading calls
+ *
+ * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ */
 @Configuration
 @EnableAspectJAutoProxy(proxyTargetClass = true)
-@Aspect
 public class TraceInterceptorConfiguration {
 
-    private static class KubernetesAPICallsInterceptor extends CustomizableTraceInterceptor {
+    private static final String WRAPPER =
+            "public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+";
+
+    /** Creating (except Secrets) and labelling calls */
+    static final String WRITE_METHODS =
+            "(execution("
+                    + WRAPPER
+                    + ".create*(..)) && !execution("
+                    + WRAPPER
+                    + ".createSecret(..))) || execution("
+                    + WRAPPER
+                    + ".label*(..))";
+
+    /** Listing and reading calls */
+    static final String GET_METHODS =
+            "execution(" + WRAPPER + ".list*(..)) || execution(" + WRAPPER + ".read*(..))";
+
+    /** Adds the response body of a failed Kubernetes call to the trace of the exception */
+    static class KubernetesAPICallsInterceptor extends CustomizableTraceInterceptor {
         @Override
         protected void writeToLog(Log logger, String message, Throwable ex) {
             super.writeToLog(logger, message, ex);
-            if (ex != null && ex instanceof KubernetesException) {
+            if (ex instanceof KubernetesException) {
                 KubernetesException exception = (KubernetesException) ex;
                 logger.trace(
                         "ApiException ResponseBody: "
@@ -30,29 +51,6 @@ public class TraceInterceptorConfiguration {
             }
         }
     }
-
-    @Pointcut(
-            "execution(public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+.create*(..))"
-                    + " && !execution(public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+.createSecret(..))")
-    public void createMethods() {}
-
-    @Pointcut(
-            "execution(public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+.label*(..))")
-    public void labelMethods() {}
-
-    @Pointcut(
-            "execution(public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+.list*(..))")
-    public void listMethods() {}
-
-    @Pointcut(
-            "execution(public * uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper+.read*(..))")
-    public void readMethods() {}
-
-    @Pointcut("listMethods() || readMethods()")
-    public void getMethods() {}
-
-    @Pointcut("createMethods() || labelMethods()")
-    public void writeMethods() {}
 
     @Bean
     public CustomizableTraceInterceptor writeMethodsInterceptor() {
@@ -84,16 +82,14 @@ public class TraceInterceptorConfiguration {
     @Bean
     public Advisor writeTaskTraceAdvisor() {
         AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
-        pointcut.setExpression(
-                "uk.ac.ebi.tsc.tesk.config.TraceInterceptorConfiguration.writeMethods()");
+        pointcut.setExpression(WRITE_METHODS);
         return new DefaultPointcutAdvisor(pointcut, writeMethodsInterceptor());
     }
 
     @Bean
     public Advisor getTaskTraceAdvisor() {
         AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
-        pointcut.setExpression(
-                "uk.ac.ebi.tsc.tesk.config.TraceInterceptorConfiguration.getMethods()");
+        pointcut.setExpression(GET_METHODS);
         return new DefaultPointcutAdvisor(pointcut, getMethodsInterceptor());
     }
 }

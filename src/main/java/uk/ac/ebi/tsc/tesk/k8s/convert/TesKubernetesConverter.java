@@ -3,7 +3,6 @@ package uk.ac.ebi.tsc.tesk.k8s.convert;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.*;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.*;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -11,6 +10,7 @@ import io.kubernetes.client.custom.QuantityFormatter;
 import io.kubernetes.client.openapi.models.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -88,22 +88,15 @@ public class TesKubernetesConverter {
         } else if (user.isMember()) {
             taskMasterJob.getMetadata().putLabelsItem(LABEL_GROUPNAME_KEY, user.getAnyGroup());
         }
-        try {
-            // in order to retrieve task details, when querying for task details, whole tesTask
-            // object is placed as taskMaster's annotation
-            // Jackson for TES objects - because, we rely on auto-generated annotations for Json
-            // mapping
-            taskMasterJob
-                    .getMetadata()
-                    .putAnnotationsItem(
-                            ANN_JSON_INPUT_KEY, this.objectMapper.writeValueAsString(task));
-        } catch (JsonProcessingException ex) {
-            logger.info(
-                    String.format(
-                            "Serializing task %s to JSON failed",
-                            taskMasterJob.getMetadata().getName()),
-                    ex);
-        }
+        // in order to retrieve task details, when querying for task details, whole tesTask
+        // object is placed as taskMaster's annotation
+        // Jackson for TES objects - because, we rely on auto-generated annotations for Json
+        // mapping
+        taskMasterJob
+                .getMetadata()
+                .putAnnotationsItem(
+                        ANN_JSON_INPUT_KEY,
+                        unchecked(() -> this.objectMapper.writeValueAsString(task)));
 
         V1Volume volume = new V1Volume();
         volume.setName("jsoninput");
@@ -152,35 +145,22 @@ public class TesKubernetesConverter {
                                                 task.getResources(),
                                                 user))
                         .collect(Collectors.toList());
-        Map<String, Object> taskMasterInput = new HashMap<>();
-        try {
-            List<TesInput> inputs = task.getInputs() == null ? new ArrayList<>() : task.getInputs();
-            List<TesOutput> outputs =
-                    task.getOutputs() == null ? new ArrayList<>() : task.getOutputs();
-            List<String> volumes =
-                    task.getVolumes() == null ? new ArrayList<>() : task.getVolumes();
-            String jobAsJson =
-                    this.objectMapper.writeValueAsString(
-                            new TesTask()
-                                    .inputs(inputs)
-                                    .outputs(outputs)
-                                    .volumes(volumes)
-                                    .resources(
-                                            new TesResources()
-                                                    .diskGb(
-                                                            Optional.ofNullable(task.getResources())
-                                                                    .map(TesResources::getDiskGb)
-                                                                    .orElse(
-                                                                            RESOURCE_DISK_DEFAULT))));
-            Map<String, Object> jobAsMap = gson.fromJson(jobAsJson, Map.class);
-            taskMasterInput.putAll(jobAsMap);
-        } catch (JsonProcessingException e) {
-            logger.info(
-                    String.format(
-                            "Serializing copy of task %s to JSON failed",
-                            taskMasterConfigMap.getMetadata().getName()),
-                    e);
-        }
+        List<TesInput> inputs = task.getInputs() == null ? new ArrayList<>() : task.getInputs();
+        List<TesOutput> outputs = task.getOutputs() == null ? new ArrayList<>() : task.getOutputs();
+        List<String> volumes = task.getVolumes() == null ? new ArrayList<>() : task.getVolumes();
+        TesTask taskmasterTask =
+                new TesTask()
+                        .inputs(inputs)
+                        .outputs(outputs)
+                        .volumes(volumes)
+                        .resources(
+                                new TesResources()
+                                        .diskGb(
+                                                Optional.ofNullable(task.getResources())
+                                                        .map(TesResources::getDiskGb)
+                                                        .orElse(RESOURCE_DISK_DEFAULT)));
+        String jobAsJson = unchecked(() -> this.objectMapper.writeValueAsString(taskmasterTask));
+        Map<String, Object> taskMasterInput = new HashMap<>(gson.fromJson(jobAsJson, Map.class));
         // without the empty lists and maps of the client's models, as before (see
         // KubernetesJson)
         taskMasterInput.put(
@@ -189,21 +169,36 @@ public class TesKubernetesConverter {
                         .map(KubernetesJson.GSON_WITHOUT_EMPTY_COLLECTIONS::toJsonTree)
                         .collect(Collectors.toList()));
         String taskMasterInputAsJSON = this.gson.toJson(taskMasterInput);
-
-        try {
-            ByteArrayOutputStream obj = new ByteArrayOutputStream();
-            GZIPOutputStream gzip = new GZIPOutputStream(obj);
-            gzip.write(taskMasterInputAsJSON.getBytes("UTF-8"));
-            gzip.close();
-            taskMasterConfigMap.putBinaryDataItem(TASKMASTER_INPUT + ".gz", obj.toByteArray());
-        } catch (Exception e) {
-            logger.info(
-                    String.format(
-                            "Compression of task %s JSON configmap failed",
-                            taskMasterConfigMap.getMetadata().getName()),
-                    e);
-        }
+        taskMasterConfigMap.putBinaryDataItem(
+                TASKMASTER_INPUT + ".gz", unchecked(() -> gzip(taskMasterInputAsJSON)));
         return taskMasterConfigMap;
+    }
+
+    /** An action that may fail with an IOException */
+    @FunctionalInterface
+    private interface IoSupplier<T> {
+        T get() throws IOException;
+    }
+
+    /**
+     * The result of the action, failing with an unchecked exception instead of an IOException (e.g.
+     * if a task can't be serialized): a task without its JSON could be neither run nor read
+     */
+    private static <T> T unchecked(IoSupplier<T> action) {
+        try {
+            return action.get();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** The text, encoded in UTF-8 and gzipped */
+    private static byte[] gzip(String text) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(bytes)) {
+            gzip.write(text.getBytes(StandardCharsets.UTF_8));
+        }
+        return bytes.toByteArray();
     }
 
     /** Creates one Docker registry Secret per executor that has registry credentials. */

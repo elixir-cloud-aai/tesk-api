@@ -202,4 +202,24 @@ public class ElixirPrincipalExtractorTest {
         assertThat(near.isMember(), is(false));
         assertThat(near.isManager(), is(false));
     }
+
+    /**
+     * If the admin group is configured as the managers' subgroup of a team, its members are TESK
+     * admins, and not also managers of that team
+     */
+    @Test
+    public void adminGroupNamedLikeManagersOfATeam() {
+        AuthorisationProperties properties = new AuthorisationProperties();
+        properties.setBaseGroupPrefix("BASE_GROUP:");
+        properties.setAdminSubgroup("ADMIN");
+        properties.setAdminGroupFull("BASE_GROUP:TEAM:ADMIN");
+        ElixirPrincipalExtractor extractor =
+                new ElixirPrincipalExtractor(
+                        new GroupNamesSecurityExtractor("groupNames", "whatever"), properties);
+
+        User user = userWithGroups(extractor, "BASE_GROUP:TEAM:ADMIN");
+
+        assertThat(user.isTeskAdmin(), is(true));
+        assertThat(user.isGroupManager("TEAM"), is(false));
+    }
 }

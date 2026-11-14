@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -23,6 +24,10 @@ import static org.mockito.Mockito.when;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantLock;
 import org.jose4j.jwa.AlgorithmConstraints;
 import org.jose4j.jwk.EcJwkGenerator;
 import org.jose4j.jwk.EllipticCurveJsonWebKey;
@@ -33,6 +38,9 @@ import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.NumericDate;
+import org.jose4j.jwt.consumer.ErrorCodeValidator;
+import org.jose4j.jwt.consumer.ErrorCodes;
+import org.jose4j.jwt.consumer.InvalidJwtException;
 import org.jose4j.jwt.consumer.JwtConsumer;
 import org.jose4j.keys.EllipticCurves;
 import org.jose4j.keys.HmacKey;
@@ -96,13 +104,26 @@ public class ServiceClientTokenServicesTest {
     private void discovery(String documentIssuer) {
         idp.givenThat(
                 get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
-                        .willReturn(
-                                okJson(
-                                        "{\"issuer\":\""
-                                                + documentIssuer
-                                                + "\",\"jwks_uri\":\"http://localhost:"
-                                                + idp.port()
-                                                + "/oidc/jwk\"}")));
+                        .willReturn(okJson(discoveryDocument(documentIssuer))));
+    }
+
+    private String discoveryDocument(String documentIssuer) {
+        return "{\"issuer\":\""
+                + documentIssuer
+                + "\",\"jwks_uri\":\"http://localhost:"
+                + idp.port()
+                + "/oidc/jwk\"}";
+    }
+
+    /** Waits (up to 5 seconds) until the issuer received a request for the URL */
+    private void awaitRequest(String url) throws InterruptedException {
+        for (int i = 0; i < 500; i++) {
+            if (!idp.findAll(getRequestedFor(urlEqualTo(url))).isEmpty()) {
+                return;
+            }
+            Thread.sleep(10);
+        }
+        throw new AssertionError("no request for " + url);
     }
 
     private void jwks(RsaJsonWebKey... keys) {
@@ -412,6 +433,12 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
+    public void settingsWithoutClientClaim_failAtStartup() {
+        properties.getServiceClients().setClientClaim(" ");
+        assertThrows(IllegalStateException.class, this::services);
+    }
+
+    @Test
     public void settingsWithNegativeLeeway_failAtStartup() {
         properties.getServiceClients().setClockSkewSeconds(-1);
         assertThrows(IllegalStateException.class, this::services);
@@ -590,6 +617,7 @@ public class ServiceClientTokenServicesTest {
         assertTrue(ServiceClientTokenServices.isSecure("https://login.example.org/oidc/"));
         assertTrue(ServiceClientTokenServices.isSecure("http://localhost:8080/oidc/"));
         assertTrue(ServiceClientTokenServices.isSecure("http://127.0.0.1/jwk"));
+        assertTrue(ServiceClientTokenServices.isSecure("http://[::1]:8080/oidc/"));
         assertFalse(ServiceClientTokenServices.isSecure("http://login.example.org/oidc/"));
         assertFalse(ServiceClientTokenServices.isSecure("http://localhost.example.org/"));
         assertFalse(ServiceClientTokenServices.isSecure("ftp://login.example.org/"));
@@ -626,5 +654,133 @@ public class ServiceClientTokenServicesTest {
     public void serviceClient_ignoresLegacyUserLabels() throws Exception {
         properties.setLegacyUserLabels(true);
         assertFalse(accepted(sign(claims(CLIENT))).isLegacyUserLabels());
+    }
+
+    /** A JWT nested in another isn't a service client's token, whatever its claims */
+    @Test
+    public void nestedToken_isPassedOn() throws Exception {
+        JsonWebSignature outer = new JsonWebSignature();
+        outer.setPayload(sign(claims(CLIENT)));
+        outer.setContentTypeHeaderValue("JWT");
+        outer.setKey(key.getPrivateKey());
+        outer.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
+        passedOn(outer.getCompactSerialization());
+    }
+
+    @Test
+    public void discoveryWithoutJwksUri_isRefused() throws Exception {
+        idp.givenThat(
+                get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
+                        .willReturn(okJson("{\"issuer\":\"" + issuer() + "\"}")));
+        refused(sign(claims(CLIENT)));
+        assertThat(output.getOut(), containsString("keys of the issuer unavailable"));
+    }
+
+    /**
+     * While one request fetches the keys of the issuer, the tokens of other requests are refused at
+     * once, instead of waiting for the issuer or fetching the keys again
+     */
+    @Test
+    public void whileTheKeysAreFetched_otherTokensAreRefused() throws Exception {
+        String discoveryPath = "/oidc" + ServiceClientTokenServices.DISCOVERY_PATH;
+        idp.givenThat(
+                get(discoveryPath)
+                        .willReturn(okJson(discoveryDocument(issuer())).withFixedDelay(3000)));
+        ServiceClientTokenServices services = services();
+        String token = sign(claims(CLIENT));
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<OAuth2AuthenticatedPrincipal> first =
+                    executor.submit(() -> services.introspect(token));
+            awaitRequest(discoveryPath);
+
+            assertThrows(BadOpaqueTokenException.class, () -> services.introspect(token));
+
+            assertEquals(CLIENT, first.get().getName());
+            idp.verify(1, getRequestedFor(urlEqualTo(discoveryPath)));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /**
+     * A request that found no verifier just before another one finished building it uses that
+     * verifier, instead of fetching the keys again
+     */
+    @Test
+    public void verifierBuiltMeanwhile_isUsed() throws Exception {
+        String token = sign(claims(CLIENT));
+        ServiceClientTokenServices other = services();
+        other.introspect(token);
+        // depends on the fields verifier and buildLock of ServiceClientTokenServices
+        Object built = ReflectionTestUtils.getField(other, "verifier");
+        assertNotNull(built);
+        ServiceClientTokenServices services = services();
+        // the other request finishes the build between this one's check and its lock
+        ReflectionTestUtils.setField(
+                services,
+                "buildLock",
+                new ReentrantLock() {
+                    @Override
+                    public boolean tryLock() {
+                        ReflectionTestUtils.setField(services, "verifier", built);
+                        return super.tryLock();
+                    }
+                });
+
+        assertEquals(CLIENT, services.introspect(token).getName());
+
+        idp.verify(
+                1,
+                getRequestedFor(urlEqualTo("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)));
+    }
+
+    /** While one request refreshes the key set, the others don't fetch it again */
+    @Test
+    public void whileTheKeysAreRefreshed_otherRefreshesAreSkipped() throws Exception {
+        idp.givenThat(
+                get("/oidc/jwk")
+                        .willReturn(okJson(new JsonWebKeySet(key).toJson()).withFixedDelay(3000)));
+        ServiceClientTokenServices.ThrottledHttpsJwks jwks =
+                new ServiceClientTokenServices.ThrottledHttpsJwks(
+                        "http://localhost:" + idp.port() + "/oidc/jwk", 0);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> first =
+                    executor.submit(
+                            () -> {
+                                jwks.refresh();
+                                return null;
+                            });
+            awaitRequest("/oidc/jwk");
+
+            jwks.refresh();
+
+            first.get();
+            idp.verify(1, getRequestedFor(urlEqualTo("/oidc/jwk")));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /** The log says why a token was refused, once per reason */
+    @Test
+    public void refusalReasons() {
+        assertEquals(
+                "invalid token",
+                ServiceClientTokenServices.reasons(
+                        new InvalidJwtException("refused", Collections.emptyList(), null)));
+        assertEquals(
+                "wrong issuer, not signed, invalid token (code 999)",
+                ServiceClientTokenServices.reasons(
+                        new InvalidJwtException(
+                                "refused",
+                                Arrays.asList(
+                                        new ErrorCodeValidator.Error(ErrorCodes.ISSUER_MISSING, ""),
+                                        new ErrorCodeValidator.Error(ErrorCodes.ISSUER_INVALID, ""),
+                                        new ErrorCodeValidator.Error(
+                                                ErrorCodes.SIGNATURE_MISSING, ""),
+                                        new ErrorCodeValidator.Error(999, "")),
+                                null)));
     }
 }

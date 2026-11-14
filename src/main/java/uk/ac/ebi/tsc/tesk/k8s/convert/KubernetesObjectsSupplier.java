@@ -7,7 +7,9 @@ import com.google.gson.Gson;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.*;
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -15,6 +17,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.util.StreamUtils;
 import org.yaml.snakeyaml.Yaml;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 
@@ -36,6 +40,9 @@ public class KubernetesObjectsSupplier {
 
     private final V1PodSecurityContext securityContext;
 
+    /** The taskmaster's job template ({@code taskmaster.json}) */
+    private final String taskmasterTemplateJson;
+
     private static final String envConfigMap = "CONFIGMAP";
     private static final String envConfigMapNamespace = "CONFIGMAPNAMESPACE";
     private static final String envConfigMapKey = "CONFIGMAPKEY";
@@ -52,6 +59,10 @@ public class KubernetesObjectsSupplier {
         this.taskmasterEnvProperties = taskmasterEnvProperties;
         this.namespace = namespace;
         this.securityContext = createSecurityContext(coreApi, namespace);
+        try (InputStream template = new ClassPathResource("taskmaster.json").getInputStream()) {
+            this.taskmasterTemplateJson =
+                    StreamUtils.copyToString(template, StandardCharsets.UTF_8);
+        }
     }
 
     private static V1PodSecurityContext createSecurityContext(
@@ -112,78 +123,72 @@ public class KubernetesObjectsSupplier {
     @Bean
     @Scope(value = "prototype")
     public V1Job taskMasterTemplate() {
-        try (InputStream inputStream =
-                        getClass().getClassLoader().getResourceAsStream("taskmaster.json");
-                Reader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-            V1Job job = gson.fromJson(reader, V1Job.class);
-            job.getSpec()
-                    .getTemplate()
-                    .getSpec()
-                    .setServiceAccountName(this.taskmasterEnvProperties.getServiceAccountName());
-            V1Container taskmasterContainer =
-                    job.getSpec()
-                            .getTemplate()
-                            .getSpec()
-                            .getContainers()
-                            .get(0)
-                            .image(
-                                    new StringJoiner(":")
-                                            .add(taskmasterEnvProperties.getImageName())
-                                            .add(taskmasterEnvProperties.getImageVersion())
-                                            .toString())
-                            .addArgsItem("-n")
-                            .addArgsItem(namespace)
-                            .addArgsItem("-fn")
-                            .addArgsItem(this.taskmasterEnvProperties.getFilerImageName())
-                            .addArgsItem("-fv")
-                            .addArgsItem(this.taskmasterEnvProperties.getFilerImageVersion());
+        V1Job job = gson.fromJson(this.taskmasterTemplateJson, V1Job.class);
+        job.getSpec()
+                .getTemplate()
+                .getSpec()
+                .setServiceAccountName(this.taskmasterEnvProperties.getServiceAccountName());
+        V1Container taskmasterContainer =
+                job.getSpec()
+                        .getTemplate()
+                        .getSpec()
+                        .getContainers()
+                        .get(0)
+                        .image(
+                                new StringJoiner(":")
+                                        .add(taskmasterEnvProperties.getImageName())
+                                        .add(taskmasterEnvProperties.getImageVersion())
+                                        .toString())
+                        .addArgsItem("-n")
+                        .addArgsItem(namespace)
+                        .addArgsItem("-fn")
+                        .addArgsItem(this.taskmasterEnvProperties.getFilerImageName())
+                        .addArgsItem("-fv")
+                        .addArgsItem(this.taskmasterEnvProperties.getFilerImageVersion());
 
-            if (this.taskmasterEnvProperties.isDebug()) {
-                taskmasterContainer.addArgsItem("-d").setImagePullPolicy("Always");
-            }
-            job.getMetadata().putLabelsItem(LABEL_JOBTYPE_KEY, LABEL_JOBTYPE_VALUE_TASKM);
-            String taskMasterName = this.jobNameGenerator.getTaskMasterName();
-            new Job(job).changeJobName(taskMasterName);
-            Set<V1EnvVar> toBeRemoved = new HashSet<>();
-            List<V1EnvVar> containerEnvironment =
-                    job.getSpec().getTemplate().getSpec().getContainers().get(0).getEnv();
-            containerEnvironment.addAll(
-                    taskmasterEnvProperties.getEnvironment().entrySet().stream()
-                            .map(
-                                    e ->
-                                            new V1EnvVar()
-                                                    .name(
-                                                            e.getKey()
-                                                                    .toUpperCase()
-                                                                    .replaceAll("\\.", "_"))
-                                                    .value(e.getValue()))
-                            .collect(Collectors.toList()));
-            containerEnvironment.stream()
-                    .filter(
-                            env ->
-                                    FTP_SECRET_USERNAME_ENV.equals(env.getName())
-                                            || FTP_SECRET_PASSWORD_ENV.equals(env.getName()))
-                    .forEach(
-                            env -> {
-                                if (taskmasterEnvProperties.isFTPEnabled()) {
-                                    // update secret name, if FTP enabled
-                                    env.getValueFrom()
-                                            .getSecretKeyRef()
-                                            .setName(
-                                                    this.taskmasterEnvProperties
-                                                            .getFtp()
-                                                            .getSecretName());
-                                } else {
-                                    // remove FTP secrets otherwise
-                                    toBeRemoved.add(env);
-                                }
-                            });
-
-            toBeRemoved.stream().forEach(containerEnvironment::remove);
-            return job;
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
+        if (this.taskmasterEnvProperties.isDebug()) {
+            taskmasterContainer.addArgsItem("-d").setImagePullPolicy("Always");
         }
+        job.getMetadata().putLabelsItem(LABEL_JOBTYPE_KEY, LABEL_JOBTYPE_VALUE_TASKM);
+        String taskMasterName = this.jobNameGenerator.getTaskMasterName();
+        new Job(job).changeJobName(taskMasterName);
+        Set<V1EnvVar> toBeRemoved = new HashSet<>();
+        List<V1EnvVar> containerEnvironment =
+                job.getSpec().getTemplate().getSpec().getContainers().get(0).getEnv();
+        containerEnvironment.addAll(
+                taskmasterEnvProperties.getEnvironment().entrySet().stream()
+                        .map(
+                                e ->
+                                        new V1EnvVar()
+                                                .name(
+                                                        e.getKey()
+                                                                .toUpperCase()
+                                                                .replaceAll("\\.", "_"))
+                                                .value(e.getValue()))
+                        .collect(Collectors.toList()));
+        containerEnvironment.stream()
+                .filter(
+                        env ->
+                                FTP_SECRET_USERNAME_ENV.equals(env.getName())
+                                        || FTP_SECRET_PASSWORD_ENV.equals(env.getName()))
+                .forEach(
+                        env -> {
+                            if (taskmasterEnvProperties.isFTPEnabled()) {
+                                // update secret name, if FTP enabled
+                                env.getValueFrom()
+                                        .getSecretKeyRef()
+                                        .setName(
+                                                this.taskmasterEnvProperties
+                                                        .getFtp()
+                                                        .getSecretName());
+                            } else {
+                                // remove FTP secrets otherwise
+                                toBeRemoved.add(env);
+                            }
+                        });
+
+        toBeRemoved.stream().forEach(containerEnvironment::remove);
+        return job;
     }
 
     /**

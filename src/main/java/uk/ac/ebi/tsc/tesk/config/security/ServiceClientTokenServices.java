@@ -283,7 +283,8 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      * refresh interval: tokens (which may be forged, as the claims that select this path are read
      * before the signature is checked) are refused at once until then, so that they can't make
      * requests wait for the issuer one after another. While one request builds it, the others are
-     * refused at once too.
+     * refused at once too. A request that found no verifier just before another one finished
+     * building it uses that one.
      */
     private JwtConsumer verifier() throws IOException, JoseException {
         JwtConsumer consumer = this.verifier;
@@ -294,18 +295,21 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             throw new IOException("keys of the issuer are being fetched");
         }
         try {
-            if (this.verifier == null) {
-                if (System.currentTimeMillis() < this.discoveryRetryAt) {
-                    throw new IOException("fetching the keys failed recently");
-                }
-                try {
-                    this.verifier = buildVerifier(keyResolver());
-                } catch (IOException | JoseException | RuntimeException e) {
-                    this.discoveryRetryAt = System.currentTimeMillis() + this.jwksRefreshIntervalMs;
-                    throw e;
-                }
+            consumer = this.verifier;
+            if (consumer != null) {
+                return consumer;
             }
-            return this.verifier;
+            if (System.currentTimeMillis() < this.discoveryRetryAt) {
+                throw new IOException("fetching the keys failed recently");
+            }
+            try {
+                consumer = buildVerifier(keyResolver());
+            } catch (IOException | JoseException | RuntimeException e) {
+                this.discoveryRetryAt = System.currentTimeMillis() + this.jwksRefreshIntervalMs;
+                throw e;
+            }
+            this.verifier = consumer;
+            return consumer;
         } finally {
             this.buildLock.unlock();
         }
@@ -376,10 +380,8 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      */
     private String discoverJwksUri() throws IOException, JoseException {
         String url = this.issuer.replaceAll("/+$", "") + DISCOVERY_PATH;
+        // throws an IOException unless the status is 200
         SimpleResponse response = httpGet().get(url);
-        if (response.getStatusCode() != 200) {
-            throw new IOException("Discovery answered with status " + response.getStatusCode());
-        }
         Map<String, Object> document = JsonUtil.parseJson(response.getBody());
         Object jwks = document.get("jwks_uri");
         if (!this.issuer.equals(document.get("issuer")) || !(jwks instanceof String)) {
@@ -415,7 +417,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     }
 
     /** Why a token was refused, without the token or its claims */
-    private static String reasons(InvalidJwtException e) {
+    static String reasons(InvalidJwtException e) {
         List<String> reasons =
                 e.getErrorDetails().stream()
                         .map(ErrorCodeValidator.Error::getErrorCode)

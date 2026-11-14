@@ -134,15 +134,9 @@ public class CustomErrorHandler extends ResponseEntityExceptionHandler {
     @SuppressWarnings("unchecked")
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception ex, Object body, HttpHeaders headers, HttpStatus status, WebRequest request) {
-
-        if (request instanceof ServletWebRequest) {
-            ServletWebRequest servletRequest = (ServletWebRequest) request;
-            HttpServletRequest httpServletRequest =
-                    servletRequest.getNativeRequest(HttpServletRequest.class);
-            return (ResponseEntity<Object>)
-                    this.handleExceptionInternal(httpServletRequest, status);
-        }
-        return super.handleExceptionInternal(ex, null, headers, status, request);
+        // Spring MVC passes the requests of its exception handlers as ServletWebRequests
+        HttpServletRequest httpServletRequest = ((ServletWebRequest) request).getRequest();
+        return (ResponseEntity<Object>) this.handleExceptionInternal(httpServletRequest, status);
     }
 
     /**

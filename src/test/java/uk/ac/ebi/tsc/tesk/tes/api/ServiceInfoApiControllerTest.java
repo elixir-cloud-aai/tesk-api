@@ -29,7 +29,7 @@ public class ServiceInfoApiControllerTest {
         service.setUp();
         assertNotNull("built-in service-info.yaml could not be parsed", service.getServiceInfo());
         mvc =
-                MockMvcBuilders.standaloneSetup(new ServiceInfoApiController(null, service))
+                MockMvcBuilders.standaloneSetup(new ServiceInfoApiController(service))
                         .addPlaceholderValue(
                                 "openapi.taskExecutionService.base-path", "/ga4gh/tes/v1")
                         .build();
