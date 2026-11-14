@@ -363,6 +363,19 @@
                             <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
                         </configuration>
                     </execution>
+                    <!-- The report of the merged data, which Codecov receives (as the check, it
+                         counts a branch as covered if either suite covers it) -->
+                    <execution>
+                        <id>report-merged</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <outputDirectory>${project.reporting.outputDirectory}/jacoco-merged</outputDirectory>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>check</id>
                         <phase>verify</phase>

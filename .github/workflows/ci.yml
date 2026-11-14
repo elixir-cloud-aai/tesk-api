@@ -141,7 +141,9 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./target/site/jacoco/jacoco.xml,./target/site/jacoco-it/jacoco.xml
+          # the merged report of the unit and integration tests, as checked by
+          # `./mvnw verify` (separate reports can't combine branches of a line)
+          files: ./target/site/jacoco-merged/jacoco.xml
           fail_ci_if_error: ${{ github.event_name == 'push' && github.repository_owner == 'elixir-cloud-aai' }}
           verbose: true
 

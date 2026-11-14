@@ -4,7 +4,8 @@
 # branches; partly covered lines count as missed), as in the other
 # repositories of the organization. `./mvnw verify` fails before that already
 # (`check` of `jacoco-maven-plugin` in `pom.xml`, which also lists the
-# generated code that isn't measured)
+# generated code that isn't measured: those classes are left out of the
+# reports, so Codecov never sees them and needs no `ignore` of its own)
 coverage:
   status:
     project:

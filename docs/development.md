@@ -54,7 +54,7 @@ provider are mocked with WireMock, so no cluster is needed):
 The unit and integration tests together must cover all lines and branches:
 `./mvnw clean verify` fails otherwise (`check` of `jacoco-maven-plugin` in
 `pom.xml`, on the merged data of both in `target/jacoco-merged.exec`), and so
-does Codecov (`codecov.yml`), which CI sends the reports of both. Not measured
+does Codecov (`codecov.yml`), to which CI sends the merged report. Not measured
 are only:
 
 - the files that openapi-generator generates from the TES specification (listed
@@ -63,15 +63,12 @@ are only:
   controllers override. Keep the list in `pom.xml` the same as that file;
 - `TeskApplication`, whose `main` only starts Spring Boot, as the tests do.
 
-JaCoCo writes the reports of the unit tests to `target/site/jacoco/` and those
-of the integration tests to `target/site/jacoco-it/` (`index.html` for a
-browser, `jacoco.xml` for tools). To see what the two miss together, write a
-report of the merged data after `./mvnw clean verify` (it replaces the report
-of the unit tests):
-
-```bash
-./mvnw jacoco:report -Djacoco.dataFile=target/jacoco-merged.exec
-```
+JaCoCo writes the reports of the unit tests to `target/site/jacoco/`, those
+of the integration tests to `target/site/jacoco-it/`, and that of both
+together, which the check uses and CI sends to Codecov, to
+`target/site/jacoco-merged/` (`index.html` for a browser, `jacoco.xml` for
+tools). To see what the tests miss, open
+`target/site/jacoco-merged/index.html` after `./mvnw clean verify`.
 
 Cover new code with tests that check its behaviour, rather than excluding it;
 code that no test can reach is usually dead and can go.
