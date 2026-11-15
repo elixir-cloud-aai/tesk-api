@@ -3,9 +3,10 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Switches off spring security for all requests making all requests anonymous
@@ -14,15 +15,25 @@ import org.springframework.security.core.userdetails.UserDetailsService;
  */
 @Configuration
 @Profile("noauth")
-public class NoAuthConfiguration extends WebSecurityConfigurerAdapter {
-    public NoAuthConfiguration() {
-        super(true);
+public class NoAuthConfiguration {
+
+    /**
+     * Lets all requests in as anonymous, without Spring Security's other defaults (CSRF protection,
+     * security headers, sessions, request cache, logout), as before with {@code
+     * WebSecurityConfigurerAdapter(disableDefaults = true)}
+     */
+    @Bean
+    public SecurityFilterChain noAuthFilterChain(HttpSecurity http) throws Exception {
+        http.csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.disable())
+                .sessionManagement(session -> session.disable())
+                .requestCache(requestCache -> requestCache.disable())
+                .logout(logout -> logout.disable())
+                .anonymous(Customizer.withDefaults())
+                .authorizeHttpRequests(requests -> requests.anyRequest().permitAll());
+        return http.build();
     }
 
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.anonymous().and().authorizeRequests().anyRequest().permitAll();
-    }
     /**
      * Switches off default in memory user store containing one user with auto-generated password
      */

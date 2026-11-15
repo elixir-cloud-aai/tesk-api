@@ -1,16 +1,19 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
+import jakarta.servlet.DispatcherType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
-import org.springframework.boot.web.servlet.error.ErrorAttributes;
+import org.springframework.boot.http.converter.autoconfigure.ServerHttpMessageConvertersCustomizer;
+import org.springframework.boot.webmvc.error.ErrorAttributes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.http.converter.HttpMessageConverters;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.core.GrantedAuthorityDefaults;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -18,6 +21,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsAliasController;
 
 /**
  * With the auth profile, protects (all but the public) endpoints with OAuth2 bearer tokens, using
@@ -29,24 +33,26 @@ import org.springframework.security.web.SecurityFilterChain;
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
-@EnableGlobalMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity
 @Profile("auth")
 public class ResourceServerConfiguration {
 
-    // The API description, and the Swagger UI paths, which are only mapped (else 404) with
+    // The API description (/v3/api-docs, also as YAML, with its former path /v2/api-docs as an
+    // alias), and the Swagger UI paths, which are only mapped (else 404) with
     // tesk.api.swagger-ui.enabled
     private static final String[] ALLOWED_URLS = {
         "/",
-        "/v2/api-docs",
-        "/configuration/ui",
-        "/swagger-resources/**",
-        "/configuration/**",
+        ApiDocsAliasController.API_DOCS,
+        ApiDocsAliasController.API_DOCS + "/**",
+        ApiDocsAliasController.API_DOCS + ".yaml",
+        ApiDocsAliasController.ALIAS,
         "/swagger-ui/**",
         "/webjars/**"
     };
 
     private final ErrorAttributes errorAttributes;
-    private final HttpMessageConverters messageConverters;
+    private final ObjectProvider<ServerHttpMessageConvertersCustomizer>
+            messageConvertersCustomizers;
     private final AuthorisationProperties authorisationProperties;
     private final String baseUrl;
     private final boolean serviceInfoPublic;
@@ -54,14 +60,14 @@ public class ResourceServerConfiguration {
 
     public ResourceServerConfiguration(
             ErrorAttributes errorAttributes,
-            HttpMessageConverters messageConverters,
+            ObjectProvider<ServerHttpMessageConvertersCustomizer> messageConvertersCustomizers,
             AuthorisationProperties authorisationProperties,
             @Value("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}") String baseUrl,
             @Value("${tesk.api.service-info.public:true}") boolean serviceInfoPublic,
             @Value("${security.oauth2.resource.user-info-uri:}") String userInfoUri) {
 
         this.errorAttributes = errorAttributes;
-        this.messageConverters = messageConverters;
+        this.messageConvertersCustomizers = messageConvertersCustomizers;
         this.authorisationProperties = authorisationProperties;
         this.baseUrl = baseUrl;
         this.serviceInfoPublic = serviceInfoPublic;
@@ -84,28 +90,34 @@ public class ResourceServerConfiguration {
         }
         String[] allowedUrlsArray = allowedUrls.toArray(new String[0]);
         AuthenticationEntryPoint entryPoint =
-                new CustomAuthenticationEntryPoint(errorAttributes, messageConverters);
-        http.csrf()
-                .disable()
-                .sessionManagement()
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                .and()
-                .authorizeRequests()
-                .antMatchers(HttpMethod.GET, allowedUrlsArray)
-                .permitAll()
-                .antMatchers(HttpMethod.HEAD, allowedUrlsArray)
-                .permitAll()
-                .anyRequest()
-                .authenticated()
-                .and()
-                .exceptionHandling()
-                .authenticationEntryPoint(entryPoint)
-                .and()
-                .oauth2ResourceServer()
-                .authenticationEntryPoint(entryPoint)
-                .opaqueToken()
-                .introspector(introspector)
-                .authenticationConverter(AuthenticatedUser::toAuthentication);
+                new CustomAuthenticationEntryPoint(
+                        errorAttributes, serverMessageConverters(messageConvertersCustomizers));
+        http.csrf(csrf -> csrf.disable())
+                .sessionManagement(
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(
+                        requests ->
+                                // Error dispatches (to /error) aren't authorised again, as before
+                                requests.dispatcherTypeMatchers(DispatcherType.ERROR)
+                                        .permitAll()
+                                        .requestMatchers(HttpMethod.GET, allowedUrlsArray)
+                                        .permitAll()
+                                        .requestMatchers(HttpMethod.HEAD, allowedUrlsArray)
+                                        .permitAll()
+                                        .anyRequest()
+                                        .authenticated())
+                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(entryPoint))
+                .oauth2ResourceServer(
+                        resourceServer ->
+                                resourceServer
+                                        .authenticationEntryPoint(entryPoint)
+                                        .opaqueToken(
+                                                opaqueToken ->
+                                                        opaqueToken
+                                                                .introspector(introspector)
+                                                                .authenticationConverter(
+                                                                        AuthenticatedUser
+                                                                                ::toAuthentication)));
         return http.build();
     }
 
@@ -129,6 +141,18 @@ public class ResourceServerConfiguration {
             return new ServiceClientTokenServices(userInfoIntrospector, authorisationProperties);
         }
         return userInfoIntrospector;
+    }
+
+    /**
+     * The message converters of Spring MVC, as Spring Boot configures them (e.g. Jackson with the
+     * {@code spring.jackson.*} settings), for the error responses written outside of Spring MVC
+     */
+    static HttpMessageConverters serverMessageConverters(
+            ObjectProvider<ServerHttpMessageConvertersCustomizer> customizers) {
+        HttpMessageConverters.ServerBuilder builder =
+                HttpMessageConverters.forServer().registerDefaults();
+        customizers.orderedStream().forEach(customizer -> customizer.customize(builder));
+        return builder.build();
     }
 
     /** Magic, that changes default role prefix from ROLE_ to (...)elixir: */

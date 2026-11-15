@@ -13,7 +13,11 @@ Method | Path | Operation
 `GET` | `/tasks/{id}` | Get a task
 `POST` | `/tasks/{id}:cancel` | Cancel a task (answers with an empty object, `{}`)
 
-The API description (OpenAPI 2.0) is at `/v2/api-docs`.
+The API description (OpenAPI 3.1) is at `/v3/api-docs` (JSON) and
+`/v3/api-docs.yaml` (YAML). `/v2/api-docs`
+serves the same description, for clients of releases before 2.0.0 (which
+served Swagger 2.0 there); it is deprecated and will be removed in a later
+release (see [Upgrading](upgrading.md#to-200)).
 
 With the `auth` profile, all endpoints need a valid access token, except the
 API description, the Swagger UI (if it is on) and, unless
@@ -307,7 +311,7 @@ The Swagger UI lists the endpoints and lets you try them, also with a token
 from its built-in OpenID Connect client (see [Access
 control](access-control.md#built-in-client)). It is off by default; set
 `TESK_API_SWAGGER_UI_ENABLED` to `true` to serve it, with its static
-resources and its configuration (`/swagger-resources`), at
+resources and its configuration (`/v3/api-docs/swagger-config`), at
 `/swagger-ui/index.html`, to which the root path (`/`) then redirects (see
 [Configuration](configuration.md)). While it is off, these paths answer `404
 Not Found`.

@@ -4,11 +4,10 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-import javax.validation.Valid;
-import javax.validation.constraints.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_MESSAGE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
@@ -16,8 +15,8 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
 /**
  * Input describes Task input files.
  */
-@ApiModel(description = "Input describes Task input files.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@Schema(description = "Input describes Task input files.")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesInput   {
   @JsonProperty("name")
   private String name;
@@ -49,7 +48,7 @@ public class TesInput   {
    * Get name
    * @return name
   */
-  @ApiModelProperty(value = "")
+  @Schema()
 
 
   public String getName() {
@@ -69,7 +68,7 @@ public class TesInput   {
    * Get description
    * @return description
   */
-  @ApiModelProperty(value = "")
+  @Schema()
 
 
   public String getDescription() {
@@ -89,7 +88,7 @@ public class TesInput   {
    * REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file
    * @return url
   */
-  @ApiModelProperty(example = "s3://<CHANGE_THIS>/file1", value = "REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file")
+  @Schema(description = "REQUIRED, unless \"content\" is set.  URL in long term storage, for example:  - s3://my-object-store/file1  - gs://my-bucket/file2  - file:///path/to/my/file  - /path/to/my/file", example = "s3://<CHANGE_THIS>/file1")
 
 
   public String getUrl() {
@@ -109,7 +108,7 @@ public class TesInput   {
    * Path of the file inside the container. Must be an absolute path.
    * @return path
   */
-  @ApiModelProperty(example = "/data/file1", required = true, value = "Path of the file inside the container. Must be an absolute path.")
+  @Schema(description = "Path of the file inside the container. Must be an absolute path.", requiredMode = Schema.RequiredMode.REQUIRED, example = "/data/file1")
   @NotNull
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
   @NotBlank
@@ -131,7 +130,7 @@ public class TesInput   {
    * downloaded before the executors start.
    * @return streamable
   */
-  @ApiModelProperty(value = "Whether the input may be streamed instead of downloaded; a hint that TESK ignores, as TES allows.")
+  @Schema(description = "Whether the input may be streamed instead of downloaded; a hint that TESK ignores, as TES allows.")
   public Boolean getStreamable() {
     return streamable;
   }
@@ -149,9 +148,7 @@ public class TesInput   {
    * Get type
    * @return type
   */
-  @ApiModelProperty(
-      value = "FILE if left out or null; directories need DIRECTORY",
-      allowableValues = "DIRECTORY,FILE")
+  @Schema(description = "FILE if left out or null; directories need DIRECTORY", requiredMode = Schema.RequiredMode.NOT_REQUIRED, allowableValues = {"DIRECTORY", "FILE"})
   @NotNull
 
   @Valid
@@ -179,7 +176,7 @@ public class TesInput   {
    * File content literal.  Implementations should support a minimum of 128 KiB in this field and may define their own maximum.  UTF-8 encoded  If content is not empty, \"url\" must be ignored.
    * @return content
   */
-  @ApiModelProperty(value = "File content literal.  Implementations should support a minimum of 128 KiB in this field and may define their own maximum.  UTF-8 encoded  If content is not empty, \"url\" must be ignored.")
+  @Schema(description = "File content literal.  Implementations should support a minimum of 128 KiB in this field and may define their own maximum.  UTF-8 encoded  If content is not empty, \"url\" must be ignored.")
 
 
   public String getContent() {

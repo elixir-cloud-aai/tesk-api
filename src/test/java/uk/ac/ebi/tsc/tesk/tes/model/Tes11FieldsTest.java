@@ -7,9 +7,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collections;
 import org.junit.Test;
+import tools.jackson.databind.ObjectMapper;
 
 /** The task fields that TES 1.1 added (TESK#276) */
 public class Tes11FieldsTest {

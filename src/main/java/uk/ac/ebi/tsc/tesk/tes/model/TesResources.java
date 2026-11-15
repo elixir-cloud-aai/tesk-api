@@ -5,21 +5,20 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.validation.Valid;
-import javax.validation.constraints.AssertTrue;
-import javax.validation.constraints.DecimalMin;
-import javax.validation.constraints.Digits;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 
 /**
  * Resources describes the resources requested by a task.
  */
-@ApiModel(description = "Resources describes the resources requested by a task.", value="tesResources")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@Schema(name = "tesResources", description = "Resources describes the resources requested by a task.")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class TesResources   {
   @JsonProperty("cpu_cores")
@@ -54,7 +53,7 @@ public class TesResources   {
    * (e.g. 0.5), which it requests from Kubernetes as such, and writes the number back as given
    * @return cpuCores
   */
-  @ApiModelProperty(example = "4", value = "Requested number of CPUs (TESK also accepts decimal numbers, e.g. 0.5)")
+  @Schema(description = "Requested number of CPUs (TESK also accepts decimal numbers, e.g. 0.5)", example = "4")
   //at most 999999.999: Kubernetes counts CPU in steps of 1m; bounds the number before it is converted
   @Digits(integer = 6, fraction = 3)
   //positive: zero or negative numbers are refused (issue #128)
@@ -92,7 +91,7 @@ public class TesResources   {
    * Define if the task is allowed to run on preemptible compute instances, for example, AWS Spot. This option may have no effect when utilized on some backends that don't have the concept of preemptible jobs.
    * @return preemptible
   */
-  @ApiModelProperty(example = "false", value = "Define if the task is allowed to run on preemptible compute instances, for example, AWS Spot. This option may have no effect when utilized on some backends that don't have the concept of preemptible jobs.")
+  @Schema(description = "Define if the task is allowed to run on preemptible compute instances, for example, AWS Spot. This option may have no effect when utilized on some backends that don't have the concept of preemptible jobs.", example = "false")
 
 
   public Boolean getPreemptible() {
@@ -112,7 +111,7 @@ public class TesResources   {
    * Requested RAM required in gigabytes (GB)
    * @return ramGb
   */
-  @ApiModelProperty(example = "8", value = "Requested RAM required in gigabytes (GB)")
+  @Schema(description = "Requested RAM required in gigabytes (GB)", example = "8")
   //positive, at least the smallest amount that TESK API requests from Kubernetes: it rounds
   //RAM to 6 decimals, see TesKubernetesConverter (issue #128)
   @DecimalMin(value = "0.000001")
@@ -134,7 +133,7 @@ public class TesResources   {
    * Requested disk size in gigabytes (GB)
    * @return diskGb
   */
-  @ApiModelProperty(example = "40", value = "Requested disk size in gigabytes (GB)")
+  @Schema(description = "Requested disk size in gigabytes (GB)", example = "40")
   //positive: zero or negative numbers are refused (issue #128)
   @DecimalMin(value = "0", inclusive = false)
 
@@ -155,7 +154,7 @@ public class TesResources   {
    * Key-value pairs for the backend; TESK supports no keys, so it doesn't store them
    * @return backendParameters
   */
-  @ApiModelProperty(value = "Key-value pairs for the backend. TESK supports no keys: it ignores them, logs a warning naming them, and neither stores nor returns them.")
+  @Schema(description = "Key-value pairs for the backend. TESK supports no keys: it ignores them, logs a warning naming them, and neither stores nor returns them.")
 
 
   public Map<String, String> getBackendParameters() {
@@ -175,7 +174,7 @@ public class TesResources   {
    * Whether the task must be refused if the backend doesn't support all its backend parameters
    * @return backendParametersStrict
   */
-  @ApiModelProperty(value = "Whether the task must be refused if the backend doesn't support all of its backend_parameters.")
+  @Schema(description = "Whether the task must be refused if the backend doesn't support all of its backend_parameters.")
 
 
   public Boolean getBackendParametersStrict() {
@@ -216,7 +215,7 @@ public class TesResources   {
    * Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.
    * @return zones
   */
-  @ApiModelProperty(example = "[\"us-west-1\"]", value = "Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.")
+  @Schema(description = "Request that the task be run in these compute zones. How this string is utilized will be dependent on the backend system. For example, a system based on a cluster queueing system may use this string to define priorty queue to which the job is assigned.", example = "[\"us-west-1\"]")
 
 
   public List<String> getZones() {

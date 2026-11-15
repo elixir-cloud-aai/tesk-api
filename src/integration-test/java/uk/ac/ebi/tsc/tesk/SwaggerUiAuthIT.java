@@ -11,9 +11,9 @@ import io.kubernetes.client.util.Config;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
@@ -57,5 +57,11 @@ public class SwaggerUiAuthIT {
     @Test
     public void apiDocsWithoutToken_isOk() throws Exception {
         this.mvc.perform(get(API_DOCS_URL)).andExpect(status().isOk());
+    }
+
+    /** The API description in YAML (springdoc) is as public as the JSON one */
+    @Test
+    public void apiDocsYamlWithoutToken_isOk() throws Exception {
+        this.mvc.perform(get(API_DOCS_URL + ".yaml")).andExpect(status().isOk());
     }
 }

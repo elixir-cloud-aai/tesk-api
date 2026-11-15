@@ -27,9 +27,9 @@ import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.config.security.User;
@@ -45,9 +45,9 @@ public class KubernetesClientWrapperTest {
     @Value("${tesk.api.k8s.namespace}")
     private String namespace;
 
-    @MockBean private BatchV1Api batchApi;
+    @MockitoBean private BatchV1Api batchApi;
 
-    @MockBean private CoreV1Api coreApi;
+    @MockitoBean private CoreV1Api coreApi;
 
     private KubernetesClientWrapper wrapper;
 

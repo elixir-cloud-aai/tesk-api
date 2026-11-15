@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -18,12 +19,14 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,6 +50,8 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 public class AuthIT {
 
     @Autowired private MockMvc mvc;
+
+    @Autowired private UserDetailsService userDetailsService;
 
     @Rule public WireMockRule mockElixir = new WireMockRule(8090);
 
@@ -709,6 +714,15 @@ public class AuthIT {
         this.mvc.perform(get(SERVICE_INFO_URL)).andExpect(status().isOk());
     }
 
+    /**
+     * With a trailing slash, which the app ignores (TrailingSlashConfiguration), service info needs
+     * a token, as before: the public paths are checked as they are sent
+     */
+    @Test
+    public void serviceInfo_withTrailingSlash_needsToken() throws Exception {
+        this.mvc.perform(get(SERVICE_INFO_URL + "/")).andExpect(status().isUnauthorized());
+    }
+
     @Test
     public void public_serviceInfo_withValidToken_isOk() throws Exception {
         mockElixir.givenThat(
@@ -841,5 +855,15 @@ public class AuthIT {
                 .perform(get(TASK_URL + "?view=FULL").header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tasks.length()").value(expectedLength));
+    }
+
+    /**
+     * Spring Boot's in-memory user store (with a generated password) is replaced by one without
+     * users
+     */
+    @Test
+    public void userStore_hasNoUsers() {
+        assertThat(userDetailsService).isNotInstanceOf(InMemoryUserDetailsManager.class);
+        assertThat(userDetailsService.loadUserByUsername("user")).isNull();
     }
 }

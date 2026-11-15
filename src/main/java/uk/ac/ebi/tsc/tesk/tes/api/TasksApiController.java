@@ -1,10 +1,11 @@
 package uk.ac.ebi.tsc.tesk.tes.api;
 
-import io.swagger.annotations.ApiParam;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.propertyeditors.StringArrayPropertyEditor;
 import org.springframework.http.HttpStatus;
@@ -25,7 +26,7 @@ import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.service.TaskFilter;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
-@javax.annotation.Generated(
+@jakarta.annotation.Generated(
         value = "io.swagger.codegen.languages.SpringCodegen",
         date = "2017-11-07T14:45:12.993Z")
 @Controller
@@ -56,7 +57,7 @@ public class TasksApiController implements TasksApi {
     }
 
     public ResponseEntity<Object> cancelTask(
-            @ApiParam(value = "", required = true) @PathVariable("id") String id) {
+            @Parameter(required = true) @PathVariable("id") String id) {
         // getTask - for authZ purposes (cancellation only possible for the same tasks, a user can
         // actually see
         this.tesService.getTask(id, TaskView.MINIMAL, getUser());
@@ -66,18 +67,20 @@ public class TasksApiController implements TasksApi {
     }
 
     public ResponseEntity<TesCreateTaskResponse> createTask(
-            @ApiParam(value = "", required = true) @Valid @RequestBody TesTask body) {
+            @Parameter(required = true) @Valid @RequestBody TesTask body) {
         TesCreateTaskResponse response = this.tesService.createTask(body, this.getUser());
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     public ResponseEntity<TesTask> getTask(
-            @ApiParam(value = "", required = true) @PathVariable("id") String id,
-            @ApiParam(
-                            value =
+            @Parameter(required = true) @PathVariable("id") String id,
+            @Parameter(
+                            description =
                                     "OPTIONAL. Affects the fields included in the returned Task messages. See TaskView below.   - MINIMAL: Task message will include ONLY the fields:   Task.Id   Task.State  - BASIC: Task message will include all fields EXCEPT:   Task.ExecutorLog.stdout   Task.ExecutorLog.stderr   Input.content   TaskLog.system_logs  - FULL: Task message includes all fields.",
-                            allowableValues = "MINIMAL, BASIC, FULL",
-                            defaultValue = "MINIMAL")
+                            schema =
+                                    @Schema(
+                                            allowableValues = {"MINIMAL", "BASIC", "FULL"},
+                                            defaultValue = "MINIMAL"))
                     @RequestParam(value = "view", required = false, defaultValue = "MINIMAL")
                     String view) {
 
@@ -90,46 +93,48 @@ public class TasksApiController implements TasksApi {
     }
 
     public ResponseEntity<TesListTasksResponse> listTasks(
-            @ApiParam(
-                            value =
+            @Parameter(
+                            description =
                                     "OPTIONAL. Filter the list to include tasks where the name matches this prefix. If unspecified, no task name filtering is done.")
                     @RequestParam(value = "name_prefix", required = false)
                     String namePrefix,
-            @ApiParam(
-                            value =
+            @Parameter(
+                            description =
                                     "OPTIONAL. Filter tasks by state. Other values than those of tesState give 400 Bad Request. Pages can be shorter, also with state.")
                     @RequestParam(value = "state", required = false)
                     TesState state,
-            @ApiParam(
-                            value =
+            @Parameter(
+                            description =
                                     "OPTIONAL. Filter tasks by tags: a task must have each tag_key, with the tag_value of the same position; a key without a value, or with an empty one, matches any value. Repeat the parameter for more tags. Pages can be shorter, also with tags.")
                     @RequestParam(value = "tag_key", required = false)
                     String[] tagKey,
-            @ApiParam(
-                            value =
+            @Parameter(
+                            description =
                                     "OPTIONAL. The values of the tags in tag_key, in the same order. More values than keys give 400 Bad Request.")
                     @RequestParam(value = "tag_value", required = false)
                     String[] tagValue,
-            @ApiParam(
-                            example = "256",
-                            value =
+            @Parameter(
+                            description =
                                     "OPTIONAL. Number of tasks to return in one page, from 1 to "
                                             + MAX_PAGE_SIZE
                                             + ". Defaults to "
                                             + DEFAULT_PAGE_SIZE
-                                            + ". Pages can be shorter, also with name_prefix.")
+                                            + ". Pages can be shorter, also with name_prefix.",
+                            example = "256")
                     @RequestParam(value = "page_size", required = false)
                     Long pageSize,
-            @ApiParam(
-                            value =
+            @Parameter(
+                            description =
                                     "OPTIONAL. Page token is used to retrieve the next page of results. If unspecified, returns the first page of results. See ListTasksResponse.next_page_token")
                     @RequestParam(value = "page_token", required = false)
                     String pageToken,
-            @ApiParam(
-                            value =
+            @Parameter(
+                            description =
                                     "OPTIONAL. Affects the fields included in the returned Task messages. See TaskView below.   - MINIMAL: Task message will include ONLY the fields:   Task.Id   Task.State  - BASIC: Task message will include all fields EXCEPT:   Task.ExecutorLog.stdout   Task.ExecutorLog.stderr   Input.content   TaskLog.system_logs  - FULL: Task message includes all fields.",
-                            allowableValues = "MINIMAL, BASIC, FULL",
-                            defaultValue = "MINIMAL")
+                            schema =
+                                    @Schema(
+                                            allowableValues = {"MINIMAL", "BASIC", "FULL"},
+                                            defaultValue = "MINIMAL"))
                     @RequestParam(value = "view", required = false, defaultValue = "MINIMAL")
                     String view) {
 

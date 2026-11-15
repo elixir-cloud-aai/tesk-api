@@ -3,8 +3,7 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,13 +11,13 @@ import uk.ac.ebi.tsc.tesk.tes.model.Service;
 import uk.ac.ebi.tsc.tesk.tes.model.ServiceOrganization;
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfoAllOf;
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceType;
-import javax.validation.Valid;
-import javax.validation.constraints.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 /**
  * TesServiceInfo
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-04-12T17:49:13.631+01:00[Europe/London]")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-04-12T17:49:13.631+01:00[Europe/London]")
 public class TesServiceInfo   {
   @JsonProperty("id")
   private String id;
@@ -72,7 +71,7 @@ public class TesServiceInfo   {
    * Unique ID of this service. Reverse domain name notation is recommended, though not required. The identifier should attempt to be globally unique so it can be used in downstream aggregator services e.g. Service Registry.
    * @return id
   */
-  @ApiModelProperty(example = "org.ga4gh.myservice", required = true, value = "Unique ID of this service. Reverse domain name notation is recommended, though not required. The identifier should attempt to be globally unique so it can be used in downstream aggregator services e.g. Service Registry.")
+  @Schema(description = "Unique ID of this service. Reverse domain name notation is recommended, though not required. The identifier should attempt to be globally unique so it can be used in downstream aggregator services e.g. Service Registry.", requiredMode = Schema.RequiredMode.REQUIRED, example = "org.ga4gh.myservice")
   @NotNull
 
 
@@ -93,7 +92,7 @@ public class TesServiceInfo   {
    * Name of this service. Should be human readable.
    * @return name
   */
-  @ApiModelProperty(example = "My project", required = true, value = "Name of this service. Should be human readable.")
+  @Schema(description = "Name of this service. Should be human readable.", requiredMode = Schema.RequiredMode.REQUIRED, example = "My project")
   @NotNull
 
 
@@ -114,7 +113,7 @@ public class TesServiceInfo   {
    * Get type
    * @return type
   */
-  @ApiModelProperty(required = true, value = "")
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   @NotNull
 
   @Valid
@@ -136,7 +135,7 @@ public class TesServiceInfo   {
    * Description of the service. Should be human readable and provide information about the service.
    * @return description
   */
-  @ApiModelProperty(example = "This service provides...", value = "Description of the service. Should be human readable and provide information about the service.")
+  @Schema(description = "Description of the service. Should be human readable and provide information about the service.", example = "This service provides...")
 
 
   public String getDescription() {
@@ -156,7 +155,7 @@ public class TesServiceInfo   {
    * Get organization
    * @return organization
   */
-  @ApiModelProperty(required = true, value = "")
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
   @NotNull
 
   @Valid
@@ -178,7 +177,7 @@ public class TesServiceInfo   {
    * URL of the contact for the provider of this service, e.g. a link to a contact form (RFC 3986 format), or an email (RFC 2368 format).
    * @return contactUrl
   */
-  @ApiModelProperty(example = "mailto:support@example.com", value = "URL of the contact for the provider of this service, e.g. a link to a contact form (RFC 3986 format), or an email (RFC 2368 format).")
+  @Schema(description = "URL of the contact for the provider of this service, e.g. a link to a contact form (RFC 3986 format), or an email (RFC 2368 format).", example = "mailto:support@example.com")
 
 
   public String getContactUrl() {
@@ -198,7 +197,7 @@ public class TesServiceInfo   {
    * URL of the documentation of this service (RFC 3986 format). This should help someone learn how to use your service, including any specifics required to access data, e.g. authentication.
    * @return documentationUrl
   */
-  @ApiModelProperty(example = "https://docs.myservice.example.com", value = "URL of the documentation of this service (RFC 3986 format). This should help someone learn how to use your service, including any specifics required to access data, e.g. authentication.")
+  @Schema(description = "URL of the documentation of this service (RFC 3986 format). This should help someone learn how to use your service, including any specifics required to access data, e.g. authentication.", example = "https://docs.myservice.example.com")
 
 
   public String getDocumentationUrl() {
@@ -218,7 +217,7 @@ public class TesServiceInfo   {
    * Timestamp describing when the service was first deployed and available (RFC 3339 format)
    * @return createdAt
   */
-  @ApiModelProperty(example = "2019-06-04T12:58:19Z", value = "Timestamp describing when the service was first deployed and available (RFC 3339 format)")
+  @Schema(description = "Timestamp describing when the service was first deployed and available (RFC 3339 format)", example = "2019-06-04T12:58:19Z")
 
   @Valid
 
@@ -239,7 +238,7 @@ public class TesServiceInfo   {
    * Timestamp describing when the service was last updated (RFC 3339 format)
    * @return updatedAt
   */
-  @ApiModelProperty(example = "2019-06-04T12:58:19Z", value = "Timestamp describing when the service was last updated (RFC 3339 format)")
+  @Schema(description = "Timestamp describing when the service was last updated (RFC 3339 format)", example = "2019-06-04T12:58:19Z")
 
   @Valid
 
@@ -260,7 +259,7 @@ public class TesServiceInfo   {
    * Environment the service is running in. Use this to distinguish between production, development and testing/staging deployments. Suggested values are prod, test, dev, staging. However this is advised and not enforced.
    * @return environment
   */
-  @ApiModelProperty(example = "test", value = "Environment the service is running in. Use this to distinguish between production, development and testing/staging deployments. Suggested values are prod, test, dev, staging. However this is advised and not enforced.")
+  @Schema(description = "Environment the service is running in. Use this to distinguish between production, development and testing/staging deployments. Suggested values are prod, test, dev, staging. However this is advised and not enforced.", example = "test")
 
 
   public String getEnvironment() {
@@ -280,7 +279,7 @@ public class TesServiceInfo   {
    * Version of the service being described. Semantic versioning is recommended, but other identifiers, such as dates or commit hashes, are also allowed. The version should be changed whenever the service is updated.
    * @return version
   */
-  @ApiModelProperty(example = "1.0.0", required = true, value = "Version of the service being described. Semantic versioning is recommended, but other identifiers, such as dates or commit hashes, are also allowed. The version should be changed whenever the service is updated.")
+  @Schema(description = "Version of the service being described. Semantic versioning is recommended, but other identifiers, such as dates or commit hashes, are also allowed. The version should be changed whenever the service is updated.", requiredMode = Schema.RequiredMode.REQUIRED, example = "1.0.0")
   @NotNull
 
 
@@ -309,7 +308,7 @@ public class TesServiceInfo   {
    * Lists some, but not necessarily all, storage locations supported by the service.
    * @return storage
   */
-  @ApiModelProperty(example = "[\"file:///path/to/local/funnel-storage\",\"s3://ohsu-compbio-funnel/storage\"]", value = "Lists some, but not necessarily all, storage locations supported by the service.")
+  @Schema(description = "Lists some, but not necessarily all, storage locations supported by the service.", example = "[\"file:///path/to/local/funnel-storage\",\"s3://ohsu-compbio-funnel/storage\"]")
 
 
   public List<String> getStorage() {
@@ -331,7 +330,7 @@ public class TesServiceInfo   {
    * (see {@code ServiceInfoService}).
    * @return tesResourcesBackendParameters
   */
-  @ApiModelProperty(example = "[\"VmSize\"]", value = "Lists all tesResources.backend_parameters keys supported by the service")
+  @Schema(description = "Lists all tesResources.backend_parameters keys supported by the service", example = "[\"VmSize\"]")
 
 
   public List<String> getTesResourcesBackendParameters() {

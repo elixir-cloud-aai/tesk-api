@@ -2,14 +2,13 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.validation.Valid;
-import javax.validation.constraints.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_MESSAGE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
@@ -17,8 +16,8 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
 /**
  * Task describes an instance of a task.
  */
-@ApiModel(description = "Task describes an instance of a task.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@Schema(description = "Task describes an instance of a task.")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesTask   {
   @JsonProperty("id")
   private String id;
@@ -72,7 +71,7 @@ public class TesTask   {
    * Task identifier assigned by the server.
    * @return id
   */
-  @ApiModelProperty(example = "job-0012345", readOnly = true, value = "Task identifier assigned by the server.")
+  @Schema(description = "Task identifier assigned by the server.", accessMode = Schema.AccessMode.READ_ONLY, example = "job-0012345")
 
 
   public String getId() {
@@ -92,7 +91,7 @@ public class TesTask   {
    * Get state
    * @return state
   */
-  @ApiModelProperty(value = "")
+  @Schema()
 
   @Valid
 
@@ -113,7 +112,7 @@ public class TesTask   {
    * User-provided task name.
    * @return name
   */
-  @ApiModelProperty(value = "User-provided task name.")
+  @Schema(description = "User-provided task name.")
 
 
   public String getName() {
@@ -133,7 +132,7 @@ public class TesTask   {
    * Optional user-provided description of task for documentation purposes.
    * @return description
   */
-  @ApiModelProperty(value = "Optional user-provided description of task for documentation purposes.")
+  @Schema(description = "Optional user-provided description of task for documentation purposes.")
 
 
   public String getDescription() {
@@ -161,7 +160,7 @@ public class TesTask   {
    * Input files that will be used by the task. Inputs will be downloaded and mounted into the executor container as defined by the task request document.
    * @return inputs
   */
-  @ApiModelProperty(example = "[{\"url\":\"s3://<CHANGE_THIS>/file1\",\"path\":\"/data/file1\"}]", value = "Input files that will be used by the task. Inputs will be downloaded and mounted into the executor container as defined by the task request document.")
+  @Schema(description = "Input files that will be used by the task. Inputs will be downloaded and mounted into the executor container as defined by the task request document.", example = "[{\"url\":\"s3://<CHANGE_THIS>/file1\",\"path\":\"/data/file1\"}]")
 
   @Valid
 
@@ -190,7 +189,7 @@ public class TesTask   {
    * Output files. Outputs will be uploaded from the executor container to long-term storage.
    * @return outputs
   */
-  @ApiModelProperty(example = "[{\"path\":\"/data/outfile\",\"url\":\"s3://<CHANGE_THIS>/outfile-1\",\"type\":\"FILE\"}]", value = "Output files. Outputs will be uploaded from the executor container to long-term storage.")
+  @Schema(description = "Output files. Outputs will be uploaded from the executor container to long-term storage.", example = "[{\"path\":\"/data/outfile\",\"url\":\"s3://<CHANGE_THIS>/outfile-1\",\"type\":\"FILE\"}]")
 
   @Valid
 
@@ -211,7 +210,7 @@ public class TesTask   {
    * Get resources
    * @return resources
   */
-  @ApiModelProperty(value = "")
+  @Schema()
 
   @Valid
 
@@ -240,7 +239,7 @@ public class TesTask   {
    * An array of executors to be run. Each of the executors will run one at a time sequentially. Each executor is a different command that will be run, and each can utilize a different docker image. But each of the executors will see the same mapped inputs and volumes that are declared in the parent CreateTask message.  Execution stops on the first error.
    * @return executors
   */
-  @ApiModelProperty(required = true, value = "An array of executors to be run. Each of the executors will run one at a time sequentially. Each executor is a different command that will be run, and each can utilize a different docker image. But each of the executors will see the same mapped inputs and volumes that are declared in the parent CreateTask message.  Execution stops on the first error.")
+  @Schema(description = "An array of executors to be run. Each of the executors will run one at a time sequentially. Each executor is a different command that will be run, and each can utilize a different docker image. But each of the executors will see the same mapped inputs and volumes that are declared in the parent CreateTask message.  Execution stops on the first error.", requiredMode = Schema.RequiredMode.REQUIRED)
   @NotNull
   @NotEmpty
   @Valid
@@ -270,7 +269,7 @@ public class TesTask   {
    * Volumes are directories which may be used to share data between Executors. Volumes are initialized as empty directories by the system when the task starts and are mounted at the same path in each Executor.  For example, given a volume defined at `/vol/A`, executor 1 may write a file to `/vol/A/exec1.out.txt`, then executor 2 may read from that file.  (Essentially, this translates to a `docker run -v` flag where the container path is the same for each executor).
    * @return volumes
   */
-  @ApiModelProperty(example = "[\"/vol/A/\"]", value = "Volumes are directories which may be used to share data between Executors. Volumes are initialized as empty directories by the system when the task starts and are mounted at the same path in each Executor.  For example, given a volume defined at `/vol/A`, executor 1 may write a file to `/vol/A/exec1.out.txt`, then executor 2 may read from that file.  (Essentially, this translates to a `docker run -v` flag where the container path is the same for each executor).")
+  @Schema(description = "Volumes are directories which may be used to share data between Executors. Volumes are initialized as empty directories by the system when the task starts and are mounted at the same path in each Executor.  For example, given a volume defined at `/vol/A`, executor 1 may write a file to `/vol/A/exec1.out.txt`, then executor 2 may read from that file.  (Essentially, this translates to a `docker run -v` flag where the container path is the same for each executor).", example = "[\"/vol/A/\"]")
 
 
   public List<@Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE) String> getVolumes() {
@@ -298,7 +297,7 @@ public class TesTask   {
    * A key-value map of arbitrary tags. These can be used to store meta-data and annotations about a task. Example: ``` {   \"tags\" : {       \"WORKFLOW_ID\" : \"cwl-01234\",       \"PROJECT_GROUP\" : \"alice-lab\"   } } ```
    * @return tags
   */
-  @ApiModelProperty(example = "{\"WORKFLOW_ID\":\"cwl-01234\",\"PROJECT_GROUP\":\"alice-lab\"}", value = "A key-value map of arbitrary tags. These can be used to store meta-data and annotations about a task. Example: ``` {   \"tags\" : {       \"WORKFLOW_ID\" : \"cwl-01234\",       \"PROJECT_GROUP\" : \"alice-lab\"   } } ```")
+  @Schema(description = "A key-value map of arbitrary tags. These can be used to store meta-data and annotations about a task. Example: ``` {   \"tags\" : {       \"WORKFLOW_ID\" : \"cwl-01234\",       \"PROJECT_GROUP\" : \"alice-lab\"   } } ```", example = "{\"WORKFLOW_ID\":\"cwl-01234\",\"PROJECT_GROUP\":\"alice-lab\"}")
 
 
   public Map<String, String> getTags() {
@@ -326,7 +325,7 @@ public class TesTask   {
    * Task logging information. Normally, this will contain only one entry, but in the case where a task fails and is retried, an entry will be appended to this list.
    * @return logs
   */
-  @ApiModelProperty(readOnly = true, value = "Task logging information. Normally, this will contain only one entry, but in the case where a task fails and is retried, an entry will be appended to this list.")
+  @Schema(description = "Task logging information. Normally, this will contain only one entry, but in the case where a task fails and is retried, an entry will be appended to this list.", accessMode = Schema.AccessMode.READ_ONLY)
 
   @Valid
 
@@ -347,7 +346,7 @@ public class TesTask   {
    * Date + time the task was created, in RFC 3339 format. This is set by the system, not the client.
    * @return creationTime
   */
-  @ApiModelProperty(example = "2020-10-02T10:00:00-05:00", readOnly = true, value = "Date + time the task was created, in RFC 3339 format. This is set by the system, not the client.")
+  @Schema(description = "Date + time the task was created, in RFC 3339 format. This is set by the system, not the client.", accessMode = Schema.AccessMode.READ_ONLY, example = "2020-10-02T10:00:00-05:00")
 
 
   public String getCreationTime() {

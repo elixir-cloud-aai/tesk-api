@@ -8,11 +8,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.API_DOCS_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.SERVICE_INFO_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -31,15 +30,19 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration testing of switched off security Kubernetes API is WireMocked
@@ -58,6 +61,8 @@ import org.springframework.test.web.servlet.MockMvc;
 public class NoAuthIT {
 
     @Autowired private MockMvc mvc;
+
+    @Autowired private UserDetailsService userDetailsService;
 
     @Autowired private ObjectMapper objectMapper;
 
@@ -197,19 +202,21 @@ public class NoAuthIT {
                 objectMapper
                         .readTree(
                                 this.mvc
-                                        .perform(get("/v2/api-docs"))
+                                        .perform(get(API_DOCS_URL))
                                         .andExpect(status().isOk())
                                         .andReturn()
                                         .getResponse()
                                         .getContentAsString())
-                        .path("definitions");
-        JsonNode requestProperties = definitions.path("TesExecutorReq").path("properties");
-        JsonNode responseProperties = definitions.path("TesExecutorRes").path("properties");
-        assertThat(requestProperties.has("docker_registry")).isTrue();
-        assertThat(requestProperties.has("docker_login")).isTrue();
-        assertThat(requestProperties.has("docker_pass")).isTrue();
-        assertThat(responseProperties.has("docker_login")).isFalse();
-        assertThat(responseProperties.has("docker_pass")).isFalse();
+                        .path("components")
+                        .path("schemas");
+        // login and password only in requests (OpenAPI 3: writeOnly), the registry in both
+        JsonNode properties = definitions.path("TesExecutor").path("properties");
+        assertThat(properties.has("docker_registry")).isTrue();
+        assertThat(properties.path("docker_registry").has("writeOnly")).isFalse();
+        assertThat(properties.path("docker_login").path("writeOnly").asBoolean()).isTrue();
+        assertThat(properties.path("docker_pass").path("writeOnly").asBoolean()).isTrue();
+        assertThat(properties.has("dockerLogin")).isFalse();
+        assertThat(properties.has("dockerPass")).isFalse();
     }
 
     @Test
@@ -229,6 +236,32 @@ public class NoAuthIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.logs[0].outputs").isArray())
                 .andExpect(jsonPath("$.logs[0].outputs").isEmpty());
+    }
+
+    /**
+     * A trailing slash is ignored, as with Spring Framework 5 (Spring Framework 6 and later no
+     * longer match it by default; TrailingSlashConfiguration)
+     */
+    @Test
+    public void trailingSlash_isIgnored() throws Exception {
+        MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
+
+        this.mvc
+                .perform(get(TASK_URL + "/{id}/", "task-123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("task-123"));
+        this.mvc.perform(get(SERVICE_INFO_URL + "/")).andExpect(status().isOk());
+    }
+
+    /** Unknown paths give 404 with the usual JSON error body (CustomErrorHandler) */
+    @Test
+    public void unknownPath_isNotFound() throws Exception {
+        this.mvc
+                .perform(get(TASK_URL + "/task-123/unknown"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.path").value(TASK_URL + "/task-123/unknown"));
     }
 
     @Test
@@ -386,7 +419,7 @@ public class NoAuthIT {
                 objectMapper
                         .readTree(
                                 this.mvc
-                                        .perform(get("/v2/api-docs"))
+                                        .perform(get(API_DOCS_URL))
                                         .andExpect(status().isOk())
                                         .andReturn()
                                         .getResponse()
@@ -403,14 +436,26 @@ public class NoAuthIT {
         assertThat(state).isNotNull();
         assertThat(state.path("in").asText()).isEqualTo("query");
         List<String> states = new ArrayList<>();
-        state.path("enum").forEach(value -> states.add(value.asText()));
+        state.path("schema").path("enum").forEach(value -> states.add(value.asText()));
         assertThat(states).contains("CANCELING", "PREEMPTED", "RUNNING");
         for (String name : new String[] {"tag_key", "tag_value"}) {
             JsonNode tagParameter = byName.get(name);
             assertThat(tagParameter).as(name).isNotNull();
             assertThat(tagParameter.path("in").asText()).isEqualTo("query");
-            assertThat(tagParameter.path("type").asText()).isEqualTo("array");
-            assertThat(tagParameter.path("collectionFormat").asText()).isEqualTo("multi");
+            // OpenAPI 3: repeated parameters (the defaults style form and explode true)
+            assertThat(tagParameter.path("schema").path("type").asText()).isEqualTo("array");
+            assertThat(tagParameter.has("style")).isFalse();
+            assertThat(tagParameter.has("explode")).isFalse();
         }
+    }
+
+    /**
+     * Spring Boot's in-memory user store (with a generated password) is replaced by one without
+     * users
+     */
+    @Test
+    public void userStore_hasNoUsers() {
+        assertThat(userDetailsService).isNotInstanceOf(InMemoryUserDetailsManager.class);
+        assertThat(userDetailsService.loadUserByUsername("user")).isNull();
     }
 }

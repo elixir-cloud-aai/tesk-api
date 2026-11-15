@@ -1,25 +1,28 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.boot.web.error.ErrorAttributeOptions;
-import org.springframework.boot.web.servlet.error.ErrorAttributes;
+import org.springframework.boot.webmvc.error.ErrorAttributes;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.http.server.ServletServerHttpResponse;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.util.InvalidMimeTypeException;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.util.WebUtils;
@@ -57,7 +60,8 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
     CustomAuthenticationEntryPoint(
             ErrorAttributes errorAttributes, HttpMessageConverters messageConverters) {
         this.errorAttributes = errorAttributes;
-        this.messageConverters = new ArrayList<>(messageConverters.getConverters());
+        this.messageConverters = new ArrayList<>();
+        messageConverters.forEach(this.messageConverters::add);
     }
 
     @Override
@@ -126,7 +130,12 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         }
         // q=0: not acceptable
         accepted.removeIf(mediaType -> mediaType.getQualityValue() == 0);
-        MediaType.sortBySpecificityAndQuality(accepted);
+        try {
+            MimeTypeUtils.sortBySpecificity(accepted);
+        } catch (InvalidMimeTypeException e) {
+            // more than 50 media types, which Spring refuses to sort: answer as without Accept
+            accepted = new ArrayList<>(Collections.singletonList(MediaType.ALL));
+        }
         for (MediaType mediaType : accepted) {
             for (HttpMessageConverter<?> converter : this.messageConverters) {
                 if (converter.canWrite(body.getClass(), mediaType)) {

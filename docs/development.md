@@ -1,18 +1,28 @@
 # Development
 
-TESK API is a [Spring Boot](https://spring.io/projects/spring-boot) 2.7
-application on Java 21, built with Maven 3.9 (through the wrapper `./mvnw`,
-which downloads the version pinned in `.mvn/wrapper/maven-wrapper.properties`).
-The server stub is generated from the TES specification with the [Swagger Codegen Maven
-plugin](https://github.com/swagger-api/swagger-codegen/tree/master/modules/swagger-codegen-maven-plugin),
-and the [Kubernetes Java client](https://github.com/kubernetes-client/java)
-talks to the Kubernetes API.
+TESK API is a [Spring Boot](https://spring.io/projects/spring-boot) 4.1
+application (Spring Framework 7, Spring Security 7, Jackson 3) on Java 21,
+built with Maven 3.9 (through the wrapper `./mvnw`, which downloads the
+version pinned in `.mvn/wrapper/maven-wrapper.properties`). The server stub is
+generated from the TES specification with the [OpenAPI Generator Maven
+plugin](https://github.com/OpenAPITools/openapi-generator/tree/master/modules/openapi-generator-maven-plugin)
+(see [Generating a new API stub](#generating-a-new-api-stub)),
+[springdoc-openapi](https://springdoc.org/) serves the API description and
+the Swagger UI, and the [Kubernetes Java
+client](https://github.com/kubernetes-client/java) talks to the Kubernetes
+API.
 
-The Kubernetes client needs newer versions of some libraries than Spring
-Boot 2.7 manages (SnakeYAML, OkHttp, Kotlin, Gson, Commons Lang and Commons
-Codec): `pom.xml` sets them to those of the client's parent POM
-(`io.kubernetes:client-java-parent`), so update them together with the
-client. The models of the client refuse JSON
+The JSON of the API and of the tasks stored in Kubernetes is written and read
+with Jackson 3 with the defaults of Jackson 2
+(`spring.jackson.use-jackson2-defaults=true` in `application.properties`), so
+that it stays as it was with Spring Boot 2.7. The model classes keep the
+annotations of Jackson 2 (`com.fasterxml.jackson.annotation`), which Jackson 3
+reads.
+
+The Kubernetes client needs newer versions of some libraries than Spring Boot
+manages (SnakeYAML, Gson, Commons Lang and Commons Codec): `pom.xml` sets them
+to those of the client's parent POM (`io.kubernetes:client-java-parent`), so
+update them together with the client. The models of the client refuse JSON
 with fields they don't know; `KubernetesJson` installs a Gson that ignores
 them (see [Deployment](deployment.md#kubernetes)), so test fixtures of
 Kubernetes objects may leave out fields that Kubernetes requires. The
@@ -48,6 +58,13 @@ provider are mocked with WireMock, so no cluster is needed):
 ```bash
 ./mvnw clean verify
 ```
+
+The tests are written for JUnit 4 and run on the JUnit Platform through its
+vintage engine ([#167](https://github.com/elixir-cloud-aai/tesk-api/issues/167)
+moves them to JUnit 5). Surefire and Failsafe load Mockito as a Java agent at
+startup (`-javaagent` in their `argLine`): Java 21 warns about agents that are
+loaded later, as Mockito would load itself, and later Java versions refuse
+them.
 
 ### Test coverage
 
@@ -96,8 +113,7 @@ These two commands need Java 8 (e.g. `JAVA_HOME` pointing to a Java 8 JDK),
 as the CI job `Lint` runs them: google-java-format 1.7 (with
 spotless-maven-plugin 2.30.0) doesn't run on Java 21, and the newer versions
 that do format the code differently. The update, with the reformat it brings,
-is part of the move to Spring Boot 3
-([#66](https://github.com/elixir-cloud-aai/tesk-api/issues/66)). Building and
+is [#163](https://github.com/elixir-cloud-aai/tesk-api/issues/163). Building and
 testing need Java 21. Until then, write code that Java 8 can parse (no
 records, text blocks, `switch` expressions or `instanceof` patterns), or the
 formatter fails.
@@ -260,3 +276,14 @@ the experimental private image credential workaround remains supported, also
 restore the `docker_registry`, `docker_login` and `docker_pass` fields,
 validation, write-only handling, and experimental API descriptions in
 `TesExecutor`; the API and converter tests check this extension.
+
+The generator (OpenAPI Generator 7, with `useSpringBoot3` and `useJakartaEe`)
+writes Jakarta and OpenAPI 3 (`io.swagger.v3`) annotations. The committed
+stubs were generated with version 6.6.0 and moved to these annotations by hand
+with the move to Spring Boot 4, so the next generation also changes their
+layout (e.g. constructors with the required fields; no `TesServiceInfoAllOf`
+and `TesServiceTypeAllOf`). Keep the annotations that make the API description
+match the API: `requiredMode = NOT_REQUIRED` on `type` of `TesInput` and
+`TesOutput` (which may be left out), `accessMode = WRITE_ONLY` on
+`docker_login` and `docker_pass`, and the schema name `tesResources` of
+`TesResources`.

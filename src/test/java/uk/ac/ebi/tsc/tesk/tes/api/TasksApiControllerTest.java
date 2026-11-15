@@ -32,17 +32,19 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -77,33 +79,34 @@ public class TasksApiControllerTest {
         // CSRF protection stays on: the resource server exempts requests with a bearer token
         @Bean
         SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-            http.authorizeRequests()
-                    .anyRequest()
-                    .authenticated()
-                    .and()
-                    .oauth2ResourceServer()
-                    .opaqueToken()
-                    .introspector(
-                            token ->
-                                    new DefaultOAuth2AuthenticatedPrincipal(
-                                            "admin",
-                                            Collections.singletonMap("sub", "admin"),
-                                            AuthorityUtils.commaSeparatedStringToAuthorityList(
-                                                    token)))
-                    .authenticationConverter(
-                            (token, principal) ->
-                                    new UsernamePasswordAuthenticationToken(
-                                            User.builder("admin").build(),
-                                            "N/A",
-                                            principal.getAuthorities()));
+            OpaqueTokenIntrospector introspector =
+                    token ->
+                            new DefaultOAuth2AuthenticatedPrincipal(
+                                    "admin",
+                                    Collections.singletonMap("sub", "admin"),
+                                    AuthorityUtils.commaSeparatedStringToAuthorityList(token));
+            OpaqueTokenAuthenticationConverter converter =
+                    (token, principal) ->
+                            new UsernamePasswordAuthenticationToken(
+                                    User.builder("admin").build(),
+                                    "N/A",
+                                    principal.getAuthorities());
+            http.authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
+                    .oauth2ResourceServer(
+                            resourceServer ->
+                                    resourceServer.opaqueToken(
+                                            opaqueToken ->
+                                                    opaqueToken
+                                                            .introspector(introspector)
+                                                            .authenticationConverter(converter)));
             return http.build();
         }
     }
 
     @Autowired private MockMvc mvc;
 
-    @MockBean private TesService tesService;
-    @MockBean ServiceInfoService serviceInfoService;
+    @MockitoBean private TesService tesService;
+    @MockitoBean ServiceInfoService serviceInfoService;
 
     @Test
     public void createTask_valid() throws Exception {
@@ -322,7 +325,7 @@ public class TasksApiControllerTest {
     public void createTask_invalid_unrecognized_field() throws Exception {
         String[][] files =
                 new String[][] {
-                    new String[] {"unrecognized_field.json", "Unrecognized field \"unknown\""}
+                    new String[] {"unrecognized_field.json", "Unrecognized property \"unknown\""}
                 };
         for (String[] file : files) {
             this.mvc

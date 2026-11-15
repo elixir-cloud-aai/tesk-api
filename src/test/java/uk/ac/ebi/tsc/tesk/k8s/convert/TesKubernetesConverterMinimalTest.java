@@ -15,8 +15,6 @@ import static org.mockito.Mockito.when;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -48,13 +46,16 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.json.JsonContentAssert;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DatabindException;
+import tools.jackson.databind.ObjectMapper;
 import uk.ac.ebi.tsc.tesk.TestUtils;
 import uk.ac.ebi.tsc.tesk.config.GsonConfig;
 import uk.ac.ebi.tsc.tesk.config.security.User;
@@ -75,9 +76,9 @@ import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
 @TestPropertySource(locations = {"classpath:application.properties"})
 @EnableConfigurationProperties(TaskmasterEnvProperties.class)
 public class TesKubernetesConverterMinimalTest {
-    @MockBean private CoreV1Api coreApi;
+    @MockitoBean private CoreV1Api coreApi;
 
-    @MockBean private JobNameGenerator jobNameGenerator;
+    @MockitoBean private JobNameGenerator jobNameGenerator;
 
     private TrsToolClient trsToolClient;
 
@@ -718,7 +719,9 @@ public class TesKubernetesConverterMinimalTest {
         given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-1");
         ObjectMapper failing = mock(ObjectMapper.class);
         when(failing.writeValueAsString(any()))
-                .thenThrow(new JsonMappingException(null, "not serializable"));
+                .thenThrow(
+                        DatabindException.from(
+                                (tools.jackson.core.JsonParser) null, "not serializable"));
         TesKubernetesConverter failingConverter =
                 new TesKubernetesConverter(
                         executorTemplateSupplier,
@@ -735,11 +738,25 @@ public class TesKubernetesConverterMinimalTest {
         User user = User.builder("user-1").build();
 
         assertThatThrownBy(() -> failingConverter.fromTesTaskToK8sJob(task, user))
-                .isInstanceOf(UncheckedIOException.class)
+                .isInstanceOf(JacksonException.class)
                 .hasMessageContaining("not serializable");
         V1Job job = this.converter.fromTesTaskToK8sJob(task, user);
         assertThatThrownBy(() -> failingConverter.fromTesTaskToK8sConfigMap(task, user, job))
-                .isInstanceOf(UncheckedIOException.class);
+                .isInstanceOf(JacksonException.class);
+    }
+
+    /** An IOException of an action (e.g. compressing the taskmaster's input) fails unchecked */
+    @Test
+    public void unchecked_wrapsIOException() {
+        assertThat(TesKubernetesConverter.unchecked(() -> "done")).isEqualTo("done");
+        assertThatThrownBy(
+                        () ->
+                                TesKubernetesConverter.unchecked(
+                                        () -> {
+                                            throw new IOException("disk full");
+                                        }))
+                .isInstanceOf(UncheckedIOException.class)
+                .hasMessageContaining("disk full");
     }
 
     /** An executor whose pod reports no containers yet has no exit code */

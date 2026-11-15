@@ -3,16 +3,13 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import org.junit.Test;
-import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
-import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.boot.webmvc.error.DefaultErrorAttributes;
+import org.springframework.http.converter.HttpMessageConverters;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
@@ -20,6 +17,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /** The answers to requests without a valid token */
 public class CustomAuthenticationEntryPointTest {
@@ -27,9 +26,9 @@ public class CustomAuthenticationEntryPointTest {
     private final CustomAuthenticationEntryPoint entryPoint =
             new CustomAuthenticationEntryPoint(
                     new DefaultErrorAttributes(),
-                    new HttpMessageConverters(
-                            false,
-                            Collections.singletonList(new MappingJackson2HttpMessageConverter())));
+                    HttpMessageConverters.forServer()
+                            .withJsonConverter(new JacksonJsonHttpMessageConverter())
+                            .build());
 
     private MockHttpServletResponse commence(String accept, AuthenticationException e)
             throws Exception {
@@ -123,6 +122,17 @@ public class CustomAuthenticationEntryPointTest {
         assertEquals("unauthorized", body(response).get("error"));
     }
 
+    /** Of equally specific writable types, the one with the higher quality is written */
+    @Test
+    public void higherQuality_isPreferred() throws Exception {
+        MockHttpServletResponse response =
+                commence(
+                        "application/problem+json;q=0.5, application/json",
+                        new InsufficientAuthenticationException("no token"));
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentType().startsWith("application/json"));
+    }
+
     /** Without a converter for an accepted type, the answer has the status and headers only */
     @Test
     public void nothingAccepted_hasNoBody() throws Exception {
@@ -151,6 +161,20 @@ public class CustomAuthenticationEntryPointTest {
         MockHttpServletResponse response =
                 commence("not a media type", new InsufficientAuthenticationException("no token"));
         assertEquals(401, response.getStatus());
+        assertEquals("unauthorized", body(response).get("error"));
+    }
+
+    /** More than 50 media types, which Spring doesn't sort, are taken as all, still with a 401 */
+    @Test
+    public void tooManyAcceptedTypes_areTakenAsAll() throws Exception {
+        StringBuilder accept = new StringBuilder("a/a0");
+        for (int i = 1; i <= 51; i++) {
+            accept.append(", a/a").append(i);
+        }
+        MockHttpServletResponse response =
+                commence(accept.toString(), new InsufficientAuthenticationException("no token"));
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentType().startsWith("application/json"));
         assertEquals("unauthorized", body(response).get("error"));
     }
 }

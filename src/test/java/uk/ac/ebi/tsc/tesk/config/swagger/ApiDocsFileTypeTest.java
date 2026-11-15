@@ -11,8 +11,8 @@ import static uk.ac.ebi.tsc.tesk.UrlConstants.API_DOCS_URL;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -32,9 +32,8 @@ public class ApiDocsFileTypeTest {
     @Test
     public void typeIsOptionalWithTwoValues() throws Exception {
         ResultActions docs = this.mvc.perform(get(API_DOCS_URL)).andExpect(status().isOk());
-        for (String model :
-                new String[] {"TesInputReq", "TesInputRes", "TesOutputReq", "TesOutputRes"}) {
-            String definition = "$.definitions." + model;
+        for (String model : new String[] {"TesInput", "TesOutput"}) {
+            String definition = "$.components.schemas." + model;
             docs.andExpect(jsonPath(definition + ".required", not(hasItem("type"))))
                     .andExpect(
                             jsonPath(

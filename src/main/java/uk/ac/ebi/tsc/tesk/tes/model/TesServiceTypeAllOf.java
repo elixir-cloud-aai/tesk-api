@@ -4,14 +4,14 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 /**
  * TesServiceTypeAllOf
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesServiceTypeAllOf   {
   /**
    * Gets or Sets artifact
@@ -58,7 +58,7 @@ public class TesServiceTypeAllOf   {
    * Get artifact
    * @return artifact
   */
-  @ApiModelProperty(example = "tes", required = true, value = "")
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "tes")
   @NotNull
 
 

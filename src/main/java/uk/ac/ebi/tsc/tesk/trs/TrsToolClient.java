@@ -1,10 +1,11 @@
 package uk.ac.ebi.tsc.tesk.trs;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.AntPathMatcher;
@@ -20,11 +21,19 @@ import uk.ac.ebi.tsc.tesk.trs.model.ToolVersion;
 @Slf4j
 @Service
 public class TrsToolClient {
+    /**
+     * Connect and read timeout of the TRS lookups, which run while a task is created: the defaults
+     * of OkHttp, which Spring Boot 2.7 used here (Spring Boot 4 uses the JDK client, without
+     * timeouts)
+     */
+    static final Duration TIMEOUT = Duration.ofSeconds(10);
+
     private final RestTemplate restTemplate;
     private final TrsProperties properties;
 
     public TrsToolClient(RestTemplateBuilder restTemplateBuilder, TrsProperties properties) {
-        this.restTemplate = restTemplateBuilder.build();
+        this.restTemplate =
+                restTemplateBuilder.connectTimeout(TIMEOUT).readTimeout(TIMEOUT).build();
         this.properties = properties;
     }
 

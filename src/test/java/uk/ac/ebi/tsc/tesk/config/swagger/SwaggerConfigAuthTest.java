@@ -3,57 +3,74 @@ package uk.ac.ebi.tsc.tesk.config.swagger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.security.OAuthFlow;
+import io.swagger.v3.oas.models.security.OAuthFlows;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import org.junit.Test;
-import org.springframework.test.util.ReflectionTestUtils;
-import springfox.documentation.service.AuthorizationCodeGrant;
-import springfox.documentation.service.GrantType;
-import springfox.documentation.service.ImplicitGrant;
 
 /** The OAuth 2.0 flow of the Swagger UI, and its scopes */
 public class SwaggerConfigAuthTest {
-
-    private static SwaggerConfigAuth config(OAuth2ClientProperties properties) {
-        SwaggerConfigAuth config = new SwaggerConfigAuth();
-        ReflectionTestUtils.setField(config, "properties", properties);
-        return config;
-    }
 
     private static OAuth2ClientProperties properties(Boolean implicit) {
         OAuth2ClientProperties properties = new OAuth2ClientProperties();
         properties.setAuthorizationEndpoint("https://login.example.org/authorize");
         properties.setTokenEndpoint("https://login.example.org/token");
         properties.setImplicit(implicit);
+        properties.setScopes(Arrays.asList("openid:OpenID Connect", "email:E-mail address"));
         return properties;
+    }
+
+    private static OAuthFlows flows(Boolean implicit) {
+        OpenAPI api = new SwaggerConfigAuth(properties(implicit)).api();
+        assertThat(api.getSecurity())
+                .singleElement()
+                .satisfies(
+                        requirement ->
+                                assertThat(requirement)
+                                        .containsOnlyKeys(SwaggerConfigAuth.SECURITY_SCHEME));
+        SecurityScheme scheme =
+                api.getComponents().getSecuritySchemes().get(SwaggerConfigAuth.SECURITY_SCHEME);
+        assertThat(scheme.getType()).isEqualTo(SecurityScheme.Type.OAUTH2);
+        return scheme.getFlows();
     }
 
     /** With the implicit flow, the Swagger UI gets the token from the authorization endpoint */
     @Test
     public void implicitGrant() {
-        List<GrantType> grants = config(properties(true)).grantTypes();
+        OAuthFlows flows = flows(true);
 
-        assertThat(grants).hasSize(1);
-        ImplicitGrant grant = (ImplicitGrant) grants.get(0);
-        assertThat(grant.getLoginEndpoint().getUrl())
-                .isEqualTo("https://login.example.org/authorize");
-        assertThat(grant.getTokenName()).isEqualTo("access_token");
+        assertThat(flows.getAuthorizationCode()).isNull();
+        OAuthFlow flow = flows.getImplicit();
+        assertThat(flow.getAuthorizationUrl()).isEqualTo("https://login.example.org/authorize");
+        assertThat(flow.getTokenUrl()).isNull();
+        assertThat(flow.getScopes())
+                .containsExactly(
+                        entry("openid", "OpenID Connect"), entry("email", "E-mail address"));
     }
 
     /** Otherwise (also if unset), it uses the authorization code flow */
     @Test
     public void authorizationCodeGrant() {
         for (Boolean implicit : Arrays.asList(false, null)) {
-            List<GrantType> grants = config(properties(implicit)).grantTypes();
+            OAuthFlows flows = flows(implicit);
 
-            assertThat(grants).hasSize(1);
-            AuthorizationCodeGrant grant = (AuthorizationCodeGrant) grants.get(0);
-            assertThat(grant.getTokenEndpoint().getUrl())
-                    .isEqualTo("https://login.example.org/token");
-            assertThat(grant.getTokenRequestEndpoint().getUrl())
-                    .isEqualTo("https://login.example.org/authorize");
+            assertThat(flows.getImplicit()).isNull();
+            OAuthFlow flow = flows.getAuthorizationCode();
+            assertThat(flow.getTokenUrl()).isEqualTo("https://login.example.org/token");
+            assertThat(flow.getAuthorizationUrl()).isEqualTo("https://login.example.org/authorize");
+            assertThat(flow.getScopes()).containsOnlyKeys("openid", "email");
         }
+    }
+
+    /** The Swagger UI's client ID (springdoc.swagger-ui.oauth.client-id) */
+    @Test
+    public void clientId() {
+        OAuth2ClientProperties properties = new OAuth2ClientProperties();
+        properties.setClientId("swagger-ui");
+        assertThat(properties.getClientId()).isEqualTo("swagger-ui");
     }
 
     /** Scopes are listed as name:description; without them, there are none */

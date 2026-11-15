@@ -92,9 +92,9 @@ jobs:
             rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
             -color
       # Java 8, unlike `test`: google-java-format 1.7 doesn't run on Java 21,
-      # and newer versions format the code differently (to be updated with the
-      # move to Spring Boot 3, #66). No Maven cache: it would share the key of
-      # `test` and could be saved with only the lint plugins in it
+      # and newer versions format the code differently (to be updated, #163).
+      # No Maven cache: it would share the key of `test` and could be saved
+      # with only the lint plugins in it
       - name: Set up Java
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
@@ -192,7 +192,7 @@ jobs:
           start() {
             docker run --detach --name smoke --publish 8080:8080 "$@" tesk-api:smoke
             for _ in $(seq 1 60); do
-              if curl --silent --fail --output /dev/null "${host}/v2/api-docs"; then
+              if curl --silent --fail --output /dev/null "${host}/v3/api-docs"; then
                 return 0
               fi
               sleep 2
@@ -223,16 +223,20 @@ jobs:
           start
           check "${api}/service-info" 200
           curl --silent --fail "${host}${api}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'
-          # The Swagger UI is off by default; the API description is not
+          # The Swagger UI is off by default; the API description is not, also
+          # at its former path (an alias, to be dropped later)
           check / 404
           check /swagger-ui/index.html 404
-          check /webjars/springfox-swagger-ui/index.html 404
-          check /swagger-resources 404
+          check /v3/api-docs/swagger-config 404
+          check /v3/api-docs 200
           check /v2/api-docs 200
+          curl --silent --fail "${host}/v2/api-docs" | jq -e '.openapi | startswith("3.")'
           stop
           start --env SPRING_PROFILES_ACTIVE=auth
           check "${api}/service-info" 200
           check "${api}/tasks" 401
+          check /v3/api-docs 200
+          check /v2/api-docs 200
           stop
           start --env SPRING_PROFILES_ACTIVE=auth --env TESK_API_SERVICE_INFO_PUBLIC=false
           check "${api}/service-info" 401
@@ -251,7 +255,7 @@ jobs:
           }
           start --env TESK_API_SWAGGER_UI_ENABLED=true
           check /swagger-ui/index.html 200
-          check /swagger-resources 200
+          check /v3/api-docs/swagger-config 200
           stop
 
   # On pushes that publish (`PUBLISH`), builds the image once and pushes it

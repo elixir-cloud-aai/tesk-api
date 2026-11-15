@@ -2,16 +2,15 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 /**
  * Type of a GA4GH service
  */
-@ApiModel(description = "Type of a GA4GH service")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@Schema(description = "Type of a GA4GH service")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class ServiceType   {
   @JsonProperty("group")
   private String group;
@@ -31,7 +30,7 @@ public class ServiceType   {
    * Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).
    * @return group
   */
-  @ApiModelProperty(example = "org.ga4gh", required = true, value = "Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).")
+  @Schema(description = "Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).", requiredMode = Schema.RequiredMode.REQUIRED, example = "org.ga4gh")
   @NotNull
 
 
@@ -52,7 +51,7 @@ public class ServiceType   {
    * Name of the API or GA4GH specification implemented. Official GA4GH types should be assigned as part of standards approval process. Custom artifacts are supported.
    * @return artifact
   */
-  @ApiModelProperty(example = "beacon", required = true, value = "Name of the API or GA4GH specification implemented. Official GA4GH types should be assigned as part of standards approval process. Custom artifacts are supported.")
+  @Schema(description = "Name of the API or GA4GH specification implemented. Official GA4GH types should be assigned as part of standards approval process. Custom artifacts are supported.", requiredMode = Schema.RequiredMode.REQUIRED, example = "beacon")
   @NotNull
 
 
@@ -73,7 +72,7 @@ public class ServiceType   {
    * Version of the API or specification. GA4GH specifications use semantic versioning.
    * @return version
   */
-  @ApiModelProperty(example = "1.0.0", required = true, value = "Version of the API or specification. GA4GH specifications use semantic versioning.")
+  @Schema(description = "Version of the API or specification. GA4GH specifications use semantic versioning.", requiredMode = Schema.RequiredMode.REQUIRED, example = "1.0.0")
   @NotNull
 
 

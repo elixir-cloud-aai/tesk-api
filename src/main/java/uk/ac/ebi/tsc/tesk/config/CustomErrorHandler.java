@@ -1,17 +1,18 @@
 package uk.ac.ebi.tsc.tesk.config;
 
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.TypeMismatchException;
-import org.springframework.boot.autoconfigure.web.servlet.error.BasicErrorController;
 import org.springframework.boot.web.error.ErrorAttributeOptions;
-import org.springframework.boot.web.servlet.error.ErrorAttributes;
+import org.springframework.boot.webmvc.autoconfigure.error.BasicErrorController;
+import org.springframework.boot.webmvc.error.ErrorAttributes;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
@@ -85,7 +86,7 @@ public class CustomErrorHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex,
             HttpHeaders headers,
-            HttpStatus status,
+            HttpStatusCode status,
             WebRequest request) {
         ResponseEntity<Object> response =
                 super.handleMethodArgumentNotValid(ex, headers, status, request);
@@ -114,7 +115,10 @@ public class CustomErrorHandler extends ResponseEntityExceptionHandler {
      */
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
-            TypeMismatchException ex, HttpHeaders headers, HttpStatus status, WebRequest request) {
+            TypeMismatchException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
         if (ex instanceof MethodArgumentTypeMismatchException) {
             request.setAttribute(
                     RequestDispatcher.ERROR_MESSAGE,
@@ -133,7 +137,11 @@ public class CustomErrorHandler extends ResponseEntityExceptionHandler {
     @Override
     @SuppressWarnings("unchecked")
     protected ResponseEntity<Object> handleExceptionInternal(
-            Exception ex, Object body, HttpHeaders headers, HttpStatus status, WebRequest request) {
+            Exception ex,
+            Object body,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
         // Spring MVC passes the requests of its exception handlers as ServletWebRequests
         HttpServletRequest httpServletRequest = ((ServletWebRequest) request).getRequest();
         return (ResponseEntity<Object>) this.handleExceptionInternal(httpServletRequest, status);
@@ -144,13 +152,15 @@ public class CustomErrorHandler extends ResponseEntityExceptionHandler {
      * response body.
      */
     private ResponseEntity<?> handleExceptionInternal(
-            HttpServletRequest request, HttpStatus status) {
+            HttpServletRequest request, HttpStatusCode status) {
         WebRequest requestAttributes = new ServletWebRequest(request);
         // missing request parameters used by DefaultErrorAttributes implementation
         requestAttributes.setAttribute(
-                "javax.servlet.error.status_code", status.value(), RequestAttributes.SCOPE_REQUEST);
+                "jakarta.servlet.error.status_code",
+                status.value(),
+                RequestAttributes.SCOPE_REQUEST);
         requestAttributes.setAttribute(
-                "javax.servlet.error.request_uri",
+                "jakarta.servlet.error.request_uri",
                 request.getRequestURI(),
                 RequestAttributes.SCOPE_REQUEST);
         return new ResponseEntity<>(

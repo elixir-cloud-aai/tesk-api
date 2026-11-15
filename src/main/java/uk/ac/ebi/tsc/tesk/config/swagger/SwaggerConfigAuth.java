@@ -1,108 +1,65 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.security.OAuthFlow;
+import io.swagger.v3.oas.models.security.OAuthFlows;
+import io.swagger.v3.oas.models.security.Scopes;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.web.bind.annotation.RequestMapping;
-import springfox.documentation.builders.OAuthBuilder;
-import springfox.documentation.builders.PathSelectors;
-import springfox.documentation.builders.RequestHandlerSelectors;
-import springfox.documentation.service.*;
-import springfox.documentation.spi.DocumentationType;
-import springfox.documentation.spi.service.contexts.SecurityContext;
-import springfox.documentation.spring.web.plugins.Docket;
-import springfox.documentation.swagger.web.SecurityConfiguration;
-import springfox.documentation.swagger.web.SecurityConfigurationBuilder;
-import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 /**
  * Swagger Configuration Configures securing all endpoints with OAuth2 (swaggerUI acts as OAuh2
- * client)
+ * client): the API description (springdoc) names the OAuth 2.0 flow of the Swagger UI, with the
+ * endpoints and scopes of {@link OAuth2ClientProperties}; the Swagger UI gets its client ID from
+ * {@code springdoc.swagger-ui.oauth.client-id} ({@code application.properties}).
  *
  * @author Ania Niewielska <aniewielska@ebi.ac.uk>
  */
 @Configuration
-@EnableSwagger2
 @Profile("auth")
 public class SwaggerConfigAuth {
 
-    @Autowired private OAuth2ClientProperties properties;
+    /** Name of the security scheme in the API description */
+    static final String SECURITY_SCHEME = "oauth2";
 
+    private final OAuth2ClientProperties properties;
+
+    public SwaggerConfigAuth(OAuth2ClientProperties properties) {
+        this.properties = properties;
+    }
+
+    /** The API description's security scheme, which all endpoints use */
     @Bean
-    public Docket api() {
-        return new Docket(DocumentationType.SWAGGER_2)
-                .select()
-                .apis(RequestHandlerSelectors.basePackage("uk.ac.ebi.tsc.tesk.tes.api"))
-                .apis(RequestHandlerSelectors.withClassAnnotation(RequestMapping.class))
-                .paths(PathSelectors.any())
-                .build()
-                .securitySchemes(Collections.singletonList(oauth()))
-                .securityContexts(Arrays.asList(securityContext()));
-    }
-
-    @Bean
-    protected List<GrantType> grantTypes() {
-        List<GrantType> grantTypes = new ArrayList<>();
-        if (Boolean.TRUE.equals(properties.getImplicit())) {
-            LoginEndpoint loginEndpoint = new LoginEndpoint(properties.getAuthorizationEndpoint());
-            grantTypes.add(new ImplicitGrant(loginEndpoint, "access_token"));
-        } else {
-            // the names of the client's parameters (OAuth 2.0), not their values: the Swagger UI is
-            // a public client
-            TokenRequestEndpoint tokenRequestEndpoint =
-                    new TokenRequestEndpoint(
-                            properties.getAuthorizationEndpoint(), "client_id", "client_secret");
-            TokenEndpoint tokenEndpoint =
-                    new TokenEndpoint(properties.getTokenEndpoint(), "access_token");
-            grantTypes.add(new AuthorizationCodeGrant(tokenRequestEndpoint, tokenEndpoint));
-        }
-        return grantTypes;
-    }
-
-    private SecurityContext securityContext() {
-        return SecurityContext.builder()
-                .securityReferences(defaultAuth())
-                .forPaths(PathSelectors.any())
-                .build();
-    }
-
-    private List<SecurityReference> defaultAuth() {
-        AuthorizationScope authorizationScope =
-                new AuthorizationScope("global", "accessEverything");
-        AuthorizationScope[] authorizationScopes = new AuthorizationScope[1];
-        authorizationScopes[0] = authorizationScope;
-        return Arrays.asList(new SecurityReference("oauth2", authorizationScopes));
-    }
-
-    @Bean
-    SecurityScheme oauth() {
-        return new OAuthBuilder().name("oauth2").scopes(scopes()).grantTypes(grantTypes()).build();
-    }
-
-    private List<AuthorizationScope> scopes() {
-        List<AuthorizationScope> list = new ArrayList<>();
-        properties
-                .getScopesAsMap()
-                .forEach(
-                        (name, description) -> list.add(new AuthorizationScope(name, description)));
-        return list;
+    public OpenAPI api() {
+        return new OpenAPI()
+                .components(new Components().addSecuritySchemes(SECURITY_SCHEME, oauth()))
+                .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME));
     }
 
     /**
-     * The configuration of the Swagger UI's OAuth client, served at {@code
-     * /swagger-resources/configuration/security}. The Swagger UI runs in the browser, so it is a
-     * public client: it gets no client secret.
+     * The flow of the Swagger UI: implicit, or authorization code (also if unset). The Swagger UI
+     * runs in the browser, so it is a public client: it gets no client secret.
      */
-    @Bean
-    public SecurityConfiguration securityInfo() {
-        return SecurityConfigurationBuilder.builder()
-                .clientId(properties.getClientId())
-                .scopeSeparator("")
-                .build();
+    SecurityScheme oauth() {
+        Scopes scopes = new Scopes();
+        properties.getScopesAsMap().forEach(scopes::addString);
+        OAuthFlows flows = new OAuthFlows();
+        if (Boolean.TRUE.equals(properties.getImplicit())) {
+            flows.implicit(
+                    new OAuthFlow()
+                            .authorizationUrl(properties.getAuthorizationEndpoint())
+                            .scopes(scopes));
+        } else {
+            flows.authorizationCode(
+                    new OAuthFlow()
+                            .authorizationUrl(properties.getAuthorizationEndpoint())
+                            .tokenUrl(properties.getTokenEndpoint())
+                            .scopes(scopes));
+        }
+        return new SecurityScheme().type(SecurityScheme.Type.OAUTH2).flows(flows);
     }
 }

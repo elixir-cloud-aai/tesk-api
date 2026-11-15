@@ -15,7 +15,6 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1JobCondition;
 import io.kubernetes.client.openapi.models.V1JobList;
@@ -31,6 +30,7 @@ import java.util.Collections;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;

@@ -1,11 +1,11 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
+import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import javax.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;

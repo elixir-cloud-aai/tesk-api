@@ -15,7 +15,7 @@ import io.kubernetes.client.openapi.models.V1LabelSelector;
 import io.kubernetes.client.openapi.models.V1ListMeta;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.Arrays;
-import org.apache.http.HttpStatus;
+import org.springframework.http.HttpStatus;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
@@ -33,7 +33,7 @@ class MockUtil {
                         .willReturn(aResponse().withBodyFile("task-123/taskmaster.json")));
         mockKubernetes.givenThat(
                 WireMock.get("/apis/batch/v1/namespaces/default/jobs/task-123-outputs-filer")
-                        .willReturn(aResponse().withStatus(HttpStatus.SC_NOT_FOUND)));
+                        .willReturn(aResponse().withStatus(HttpStatus.NOT_FOUND.value())));
 
         mockKubernetes.givenThat(
                 WireMock.get(

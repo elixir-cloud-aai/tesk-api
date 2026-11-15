@@ -2,16 +2,15 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 /**
  * ExecutorLog describes logging information related to an Executor.
  */
-@ApiModel(description = "ExecutorLog describes logging information related to an Executor.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@Schema(description = "ExecutorLog describes logging information related to an Executor.")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesExecutorLog   {
   @JsonProperty("start_time")
   private String startTime;
@@ -37,7 +36,7 @@ public class TesExecutorLog   {
    * Time the executor started, in RFC 3339 format.
    * @return startTime
   */
-  @ApiModelProperty(example = "2020-10-02T10:00:00-05:00", value = "Time the executor started, in RFC 3339 format.")
+  @Schema(description = "Time the executor started, in RFC 3339 format.", example = "2020-10-02T10:00:00-05:00")
 
 
   public String getStartTime() {
@@ -57,7 +56,7 @@ public class TesExecutorLog   {
    * Time the executor ended, in RFC 3339 format.
    * @return endTime
   */
-  @ApiModelProperty(example = "2020-10-02T11:00:00-05:00", value = "Time the executor ended, in RFC 3339 format.")
+  @Schema(description = "Time the executor ended, in RFC 3339 format.", example = "2020-10-02T11:00:00-05:00")
 
 
   public String getEndTime() {
@@ -77,7 +76,7 @@ public class TesExecutorLog   {
    * Stdout content.  This is meant for convenience. No guarantees are made about the content. Implementations may chose different approaches: only the head, only the tail, a URL reference only, etc.  In order to capture the full stdout client should set Executor.stdout to a container file path, and use Task.outputs to upload that file to permanent storage.
    * @return stdout
   */
-  @ApiModelProperty(value = "Stdout content.  This is meant for convenience. No guarantees are made about the content. Implementations may chose different approaches: only the head, only the tail, a URL reference only, etc.  In order to capture the full stdout client should set Executor.stdout to a container file path, and use Task.outputs to upload that file to permanent storage.")
+  @Schema(description = "Stdout content.  This is meant for convenience. No guarantees are made about the content. Implementations may chose different approaches: only the head, only the tail, a URL reference only, etc.  In order to capture the full stdout client should set Executor.stdout to a container file path, and use Task.outputs to upload that file to permanent storage.")
 
 
   public String getStdout() {
@@ -97,7 +96,7 @@ public class TesExecutorLog   {
    * Stderr content.  This is meant for convenience. No guarantees are made about the content. Implementations may chose different approaches: only the head, only the tail, a URL reference only, etc.  In order to capture the full stderr client should set Executor.stderr to a container file path, and use Task.outputs to upload that file to permanent storage.
    * @return stderr
   */
-  @ApiModelProperty(value = "Stderr content.  This is meant for convenience. No guarantees are made about the content. Implementations may chose different approaches: only the head, only the tail, a URL reference only, etc.  In order to capture the full stderr client should set Executor.stderr to a container file path, and use Task.outputs to upload that file to permanent storage.")
+  @Schema(description = "Stderr content.  This is meant for convenience. No guarantees are made about the content. Implementations may chose different approaches: only the head, only the tail, a URL reference only, etc.  In order to capture the full stderr client should set Executor.stderr to a container file path, and use Task.outputs to upload that file to permanent storage.")
 
 
   public String getStderr() {
@@ -117,7 +116,7 @@ public class TesExecutorLog   {
    * Exit code.
    * @return exitCode
   */
-  @ApiModelProperty(example="0", required = true, value = "Exit code.")
+  @Schema(description = "Exit code.", requiredMode = Schema.RequiredMode.REQUIRED, example = "0")
   @NotNull
 
 
