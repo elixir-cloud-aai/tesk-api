@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 
-@javax.annotation.Generated(
+@jakarta.annotation.Generated(
         value = "org.openapitools.codegen.languages.SpringCodegen",
         date = "2021-03-24T17:10:08.716Z[Europe/London]")
 @RequiredArgsConstructor

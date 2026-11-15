@@ -18,9 +18,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
@@ -707,6 +707,15 @@ public class AuthIT {
     @Test
     public void anybody_can_see_serviceInfo() throws Exception {
         this.mvc.perform(get(SERVICE_INFO_URL)).andExpect(status().isOk());
+    }
+
+    /**
+     * With a trailing slash, which the app ignores (TrailingSlashConfiguration), service info needs
+     * a token, as before: the public paths are checked as they are sent
+     */
+    @Test
+    public void serviceInfo_withTrailingSlash_needsToken() throws Exception {
+        this.mvc.perform(get(SERVICE_INFO_URL + "/")).andExpect(status().isUnauthorized());
     }
 
     @Test

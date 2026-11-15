@@ -12,9 +12,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.OutputCaptureRule;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
@@ -51,12 +51,18 @@ public class SwaggerOAuthClientSecretTest {
         assertThat(this.output.getOut(), not(containsString(SECRET)));
     }
 
+    /** The Swagger UI gets the client ID (in its initializer), but not the secret. */
     @Test
     public void securityConfiguration_hasNoClientSecret() throws Exception {
         this.mvc
-                .perform(get("/swagger-resources/configuration/security"))
+                .perform(get("/swagger-ui/swagger-initializer.js"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.clientId").value("swagger-client-id"))
+                .andExpect(content().string(containsString("\"clientId\":\"swagger-client-id\"")))
+                .andExpect(content().string(not(containsString("clientSecret"))))
+                .andExpect(content().string(not(containsString(SECRET))));
+        this.mvc
+                .perform(get("/v3/api-docs/swagger-config"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clientSecret").doesNotExist())
                 .andExpect(content().string(not(containsString(SECRET))));
     }
@@ -65,7 +71,7 @@ public class SwaggerOAuthClientSecretTest {
     @Test
     public void apiDescription_hasNoClientSecret() throws Exception {
         this.mvc
-                .perform(get("/v2/api-docs"))
+                .perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString(SECRET))));
     }

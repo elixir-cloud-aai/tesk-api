@@ -3,16 +3,15 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
-import javax.validation.Valid;
-import javax.validation.constraints.*;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 /**
  * Organization providing the service
  */
-@ApiModel(description = "Organization providing the service")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-04-12T17:49:13.631+01:00[Europe/London]")
+@Schema(description = "Organization providing the service")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-04-12T17:49:13.631+01:00[Europe/London]")
 public class ServiceOrganization   {
   @JsonProperty("name")
   private String name;
@@ -29,7 +28,7 @@ public class ServiceOrganization   {
    * Name of the organization responsible for the service
    * @return name
   */
-  @ApiModelProperty(example = "My organization", required = true, value = "Name of the organization responsible for the service")
+  @Schema(description = "Name of the organization responsible for the service", requiredMode = Schema.RequiredMode.REQUIRED, example = "My organization")
   @NotNull
 
 
@@ -50,7 +49,7 @@ public class ServiceOrganization   {
    * URL of the website of the organization (RFC 3986 format)
    * @return url
   */
-  @ApiModelProperty(example = "https://example.com", required = true, value = "URL of the website of the organization (RFC 3986 format)")
+  @Schema(description = "URL of the website of the organization (RFC 3986 format)", requiredMode = Schema.RequiredMode.REQUIRED, example = "https://example.com")
   @NotNull
 
 

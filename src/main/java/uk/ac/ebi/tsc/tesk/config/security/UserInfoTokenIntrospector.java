@@ -146,7 +146,7 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
             body = this.restOperations.exchange(request, USER_INFO).getBody();
         } catch (RestClientResponseException e) {
             // its message holds the answer, which may have personal data: the status only
-            logger.warn("Could not fetch user details: status {}", e.getRawStatusCode());
+            logger.warn("Could not fetch user details: status {}", e.getStatusCode().value());
             throw new BadOpaqueTokenException(INVALID_TOKEN);
         } catch (ResourceAccessException e) {
             // e.g. connection refused; its own message has the URI, which may hold credentials

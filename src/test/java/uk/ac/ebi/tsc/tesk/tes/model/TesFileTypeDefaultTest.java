@@ -3,8 +3,8 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * TES 1.1 doesn't require the type of inputs and outputs: a missing type and an explicit {@code

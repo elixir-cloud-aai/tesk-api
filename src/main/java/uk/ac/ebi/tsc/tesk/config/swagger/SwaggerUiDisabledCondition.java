@@ -7,7 +7,7 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
 /**
  * Matches if the Swagger UI is off: {@code tesk.api.swagger-ui.enabled} unset or {@code false}.
  * Rejects any value other than {@code true} or {@code false} (ignoring case), so that the app fails
- * to start instead of serving only some of the UI: Spring and Springfox read other spellings of
+ * to start instead of serving only some of the UI: Spring and springdoc read other spellings of
  * booleans (e.g. {@code off}, {@code yes}) differently
  */
 public class SwaggerUiDisabledCondition implements Condition {

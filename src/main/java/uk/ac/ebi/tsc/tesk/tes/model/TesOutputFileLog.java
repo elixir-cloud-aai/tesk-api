@@ -2,16 +2,15 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 /**
  * OutputFileLog describes a single output file. This describes file details after the task has completed successfully, for logging purposes.
  */
-@ApiModel(description = "OutputFileLog describes a single output file. This describes file details after the task has completed successfully, for logging purposes.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@Schema(description = "OutputFileLog describes a single output file. This describes file details after the task has completed successfully, for logging purposes.")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesOutputFileLog   {
   @JsonProperty("url")
   private String url;
@@ -31,7 +30,7 @@ public class TesOutputFileLog   {
    * URL of the file in storage, e.g. s3://bucket/file.txt
    * @return url
   */
-  @ApiModelProperty(example="s3://bucket/file.txt", required = true, value = "URL of the file in storage, e.g. s3://bucket/file.txt")
+  @Schema(description = "URL of the file in storage, e.g. s3://bucket/file.txt", requiredMode = Schema.RequiredMode.REQUIRED, example = "s3://bucket/file.txt")
   @NotNull
 
 
@@ -52,7 +51,7 @@ public class TesOutputFileLog   {
    * Path of the file inside the container. Must be an absolute path.
    * @return path
   */
-  @ApiModelProperty(example="/data/file1", required = true, value = "Path of the file inside the container. Must be an absolute path.")
+  @Schema(description = "Path of the file inside the container. Must be an absolute path.", requiredMode = Schema.RequiredMode.REQUIRED, example = "/data/file1")
   @NotNull
 
 
@@ -73,7 +72,7 @@ public class TesOutputFileLog   {
    * Size of the file in bytes. Note, this is currently coded as a string because official JSON doesn't support int64 numbers.
    * @return sizeBytes
   */
-  @ApiModelProperty(example = "[\"1024\"]", required = true, value = "Size of the file in bytes. Note, this is currently coded as a string because official JSON doesn't support int64 numbers.")
+  @Schema(description = "Size of the file in bytes. Note, this is currently coded as a string because official JSON doesn't support int64 numbers.", requiredMode = Schema.RequiredMode.REQUIRED, example = "[\"1024\"]")
   @NotNull
 
 

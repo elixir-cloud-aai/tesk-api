@@ -3,16 +3,13 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import org.junit.Test;
-import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
-import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.boot.webmvc.error.DefaultErrorAttributes;
+import org.springframework.http.converter.HttpMessageConverters;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
@@ -20,6 +17,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /** The answers to requests without a valid token */
 public class CustomAuthenticationEntryPointTest {
@@ -27,9 +26,9 @@ public class CustomAuthenticationEntryPointTest {
     private final CustomAuthenticationEntryPoint entryPoint =
             new CustomAuthenticationEntryPoint(
                     new DefaultErrorAttributes(),
-                    new HttpMessageConverters(
-                            false,
-                            Collections.singletonList(new MappingJackson2HttpMessageConverter())));
+                    HttpMessageConverters.forServer()
+                            .withJsonConverter(new JacksonJsonHttpMessageConverter())
+                            .build());
 
     private MockHttpServletResponse commence(String accept, AuthenticationException e)
             throws Exception {

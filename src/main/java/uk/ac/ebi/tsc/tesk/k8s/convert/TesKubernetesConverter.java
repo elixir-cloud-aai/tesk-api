@@ -3,8 +3,6 @@ package uk.ac.ebi.tsc.tesk.k8s.convert;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.*;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.*;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import io.kubernetes.client.custom.QuantityFormatter;
 import io.kubernetes.client.openapi.models.*;
@@ -23,6 +21,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.config.KubernetesJson;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
@@ -94,9 +95,7 @@ public class TesKubernetesConverter {
         // mapping
         taskMasterJob
                 .getMetadata()
-                .putAnnotationsItem(
-                        ANN_JSON_INPUT_KEY,
-                        unchecked(() -> this.objectMapper.writeValueAsString(task)));
+                .putAnnotationsItem(ANN_JSON_INPUT_KEY, this.objectMapper.writeValueAsString(task));
 
         V1Volume volume = new V1Volume();
         volume.setName("jsoninput");
@@ -159,7 +158,7 @@ public class TesKubernetesConverter {
                                                 Optional.ofNullable(task.getResources())
                                                         .map(TesResources::getDiskGb)
                                                         .orElse(RESOURCE_DISK_DEFAULT)));
-        String jobAsJson = unchecked(() -> this.objectMapper.writeValueAsString(taskmasterTask));
+        String jobAsJson = this.objectMapper.writeValueAsString(taskmasterTask);
         Map<String, Object> taskMasterInput = new HashMap<>(gson.fromJson(jobAsJson, Map.class));
         // without the empty lists and maps of the client's models, as before (see
         // KubernetesJson)
@@ -176,15 +175,15 @@ public class TesKubernetesConverter {
 
     /** An action that may fail with an IOException */
     @FunctionalInterface
-    private interface IoSupplier<T> {
+    interface IoSupplier<T> {
         T get() throws IOException;
     }
 
     /**
      * The result of the action, failing with an unchecked exception instead of an IOException (e.g.
-     * if a task can't be serialized): a task without its JSON could be neither run nor read
+     * if the taskmaster's input can't be compressed): a task without it couldn't run
      */
-    private static <T> T unchecked(IoSupplier<T> action) {
+    static <T> T unchecked(IoSupplier<T> action) {
         try {
             return action.get();
         } catch (IOException e) {
@@ -397,12 +396,14 @@ public class TesKubernetesConverter {
             return null;
         }
         Map<String, String> result = new HashMap<>();
-        tags.fields()
-                .forEachRemaining(
+        tags.properties()
+                .forEach(
                         tag ->
                                 result.put(
                                         tag.getKey(),
-                                        tag.getValue().isNull() ? null : tag.getValue().asText()));
+                                        tag.getValue().isNull()
+                                                ? null
+                                                : tag.getValue().asString()));
         return result;
     }
 
@@ -442,12 +443,12 @@ public class TesKubernetesConverter {
                     }
                     logs.add(
                             new TesOutputFileLog()
-                                    .url(file.get("url").asText())
-                                    .path(file.get("path").asText())
-                                    .sizeBytes(file.get("size_bytes").asText()));
+                                    .url(file.get("url").asString())
+                                    .path(file.get("path").asString())
+                                    .sizeBytes(file.get("size_bytes").asString()));
                 }
             }
-        } catch (IOException ex) {
+        } catch (JacksonException ex) {
             reason = "not JSON";
         }
         if (reason != null) {
@@ -465,10 +466,10 @@ public class TesKubernetesConverter {
      */
     private static boolean isOutputFileLog(JsonNode file) {
         return file.isObject()
-                && file.path("url").isTextual()
-                && file.path("path").isTextual()
-                && file.path("size_bytes").isTextual()
-                && file.path("size_bytes").asText().matches("[0-9]+");
+                && file.path("url").isString()
+                && file.path("path").isString()
+                && file.path("size_bytes").isString()
+                && file.path("size_bytes").asString().matches("[0-9]+");
     }
 
     /**
@@ -490,7 +491,7 @@ public class TesKubernetesConverter {
             return Optional.ofNullable(this.objectMapper.readTree(inputJson))
                     .map(tree -> tree.get(field))
                     .orElse(null);
-        } catch (IOException ex) {
+        } catch (JacksonException ex) {
             logger.info(
                     "Reading the {} of task {} from JSON failed; {}",
                     field,
@@ -600,7 +601,7 @@ public class TesKubernetesConverter {
             if (nullifyInputContent && task.getInputs() != null) {
                 task.getInputs().forEach(input -> input.setContent(null));
             }
-        } catch (IOException ex) {
+        } catch (JacksonException ex) {
             logger.info(
                     "Deserializing task {} from JSON failed; {}",
                     taskMasterJobMetadata.getName(),

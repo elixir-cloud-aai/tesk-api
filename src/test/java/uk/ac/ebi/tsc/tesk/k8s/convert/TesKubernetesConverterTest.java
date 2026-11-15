@@ -11,7 +11,6 @@ import static org.mockito.Mockito.*;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -38,13 +37,14 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.json.JsonContentAssert;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
+import tools.jackson.databind.ObjectMapper;
 import uk.ac.ebi.tsc.tesk.TestUtils;
 import uk.ac.ebi.tsc.tesk.config.GsonConfig;
 import uk.ac.ebi.tsc.tesk.config.security.User;
@@ -79,9 +79,9 @@ import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
         })
 @EnableConfigurationProperties(TaskmasterEnvProperties.class)
 public class TesKubernetesConverterTest {
-    @MockBean private CoreV1Api coreApi;
+    @MockitoBean private CoreV1Api coreApi;
 
-    @MockBean private JobNameGenerator jobNameGenerator;
+    @MockitoBean private JobNameGenerator jobNameGenerator;
 
     private TrsToolClient trsToolClient;
 
@@ -1151,8 +1151,7 @@ public class TesKubernetesConverterTest {
     }
 
     /** Reads {@code cpu_cores} into the model and returns the value as written back */
-    private com.fasterxml.jackson.databind.JsonNode writtenCpuCores(String cpuCores)
-            throws IOException {
+    private tools.jackson.databind.JsonNode writtenCpuCores(String cpuCores) throws IOException {
         TesResources resources =
                 this.objectMapper.readValue(
                         "{\"cpu_cores\": " + cpuCores + "}", TesResources.class);

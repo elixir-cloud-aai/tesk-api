@@ -4,14 +4,14 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 /**
  * TesServiceType
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesServiceType   {
   @JsonProperty("group")
   private String group;
@@ -64,7 +64,7 @@ public class TesServiceType   {
    * Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).
    * @return group
   */
-  @ApiModelProperty(example = "org.ga4gh", required = true, value = "Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).")
+  @Schema(description = "Namespace in reverse domain name format. Use `org.ga4gh` for implementations compliant with official GA4GH specifications. For services with custom APIs not standardized by GA4GH, or implementations diverging from official GA4GH specifications, use a different namespace (e.g. your organization's reverse domain name).", requiredMode = Schema.RequiredMode.REQUIRED, example = "org.ga4gh")
   @NotNull
 
 
@@ -85,7 +85,7 @@ public class TesServiceType   {
    * Get artifact
    * @return artifact
   */
-  @ApiModelProperty(example = "tes", required = true, value = "")
+  @Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "tes")
   @NotNull
 
 
@@ -106,7 +106,7 @@ public class TesServiceType   {
    * Version of the API or specification. GA4GH specifications use semantic versioning.
    * @return version
   */
-  @ApiModelProperty(example = "1.0.0", required = true, value = "Version of the API or specification. GA4GH specifications use semantic versioning.")
+  @Schema(description = "Version of the API or specification. GA4GH specifications use semantic versioning.", requiredMode = Schema.RequiredMode.REQUIRED, example = "1.0.0")
   @NotNull
 
 

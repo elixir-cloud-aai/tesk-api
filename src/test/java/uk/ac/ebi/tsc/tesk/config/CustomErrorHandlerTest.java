@@ -3,12 +3,12 @@ package uk.ac.ebi.tsc.tesk.config;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import jakarta.servlet.RequestDispatcher;
 import java.util.Arrays;
 import java.util.Map;
-import javax.servlet.RequestDispatcher;
 import org.junit.Test;
 import org.springframework.beans.TypeMismatchException;
-import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
+import org.springframework.boot.webmvc.error.DefaultErrorAttributes;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

@@ -3,14 +3,13 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.validation.Valid;
-import javax.validation.constraints.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_MESSAGE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
@@ -18,8 +17,8 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
 /**
  * Executor describes a command to be executed, and its environment.
  */
-@ApiModel(description = "Executor describes a command to be executed, and its environment.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@Schema(description = "Executor describes a command to be executed, and its environment.")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesExecutor   {
   @JsonProperty("image")
   private String image;
@@ -65,7 +64,7 @@ public class TesExecutor   {
    * Name of the container image. The string will be passed as the image argument to the containerization run command. Examples:    - `ubuntu`    - `quay.io/aptible/ubuntu`    - `gcr.io/my-org/my-image`    - `myregistryhost:5000/fedora/httpd:version1.0`
    * @return image
   */
-  @ApiModelProperty(example = "ubuntu:22.04", required = true, value = "Name of the container image. The string will be passed as the image argument to the containerization run command. Examples:    - `ubuntu`    - `quay.io/aptible/ubuntu`    - `gcr.io/my-org/my-image`    - `myregistryhost:5000/fedora/httpd:version1.0`")
+  @Schema(description = "Name of the container image. The string will be passed as the image argument to the containerization run command. Examples:    - `ubuntu`    - `quay.io/aptible/ubuntu`    - `gcr.io/my-org/my-image`    - `myregistryhost:5000/fedora/httpd:version1.0`", requiredMode = Schema.RequiredMode.REQUIRED, example = "ubuntu:22.04")
   @NotNull
   @NotBlank
 
@@ -82,7 +81,7 @@ public class TesExecutor   {
     return this;
   }
 
-  @ApiModelProperty(value = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry address for a private executor image. Supply it with docker_login and docker_pass when creating a task.")
+  @Schema(description = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry address for a private executor image. Supply it with docker_login and docker_pass when creating a task.")
   public String getDockerRegistry() {
     return dockerRegistry;
   }
@@ -96,7 +95,7 @@ public class TesExecutor   {
     return this;
   }
 
-  @ApiModelProperty(value = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry username, used only when creating the task; never returned.")
+  @Schema(accessMode = Schema.AccessMode.WRITE_ONLY, description = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry username, used only when creating the task; never returned.")
   public String getDockerLogin() {
     return dockerLogin;
   }
@@ -110,7 +109,7 @@ public class TesExecutor   {
     return this;
   }
 
-  @ApiModelProperty(value = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry password or access token, used only when creating the task; never returned.")
+  @Schema(accessMode = Schema.AccessMode.WRITE_ONLY, description = "Experimental TESK-specific proof-of-concept workaround; do not rely on it in production. Registry password or access token, used only when creating the task; never returned.")
   public String getDockerPass() {
     return dockerPass;
   }
@@ -155,7 +154,7 @@ public class TesExecutor   {
    * A sequence of program arguments to execute, where the first argument is the program to execute (i.e. argv). Example: ``` {   \"command\" : [\"/bin/md5\", \"/data/file1\"] } ```
    * @return command
   */
-  @ApiModelProperty(example = "[\"/bin/md5sum\",\"/data/file1\"]", required = true, value = "A sequence of program arguments to execute, where the first argument is the program to execute (i.e. argv). Example: ``` {   \"command\" : [\"/bin/md5sum\", \"/data/file1\"] } ```")
+  @Schema(description = "A sequence of program arguments to execute, where the first argument is the program to execute (i.e. argv). Example: ``` {   \"command\" : [\"/bin/md5sum\", \"/data/file1\"] } ```", requiredMode = Schema.RequiredMode.REQUIRED, example = "[\"/bin/md5sum\",\"/data/file1\"]")
   @NotNull
   @NotEmpty
 
@@ -176,7 +175,7 @@ public class TesExecutor   {
    * The working directory that the command will be executed in. If not defined, the system will default to the directory set by the container image.
    * @return workdir
   */
-  @ApiModelProperty(example = "/data/", value = "The working directory that the command will be executed in. If not defined, the system will default to the directory set by the container image.")
+  @Schema(description = "The working directory that the command will be executed in. If not defined, the system will default to the directory set by the container image.", example = "/data/")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
 
   public String getWorkdir() {
@@ -196,7 +195,7 @@ public class TesExecutor   {
    * Path inside the container to a file which will be piped to the executor's stdin. This must be an absolute path. This mechanism could be used in conjunction with the input declaration to process a data file using a tool that expects STDIN.  For example, to get the MD5 sum of a file by reading it into the STDIN ``` {   \"command\" : [\"/bin/md5\"],   \"stdin\" : \"/data/file1\" } ```
    * @return stdin
   */
-  @ApiModelProperty(example = "/data/file1", value = "Path inside the container to a file which will be piped to the executor's stdin. This must be an absolute path. This mechanism could be used in conjunction with the input declaration to process a data file using a tool that expects STDIN.  For example, to get the MD5 sum of a file by reading it into the STDIN ``` {   \"command\" : [\"/bin/md5\"],   \"stdin\" : \"/data/file1\" } ```")
+  @Schema(description = "Path inside the container to a file which will be piped to the executor's stdin. This must be an absolute path. This mechanism could be used in conjunction with the input declaration to process a data file using a tool that expects STDIN.  For example, to get the MD5 sum of a file by reading it into the STDIN ``` {   \"command\" : [\"/bin/md5\"],   \"stdin\" : \"/data/file1\" } ```", example = "/data/file1")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
 
   public String getStdin() {
@@ -216,7 +215,7 @@ public class TesExecutor   {
    * Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/tmp/stdout.log\" } ```
    * @return stdout
   */
-  @ApiModelProperty(example = "/data/outfile", value = "Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/data/outfile\" } ```")
+  @Schema(description = "Path inside the container to a file where the executor's stdout will be written to. Must be an absolute path. Example: ``` {   \"stdout\" : \"/data/outfile\" } ```", example = "/data/outfile")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
 
   public String getStdout() {
@@ -236,7 +235,7 @@ public class TesExecutor   {
    * Path inside the container to a file where the executor's stderr will be written to. Must be an absolute path. Example: ``` {   \"stderr\" : \"/tmp/stderr.log\" } ```
    * @return stderr
   */
-  @ApiModelProperty(example = "/tmp/stderr.log", value = "Path inside the container to a file where the executor's stderr will be written to. Must be an absolute path. Example: ``` {   \"stderr\" : \"/tmp/stderr.log\" } ```")
+  @Schema(description = "Path inside the container to a file where the executor's stderr will be written to. Must be an absolute path. Example: ``` {   \"stderr\" : \"/tmp/stderr.log\" } ```", example = "/tmp/stderr.log")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
 
   public String getStderr() {
@@ -258,7 +257,7 @@ public class TesExecutor   {
    * on after it fails (see `TaskStateResolver`).
    * @return ignoreError
   */
-  @ApiModelProperty(value = "Whether errors of this executor are ignored: if it fails, the next executor runs, and the task can still complete.")
+  @Schema(description = "Whether errors of this executor are ignored: if it fails, the next executor runs, and the task can still complete.")
   public Boolean getIgnoreError() {
     return ignoreError;
   }
@@ -284,7 +283,7 @@ public class TesExecutor   {
    * Enviromental variables to set within the container. Example: ``` {   \"env\" : {     \"ENV_CONFIG_PATH\" : \"/data/config.file\",     \"BLASTDB\" : \"/data/GRC38\",     \"HMMERDB\" : \"/data/hmmer\"   } } ```
    * @return env
   */
-  @ApiModelProperty(example = "{\"BLASTDB\":\"/data/GRC38\",\"HMMERDB\":\"/data/hmmer\"}", value = "Enviromental variables to set within the container. Example: ``` {   \"env\" : {     \"ENV_CONFIG_PATH\" : \"/data/config.file\",     \"BLASTDB\" : \"/data/GRC38\",     \"HMMERDB\" : \"/data/hmmer\"   } } ```")
+  @Schema(description = "Enviromental variables to set within the container. Example: ``` {   \"env\" : {     \"ENV_CONFIG_PATH\" : \"/data/config.file\",     \"BLASTDB\" : \"/data/GRC38\",     \"HMMERDB\" : \"/data/hmmer\"   } } ```", example = "{\"BLASTDB\":\"/data/GRC38\",\"HMMERDB\":\"/data/hmmer\"}")
 
 
   public Map<String, String> getEnv() {

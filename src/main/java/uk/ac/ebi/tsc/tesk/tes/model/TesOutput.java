@@ -4,11 +4,10 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-import javax.validation.Valid;
-import javax.validation.constraints.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_MESSAGE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
@@ -16,8 +15,8 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ABSOLUTE_PATH_REGEXP;
 /**
  * Output describes Task output files.
  */
-@ApiModel(description = "Output describes Task output files.")
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
+@Schema(description = "Output describes Task output files.")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-24T17:10:08.716Z[Europe/London]")
 public class TesOutput   {
   @JsonProperty("name")
   private String name;
@@ -46,7 +45,7 @@ public class TesOutput   {
    * User-provided name of output file
    * @return name
   */
-  @ApiModelProperty(value = "User-provided name of output file")
+  @Schema(description = "User-provided name of output file")
 
 
   public String getName() {
@@ -66,7 +65,7 @@ public class TesOutput   {
    * Optional users provided description field, can be used for documentation.
    * @return description
   */
-  @ApiModelProperty(value = "Optional users provided description field, can be used for documentation.")
+  @Schema(description = "Optional users provided description field, can be used for documentation.")
 
 
   public String getDescription() {
@@ -86,7 +85,7 @@ public class TesOutput   {
    * URL for the file to be copied by the TES server after the task is complete. For Example:  - `s3://my-object-store/file1`  - `gs://my-bucket/file2`  - `file:///path/to/my/file`
    * @return url
   */
-  @ApiModelProperty(required = true, value = "URL for the file to be copied by the TES server after the task is complete. For Example:  - `s3://my-object-store/file1`  - `gs://my-bucket/file2`  - `file:///path/to/my/file`")
+  @Schema(description = "URL for the file to be copied by the TES server after the task is complete. For Example:  - `s3://my-object-store/file1`  - `gs://my-bucket/file2`  - `file:///path/to/my/file`", requiredMode = Schema.RequiredMode.REQUIRED)
   @NotNull
   @NotBlank
 
@@ -107,7 +106,7 @@ public class TesOutput   {
    * Path of the file inside the container. Must be an absolute path.
    * @return path
   */
-  @ApiModelProperty(example = "/data/file1", required = true, value = "Path of the file inside the container. Must be an absolute path.")
+  @Schema(description = "Path of the file inside the container. Must be an absolute path.", requiredMode = Schema.RequiredMode.REQUIRED, example = "/data/file1")
   @NotNull
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
   @NotBlank
@@ -131,7 +130,7 @@ public class TesOutput   {
    * before (TES 1.0).
    * @return pathPrefix
   */
-  @ApiModelProperty(example = "/data", value = "Prefix to be removed from matching outputs if `path` contains wildcards; output URLs are constructed by appending pruned paths to the directory specified in `url`. Required if `path` has wildcards, unless `url` is a `file:` URL or has no scheme; ignored if `path` has no wildcards.")
+  @Schema(description = "Prefix to be removed from matching outputs if `path` contains wildcards; output URLs are constructed by appending pruned paths to the directory specified in `url`. Required if `path` has wildcards, unless `url` is a `file:` URL or has no scheme; ignored if `path` has no wildcards.", example = "/data")
   @Pattern(regexp = ABSOLUTE_PATH_REGEXP, message = ABSOLUTE_PATH_MESSAGE)
   public String getPathPrefix() {
     return pathPrefix;
@@ -250,9 +249,7 @@ public class TesOutput   {
    * Get type
    * @return type
   */
-  @ApiModelProperty(
-      value = "FILE if left out or null; directories need DIRECTORY",
-      allowableValues = "DIRECTORY,FILE")
+  @Schema(description = "FILE if left out or null; directories need DIRECTORY", requiredMode = Schema.RequiredMode.NOT_REQUIRED, allowableValues = {"DIRECTORY", "FILE"})
   @NotNull
 
   @Valid
