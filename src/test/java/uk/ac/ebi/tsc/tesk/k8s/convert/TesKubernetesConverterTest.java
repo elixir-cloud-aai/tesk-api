@@ -996,6 +996,24 @@ public class TesKubernetesConverterTest {
         assertThat(this.tagsOf("{\"tags\": {}}"), is(new HashMap<String, String>()));
     }
 
+    /**
+     * Tag values that aren't strings (only in a stored task changed by hand) are read as text, and
+     * objects and arrays as empty strings, as with Jackson 2, rather than failing the listing.
+     */
+    @Test
+    public void extractTags_otherValues() throws IOException {
+        Map<String, String> expected = new HashMap<>();
+        expected.put("NUMBER", "1");
+        expected.put("BOOLEAN", "true");
+        expected.put("OBJECT", "");
+        expected.put("ARRAY", "");
+        assertThat(
+                this.tagsOf(
+                        "{\"tags\": {\"NUMBER\": 1, \"BOOLEAN\": true, \"OBJECT\": {\"a\": \"b\"},"
+                                + " \"ARRAY\": [\"a\"]}}"),
+                is(expected));
+    }
+
     /** Without tags, or a stored task that can't be read, there are no tags (issue #143). */
     @Test
     public void extractTags_none() throws IOException {

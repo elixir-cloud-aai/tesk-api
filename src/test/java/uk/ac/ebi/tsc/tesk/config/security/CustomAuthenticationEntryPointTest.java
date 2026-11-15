@@ -122,6 +122,17 @@ public class CustomAuthenticationEntryPointTest {
         assertEquals("unauthorized", body(response).get("error"));
     }
 
+    /** Of equally specific writable types, the one with the higher quality is written */
+    @Test
+    public void higherQuality_isPreferred() throws Exception {
+        MockHttpServletResponse response =
+                commence(
+                        "application/problem+json;q=0.5, application/json",
+                        new InsufficientAuthenticationException("no token"));
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentType().startsWith("application/json"));
+    }
+
     /** Without a converter for an accepted type, the answer has the status and headers only */
     @Test
     public void nothingAccepted_hasNoBody() throws Exception {

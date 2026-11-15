@@ -396,15 +396,19 @@ public class TesKubernetesConverter {
             return null;
         }
         Map<String, String> result = new HashMap<>();
-        tags.properties()
-                .forEach(
-                        tag ->
-                                result.put(
-                                        tag.getKey(),
-                                        tag.getValue().isNull()
-                                                ? null
-                                                : tag.getValue().asString()));
+        tags.properties().forEach(tag -> result.put(tag.getKey(), tagValue(tag.getValue())));
         return result;
+    }
+
+    /**
+     * A stored tag value as text: null stays null, objects and arrays (only in a stored task
+     * changed by hand) are empty, as with Jackson 2, so that they don't fail the listing of tasks
+     */
+    private static String tagValue(JsonNode value) {
+        if (value.isNull()) {
+            return null;
+        }
+        return value.isContainer() ? "" : value.asString();
     }
 
     /**

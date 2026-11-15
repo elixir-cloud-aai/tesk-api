@@ -36,6 +36,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
@@ -59,6 +61,8 @@ import tools.jackson.databind.ObjectMapper;
 public class NoAuthIT {
 
     @Autowired private MockMvc mvc;
+
+    @Autowired private UserDetailsService userDetailsService;
 
     @Autowired private ObjectMapper objectMapper;
 
@@ -443,5 +447,15 @@ public class NoAuthIT {
             assertThat(tagParameter.has("style")).isFalse();
             assertThat(tagParameter.has("explode")).isFalse();
         }
+    }
+
+    /**
+     * Spring Boot's in-memory user store (with a generated password) is replaced by one without
+     * users
+     */
+    @Test
+    public void userStore_hasNoUsers() {
+        assertThat(userDetailsService).isNotInstanceOf(InMemoryUserDetailsManager.class);
+        assertThat(userDetailsService.loadUserByUsername("user")).isNull();
     }
 }

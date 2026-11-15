@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -24,6 +25,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,6 +50,8 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 public class AuthIT {
 
     @Autowired private MockMvc mvc;
+
+    @Autowired private UserDetailsService userDetailsService;
 
     @Rule public WireMockRule mockElixir = new WireMockRule(8090);
 
@@ -850,5 +855,15 @@ public class AuthIT {
                 .perform(get(TASK_URL + "?view=FULL").header("Authorization", "Bearer BAR"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tasks.length()").value(expectedLength));
+    }
+
+    /**
+     * Spring Boot's in-memory user store (with a generated password) is replaced by one without
+     * users
+     */
+    @Test
+    public void userStore_hasNoUsers() {
+        assertThat(userDetailsService).isNotInstanceOf(InMemoryUserDetailsManager.class);
+        assertThat(userDetailsService.loadUserByUsername("user")).isNull();
     }
 }
