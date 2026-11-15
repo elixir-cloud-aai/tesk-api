@@ -1,9 +1,12 @@
 # Upgrading
 
-## To the next release
+## To 2.0.0
 
-From 1.2.0, deployments may have to check their JVM options, and clients may
-notice changed answers:
+From 1.2.0, deployments may have to check their JVM options, the order in
+which they upgrade TESK API and the taskmaster, and the taskmaster's rights;
+the new options are off by default. TESK API 2.0.0 accepts the task fields,
+list filters and states of TES 1.1, and clients may notice changed answers:
+read all of the items below before you upgrade.
 
 - **Java 21.** The image runs TESK API on Java 21 instead of Java 8 (see
   [Deployment](deployment.md)). If you pass options to the JVM in
@@ -11,19 +14,50 @@ notice changed answers:
   removed (e.g. `-XX:MaxPermSize`, `-XX:+UseConcMarkSweepGC`,
   `-XX:+UseCGroupMemoryLimitForHeap`) stop the JVM
   at startup. Without `JAVA_OPTS`, nothing changes.
-- **Inputs without a source.** An input with neither a `url` (that isn't
-  blank) nor a `content` (that isn't empty) is still refused with `400 Bad
-  Request`, but the message now names the check:
-  `Field 'inputs[0].urlOrContentGiven' URL or content required` instead of
-  `Field 'inputs[0]' URL or content required`. The messages are meant for
-  people; clients should rely on the status code, not on their text.
+- **Upgrade order for filer labels.** A single task's executors are its
+  jobs with both labels `taskmaster-name=<task>` and `job-type=executor`
+  (before: `taskmaster-name` only). Taskmasters of tesk-core releases with
+  [tesk-core#147](https://github.com/elixir-cloud-aai/tesk-core/issues/147)
+  (0.12.0 and later) also give the filers' jobs the label `taskmaster-name`. Upgrade TESK API
+  to this release first, and set the taskmaster to such a release
+  (`TESK_API_TASKMASTER_IMAGE_VERSION`, see
+  [Configuration](configuration.md)) only once no older replica of TESK API
+  serves requests: in a second deployment after the rollout has finished,
+  or in the same one with the `Recreate` strategy. An older TESK API with
+  such a
+  taskmaster takes the inputs filer's job for the outputs filer's job on
+  `GET /tasks/{id}` and `POST /tasks/{id}:cancel`: a task whose taskmaster
+  stopped before the outputs filer after an ignored executor failure is
+  `COMPLETE` instead of `SYSTEM_ERROR`, and a task whose inputs filer
+  failed is `SYSTEM_ERROR` while its taskmaster still runs. `GET /tasks`
+  isn't affected. With older taskmasters, nothing changes.
+- **TES 1.1 fields.** `outputs[].path_prefix`, `inputs[].streamable`,
+  `executors[].ignore_error` and `resources.backend_parameters_strict` are
+  accepted instead of being refused as unknown fields, with one exception
+  that is refused with `400 Bad Request`, as TESK can't do what it asks:
+  `backend_parameters_strict: true` with `backend_parameters` (see [TES 1.1
+  fields](api.md#tes-11-fields)).
+- **`ignore_error`.** `executors[].ignore_error: true` is accepted rather
+  than refused with `400 Bad Request` (see [TES 1.1
+  fields](api.md#tes-11-fields)). It needs a taskmaster that goes on after
+  such an executor fails
+  ([tesk-core#142](https://github.com/elixir-cloud-aai/tesk-core/issues/142)):
+  set the taskmaster image to such a release
+  (`TESK_API_TASKMASTER_IMAGE_VERSION`, see
+  [Configuration](configuration.md)) once this TESK API runs, not before
+  (see "Upgrade order for filer labels" above, as such a release may also
+  label the filers' jobs). An older taskmaster stops at the
+  failure: the task then ends `SYSTEM_ERROR`, unless the failed executor was
+  the last one and the task has no outputs, which completes as asked.
 - **Wildcards without `path_prefix`.** An output whose `path` has wildcards
   (`*`, `?`, `[`) but no `path_prefix` is refused with `400 Bad Request`,
   unless its `url` is a `file:` URL or has no scheme, as TES 1.1 requires
   `path_prefix` for such outputs (see [TES 1.1 fields](api.md#tes-11-fields)).
   Before, such a task ran, and its output then failed or uploaded nothing
   useful. Clients that send such outputs to other URLs set `path_prefix`,
-  e.g. to the part of `path` before its first wildcard.
+  e.g. to the part of `path` before its first wildcard. Uploading the
+  matches of a pattern needs a taskmaster whose filer supports `path_prefix`
+  ([tesk-core#134](https://github.com/elixir-cloud-aai/tesk-core/pull/134)).
 - **Output file logs.** `logs[0].outputs` lists the uploaded files (see
   [Output file logs](api.md#output-file-logs)) once the taskmaster and the
   filer are of a tesk-core release with
@@ -42,6 +76,30 @@ notice changed answers:
   are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned
   all tasks at once. Clients that don't pass `page_size` must follow
   `next_page_token`, or pass a `page_size` of up to 2048.
+- **`CANCELING` and `PREEMPTED`.** A cancelled task is `CANCELING` while a
+  pod of its taskmaster, executors or outputs filer is still running, and
+  `CANCELED` only once they have ended; a task whose failed executors were
+  all disrupted by Kubernetes (preemption, eviction, node pressure, taints) is
+  `PREEMPTED` instead of `EXECUTOR_ERROR` (see [Getting
+  tasks](index.md#getting-tasks)). Clients that wait for `CANCELED` after a
+  cancel request wait until the pods have ended; clients that know only the
+  states of TES 1.0 must accept the new ones.
+- **`backend_parameters`.** They are no longer stored or returned, also for
+  tasks created by earlier versions; with the view `FULL`, a task lists the
+  keys it ignored in `logs[0].system_logs` (only tasks created by 2.0.0 or
+  later: earlier versions recorded no ignored keys, so their tasks list
+  none).
+  Service info lists `tesResources_backend_parameters` (always `[]`); keep
+  it at `[]` in your own service info file, if you use one.
+- **Service info.** `type.version` is `1.1.0` instead of `1.0.0`. If you
+  use your own file (`TESK_API_SERVICE_INFO_LOCATION`), update `type.version`
+  and `version` there, too.
+- **Inputs without a source.** An input with neither a `url` (that isn't
+  blank) nor a `content` (that isn't empty) is still refused with `400 Bad
+  Request`, but the message now names the check:
+  `Field 'inputs[0].urlOrContentGiven' URL or content required` instead of
+  `Field 'inputs[0]' URL or content required`. The messages are meant for
+  people; clients should rely on the status code, not on their text.
 - **Token validation.** TESK API validates access tokens with the resource
   server of Spring Security instead of Spring Security OAuth, which is end
   of life. Deployments need no change if
@@ -64,41 +122,14 @@ notice changed answers:
     - Without a valid token, a request that accepts no JSON (e.g.
       `Accept: text/plain`) gets `401` with the `WWW-Authenticate`
       header and no body.
+    - A user whose groups claim is `null` has no group authorities; before,
+      they had one named `null`.
 - **User info endpoint.** TESK API waits at most 10 seconds to connect to
   the user info endpoint and 30 seconds for each read of its answer, and then refuses
   the token (before, it waited without limit). It doesn't start if
   `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` isn't an absolute `http` or
   `https` URL with a host; before, it started and refused every
   token.
-- **`ignore_error`.** `executors[].ignore_error: true` is accepted rather
-  than refused with `400 Bad Request` (see [TES 1.1
-  fields](api.md#tes-11-fields)). It needs a taskmaster that goes on after
-  such an executor fails
-  ([tesk-core#142](https://github.com/elixir-cloud-aai/tesk-core/issues/142)):
-  set the taskmaster image to such a release
-  (`TESK_API_TASKMASTER_IMAGE_VERSION`, see
-  [Configuration](configuration.md)) once this TESK API runs, not before
-  (see "Upgrade order for filer labels" below, as such a release may also
-  label the filers' jobs). An older taskmaster stops at the
-  failure: the task then ends `SYSTEM_ERROR`, unless the failed executor was
-  the last one and the task has no outputs, which completes as asked.
-- **Upgrade order for filer labels.** A single task's executors are its
-  jobs with both labels `taskmaster-name=<task>` and `job-type=executor`
-  (before: `taskmaster-name` only). Taskmasters of tesk-core releases with
-  [tesk-core#147](https://github.com/elixir-cloud-aai/tesk-core/issues/147)
-  also give the filers' jobs the label `taskmaster-name`. Upgrade TESK API
-  to this release first, and set the taskmaster to such a release
-  (`TESK_API_TASKMASTER_IMAGE_VERSION`, see
-  [Configuration](configuration.md)) only once no older replica of TESK API
-  serves requests: in a second deployment after the rollout has finished,
-  or in the same one with the `Recreate` strategy. An older TESK API with
-  such a
-  taskmaster takes the inputs filer's job for the outputs filer's job on
-  `GET /tasks/{id}` and `POST /tasks/{id}:cancel`: a task whose taskmaster
-  stopped before the outputs filer after an ignored executor failure is
-  `COMPLETE` instead of `SYSTEM_ERROR`, and a task whose inputs filer
-  failed is `SYSTEM_ERROR` while its taskmaster still runs. `GET /tasks`
-  isn't affected. With older taskmasters, nothing changes.
 - **Kubernetes client.** TESK API has version 28 of the Kubernetes Java
   client instead of 11 (see [Deployment](deployment.md#kubernetes)), and
   SnakeYAML 2 instead of 1.33. Nothing changes for deployments: it needs the
@@ -111,6 +142,19 @@ notice changed answers:
   which Kubernetes refused. A task whose taskmaster
   job has no creation time has no `creation_time`, instead of the current
   time; Kubernetes sets it for every job, so this only matters for tests.
+- **Tasks that can't be serialized.** If TESK API can't write a task as
+  JSON for its taskmaster, creating the task fails with `500 Internal
+  Server Error`; before, it logged the error and created a job without the
+  task's JSON, which could neither run nor be read back. This doesn't
+  happen with valid TES tasks.
+
+New, off until you use them: tokens of allow-listed service clients
+(`TESK_API_AUTHORISATION_SERVICE_CLIENTS_*`, see [Tokens of
+services](access-control.md#tokens-of-services); in the Helm chart of TESK
+after 0.3.0: `auth.tokenClients`) and private executor images, an experimental
+workaround that needs `create` and `delete` on `secrets` (see [Private
+executor images](api.md#private-executor-images) and
+[Deployment](deployment.md)).
 
 ## To 1.2.0
 
