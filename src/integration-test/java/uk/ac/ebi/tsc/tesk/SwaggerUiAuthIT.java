@@ -58,4 +58,10 @@ public class SwaggerUiAuthIT {
     public void apiDocsWithoutToken_isOk() throws Exception {
         this.mvc.perform(get(API_DOCS_URL)).andExpect(status().isOk());
     }
+
+    /** The API description in YAML (springdoc) is as public as the JSON one */
+    @Test
+    public void apiDocsYamlWithoutToken_isOk() throws Exception {
+        this.mvc.perform(get(API_DOCS_URL + ".yaml")).andExpect(status().isOk());
+    }
 }

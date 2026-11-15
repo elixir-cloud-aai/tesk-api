@@ -12,12 +12,8 @@ import org.springframework.context.annotation.Configuration;
 public class ApiDocsConfiguration {
 
     /** The properties of TesExecutor that are only written (in requests), by their JSON names */
-    static final Map<String, String> WRITE_ONLY_EXECUTOR_PROPERTIES = new LinkedHashMap<>();
-
-    static {
-        WRITE_ONLY_EXECUTOR_PROPERTIES.put("dockerLogin", "docker_login");
-        WRITE_ONLY_EXECUTOR_PROPERTIES.put("dockerPass", "docker_pass");
-    }
+    private static final Map<String, String> WRITE_ONLY_EXECUTOR_PROPERTIES =
+            Map.of("dockerLogin", "docker_login", "dockerPass", "docker_pass");
 
     /**
      * Names the write-only properties of TesExecutor as in JSON: swagger-core takes their names

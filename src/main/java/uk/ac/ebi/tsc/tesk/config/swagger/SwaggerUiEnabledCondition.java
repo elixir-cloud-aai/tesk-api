@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
+import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
@@ -8,10 +9,10 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
  * value other than {@code true} or {@code false} (ignoring case), as {@link
  * SwaggerUiDisabledCondition} does.
  */
-public class SwaggerUiEnabledCondition extends SwaggerUiDisabledCondition {
+public class SwaggerUiEnabledCondition implements Condition {
 
     @Override
     public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-        return !super.matches(context, metadata);
+        return SwaggerUiDisabledCondition.isEnabled(context.getEnvironment());
     }
 }

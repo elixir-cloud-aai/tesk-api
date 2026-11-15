@@ -152,4 +152,17 @@ public class CustomAuthenticationEntryPointTest {
         assertEquals(401, response.getStatus());
         assertEquals("unauthorized", body(response).get("error"));
     }
+
+    /** More than 50 media types, which Spring doesn't sort, are taken as all, still with a 401 */
+    @Test
+    public void tooManyAcceptedTypes_areTakenAsAll() throws Exception {
+        StringBuilder accept = new StringBuilder("a/a0");
+        for (int i = 1; i <= 51; i++) {
+            accept.append(", a/a").append(i);
+        }
+        MockHttpServletResponse response =
+                commence(accept.toString(), new InsufficientAuthenticationException("no token"));
+        assertEquals(401, response.getStatus());
+        assertEquals("unauthorized", body(response).get("error"));
+    }
 }

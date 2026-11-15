@@ -13,7 +13,8 @@ Method | Path | Operation
 `GET` | `/tasks/{id}` | Get a task
 `POST` | `/tasks/{id}:cancel` | Cancel a task (answers with an empty object, `{}`)
 
-The API description (OpenAPI 3.1) is at `/v3/api-docs`. `/v2/api-docs`
+The API description (OpenAPI 3.1) is at `/v3/api-docs` (JSON) and
+`/v3/api-docs.yaml` (YAML). `/v2/api-docs`
 serves the same description, for clients of releases before 2.0.0 (which
 served Swagger 2.0 there); it is deprecated and will be removed in a later
 release (see [Upgrading](upgrading.md#to-200)).

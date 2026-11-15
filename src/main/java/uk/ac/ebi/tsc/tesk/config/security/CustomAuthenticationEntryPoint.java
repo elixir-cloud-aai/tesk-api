@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -20,6 +21,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.util.InvalidMimeTypeException;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -128,7 +130,12 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         }
         // q=0: not acceptable
         accepted.removeIf(mediaType -> mediaType.getQualityValue() == 0);
-        MimeTypeUtils.sortBySpecificity(accepted);
+        try {
+            MimeTypeUtils.sortBySpecificity(accepted);
+        } catch (InvalidMimeTypeException e) {
+            // more than 50 media types, which Spring refuses to sort: answer as without Accept
+            accepted = new ArrayList<>(Collections.singletonList(MediaType.ALL));
+        }
         for (MediaType mediaType : accepted) {
             for (HttpMessageConverter<?> converter : this.messageConverters) {
                 if (converter.canWrite(body.getClass(), mediaType)) {

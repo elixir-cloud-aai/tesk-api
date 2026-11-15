@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.config.swagger;
 
 import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
+import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
 /**
@@ -16,12 +17,21 @@ public class SwaggerUiDisabledCondition implements Condition {
 
     @Override
     public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-        String value = context.getEnvironment().getProperty(PROPERTY);
+        return !isEnabled(context.getEnvironment());
+    }
+
+    /**
+     * Whether the Swagger UI is on, rejecting values other than {@code true} and {@code false}
+     *
+     * @throws IllegalArgumentException for any other value
+     */
+    static boolean isEnabled(Environment environment) {
+        String value = environment.getProperty(PROPERTY);
         if (value == null || "false".equalsIgnoreCase(value)) {
-            return true;
+            return false;
         }
         if ("true".equalsIgnoreCase(value)) {
-            return false;
+            return true;
         }
         throw new IllegalArgumentException(
                 "Invalid value '"

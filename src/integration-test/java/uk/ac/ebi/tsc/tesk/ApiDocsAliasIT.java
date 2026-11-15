@@ -40,6 +40,8 @@ public class ApiDocsAliasIT {
 
     private static final ObjectMapper JSON = JsonMapper.builder().build();
 
+    private static final HttpClient CLIENT = HttpClient.newHttpClient();
+
     @LocalServerPort private int port;
 
     @TestConfiguration
@@ -52,11 +54,9 @@ public class ApiDocsAliasIT {
     }
 
     private HttpResponse<String> get(String path) throws Exception {
-        return HttpClient.newHttpClient()
-                .send(
-                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
-                                .build(),
-                        HttpResponse.BodyHandlers.ofString());
+        return CLIENT.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).build(),
+                HttpResponse.BodyHandlers.ofString());
     }
 
     @Test

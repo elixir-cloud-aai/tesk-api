@@ -21,6 +21,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsAliasController;
 
 /**
  * With the auth profile, protects (all but the public) endpoints with OAuth2 bearer tokens, using
@@ -36,14 +37,15 @@ import org.springframework.security.web.SecurityFilterChain;
 @Profile("auth")
 public class ResourceServerConfiguration {
 
-    // The API description (/v3/api-docs, with its former path /v2/api-docs as an alias), and the
+    // The API description (/v3/api-docs, also as YAML, with its former path /v2/api-docs as an
+    // alias), and the
     // Swagger UI paths, which are only mapped (else 404) with tesk.api.swagger-ui.enabled
     private static final String[] ALLOWED_URLS = {
         "/",
-        "/v3/api-docs",
-        "/v3/api-docs/**",
-        "/v2/api-docs",
-        "/swagger-ui.html",
+        ApiDocsAliasController.API_DOCS,
+        ApiDocsAliasController.API_DOCS + "/**",
+        ApiDocsAliasController.API_DOCS + ".yaml",
+        ApiDocsAliasController.ALIAS,
         "/swagger-ui/**",
         "/webjars/**"
     };
