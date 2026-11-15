@@ -1,10 +1,10 @@
 # Upgrading
 
-## To 1.3.0
+## To 2.0.0
 
 From 1.2.0, deployments may have to check their JVM options, the order in
 which they upgrade TESK API and the taskmaster, and the taskmaster's rights;
-the new options are off by default. TESK API 1.3.0 accepts the task fields,
+the new options are off by default. TESK API 2.0.0 accepts the task fields,
 list filters and states of TES 1.1, and clients may notice changed answers:
 read all of the items below before you upgrade.
 
@@ -86,7 +86,7 @@ read all of the items below before you upgrade.
   states of TES 1.0 must accept the new ones.
 - **`backend_parameters`.** They are no longer stored or returned, also for
   tasks created by earlier versions; with the view `FULL`, a task lists the
-  keys it ignored in `logs[0].system_logs` (only tasks created by 1.3.0 or
+  keys it ignored in `logs[0].system_logs` (only tasks created by 2.0.0 or
   later: earlier versions recorded no ignored keys, so their tasks list
   none).
   Service info lists `tesResources_backend_parameters` (always `[]`); keep
