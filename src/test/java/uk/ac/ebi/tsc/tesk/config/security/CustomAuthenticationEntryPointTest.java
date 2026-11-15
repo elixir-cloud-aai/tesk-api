@@ -163,6 +163,7 @@ public class CustomAuthenticationEntryPointTest {
         MockHttpServletResponse response =
                 commence(accept.toString(), new InsufficientAuthenticationException("no token"));
         assertEquals(401, response.getStatus());
+        assertTrue(response.getContentType().startsWith("application/json"));
         assertEquals("unauthorized", body(response).get("error"));
     }
 }

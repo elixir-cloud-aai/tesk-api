@@ -38,8 +38,8 @@ import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsAliasController;
 public class ResourceServerConfiguration {
 
     // The API description (/v3/api-docs, also as YAML, with its former path /v2/api-docs as an
-    // alias), and the
-    // Swagger UI paths, which are only mapped (else 404) with tesk.api.swagger-ui.enabled
+    // alias), and the Swagger UI paths, which are only mapped (else 404) with
+    // tesk.api.swagger-ui.enabled
     private static final String[] ALLOWED_URLS = {
         "/",
         ApiDocsAliasController.API_DOCS,
