@@ -91,8 +91,9 @@ labelled `job-type=executor` and `taskmaster-name=<task>`, and its outputs filer
 is the job `<task>-outputs-filer`; the filers' jobs are never taken as
 executors, also when they carry the label `taskmaster-name`. For a list of
 tasks, TESK API reads only the filers' jobs of the page's tasks, by the label
-`taskmaster-name`, and all filers' jobs without that label only while a task
-of the page has no labelled filer job (see [Output file
+`taskmaster-name` that taskmasters of tesk-core 0.12.0 and later put on them,
+and all filers' jobs without that label only while a task of the page has
+outputs but no labelled filer job (see [Output file
 logs](api.md#output-file-logs)).
 
 The task's state comes from these jobs. In this order, the first rule that

@@ -74,7 +74,8 @@ read all of the items below before you upgrade.
 - **Listing reads the page's filer jobs.** `GET /tasks` reads the filers'
   jobs of the page's tasks by their label `taskmaster-name` instead of all
   filers' jobs in the namespace, and the unlabelled filers' jobs of older
-  taskmasters only while a task of the page has no labelled filer job (see
+  taskmasters only while a task of the page has outputs but no labelled
+  filer job (see
   [Output file logs](api.md#output-file-logs)). Tasks started before the
   taskmaster upgrade keep their states. TESK API needs no new permissions
   (it still lists `jobs`). Listing gets cheaper once the taskmaster is of

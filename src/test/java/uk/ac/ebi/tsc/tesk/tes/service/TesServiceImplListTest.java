@@ -436,4 +436,45 @@ class TesServiceImplListTest {
                         tuple("task-2", TesState.SYSTEM_ERROR));
         verify(this.client).listUnlabelledFilerJobs();
     }
+
+    /**
+     * A task without outputs has no outputs filer, the only filer job that counts: it needs no
+     * fallback, also without a labelled filer job (e.g. a task without inputs and outputs, which
+     * never gets one). A task with outputs and without a labelled filer job does (issue #177).
+     */
+    @Test
+    void fallsBackOnlyForTasksWithOutputs() {
+        this.page(
+                null,
+                null,
+                null,
+                stored("task-1", "{\"executors\":[{}],\"outputs\":[]}"),
+                stored("task-2", "{\"executors\":[{}]}"));
+        this.service.listTasks(TaskFilter.byNamePrefix(null), null, null, TaskView.MINIMAL, USER);
+        verify(this.client, never()).listUnlabelledFilerJobs();
+
+        this.page(
+                null,
+                null,
+                null,
+                stored("task-1", "{\"executors\":[{}],\"outputs\":[]}"),
+                stored("task-3", "{\"executors\":[{}],\"outputs\":[{\"url\":\"s3://b/o\"}]}"));
+        this.service.listTasks(TaskFilter.byNamePrefix(null), null, null, TaskView.MINIMAL, USER);
+        verify(this.client).listUnlabelledFilerJobs();
+    }
+
+    /** A filer job without labels (which Kubernetes wouldn't select) counts as unlabelled. */
+    @Test
+    void filerJobWithoutLabelsCountsAsUnlabelled() {
+        this.page(null, null, null, taskmaster("task-1", "a"));
+        when(this.client.listFilerJobsOfTasks(Collections.singletonList("task-1")))
+                .thenReturn(
+                        jobList(
+                                new V1Job()
+                                        .metadata(new V1ObjectMeta().name("task-1-inputs-filer"))));
+
+        this.service.listTasks(TaskFilter.byNamePrefix(null), null, null, TaskView.MINIMAL, USER);
+
+        verify(this.client).listUnlabelledFilerJobs();
+    }
 }

@@ -362,7 +362,7 @@ public class TesKubernetesConverter {
      * @param taskMasterJob - taskmaster's job
      * @return whether the task has outputs, or null if the task isn't stored or can't be read
      */
-    Boolean extractHasOutputs(V1Job taskMasterJob) {
+    public Boolean extractHasOutputs(V1Job taskMasterJob) {
         if (this.readStoredTaskField(taskMasterJob, "executors") == null) {
             return null;
         }

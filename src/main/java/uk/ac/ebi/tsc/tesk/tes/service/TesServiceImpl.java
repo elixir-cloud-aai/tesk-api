@@ -18,6 +18,7 @@ import io.kubernetes.client.openapi.models.V1Secret;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -338,26 +339,38 @@ public class TesServiceImpl implements TesService {
 
     /**
      * The filer jobs of the tasks of these taskmaster jobs: selected by their label {@code
-     * taskmaster-name}, which taskmasters with tesk-core#147 put on them (issue #177). A task
-     * without any labelled filer job may have been started by an older taskmaster, whose filer jobs
-     * have no label; then all unlabelled filer jobs are listed as well. Tasks with a labelled filer
-     * job, e.g. the inputs filer's, need no fallback, as the outputs filer's job of the same
-     * taskmaster is labelled too.
+     * taskmaster-name}, which taskmasters with tesk-core#147 put on them (issue #177). The filer
+     * jobs of older taskmasters have no label: if a task that may have an outputs filer (its stored
+     * task has outputs, or can't be read) has no labelled filer job, all unlabelled filer jobs are
+     * listed as well. Tasks with a labelled filer job, e.g. the inputs filer's, need no fallback,
+     * as a taskmaster labels all its filer jobs or none; tasks without outputs have no outputs
+     * filer, the only filer job that counts for the task.
      */
     private List<V1Job> listFilerJobs(List<V1Job> taskmasterJobs) {
         List<String> taskIds =
                 taskmasterJobs.stream()
                         .map(job -> job.getMetadata().getName())
-                        .distinct()
                         .collect(Collectors.toList());
         List<V1Job> filerJobs =
                 new ArrayList<>(
                         this.kubernetesClientWrapper.listFilerJobsOfTasks(taskIds).getItems());
         Set<String> tasksWithLabelledFilers =
                 filerJobs.stream()
-                        .map(job -> job.getMetadata().getLabels().get(LABEL_TESTASK_ID_KEY))
+                        .map(job -> job.getMetadata().getLabels())
+                        .filter(Objects::nonNull)
+                        .map(labels -> labels.get(LABEL_TESTASK_ID_KEY))
                         .collect(Collectors.toSet());
-        if (!tasksWithLabelledFilers.containsAll(taskIds)) {
+        boolean fallback =
+                taskmasterJobs.stream()
+                        .filter(
+                                job ->
+                                        !tasksWithLabelledFilers.contains(
+                                                job.getMetadata().getName()))
+                        .anyMatch(
+                                job ->
+                                        !Boolean.FALSE.equals(
+                                                this.converter.extractHasOutputs(job)));
+        if (fallback) {
             filerJobs.addAll(this.kubernetesClientWrapper.listUnlabelledFilerJobs().getItems());
         }
         return filerJobs;

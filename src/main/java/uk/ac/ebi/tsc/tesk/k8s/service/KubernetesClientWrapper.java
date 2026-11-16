@@ -39,6 +39,13 @@ public class KubernetesClientWrapper {
 
     private static Logger logger = LoggerFactory.getLogger(KubernetesClientWrapper.class);
 
+    /**
+     * Maximum number of tasks in the label selector of a request for their filer jobs, so that the
+     * request's URL stays short: about 1.4 KB for the task IDs that TESK API generates ({@code
+     * task-} and 8 hexadecimal digits).
+     */
+    static final int FILER_SELECTOR_BATCH_SIZE = 100;
+
     private final BatchV1Api batchApi;
 
     private final BatchV1Api patchBatchApi;
@@ -48,12 +55,6 @@ public class KubernetesClientWrapper {
     private final CoreV1Api patchCoreApi;
 
     private final String namespace;
-
-    /**
-     * Maximum number of tasks in the label selector of a request for their filer jobs: with task
-     * IDs of 13 characters, the selector stays below 1.5 KB.
-     */
-    static final int FILER_SELECTOR_BATCH_SIZE = 100;
 
     public KubernetesClientWrapper(
             BatchV1Api batchApi,
