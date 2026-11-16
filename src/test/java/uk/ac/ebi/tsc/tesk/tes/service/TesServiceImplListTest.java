@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -13,13 +14,16 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_VALUE_TASKM;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TASKSTATE_VALUE_CANC;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
 
 import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobCondition;
 import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1JobStatus;
 import io.kubernetes.client.openapi.models.V1ListMeta;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +57,8 @@ class TesServiceImplListTest {
                 new TesKubernetesConverter(null, null, new ObjectMapper(), null, null);
         this.service = new TesServiceImpl(this.client, converter);
         when(this.client.listAllTaskExecutorJobs()).thenReturn(new V1JobList());
-        when(this.client.listAllFilerJobs()).thenReturn(new V1JobList());
+        when(this.client.listFilerJobsOfTasks(any())).thenReturn(new V1JobList());
+        when(this.client.listUnlabelledFilerJobs()).thenReturn(new V1JobList());
         when(this.client.listAllJobPods()).thenReturn(new V1PodList());
     }
 
@@ -203,7 +208,8 @@ class TesServiceImplListTest {
         assertThat(ids(response)).isEmpty();
         assertThat(response.getNextPageToken()).isEqualTo("token-2");
         verify(this.client, never()).listAllTaskExecutorJobs();
-        verify(this.client, never()).listAllFilerJobs();
+        verify(this.client, never()).listFilerJobsOfTasks(any());
+        verify(this.client, never()).listUnlabelledFilerJobs();
         verify(this.client, never()).listAllJobPods();
     }
 
@@ -324,7 +330,8 @@ class TesServiceImplListTest {
         assertThat(ids(response)).isEmpty();
         assertThat(response.getNextPageToken()).isEqualTo("token-2");
         verify(this.client, never()).listAllTaskExecutorJobs();
-        verify(this.client, never()).listAllFilerJobs();
+        verify(this.client, never()).listFilerJobsOfTasks(any());
+        verify(this.client, never()).listUnlabelledFilerJobs();
         verify(this.client, never()).listAllJobPods();
     }
 
@@ -342,5 +349,91 @@ class TesServiceImplListTest {
                         USER);
         assertThat(ids(response)).isEmpty();
         assertThat(response.getNextPageToken()).isEqualTo("token-2");
+    }
+
+    /**
+     * A filer job of the task with the given ID: the inputs or outputs filer's (suffix), labelled
+     * with the task's ID as taskmasters with tesk-core#147 do it, or not (as older ones), and
+     * failed.
+     */
+    private static V1Job failedFiler(String taskId, String suffix, boolean labelled) {
+        V1ObjectMeta metadata = new V1ObjectMeta().name(taskId + suffix);
+        if (labelled) {
+            metadata.putLabelsItem(LABEL_TESTASK_ID_KEY, taskId);
+        }
+        return new V1Job()
+                .metadata(metadata)
+                .status(
+                        new V1JobStatus()
+                                .failed(1)
+                                .addConditionsItem(
+                                        new V1JobCondition().type("Failed").status("True")));
+    }
+
+    private static V1JobList jobList(V1Job... jobs) {
+        V1JobList list = new V1JobList();
+        Arrays.stream(jobs).forEach(list::addItemsItem);
+        return list;
+    }
+
+    /**
+     * Only the filer jobs of the page's matching tasks are listed, by their label (issue #177); the
+     * unlabelled filer jobs of older taskmasters aren't, if every matching task has a labelled
+     * filer job. A failed outputs filer makes its task fail, so it was combined with its task.
+     */
+    @Test
+    void listsOnlyFilerJobsOfMatchingTasks() {
+        this.page(
+                null,
+                null,
+                null,
+                taskmaster("task-1", "align-1"),
+                taskmaster("task-2", "call-1"),
+                taskmaster("task-3", "align-2"));
+        when(this.client.listFilerJobsOfTasks(Arrays.asList("task-1", "task-3")))
+                .thenReturn(
+                        jobList(
+                                failedFiler("task-1", "-outputs-filer", true),
+                                failedFiler("task-3", "-inputs-filer", true)));
+
+        TesListTasksResponse response =
+                this.service.listTasks(
+                        TaskFilter.byNamePrefix("align"), null, null, TaskView.MINIMAL, USER);
+
+        assertThat(response.getTasks())
+                .extracting(TesTask::getId, TesTask::getState)
+                .containsExactly(
+                        tuple("task-1", TesState.SYSTEM_ERROR),
+                        tuple("task-3", TesState.INITIALIZING));
+        verify(this.client).listFilerJobsOfTasks(Arrays.asList("task-1", "task-3"));
+        verify(this.client, never()).listUnlabelledFilerJobs();
+    }
+
+    /**
+     * Tasks started by taskmasters before tesk-core#147 have filer jobs without the label: if a
+     * matching task has no labelled filer job, the unlabelled filer jobs are listed too, so that
+     * those tasks keep their state (issue #177).
+     */
+    @Test
+    void fallsBackToUnlabelledFilerJobs() {
+        this.page(null, null, null, taskmaster("task-1", "new"), taskmaster("task-2", "old"));
+        when(this.client.listFilerJobsOfTasks(Arrays.asList("task-1", "task-2")))
+                .thenReturn(jobList(failedFiler("task-1", "-outputs-filer", true)));
+        when(this.client.listUnlabelledFilerJobs())
+                .thenReturn(
+                        jobList(
+                                failedFiler("task-2", "-outputs-filer", false),
+                                failedFiler("task-9", "-outputs-filer", false)));
+
+        TesListTasksResponse response =
+                this.service.listTasks(
+                        TaskFilter.byNamePrefix(null), null, null, TaskView.MINIMAL, USER);
+
+        assertThat(response.getTasks())
+                .extracting(TesTask::getId, TesTask::getState)
+                .containsExactly(
+                        tuple("task-1", TesState.SYSTEM_ERROR),
+                        tuple("task-2", TesState.SYSTEM_ERROR));
+        verify(this.client).listUnlabelledFilerJobs();
     }
 }
