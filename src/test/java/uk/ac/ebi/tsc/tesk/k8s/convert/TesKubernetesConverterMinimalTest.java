@@ -2,10 +2,10 @@ package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -36,9 +36,8 @@ import java.util.Map;
 import java.util.function.Supplier;
 import java.util.zip.GZIPInputStream;
 import org.hamcrest.CoreMatchers;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -51,7 +50,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DatabindException;
@@ -71,7 +69,6 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
 
 /** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
-@RunWith(SpringRunner.class)
 @JsonTest
 @TestPropertySource(locations = {"classpath:application.properties"})
 @EnableConfigurationProperties(TaskmasterEnvProperties.class)
@@ -100,7 +97,7 @@ public class TesKubernetesConverterMinimalTest {
 
     private TesKubernetesConverter converter;
 
-    @Before
+    @BeforeEach
     public void setUpConverter() {
         trsToolClient = mock(TrsToolClient.class);
         when(trsToolClient.getDockerImageForToolVersionURI(anyString())).then(returnsFirstArg());

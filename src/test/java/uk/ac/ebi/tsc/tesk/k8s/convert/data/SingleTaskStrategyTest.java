@@ -2,12 +2,12 @@ package uk.ac.ebi.tsc.tesk.k8s.convert.data;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class SingleTaskStrategyTest {
 

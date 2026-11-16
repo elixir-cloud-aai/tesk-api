@@ -1,12 +1,12 @@
 package uk.ac.ebi.tsc.tesk.config;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import jakarta.servlet.RequestDispatcher;
 import java.util.Arrays;
 import java.util.Map;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.boot.webmvc.error.DefaultErrorAttributes;
 import org.springframework.core.MethodParameter;

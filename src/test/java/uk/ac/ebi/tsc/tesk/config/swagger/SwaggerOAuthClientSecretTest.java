@@ -8,22 +8,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.system.OutputCaptureRule;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * The Swagger UI is a public client: its configuration and the API description never contain the
  * client secret, also if one is configured (the setting is deprecated), for both grant types.
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest(
         properties = {
             "tesk.api.swagger-ui.enabled=true",
@@ -31,13 +29,12 @@ import org.springframework.test.web.servlet.MockMvc;
             "tesk.api.swagger-oauth.client-id=swagger-client-id",
             "tesk.api.swagger-oauth.client-secret=" + SwaggerOAuthClientSecretTest.SECRET
         })
+@ExtendWith(OutputCaptureExtension.class)
 @ActiveProfiles("auth")
 @AutoConfigureMockMvc
 public class SwaggerOAuthClientSecretTest {
 
     static final String SECRET = "configured-client-secret-value";
-
-    @Rule public OutputCaptureRule output = new OutputCaptureRule();
 
     @Autowired private MockMvc mvc;
 
@@ -45,10 +42,10 @@ public class SwaggerOAuthClientSecretTest {
 
     /** The startup check logs the warning, without the secret. */
     @Test
-    public void startupCheck_logsWarningWithoutSecret() {
+    public void startupCheck_logsWarningWithoutSecret(CapturedOutput output) {
         this.properties.warnAboutClientSecret();
-        assertThat(this.output.getOut(), containsString("TESK_API_SWAGGER_OAUTH_CLIENT_SECRET"));
-        assertThat(this.output.getOut(), not(containsString(SECRET)));
+        assertThat(output.getOut(), containsString("TESK_API_SWAGGER_OAUTH_CLIENT_SECRET"));
+        assertThat(output.getOut(), not(containsString(SECRET)));
     }
 
     /** The Swagger UI gets the client ID (in its initializer), but not the secret. */

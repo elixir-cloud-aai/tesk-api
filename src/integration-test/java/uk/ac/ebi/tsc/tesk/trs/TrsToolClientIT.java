@@ -1,7 +1,7 @@
 package uk.ac.ebi.tsc.tesk.trs;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withNoContent;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
@@ -10,9 +10,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import jakarta.annotation.PostConstruct;
 import java.util.Optional;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.restclient.test.autoconfigure.RestClientTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -20,7 +19,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.client.MockRestServiceServer;
 import tools.jackson.databind.ObjectMapper;
 import uk.ac.ebi.tsc.tesk.trs.model.ImageData;
@@ -31,7 +29,6 @@ import uk.ac.ebi.tsc.tesk.trs.model.ToolVersion;
  * @author aniewielska
  * @since 31/03/2021
  */
-@RunWith(SpringRunner.class)
 @RestClientTest(TrsToolClient.class)
 @TestPropertySource(
         properties = {
@@ -71,7 +68,7 @@ public class TrsToolClientIT {
         detailsStringWithoutDocker = objectMapper.writeValueAsString(toolVersion);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         this.server.reset();
     }

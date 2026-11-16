@@ -10,19 +10,20 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1PodSecurityContext;
 import java.io.IOException;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.contrib.java.lang.system.EnvironmentVariables;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 
 /**
  * The security context of the executors' pods, from the ConfigMap that the environment variables
- * {@code CONFIGMAP}, {@code CONFIGMAPNAMESPACE} and {@code CONFIGMAPKEY} name
+ * {@code CONFIGMAP}, {@code CONFIGMAPNAMESPACE} and {@code CONFIGMAPKEY} name (read through
+ * Spring's {@link org.springframework.core.env.Environment}, which includes the environment
+ * variables)
  */
 public class KubernetesObjectsSupplierTest {
 
-    @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
-
     private final CoreV1Api coreApi = mock(CoreV1Api.class);
+
+    private final MockEnvironment environment = new MockEnvironment();
 
     /** The ConfigMap {@code name} in {@code namespace} has {@code data} */
     private void configMap(String name, String namespace, V1ConfigMap data) throws ApiException {
@@ -38,7 +39,8 @@ public class KubernetesObjectsSupplierTest {
                         mock(JobNameGenerator.class),
                         new TaskmasterEnvProperties(),
                         "tesk",
-                        coreApi)
+                        coreApi,
+                        environment)
                 .executorTemplate()
                 .getSpec()
                 .getTemplate()
@@ -52,8 +54,7 @@ public class KubernetesObjectsSupplierTest {
      */
     @Test
     public void defaultNamespaceAndKey() throws Exception {
-        environmentVariables.set("CONFIGMAP", "security");
-        environmentVariables.clear("CONFIGMAPNAMESPACE", "CONFIGMAPKEY");
+        environment.setProperty("CONFIGMAP", "security");
         configMap(
                 "security",
                 "tesk",
@@ -62,12 +63,39 @@ public class KubernetesObjectsSupplierTest {
         assertThat(securityContext()).isEqualTo(new V1PodSecurityContext().runAsUser(1001L));
     }
 
+    /**
+     * {@code CONFIGMAPNAMESPACE} and {@code CONFIGMAPKEY} choose the namespace and the key, and all
+     * settings of the YAML are taken over
+     */
+    @Test
+    public void customNamespaceAndKey() throws Exception {
+        environment.setProperty("CONFIGMAP", "security");
+        environment.setProperty("CONFIGMAPNAMESPACE", "config");
+        environment.setProperty("CONFIGMAPKEY", "executors");
+        configMap(
+                "security",
+                "config",
+                new V1ConfigMap()
+                        .putDataItem("securityContext", "runAsUser: 1")
+                        .putDataItem(
+                                "executors",
+                                "fsGroup: 2000\nrunAsUser: 2001\nrunAsGroup: 2002\nnonRoot: TRUE"));
+
+        assertThat(securityContext())
+                .isEqualTo(
+                        new V1PodSecurityContext()
+                                .fsGroup(2000L)
+                                .runAsUser(2001L)
+                                .runAsGroup(2002L)
+                                .runAsNonRoot(true));
+    }
+
     /** Settings that the YAML leaves out stay unset */
     @Test
     public void emptySecurityContext() throws Exception {
-        environmentVariables.set("CONFIGMAP", "security");
-        environmentVariables.set("CONFIGMAPNAMESPACE", "config");
-        environmentVariables.set("CONFIGMAPKEY", "executors");
+        environment.setProperty("CONFIGMAP", "security");
+        environment.setProperty("CONFIGMAPNAMESPACE", "config");
+        environment.setProperty("CONFIGMAPKEY", "executors");
         configMap("security", "config", new V1ConfigMap().putDataItem("executors", "{}"));
 
         assertThat(securityContext()).isEqualTo(new V1PodSecurityContext());
@@ -76,9 +104,9 @@ public class KubernetesObjectsSupplierTest {
     /** A ConfigMap without the key gives an empty security context */
     @Test
     public void configMapWithoutTheKey() throws Exception {
-        environmentVariables.set("CONFIGMAP", "security");
-        environmentVariables.set("CONFIGMAPNAMESPACE", "config");
-        environmentVariables.set("CONFIGMAPKEY", "executors");
+        environment.setProperty("CONFIGMAP", "security");
+        environment.setProperty("CONFIGMAPNAMESPACE", "config");
+        environment.setProperty("CONFIGMAPKEY", "executors");
         configMap("security", "config", new V1ConfigMap().putDataItem("other", "runAsUser: 1"));
 
         assertThat(securityContext()).isEqualTo(new V1PodSecurityContext());
@@ -87,8 +115,6 @@ public class KubernetesObjectsSupplierTest {
     /** Without {@code CONFIGMAP}, the executors' pods have no security context of TESK's */
     @Test
     public void withoutConfigMap() throws Exception {
-        environmentVariables.clear("CONFIGMAP");
-
         assertThat(securityContext()).isNull();
     }
 }

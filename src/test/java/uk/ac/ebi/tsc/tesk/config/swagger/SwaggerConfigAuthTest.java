@@ -9,7 +9,7 @@ import io.swagger.v3.oas.models.security.OAuthFlows;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import java.util.Arrays;
 import java.util.Collections;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** The OAuth 2.0 flow of the Swagger UI, and its scopes */
 public class SwaggerConfigAuthTest {

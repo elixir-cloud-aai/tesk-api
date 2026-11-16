@@ -1,15 +1,16 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Map;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** Normalisation of CPU cores (issue #44) */
 public class TesResourcesTest {
@@ -49,18 +50,20 @@ public class TesResourcesTest {
                 new TesResources().cpuCores(new BigDecimal("1e8")).getCpuCores().toString());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void cpuCores_hugeNumberRefused() {
-        new TesResources().setCpuCores(new BigDecimal("1e10"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new TesResources().setCpuCores(new BigDecimal("1e10")));
     }
 
     @Test
     public void cpuCores_zeroInAnyNotation() {
         for (String zero : new String[] {"0e10", "0e-10", "0.0000"}) {
             assertEquals(
-                    zero,
                     "0",
-                    new TesResources().cpuCores(new BigDecimal(zero)).getCpuCores().toString());
+                    new TesResources().cpuCores(new BigDecimal(zero)).getCpuCores().toString(),
+                    zero);
         }
     }
 

@@ -1,14 +1,14 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.util.StringUtils;
 
 public class ElixirPrincipalExtractorTest {
@@ -16,7 +16,7 @@ public class ElixirPrincipalExtractorTest {
     private ElixirPrincipalExtractor extractorNoSuffix;
     private ElixirPrincipalExtractor extractorSuffix;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         AuthorisationProperties properties = new AuthorisationProperties();
         properties.setBaseGroupPrefix("BASE_GROUP:");

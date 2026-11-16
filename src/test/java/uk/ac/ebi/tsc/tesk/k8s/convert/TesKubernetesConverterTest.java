@@ -2,8 +2,9 @@ package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.isEmptyOrNullString;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
@@ -25,11 +26,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.zip.GZIPInputStream;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.contrib.java.lang.system.EnvironmentVariables;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -40,9 +38,9 @@ import org.springframework.boot.test.json.JsonContentAssert;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
 import tools.jackson.databind.ObjectMapper;
 import uk.ac.ebi.tsc.tesk.TestUtils;
@@ -59,7 +57,6 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
 
 /** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
-@RunWith(SpringRunner.class)
 @JsonTest
 @TestPropertySource(
         locations = {"classpath:application.properties"},
@@ -105,16 +102,26 @@ public class TesKubernetesConverterTest {
 
     private TesKubernetesConverter converter;
 
-    @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
+    /**
+     * The templates of a supplier that reads the security context of the executors' pods from a
+     * ConfigMap, then the converter that uses them (in this order, as one method: JUnit doesn't
+     * guarantee the order of several {@code @BeforeEach} methods)
+     */
+    @BeforeEach
+    public void setUp() throws ApiException, IOException {
+        setUpKubernetes();
+        setUpConverter();
+    }
 
-    @Before
-    public void setUpKubernetes() throws ApiException, IOException {
+    private void setUpKubernetes() throws ApiException, IOException {
         String configMapName = "testconf";
         String configMapNamespace = "test-namespace";
         String configMapKey = "testkey";
-        environmentVariables.set("CONFIGMAP", configMapName);
-        environmentVariables.set("CONFIGMAPNAMESPACE", configMapNamespace);
-        environmentVariables.set("CONFIGMAPKEY", configMapKey);
+        MockEnvironment environment =
+                new MockEnvironment()
+                        .withProperty("CONFIGMAP", configMapName)
+                        .withProperty("CONFIGMAPNAMESPACE", configMapNamespace)
+                        .withProperty("CONFIGMAPKEY", configMapKey);
         Map<String, String> testConfigMapData = new HashMap<>();
         testConfigMapData.put(
                 configMapKey, "fsGroup: 1000\nrunAsUser: 1001\nnonRoot: true\nrunAsGroup: 1002");
@@ -127,13 +134,17 @@ public class TesKubernetesConverterTest {
         when(readConfigMap.execute()).thenReturn(testConfigMap);
         KubernetesObjectsSupplier objectsSupplier =
                 new KubernetesObjectsSupplier(
-                        gson, jobNameGenerator, taskmasterEnvProperties, "test-namespace", coreApi);
+                        gson,
+                        jobNameGenerator,
+                        taskmasterEnvProperties,
+                        "test-namespace",
+                        coreApi,
+                        environment);
         this.executorTemplateSupplier = objectsSupplier.executorSupplier();
         this.taskmasterTemplateSupplier = objectsSupplier.taskMasterSupplier();
     }
 
-    @Before
-    public void setUpConverter() {
+    private void setUpConverter() {
         trsToolClient = mock(TrsToolClient.class);
         when(trsToolClient.getDockerImageForToolVersionURI(anyString())).then(returnsFirstArg());
         this.converter =
@@ -582,13 +593,13 @@ public class TesKubernetesConverterTest {
         filer.getMetadata().setAnnotations(null);
         taskBuilder.addJob(filer);
         assertEquals(
-                "no annotations",
                 Collections.emptyList(),
                 this.converter
                         .fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true)
                         .getLogs()
                         .get(0)
-                        .getOutputs());
+                        .getOutputs(),
+                "no annotations");
     }
 
     @Test
@@ -600,9 +611,9 @@ public class TesKubernetesConverterTest {
     public void fromK8sToTask_outputFileLogsNotList() throws IOException {
         assertEquals(Collections.emptyList(), this.outputsOf("{}"));
         // Jackson reads blank text as a missing node, not null
-        assertEquals("empty", Collections.emptyList(), this.outputsOf(""));
-        assertEquals("blank", Collections.emptyList(), this.outputsOf("  "));
-        assertEquals("JSON null", Collections.emptyList(), this.outputsOf("null"));
+        assertEquals(Collections.emptyList(), this.outputsOf(""), "empty");
+        assertEquals(Collections.emptyList(), this.outputsOf("  "), "blank");
+        assertEquals(Collections.emptyList(), this.outputsOf("null"), "JSON null");
     }
 
     @Test
@@ -616,25 +627,25 @@ public class TesKubernetesConverterTest {
         String valid = STORED_FILE_LOGS.substring(1, STORED_FILE_LOGS.length() - 1);
         assertEquals(Collections.emptyList(), this.outputsOf("[" + valid + ", 1]"));
         assertEquals(
-                "numeric URL",
                 Collections.emptyList(),
-                this.outputsOf("[{\"url\":1,\"path\":\"/p\",\"size_bytes\":\"1\"}]"));
+                this.outputsOf("[{\"url\":1,\"path\":\"/p\",\"size_bytes\":\"1\"}]"),
+                "numeric URL");
         assertEquals(
-                "missing path",
                 Collections.emptyList(),
-                this.outputsOf("[{\"url\":\"u\",\"size_bytes\":\"1\"}]"));
+                this.outputsOf("[{\"url\":\"u\",\"size_bytes\":\"1\"}]"),
+                "missing path");
         assertEquals(
-                "missing size",
                 Collections.emptyList(),
-                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\"}]"));
+                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\"}]"),
+                "missing size");
         assertEquals(
-                "numeric size",
                 Collections.emptyList(),
-                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\",\"size_bytes\":1}]"));
+                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\",\"size_bytes\":1}]"),
+                "numeric size");
         assertEquals(
-                "negative size",
                 Collections.emptyList(),
-                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\",\"size_bytes\":\"-1\"}]"));
+                this.outputsOf("[{\"url\":\"u\",\"path\":\"/p\",\"size_bytes\":\"-1\"}]"),
+                "negative size");
     }
 
     /** The files that the taskmaster stores, as JSON, and as TES reports them. */
@@ -975,7 +986,7 @@ public class TesKubernetesConverterTest {
                     "{\"executors\": null}",
                     null
                 }) {
-            assertNull(stored, this.executorCountOf(stored));
+            assertNull(this.executorCountOf(stored), stored);
         }
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         taskmaster.getMetadata().setAnnotations(null);
@@ -1021,7 +1032,7 @@ public class TesKubernetesConverterTest {
                 new String[] {
                     "not JSON", "", "null", "[]", "{}", "{\"tags\": []}", "{\"tags\": null}", null
                 }) {
-            assertNull(stored, this.tagsOf(stored));
+            assertNull(this.tagsOf(stored), stored);
         }
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         taskmaster.getMetadata().setAnnotations(null);
@@ -1115,9 +1126,9 @@ public class TesKubernetesConverterTest {
                             User.builder("test-user-id").build());
             String annotation = job.getMetadata().getAnnotations().get("ignore-error");
             assertEquals(
-                    "ignore_error: " + ignoreError,
                     Boolean.TRUE.equals(ignoreError) ? "true" : null,
-                    annotation);
+                    annotation,
+                    "ignore_error: " + ignoreError);
         }
     }
 

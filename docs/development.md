@@ -59,12 +59,20 @@ provider are mocked with WireMock, so no cluster is needed):
 ./mvnw clean verify
 ```
 
-The tests are written for JUnit 4 and run on the JUnit Platform through its
-vintage engine ([#167](https://github.com/elixir-cloud-aai/tesk-api/issues/167)
-moves them to JUnit 5). Surefire and Failsafe load Mockito as a Java agent at
-startup (`-javaagent` in their `argLine`): Java 21 warns about agents that are
-loaded later, as Mockito would load itself, and later Java versions refuse
-them.
+The tests are written for JUnit Jupiter (JUnit 5 and later; no JUnit 4 or
+vintage engine): `@ExtendWith` and `@RegisterExtension` instead of runners and
+rules, e.g. `WireMockExtension` for WireMock servers (built with
+`failOnUnmatchedRequests(true)`, so that a request that no stub matches fails
+the test) and Spring Boot's
+`OutputCaptureExtension` for logs. Spring Boot's test annotations
+(`@SpringBootTest`, `@WebMvcTest`, …) include the Spring extension. Settings
+that the code reads from environment variables are read through Spring's
+`Environment` (e.g. those of the security context, `CONFIGMAP` and the like),
+so that tests set them with a `MockEnvironment` or test properties rather than
+by changing the process's environment. Surefire and Failsafe load Mockito as a
+Java agent at startup (`-javaagent` in their `argLine`): Java 21 warns about
+agents that are loaded later, as Mockito would load itself, and later Java
+versions refuse them.
 
 ### Test coverage
 

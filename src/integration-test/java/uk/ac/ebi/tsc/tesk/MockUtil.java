@@ -4,7 +4,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.client.WireMock.ok;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.google.gson.Gson;
 import io.kubernetes.client.openapi.JSON;
 import io.kubernetes.client.openapi.models.V1Job;
@@ -23,7 +23,7 @@ class MockUtil {
 
     private static final Gson GSON = new JSON().getGson();
 
-    static void mockGetTaskKubernetesResponses(WireMockRule mockKubernetes) {
+    static void mockGetTaskKubernetesResponses(WireMockExtension mockKubernetes) {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=taskmaster-name%3Dtask-123%2Cjob-type%3Dexecutor")
@@ -55,13 +55,14 @@ class MockUtil {
      * Lets task-123 be a task of the user {@code userId} without a group (replaces the taskmaster
      * of {@link #mockGetTaskKubernetesResponses}, as WireMock prefers the stub added last)
      */
-    static void mockUngroupedTaskKubernetesResponses(WireMockRule mockKubernetes, String userId) {
+    static void mockUngroupedTaskKubernetesResponses(
+            WireMockExtension mockKubernetes, String userId) {
         mockTaskKubernetesResponses(mockKubernetes, taskmaster(null, userId));
     }
 
     /** Lets task-123 be a task of the user {@code userId} for the group {@code group} */
     static void mockGroupTaskKubernetesResponses(
-            WireMockRule mockKubernetes, String group, String userId) {
+            WireMockExtension mockKubernetes, String group, String userId) {
         mockTaskKubernetesResponses(mockKubernetes, taskmaster(group, userId));
     }
 
@@ -70,7 +71,7 @@ class MockUtil {
      * the old label {@code creator-user-id} (issue #119)
      */
     static void mockLegacyTaskKubernetesResponses(
-            WireMockRule mockKubernetes, String group, String legacyUserLabel) {
+            WireMockExtension mockKubernetes, String group, String legacyUserLabel) {
         V1ObjectMeta metadata =
                 new V1ObjectMeta()
                         .name("task-123")
@@ -106,7 +107,7 @@ class MockUtil {
                 .status(new V1JobStatus().succeeded(1));
     }
 
-    private static void mockTaskKubernetesResponses(WireMockRule mockKubernetes, V1Job job) {
+    private static void mockTaskKubernetesResponses(WireMockExtension mockKubernetes, V1Job job) {
         mockGetTaskKubernetesResponses(mockKubernetes);
         mockKubernetes.givenThat(
                 WireMock.get("/apis/batch/v1/namespaces/default/jobs/task-123")
@@ -118,7 +119,7 @@ class MockUtil {
         return GSON.toJson(new V1JobList().metadata(new V1ListMeta()).items(Arrays.asList(jobs)));
     }
 
-    static void mockListTaskKubernetesResponses(WireMockRule mockKubernetes) {
+    static void mockListTaskKubernetesResponses(WireMockExtension mockKubernetes) {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dexecutor")

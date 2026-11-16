@@ -8,8 +8,7 @@ import static uk.ac.ebi.tsc.tesk.UrlConstants.SWAGGER_UI_URLS;
 
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -17,14 +16,12 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * With authentication on and the default settings, the Swagger UI and its static resources are not
  * found (not unauthorized), and the API description needs no token
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(

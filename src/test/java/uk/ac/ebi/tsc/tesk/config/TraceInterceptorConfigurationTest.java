@@ -13,7 +13,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.logging.Log;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.aop.Advisor;
 import org.springframework.aop.PointcutAdvisor;
 import uk.ac.ebi.tsc.tesk.config.TraceInterceptorConfiguration.KubernetesAPICallsInterceptor;

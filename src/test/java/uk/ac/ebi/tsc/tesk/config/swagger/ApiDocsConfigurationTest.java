@@ -7,7 +7,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 
 /** The write-only properties of TesExecutor have their JSON names in the API description */

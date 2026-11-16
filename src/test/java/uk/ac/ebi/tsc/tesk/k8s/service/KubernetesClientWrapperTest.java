@@ -1,11 +1,12 @@
 package uk.ac.ebi.tsc.tesk.k8s.service;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -20,9 +21,9 @@ import io.kubernetes.client.openapi.models.*;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Optional;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -30,7 +31,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
@@ -38,7 +39,7 @@ import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 
-@RunWith(SpringRunner.class)
+@ExtendWith(SpringExtension.class)
 @TestPropertySource(properties = {"tesk.api.k8s.namespace = test-namespace"})
 public class KubernetesClientWrapperTest {
 
@@ -69,7 +70,7 @@ public class KubernetesClientWrapperTest {
 
     private CoreV1Api.APIlistNamespacedPodRequest listPods;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         createJob = request(BatchV1Api.APIcreateNamespacedJobRequest.class);
         given(batchApi.createNamespacedJob(any(), any())).willReturn(createJob);
@@ -114,10 +115,10 @@ public class KubernetesClientWrapperTest {
                 patch.getValue().getValue());
     }
 
-    @Test(expected = KubernetesException.class)
+    @Test
     public void cancelJobBeforeStart_refused() throws ApiException {
         given(patchJob.execute()).willThrow(new ApiException(403, "forbidden"));
-        wrapper.cancelJobBeforeStart("task-123");
+        assertThrows(KubernetesException.class, () -> wrapper.cancelJobBeforeStart("task-123"));
     }
 
     /** A ConfigMap is checked by creating it in a dry run */
@@ -130,10 +131,10 @@ public class KubernetesClientWrapperTest {
         Mockito.verify(createConfigMap).execute();
     }
 
-    @Test(expected = KubernetesException.class)
+    @Test
     public void checkConfigMap_refused() throws ApiException {
         given(createConfigMap.execute()).willThrow(new ApiException(422, "too large"));
-        wrapper.checkConfigMap(new V1ConfigMap());
+        assertThrows(KubernetesException.class, () -> wrapper.checkConfigMap(new V1ConfigMap()));
     }
 
     /**
@@ -155,18 +156,18 @@ public class KubernetesClientWrapperTest {
     }
 
     /** A 400 of the dry run without a Status to tell the cause isn't skipped */
-    @Test(expected = KubernetesException.class)
+    @Test
     public void checkConfigMap_badRequestWithoutBody() throws ApiException {
         given(createConfigMap.execute()).willThrow(new ApiException("", 400, null, null));
-        wrapper.checkConfigMap(new V1ConfigMap());
+        assertThrows(KubernetesException.class, () -> wrapper.checkConfigMap(new V1ConfigMap()));
     }
 
     /** Other 400s of the dry run aren't skipped */
-    @Test(expected = KubernetesException.class)
+    @Test
     public void checkConfigMap_otherBadRequest() throws ApiException {
         given(createConfigMap.execute())
                 .willThrow(new ApiException("", 400, null, "{\"message\":\"invalid\"}"));
-        wrapper.checkConfigMap(new V1ConfigMap());
+        assertThrows(KubernetesException.class, () -> wrapper.checkConfigMap(new V1ConfigMap()));
     }
 
     @Test
@@ -252,7 +253,7 @@ public class KubernetesClientWrapperTest {
         Mockito.verify(batchApi).readNamespacedJob("123", "test-namespace");
     }
 
-    @Test(expected = TaskNotFoundException.class)
+    @Test
     public void readTaskmasterJob_wrongType() throws Exception {
         V1Job job =
                 new V1Job()
@@ -261,10 +262,10 @@ public class KubernetesClientWrapperTest {
                                         .name("test job")
                                         .putLabelsItem("job-type", "executor"));
         given(readJob.execute()).willReturn(job);
-        wrapper.readTaskmasterJob("123");
+        assertThrows(TaskNotFoundException.class, () -> wrapper.readTaskmasterJob("123"));
     }
 
-    @Test(expected = TaskNotFoundException.class)
+    @Test
     public void readTaskmasterJob_noType() throws Exception {
         V1Job job =
                 new V1Job()
@@ -273,33 +274,33 @@ public class KubernetesClientWrapperTest {
                                         .name("test job")
                                         .putLabelsItem("other", "taskmaster"));
         given(readJob.execute()).willReturn(job);
-        wrapper.readTaskmasterJob("123");
+        assertThrows(TaskNotFoundException.class, () -> wrapper.readTaskmasterJob("123"));
     }
 
     /** A job without labels isn't a taskmaster's job: 404, not 500 (issue #125) */
-    @Test(expected = TaskNotFoundException.class)
+    @Test
     public void readTaskmasterJob_noLabels() throws Exception {
         V1Job job = new V1Job().metadata(new V1ObjectMeta().name("123"));
         given(readJob.execute()).willReturn(job);
-        wrapper.readTaskmasterJob("123");
+        assertThrows(TaskNotFoundException.class, () -> wrapper.readTaskmasterJob("123"));
     }
 
     /** A job without metadata isn't a taskmaster's job either (issue #125) */
-    @Test(expected = TaskNotFoundException.class)
+    @Test
     public void readTaskmasterJob_noMetadata() throws Exception {
         given(readJob.execute()).willReturn(new V1Job());
-        wrapper.readTaskmasterJob("123");
+        assertThrows(TaskNotFoundException.class, () -> wrapper.readTaskmasterJob("123"));
     }
 
-    @Test(expected = TaskNotFoundException.class)
+    @Test
     public void readTaskmasterJob_noJob() throws Exception {
         given(readJob.execute())
                 .willThrow(new ApiException(HttpStatus.NOT_FOUND.value(), "No job"));
-        wrapper.readTaskmasterJob("123");
+        assertThrows(TaskNotFoundException.class, () -> wrapper.readTaskmasterJob("123"));
     }
 
     /** A taskmaster job that Kubernetes is deleting (e.g. after its TTL) is gone (issue #117) */
-    @Test(expected = TaskNotFoundException.class)
+    @Test
     public void readTaskmasterJob_beingDeleted() throws Exception {
         V1Job job =
                 new V1Job()
@@ -309,7 +310,7 @@ public class KubernetesClientWrapperTest {
                                         .deletionTimestamp(OffsetDateTime.now())
                                         .putLabelsItem("job-type", "taskmaster"));
         given(readJob.execute()).willReturn(job);
-        wrapper.readTaskmasterJob("123");
+        assertThrows(TaskNotFoundException.class, () -> wrapper.readTaskmasterJob("123"));
     }
 
     /** Taskmaster jobs that Kubernetes is deleting aren't listed (issue #117) */
@@ -342,11 +343,11 @@ public class KubernetesClientWrapperTest {
         Mockito.verify(deleteJob).execute();
     }
 
-    @Test(expected = KubernetesException.class)
+    @Test
     public void deleteJob_fails() throws ApiException {
         given(deleteJob.execute())
                 .willThrow(new ApiException(HttpStatus.FORBIDDEN.value(), "forbidden"));
-        wrapper.deleteJob("123");
+        assertThrows(KubernetesException.class, () -> wrapper.deleteJob("123"));
     }
 
     @Test
@@ -660,34 +661,50 @@ public class KubernetesClientWrapperTest {
     }
 
     /** Without a page token, a 400 of Kubernetes stays a server error */
-    @Test(expected = KubernetesException.class)
+    @Test
     public void listAllTaskmasterJobsForUser_badRequestWithoutPageToken() throws ApiException {
         this.listJobsFails(HttpStatus.BAD_REQUEST.value(), "bad selector");
-        wrapper.listAllTaskmasterJobsForUser(null, null, User.builder("123").build());
+        assertThrows(
+                KubernetesException.class,
+                () ->
+                        wrapper.listAllTaskmasterJobsForUser(
+                                null, null, User.builder("123").build()));
     }
 
     /** A 400 of Kubernetes that isn't about the continue token stays a server error */
-    @Test(expected = KubernetesException.class)
+    @Test
     public void listAllTaskmasterJobsForUser_otherBadRequestWithPageToken() throws ApiException {
         this.listJobsFails(
                 HttpStatus.BAD_REQUEST.value(),
                 "{\"kind\":\"Status\",\"message\":\"unable to parse requirement\"}");
-        wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
+        assertThrows(
+                KubernetesException.class,
+                () ->
+                        wrapper.listAllTaskmasterJobsForUser(
+                                "token", null, User.builder("123").build()));
     }
 
     /** A 400 of Kubernetes without a Status to tell the cause stays a server error */
-    @Test(expected = KubernetesException.class)
+    @Test
     public void listAllTaskmasterJobsForUser_badRequestWithoutBodyWithPageToken()
             throws ApiException {
         this.listJobsFails(HttpStatus.BAD_REQUEST.value(), null);
-        wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
+        assertThrows(
+                KubernetesException.class,
+                () ->
+                        wrapper.listAllTaskmasterJobsForUser(
+                                "token", null, User.builder("123").build()));
     }
 
     /** Other errors of Kubernetes stay server errors, also with a page token */
-    @Test(expected = KubernetesException.class)
+    @Test
     public void listAllTaskmasterJobsForUser_serverErrorWithPageToken() throws ApiException {
         this.listJobsFails(HttpStatus.INTERNAL_SERVER_ERROR.value(), "error");
-        wrapper.listAllTaskmasterJobsForUser("token", null, User.builder("123").build());
+        assertThrows(
+                KubernetesException.class,
+                () ->
+                        wrapper.listAllTaskmasterJobsForUser(
+                                "token", null, User.builder("123").build()));
     }
 
     /**

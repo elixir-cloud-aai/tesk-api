@@ -1,17 +1,17 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERHASH_KEY;
 
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.regex.Pattern;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** The creator's label and annotation of a task's Kubernetes objects (issue #119) */
 public class CreatorLabelsTest {
@@ -44,7 +44,7 @@ public class CreatorLabelsTest {
                 }) {
             String hash = CreatorLabels.hash(id);
             assertEquals(CreatorLabels.HASH_LENGTH, hash.length());
-            assertTrue(hash, LABEL_VALUE.matcher(hash).matches());
+            assertTrue(LABEL_VALUE.matcher(hash).matches(), hash);
         }
     }
 

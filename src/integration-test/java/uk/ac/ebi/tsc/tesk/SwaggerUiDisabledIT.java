@@ -6,19 +6,16 @@ import static uk.ac.ebi.tsc.tesk.UrlConstants.API_DOCS_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.HOME_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.SWAGGER_UI_URLS;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * By default, the Swagger UI and its static resources are off; the API description stays available
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(

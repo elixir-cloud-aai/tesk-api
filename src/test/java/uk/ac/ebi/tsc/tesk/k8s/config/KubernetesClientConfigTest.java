@@ -8,7 +8,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.patchRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.custom.V1Patch;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
@@ -16,13 +16,18 @@ import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.credentials.AccessTokenAuthentication;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** The clients that merge-patch jobs and pods (labelling and cancelling tasks) */
 public class KubernetesClientConfigTest {
 
-    @Rule public WireMockRule kubernetes = new WireMockRule(wireMockConfig().dynamicPort());
+    @RegisterExtension
+    public WireMockExtension kubernetes =
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().dynamicPort())
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     private final KubernetesClientConfig config = new KubernetesClientConfig();
 

@@ -2,18 +2,18 @@ package uk.ac.ebi.tsc.tesk;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.unauthorized;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.SERVICE_INFO_URL;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -21,14 +21,12 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Integration testing of GET /service-info with authentication on and the setting that requires a
  * token for it. OIDC userInfo endpoint is WireMocked
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(
@@ -42,7 +40,12 @@ public class ServiceInfoTokenRequiredIT {
 
     @Autowired private MockMvc mvc;
 
-    @Rule public WireMockRule mockElixir = new WireMockRule(8090);
+    @RegisterExtension
+    public WireMockExtension mockElixir =
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(8090))
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     @TestConfiguration
     static class KubernetesClientMock {

@@ -143,23 +143,6 @@
             <version>3.13.2</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.junit.vintage</groupId>
-            <artifactId>junit-vintage-engine</artifactId>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.hamcrest</groupId>
-                    <artifactId>hamcrest-core</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.github.stefanbirkner</groupId>
-            <artifactId>system-rules</artifactId>
-            <version>1.19.0</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
@@ -253,12 +236,10 @@
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
                     <useSystemClassLoader>false</useSystemClassLoader>
-                    <!-- JaCoCo's agent (`argLine`, set by prepare-agent), Mockito's agent (inline
-                         mocks; loaded at startup, as Java 21 and later warn about agents loaded
-                         later and may refuse them), and access to the JDK internals that
-                         system-rules' EnvironmentVariables changes, which Java 17 and later close
-                         (TesKubernetesConverterTest) -->
-                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+                    <!-- JaCoCo's agent (`argLine`, set by prepare-agent) and Mockito's agent
+                         (inline mocks; loaded at startup, as Java 21 and later warn about agents
+                         loaded later and may refuse them) -->
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
                 </configuration>
             </plugin>
             <plugin>

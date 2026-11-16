@@ -8,25 +8,31 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.serverError;
 import static com.github.tomakehurst.wiremock.client.WireMock.unauthorized;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.github.tomakehurst.wiremock.http.Fault;
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.stream.Collectors;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.springframework.boot.test.system.OutputCaptureRule;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
@@ -35,28 +41,44 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
 /** Validation of tokens at the user info endpoint (WireMocked) */
+@ExtendWith(OutputCaptureExtension.class)
 public class UserInfoTokenIntrospectorTest {
 
     private static final String TOKEN = "secret-token";
     private static final String PREFIX = "urn:example:group:";
 
-    @Rule public WireMockRule userInfo = new WireMockRule(options().dynamicPort());
-    @Rule public OutputCaptureRule output = new OutputCaptureRule();
+    @RegisterExtension
+    public WireMockExtension userInfo =
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().dynamicPort())
+                    .failOnUnmatchedRequests(true)
+                    .build();
+
+    private CapturedOutput output;
+
+    @BeforeEach
+    public void captureOutput(CapturedOutput output) {
+        this.output = output;
+    }
 
     private UserInfoTokenIntrospector introspector;
 
-    @Before
+    @BeforeEach
     public void setUp() {
+        introspector = introspector(userInfo.getPort());
+    }
+
+    /** An introspector that asks the user info endpoint on {@code port} of localhost */
+    private static UserInfoTokenIntrospector introspector(int port) {
         AuthorisationProperties properties = new AuthorisationProperties();
         properties.setBaseGroupPrefix(PREFIX + "BASE:");
         properties.setAdminSubgroup("ADMIN");
         properties.setAdminGroupFull(PREFIX + "BASE:ADMIN");
         GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
-        introspector =
-                new UserInfoTokenIntrospector(
-                        "http://localhost:" + userInfo.port() + "/userinfo",
-                        new ElixirPrincipalExtractor(groups, properties),
-                        groups);
+        return new UserInfoTokenIntrospector(
+                "http://localhost:" + port + "/userinfo",
+                new ElixirPrincipalExtractor(groups, properties),
+                groups);
     }
 
     private void answer(String json) {
@@ -131,9 +153,14 @@ public class UserInfoTokenIntrospectorTest {
     }
 
     @Test
-    public void userInfoUnreachable_isRefused() {
-        userInfo.stop();
-        refused();
+    public void userInfoUnreachable_isRefused() throws IOException {
+        // a port that this socket holds, bound but not listening: connections are refused, and
+        // no other process can listen on it meanwhile
+        try (Socket socket = new Socket()) {
+            socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+            introspector = introspector(socket.getLocalPort());
+            refused();
+        }
     }
 
     @Test
@@ -222,7 +249,7 @@ public class UserInfoTokenIntrospectorTest {
         GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
         introspector =
                 new UserInfoTokenIntrospector(
-                        "http://localhost:" + userInfo.port() + "/userinfo",
+                        "http://localhost:" + userInfo.getPort() + "/userinfo",
                         new ElixirPrincipalExtractor(groups, new AuthorisationProperties()),
                         groups,
                         new RestTemplate(factory));

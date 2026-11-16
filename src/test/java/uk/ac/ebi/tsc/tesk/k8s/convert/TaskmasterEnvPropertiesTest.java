@@ -2,7 +2,7 @@ package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** The optional FTP account and executor Secret of the taskmaster's settings */
 public class TaskmasterEnvPropertiesTest {

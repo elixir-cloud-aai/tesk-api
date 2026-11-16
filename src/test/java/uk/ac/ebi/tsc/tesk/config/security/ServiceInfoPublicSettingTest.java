@@ -1,9 +1,9 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Collections;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
