@@ -89,7 +89,11 @@ their [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects
 and combines them into the TES task. A single task's executors are its jobs
 labelled `job-type=executor` and `taskmaster-name=<task>`, and its outputs filer
 is the job `<task>-outputs-filer`; the filers' jobs are never taken as
-executors, also when they carry the label `taskmaster-name`.
+executors, also when they carry the label `taskmaster-name`. For a list of
+tasks, TESK API reads only the filers' jobs of the page's tasks, by the label
+`taskmaster-name`, and all filers' jobs without that label only while a task
+of the page has no labelled filer job (see [Output file
+logs](api.md#output-file-logs)).
 
 The task's state comes from these jobs. In this order, the first rule that
 applies gives the state:

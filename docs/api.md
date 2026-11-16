@@ -298,14 +298,20 @@ for `file:` URLs and URLs without a scheme) give no entries. The `url`s
 are those of the task's outputs, so they carry what those carry (e.g. the
 signature of a presigned URL), as `outputs[].url` in the same answer does.
 
-`GET /tasks` reads the jobs of all outputs filers in the namespace, as
-before, to match them to the page's tasks; with the annotation, each job of
-a finished task with outputs can be up to about 200 KB larger. In
-namespaces with many finished tasks with many output files, delete
-finished tasks (e.g. with the taskmaster's TTL, see [Deleting
-tasks](index.md#deleting-tasks)) to keep listing cheap.
-[#177](https://github.com/elixir-cloud-aai/tesk-api/issues/177) is about
-reading only the outputs filers' jobs of the page's tasks.
+With the annotation, each outputs filer's job of a finished task with
+outputs can be up to about 200 KB larger. `GET /tasks` therefore reads only
+the filers' jobs of the page's tasks, by their label `taskmaster-name`,
+which taskmasters of tesk-core 0.12.0 and later
+([tesk-core#147](https://github.com/elixir-cloud-aai/tesk-core/issues/147))
+put on them, in requests of up to 100 tasks each
+([#177](https://github.com/elixir-cloud-aai/tesk-api/issues/177)). Older
+taskmasters don't label the filers' jobs: while a task of the page has no
+labelled filer job (e.g. one started by such a taskmaster, or one whose
+first filer hasn't started yet), `GET /tasks` also reads all filers' jobs
+without the label in the namespace, as before for all filers' jobs. Once
+the tasks of older taskmasters are deleted (e.g. with the taskmaster's TTL,
+see [Deleting tasks](index.md#deleting-tasks)), that request returns
+nothing.
 
 ## Swagger UI
 
