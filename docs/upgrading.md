@@ -35,12 +35,25 @@ read all of the items below before you upgrade.
   those that read Swagger 2.0 or generate code from it (schema names, e.g.
   `TesInput`, and the layout differ). The paths, fields and status codes it
   describes are the same. The server URL in the description (which the
-  Swagger UI uses for "Try it out") comes from the request; behind a reverse
-  proxy, it honours `X-Forwarded-*` headers only with Spring Boot's
-  forwarded-headers support. In Kubernetes, Spring Boot turns that on by
-  itself for proxies on internal addresses; elsewhere (e.g. Docker behind
-  nginx), set `SERVER_FORWARD_HEADERS_STRATEGY` to `native` (or
-  `framework`), or the description names the internal URL.
+  Swagger UI uses for "Try it out") comes from the request, with the
+  `X-Forwarded-*` headers of a reverse proxy (see "Forwarded headers"
+  below).
+- **Forwarded headers.** TESK API takes the scheme, host and port of
+  requests from the `X-Forwarded-Proto`, `-Host` and `-Port` headers, and
+  the client address from `X-Forwarded-For`, if the request comes from an
+  internal address (e.g. `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+  loopback), now also outside Kubernetes (e.g. Docker behind nginx): the
+  new default `SERVER_FORWARD_HEADERS_STRATEGY=native` replaces the property
+  `server.use-forward-headers`, which Spring Boot no longer read. In
+  Kubernetes, Spring Boot already did this; up to 1.2.0, Springfox also
+  read `X-Forwarded-Host` of any client for the API description. If your
+  proxy has a public address, set `SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES`
+  to ranges that contain it. If clients reach TESK API from internal
+  addresses without a proxy (e.g. through a port that Docker publishes, as
+  the requests then come from the Docker bridge), they can set these headers
+  themselves; this changes only what TESK API answers them (e.g. the server
+  URL in their API description). Set `SERVER_FORWARD_HEADERS_STRATEGY=none` to
+  ignore the headers (see [Configuration](configuration.md)).
 - **Swagger UI configuration.** With the Swagger UI on, its configuration
   is at `/v3/api-docs/swagger-config` instead of `/swagger-resources`; the
   Swagger UI itself (`/swagger-ui/index.html`), the redirect from `/` and
@@ -108,9 +121,14 @@ read all of the items below before you upgrade.
   needs no new permissions. The taskmaster needs `patch` on `jobs` and
   `get` on `pods/log` (see [Deployment](deployment.md)): TESK's Helm chart
   grants both; if you manage the taskmaster's role yourself, check that it
-  has them, or the array stays empty. `GET /tasks` transfers more data in
-  namespaces with many finished tasks with many output files (see [Output
-  file logs](api.md#output-file-logs)).
+  has them, or the array stays empty. `GET /tasks` reads only the filers'
+  jobs of the page's tasks, by the label `taskmaster-name` of taskmasters of
+  tesk-core 0.12.0 and later; while a task of the page has inputs, outputs
+  or volumes but no labelled filer job (e.g. one started by an older
+  taskmaster), it also reads the unlabelled filers' jobs of the namespace,
+  in one more request (see [Output file logs](api.md#output-file-logs)).
+  Deleting the tasks of older taskmasters (e.g. with the taskmaster's TTL)
+  makes that request return nothing.
 - **Default page size.** `GET /tasks` without `page_size` returns at most
   256 tasks per page, as TES specifies, with a `next_page_token` if there
   are more (see [Listing tasks](api.md#listing-tasks)). Before, it returned
@@ -191,7 +209,10 @@ read all of the items below before you upgrade.
 New, off until you use them: tokens of allow-listed service clients
 (`TESK_API_AUTHORISATION_SERVICE_CLIENTS_*`, see [Tokens of
 services](access-control.md#tokens-of-services); in the Helm chart of TESK
-after 0.3.0: `auth.tokenClients`) and private executor images, an experimental
+after 0.3.0: `auth.tokenClients`), CORS for browser clients of the origins
+listed in `TESK_API_CORS_ALLOWED_ORIGINS` (see [Cross-origin
+requests](configuration.md#cross-origin-requests-cors); list only origins
+that you trust with your users' tokens) and private executor images, an experimental
 workaround that needs `create` and `delete` on `secrets` (see [Private
 executor images](api.md#private-executor-images) and
 [Deployment](deployment.md)).
