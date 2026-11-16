@@ -17,12 +17,12 @@ import java.util.regex.Pattern;
  *       {@code ://}; the part W runs from there to the first {@code /} (or the end).
  *   <li>If W has an {@code @} after its first {@code ?} or {@code #}, or a backslash (which WHATWG
  *       parsers read as {@code /}, ending the host there), the value is ambiguous and is left out.
- *       So is it if W is empty and the rest has an {@code @} before its first {@code ?} or {@code
- *       #}: WHATWG parsers skip the extra slashes, so {@code https:///u:p@h/p} sends {@code u:p} to
- *       {@code h}.
  *   <li>The authority is W up to its first {@code ?} or {@code #}; everything up to and including
  *       its last {@code @} is dropped.
- *   <li>The rest is cut at its first {@code ?} or {@code #}; an {@code @} in the path is kept.
+ *   <li>The rest is cut at its first {@code ?} or {@code #}; an {@code @} in the path is kept,
+ *       unless the authority left is empty (step 4b): then the value is left out, as WHATWG parsers
+ *       skip the extra slashes, so {@code https:///u:p@h/p} or {@code https://x@/u:p@h/p} sends
+ *       {@code u:p} to {@code h}.
  *   <li>A value without a scheme is kept only if it has no {@code @} and no {@code ?}.
  *   <li>Nothing else changes (case, percent-encoding, ports).
  * </ol>
@@ -59,12 +59,6 @@ public final class UrlStripper {
         if (w.indexOf('\\') >= 0 || queryOrFragment >= 0 && w.lastIndexOf('@') > queryOrFragment) {
             return null;
         }
-        if (w.isEmpty()) {
-            int restCut = firstQueryOrFragment(rest);
-            if ((restCut < 0 ? rest : rest.substring(0, restCut)).indexOf('@') >= 0) {
-                return null;
-            }
-        }
         String authority = queryOrFragment < 0 ? w : w.substring(0, queryOrFragment);
         if (queryOrFragment >= 0) {
             rest = w.substring(queryOrFragment) + rest;
@@ -73,6 +67,9 @@ public final class UrlStripper {
         int cut = firstQueryOrFragment(rest);
         if (cut >= 0) {
             rest = rest.substring(0, cut);
+        }
+        if (authority.isEmpty() && rest.indexOf('@') >= 0) {
+            return null;
         }
         return url.substring(0, start) + authority + rest;
     }
