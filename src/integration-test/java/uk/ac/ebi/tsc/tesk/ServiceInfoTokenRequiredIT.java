@@ -42,7 +42,10 @@ public class ServiceInfoTokenRequiredIT {
 
     @RegisterExtension
     public WireMockExtension mockElixir =
-            WireMockExtension.newInstance().options(wireMockConfig().port(8090)).build();
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(8090))
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     @TestConfiguration
     static class KubernetesClientMock {

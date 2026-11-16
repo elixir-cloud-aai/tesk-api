@@ -8,7 +8,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.serverError;
 import static com.github.tomakehurst.wiremock.client.WireMock.unauthorized;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -47,7 +47,10 @@ public class UserInfoTokenIntrospectorTest {
 
     @RegisterExtension
     public WireMockExtension userInfo =
-            WireMockExtension.newInstance().options(options().dynamicPort()).build();
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().dynamicPort())
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     private CapturedOutput output;
 

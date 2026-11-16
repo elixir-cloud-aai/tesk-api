@@ -13,7 +13,6 @@ import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -31,13 +30,6 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
  */
 @ExtendWith(OutputCaptureExtension.class)
 public class ServiceInfoServiceTest {
-
-    private CapturedOutput output;
-
-    @BeforeEach
-    public void captureOutput(CapturedOutput output) {
-        this.output = output;
-    }
 
     @TempDir public File folder;
 
@@ -67,7 +59,7 @@ public class ServiceInfoServiceTest {
      * service info lists none, whatever the file lists, and a warning says so (issue #145)
      */
     @Test
-    public void getServiceInfo_backendParameters() {
+    public void getServiceInfo_backendParameters(CapturedOutput output) {
         ServiceInfoService service =
                 new ServiceInfoService(
                         new ClassPathResource("service-info-backend-parameters.yaml"));
@@ -108,7 +100,8 @@ public class ServiceInfoServiceTest {
 
     /** A file that can't be parsed is logged, and the service info read before is kept */
     @Test
-    public void reload_keepsTheServiceInfoIfTheFileIsInvalid() throws IOException {
+    public void reload_keepsTheServiceInfoIfTheFileIsInvalid(CapturedOutput output)
+            throws IOException {
         File file = new File(folder, "service-info.yaml");
         Files.write(file.toPath(), "name: first\n".getBytes(StandardCharsets.UTF_8));
         ServiceInfoService service = new ServiceInfoService(new FileSystemResource(file));

@@ -38,7 +38,10 @@ public class KubernetesClientWrapperHttpTest {
 
     @RegisterExtension
     public WireMockExtension kubernetes =
-            WireMockExtension.newInstance().options(wireMockConfig().dynamicPort()).build();
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().dynamicPort())
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     private KubernetesClientWrapper wrapper;
 

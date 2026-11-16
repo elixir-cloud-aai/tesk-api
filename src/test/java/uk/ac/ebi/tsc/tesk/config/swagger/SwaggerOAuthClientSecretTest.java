@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,23 +36,16 @@ public class SwaggerOAuthClientSecretTest {
 
     static final String SECRET = "configured-client-secret-value";
 
-    private CapturedOutput output;
-
-    @BeforeEach
-    public void captureOutput(CapturedOutput output) {
-        this.output = output;
-    }
-
     @Autowired private MockMvc mvc;
 
     @Autowired private OAuth2ClientProperties properties;
 
     /** The startup check logs the warning, without the secret. */
     @Test
-    public void startupCheck_logsWarningWithoutSecret() {
+    public void startupCheck_logsWarningWithoutSecret(CapturedOutput output) {
         this.properties.warnAboutClientSecret();
-        assertThat(this.output.getOut(), containsString("TESK_API_SWAGGER_OAUTH_CLIENT_SECRET"));
-        assertThat(this.output.getOut(), not(containsString(SECRET)));
+        assertThat(output.getOut(), containsString("TESK_API_SWAGGER_OAUTH_CLIENT_SECRET"));
+        assertThat(output.getOut(), not(containsString(SECRET)));
     }
 
     /** The Swagger UI gets the client ID (in its initializer), but not the secret. */

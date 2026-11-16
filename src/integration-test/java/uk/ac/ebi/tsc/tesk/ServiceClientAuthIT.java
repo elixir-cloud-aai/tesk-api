@@ -68,11 +68,17 @@ public class ServiceClientAuthIT {
 
     @RegisterExtension
     public WireMockExtension mockUserInfo =
-            WireMockExtension.newInstance().options(wireMockConfig().port(8090)).build();
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(8090))
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     @RegisterExtension
     public WireMockExtension mockIssuer =
-            WireMockExtension.newInstance().options(wireMockConfig().port(8091)).build();
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(8091))
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     @RegisterExtension
     public WireMockExtension mockKubernetes =
@@ -81,6 +87,7 @@ public class ServiceClientAuthIT {
                             wireMockConfig()
                                     .port(9000)
                                     .usingFilesUnderDirectory("src/integration-test/resources"))
+                    .failOnUnmatchedRequests(true)
                     .build();
 
     @TestConfiguration

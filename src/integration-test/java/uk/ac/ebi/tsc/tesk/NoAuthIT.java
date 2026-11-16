@@ -70,6 +70,7 @@ public class NoAuthIT {
                             wireMockConfig()
                                     .port(9000)
                                     .usingFilesUnderDirectory("src/integration-test/resources"))
+                    .failOnUnmatchedRequests(true)
                     .build();
 
     @TestConfiguration

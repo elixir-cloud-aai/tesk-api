@@ -61,7 +61,9 @@ provider are mocked with WireMock, so no cluster is needed):
 
 The tests are written for JUnit Jupiter (JUnit 5 and later; no JUnit 4 or
 vintage engine): `@ExtendWith` and `@RegisterExtension` instead of runners and
-rules, e.g. `WireMockExtension` for WireMock servers and Spring Boot's
+rules, e.g. `WireMockExtension` for WireMock servers (built with
+`failOnUnmatchedRequests(true)`, so that a request that no stub matches fails
+the test) and Spring Boot's
 `OutputCaptureExtension` for logs. Spring Boot's test annotations
 (`@SpringBootTest`, `@WebMvcTest`, …) include the Spring extension. Settings
 that the code reads from environment variables are read through Spring's

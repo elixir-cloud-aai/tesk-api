@@ -55,7 +55,10 @@ public class AuthErrorResponsesIT {
 
     @RegisterExtension
     public WireMockExtension mockUserInfo =
-            WireMockExtension.newInstance().options(wireMockConfig().port(8090)).build();
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(8090))
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     @TestConfiguration
     static class KubernetesClientMock {

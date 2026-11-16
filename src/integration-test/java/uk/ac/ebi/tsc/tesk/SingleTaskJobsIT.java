@@ -60,7 +60,10 @@ public class SingleTaskJobsIT {
 
     @RegisterExtension
     public WireMockExtension mockKubernetes =
-            WireMockExtension.newInstance().options(wireMockConfig().port(9000)).build();
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(9000))
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     @TestConfiguration
     static class KubernetesClientMock {

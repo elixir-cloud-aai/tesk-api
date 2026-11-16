@@ -5,7 +5,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -73,14 +73,10 @@ public class ServiceClientTokenServicesTest {
 
     @RegisterExtension
     public WireMockExtension idp =
-            WireMockExtension.newInstance().options(options().dynamicPort()).build();
-
-    private CapturedOutput output;
-
-    @BeforeEach
-    public void captureOutput(CapturedOutput output) {
-        this.output = output;
-    }
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().dynamicPort())
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     private OpaqueTokenIntrospector userInfo;
     private OAuth2AuthenticatedPrincipal userPrincipal;
@@ -196,7 +192,8 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
-    public void listedClient_isAccepted_asPrincipalOfItsOwn() throws Exception {
+    public void listedClient_isAccepted_asPrincipalOfItsOwn(CapturedOutput output)
+            throws Exception {
         String token = sign(claims(CLIENT));
 
         User user = accepted(token);
@@ -255,7 +252,7 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
-    public void expired_isRefused() throws Exception {
+    public void expired_isRefused(CapturedOutput output) throws Exception {
         JwtClaims claims = claims(CLIENT);
         claims.setExpirationTimeMinutesInTheFuture(-5);
         String token = sign(claims);
@@ -290,7 +287,7 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
-    public void badSignature_isRefused() throws Exception {
+    public void badSignature_isRefused(CapturedOutput output) throws Exception {
         // signed with another key under the ID of the issuer's key
         refused(sign(claims(CLIENT), otherKey, key.getKeyId(), "at+jwt"));
         assertThat(output.getOut(), containsString("invalid signature"));
@@ -417,7 +414,7 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
-    public void discoveryOfAnotherIssuer_isRefused() throws Exception {
+    public void discoveryOfAnotherIssuer_isRefused(CapturedOutput output) throws Exception {
         discovery("https://other.example.org/");
         refused(sign(claims(CLIENT)));
         assertThat(output.getOut(), containsString("keys of the issuer unavailable"));
@@ -683,7 +680,7 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
-    public void discoveryWithoutJwksUri_isRefused() throws Exception {
+    public void discoveryWithoutJwksUri_isRefused(CapturedOutput output) throws Exception {
         idp.givenThat(
                 get("/oidc" + ServiceClientTokenServices.DISCOVERY_PATH)
                         .willReturn(okJson("{\"issuer\":\"" + issuer() + "\"}")));

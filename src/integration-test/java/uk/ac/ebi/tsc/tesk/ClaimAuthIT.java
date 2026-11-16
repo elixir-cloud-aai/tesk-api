@@ -53,7 +53,10 @@ public class ClaimAuthIT {
 
     @RegisterExtension
     public WireMockExtension mockElixir =
-            WireMockExtension.newInstance().options(wireMockConfig().port(8090)).build();
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(8090))
+                    .failOnUnmatchedRequests(true)
+                    .build();
 
     @RegisterExtension
     public WireMockExtension mockKubernetes =
@@ -62,6 +65,7 @@ public class ClaimAuthIT {
                             wireMockConfig()
                                     .port(9000)
                                     .usingFilesUnderDirectory("src/integration-test/resources"))
+                    .failOnUnmatchedRequests(true)
                     .build();
 
     @TestConfiguration
