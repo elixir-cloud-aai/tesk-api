@@ -18,6 +18,9 @@ These `GET` and `HEAD` requests need no token, also with the `auth` profile:
 
 A request that does carry a token has it validated on these too: with an invalid token, the answer is `HTTP 401 Unauthorized`.
 
+### Browser clients (CORS)
+Browser apps on other origins can call TESK API only from the origins listed in `TESK_API_CORS_ALLOWED_ORIGINS` (none by default; see [Configuration](configuration.md#cross-origin-requests-cors)). Their preflight requests need no token, also with the `auth` profile, but carry no data and reach no endpoint: every actual request needs a valid token as described here. List only origins that you trust to handle your users' tokens: a listed origin's pages can call TESK API with any token that they hold, and the browser lets them read the answers. CORS doesn't protect TESK API from other clients (e.g. scripts or servers), which send any `Origin` they like or none; it only controls what browsers let web pages read.
+
 ### Obtaining a token
 At the moment (subject to change) TESK API does not require the access token to be obtained using any specific client (application). Also the token audience is not currently checked (it is not clear, if Elixir AAI supports defining a token audience). Therefore, a valid token has the following properties:
 * Access token
