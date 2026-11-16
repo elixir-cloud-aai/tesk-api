@@ -14,8 +14,6 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.boot.context.properties.bind.Bindable;
-import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.ConditionContext;
@@ -125,7 +123,11 @@ public class CorsConfigTest {
                 "https://client.example.org:08443",
                 "https://client.example.org:99999",
                 "https://client.example.org:0",
-                "https://my_app.example.org"
+                "https://my_app.example.org",
+                "http://127.1",
+                "http://0x7f.0.0.1",
+                "http://127.000.0.1",
+                "http://256.0.0.1"
             })
     public void invalidOrigin_isRejected(String origin) {
         IllegalArgumentException exception =
@@ -149,9 +151,7 @@ public class CorsConfigTest {
 
         assertEquals(
                 List.of("https://a.example.org", "https://b.example.org"),
-                Binder.get(environment)
-                        .bind(CorsConfig.PROPERTY, Bindable.listOf(String.class))
-                        .get());
+                CorsConfig.configured(environment));
     }
 
     private final ApplicationContextRunner contextRunner =
@@ -215,5 +215,29 @@ public class CorsConfigTest {
                 List.of("https://client.example.org:8443", "http://localhost:3000"),
                 CorsConfig.origins(
                         List.of("https://client.example.org:8443", "http://localhost:3000")));
+    }
+
+    @Test
+    public void origin_withIpHostsAndUpperCase_isAccepted() {
+        List<String> origins =
+                List.of(
+                        "http://127.0.0.1:3000",
+                        "https://[::1]:8443",
+                        "https://10.0.0.1",
+                        "HTTPS://Client.Example.ORG");
+
+        assertEquals(origins, CorsConfig.origins(origins));
+    }
+
+    @Test
+    public void origin_inUpperCase_matchesBrowserOrigin() {
+        CorsConfiguration config =
+                configFor(
+                        new CorsConfig(List.of("HTTPS://Client.Example.ORG"))
+                                .corsConfigurationSource(),
+                        "/ga4gh/tes/v1/tasks");
+
+        assertEquals(
+                "https://client.example.org", config.checkOrigin("https://client.example.org"));
     }
 }

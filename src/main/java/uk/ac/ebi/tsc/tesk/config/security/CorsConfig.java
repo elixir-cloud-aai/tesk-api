@@ -4,6 +4,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -35,6 +36,15 @@ public class CorsConfig {
 
     static final String PROPERTY = "tesk.api.cors.allowed-origins";
     private static final String ENV = "TESK_API_CORS_ALLOWED_ORIGINS";
+
+    /** A label that browsers read as a number (WHATWG URL Standard: "ends in a number") */
+    private static final Pattern NUMBER = Pattern.compile("(?i)[0-9]+|0x[0-9a-f]*");
+
+    private static final String OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
+
+    /** An IPv4 address as browsers write it: four decimal numbers without leading zeros */
+    private static final Pattern IPV4 =
+            Pattern.compile(OCTET + "\\." + OCTET + "\\." + OCTET + "\\." + OCTET);
 
     private final List<String> allowedOrigins;
 
@@ -101,11 +111,22 @@ public class CorsConfig {
                         && (path.isEmpty() || "/".equals(path))
                         && uri.getRawQuery() == null
                         && uri.getRawFragment() == null
+                        && canonicalHost(uri.getHost())
                         && canonicalPort(uri);
         if (!valid) {
             throw invalid(origin);
         }
         return origin;
+    }
+
+    /**
+     * A host as browsers send it: a host whose last label is a number (decimal or hex) is an IPv4
+     * address to browsers, which they send as four decimal numbers (e.g. {@code 127.1} as {@code
+     * 127.0.0.1}), so only that form is accepted for it
+     */
+    private static boolean canonicalHost(String host) {
+        String lastLabel = host.substring(host.lastIndexOf('.') + 1);
+        return !NUMBER.matcher(lastLabel).matches() || IPV4.matcher(host).matches();
     }
 
     /**
