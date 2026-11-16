@@ -71,16 +71,6 @@ read all of the items below before you upgrade.
   `COMPLETE` instead of `SYSTEM_ERROR`, and a task whose inputs filer
   failed is `SYSTEM_ERROR` while its taskmaster still runs. `GET /tasks`
   isn't affected. With older taskmasters, nothing changes.
-- **Listing reads the page's filer jobs.** `GET /tasks` reads the filers'
-  jobs of the page's tasks by their label `taskmaster-name` instead of all
-  filers' jobs in the namespace, and the unlabelled filers' jobs of older
-  taskmasters only while a task of the page has inputs, outputs or volumes
-  but no labelled filer job (see
-  [Output file logs](api.md#output-file-logs)). Tasks started before the
-  taskmaster upgrade keep their states. TESK API needs no new permissions
-  (it still lists `jobs`). Listing gets cheaper once the taskmaster is of
-  tesk-core 0.12.0 or later and the tasks of older taskmasters are
-  deleted.
 - **TES 1.1 fields.** `outputs[].path_prefix`, `inputs[].streamable`,
   `executors[].ignore_error` and `resources.backend_parameters_strict` are
   accepted instead of being refused as unknown fields, with one exception
