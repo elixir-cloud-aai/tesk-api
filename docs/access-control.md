@@ -395,8 +395,8 @@ comma-separated, or, as values can contain commas, a JSON array of strings
 one). In YAML configuration files, they can also be lists.
 
 The required claim is checked once the request has been read: a request
-that TESK API can't read (e.g. an invalid task or `page_size`) gets `400 Bad
-Request` first.
+that TESK API can't read (e.g. an invalid task, or a `page_size` that isn't a
+number) gets `400 Bad Request` first.
 
 TESK API doesn't start with values or prefixes but no name, with a name but
 neither values nor prefixes, with an empty value or prefix, or with the

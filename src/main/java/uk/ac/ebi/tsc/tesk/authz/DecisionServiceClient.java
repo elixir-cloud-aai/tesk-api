@@ -104,7 +104,7 @@ public class DecisionServiceClient {
             try {
                 request.header("Authorization", "Bearer " + readCredential(this.credentialFile));
             } catch (IOException e) {
-                throw new Failure("credential file unreadable");
+                throw new Failure("credential file empty, unreadable or with control characters");
             }
         }
         return request.build();

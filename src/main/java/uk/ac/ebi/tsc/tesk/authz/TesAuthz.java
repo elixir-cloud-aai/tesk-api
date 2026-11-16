@@ -148,9 +148,8 @@ public class TesAuthz {
                 DecisionServiceClient.readCredential(Paths.get(settings.getCredentialFile()));
             } catch (IOException | RuntimeException e) {
                 throw refuse(
-                        "tesk.api.authz.decision-service.credential-file is empty or unreadable ("
-                                + e.getClass().getSimpleName()
-                                + ")");
+                        "tesk.api.authz.decision-service.credential-file is empty, unreadable or"
+                                + " has control characters");
             }
         }
         if ("http".equalsIgnoreCase(url.getScheme()) && !isLoopback(url.getHost())) {

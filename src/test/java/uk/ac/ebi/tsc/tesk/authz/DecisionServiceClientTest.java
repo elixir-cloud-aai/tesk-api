@@ -90,7 +90,7 @@ public class DecisionServiceClientTest {
     public void evaluate_credentialFileGone() {
         assertThatThrownBy(() -> client(dir.resolve("missing"), 2000).evaluate(BODY, "rid"))
                 .isInstanceOf(DecisionServiceClient.Failure.class)
-                .hasMessage("credential file unreadable");
+                .hasMessage("credential file empty, unreadable or with control characters");
     }
 
     /** A credential of several lines can't be a header value: refused, not a 500 */
@@ -105,7 +105,7 @@ public class DecisionServiceClientTest {
                 .isInstanceOf(IOException.class);
         assertThatThrownBy(() -> client(file, 2000).evaluate(BODY, "rid"))
                 .isInstanceOf(DecisionServiceClient.Failure.class)
-                .hasMessage("credential file unreadable");
+                .hasMessage("credential file empty, unreadable or with control characters");
     }
 
     /** A value whose getter fails, so that it can't be written as JSON */

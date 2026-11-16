@@ -13,7 +13,6 @@ deployments:
   [Configuration](configuration.md)) for each read of the user info, instead
   of 30, and 10 seconds instead of 5 to connect to and read from the issuer
   of service clients. If your provider is slower, raise the setting.
-
 - **Owners of new tasks.** New tasks get the annotation `owner-id`
   (`<iss>|<sub>`) whenever TESK API knows the issuer: for service clients
   always, for users if `TESK_API_AUTHZ_ISSUER` is set, also with the decision
