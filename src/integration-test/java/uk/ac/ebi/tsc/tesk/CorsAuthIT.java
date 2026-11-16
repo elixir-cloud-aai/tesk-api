@@ -1,12 +1,16 @@
 package uk.ac.ebi.tsc.tesk;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.SERVICE_INFO_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
+import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
@@ -148,6 +152,31 @@ public class CorsAuthIT {
         this.mvc
                 .perform(get(TASK_URL))
                 .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    public void request_allowedOriginWithValidToken_isOkWithCorsHeaders() throws Exception {
+        mockElixir.givenThat(
+                WireMock.get("/")
+                        .willReturn(
+                                okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : []}")));
+
+        this.mvc
+                .perform(
+                        get(SERVICE_INFO_URL)
+                                .header("Origin", ALLOWED_ORIGIN)
+                                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", ALLOWED_ORIGIN));
+        mockElixir.verify(1, WireMock.getRequestedFor(WireMock.urlEqualTo("/")));
+    }
+
+    @Test
+    public void request_allowedOriginOtherMethod_isForbidden() throws Exception {
+        this.mvc
+                .perform(delete(TASK_URL).header("Origin", ALLOWED_ORIGIN))
+                .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 }

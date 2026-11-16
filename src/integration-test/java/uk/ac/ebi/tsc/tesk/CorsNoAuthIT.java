@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -71,5 +72,13 @@ public class CorsNoAuthIT {
                 .andExpect(status().isOk())
                 .andExpect(
                         header().string("Access-Control-Allow-Origin", CorsAuthIT.ALLOWED_ORIGIN));
+    }
+
+    @Test
+    public void request_allowedOriginOtherMethod_isForbidden() throws Exception {
+        this.mvc
+                .perform(delete(TASK_URL).header("Origin", CorsAuthIT.ALLOWED_ORIGIN))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 }

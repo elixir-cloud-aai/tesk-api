@@ -4,7 +4,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -38,11 +39,31 @@ public class CorsConfig {
     private final List<String> allowedOrigins;
 
     /**
+     * Reads {@value #PROPERTY} as {@link Enabled} does, so that both see the same origins
+     *
+     * @throws IllegalArgumentException for an invalid origin (see {@link #origins(List)})
+     */
+    @Autowired
+    public CorsConfig(Environment environment) {
+        this(configured(environment));
+    }
+
+    /**
      * @param allowedOrigins the origins of {@value #PROPERTY}
      * @throws IllegalArgumentException for an invalid origin (see {@link #origins(List)})
      */
-    public CorsConfig(@Value("${" + PROPERTY + ":}") List<String> allowedOrigins) {
+    CorsConfig(List<String> allowedOrigins) {
         this.allowedOrigins = origins(allowedOrigins);
+    }
+
+    /**
+     * The entries of {@value #PROPERTY} in any form that Spring Boot binds to a list (e.g. comma
+     * separated, or indexed), none if unset
+     */
+    static List<String> configured(Environment environment) {
+        return Binder.get(environment)
+                .bind(PROPERTY, Bindable.listOf(String.class))
+                .orElse(List.of());
     }
 
     /**
@@ -79,11 +100,18 @@ public class CorsConfig {
                         && uri.getRawUserInfo() == null
                         && (path.isEmpty() || "/".equals(path))
                         && uri.getRawQuery() == null
-                        && uri.getRawFragment() == null;
+                        && uri.getRawFragment() == null
+                        // browsers leave out default ports, so these would never match
+                        && !uri.getRawAuthority().endsWith(":")
+                        && uri.getPort() != defaultPort(uri.getScheme());
         if (!valid) {
             throw invalid(origin);
         }
         return origin;
+    }
+
+    private static int defaultPort(String scheme) {
+        return "https".equalsIgnoreCase(scheme) ? 443 : 80;
     }
 
     private static IllegalArgumentException invalid(String origin) {
@@ -95,7 +123,7 @@ public class CorsConfig {
                         + " ("
                         + ENV
                         + "): use exact origins such as https://client.example.org (scheme http or"
-                        + " https, host, optional port), without wildcards, paths or user info");
+                        + " https, host, optional port), without wildcards, paths, user info or default ports");
     }
 
     /**
@@ -123,11 +151,7 @@ public class CorsConfig {
 
         @Override
         public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-            List<String> configured =
-                    Binder.get(context.getEnvironment())
-                            .bind(PROPERTY, Bindable.listOf(String.class))
-                            .orElse(List.of());
-            return !origins(configured).isEmpty();
+            return !origins(configured(context.getEnvironment())).isEmpty();
         }
     }
 }
