@@ -121,7 +121,11 @@ public class CorsConfigTest {
                 "https://client example.org",
                 "https://client.example.org:443",
                 "http://client.example.org:80",
-                "https://client.example.org:"
+                "https://client.example.org:",
+                "https://client.example.org:08443",
+                "https://client.example.org:99999",
+                "https://client.example.org:0",
+                "https://my_app.example.org"
             })
     public void invalidOrigin_isRejected(String origin) {
         IllegalArgumentException exception =

@@ -101,13 +101,26 @@ public class CorsConfig {
                         && (path.isEmpty() || "/".equals(path))
                         && uri.getRawQuery() == null
                         && uri.getRawFragment() == null
-                        // browsers leave out default ports, so these would never match
-                        && !uri.getRawAuthority().endsWith(":")
-                        && uri.getPort() != defaultPort(uri.getScheme());
+                        && canonicalPort(uri);
         if (!valid) {
             throw invalid(origin);
         }
         return origin;
+    }
+
+    /**
+     * No port, or one written as browsers send it (origins are compared as strings): not empty, not
+     * the scheme's default (which browsers leave out), from 1 to 65535, without leading zeros
+     */
+    private static boolean canonicalPort(URI uri) {
+        int port = uri.getPort();
+        if (port == -1) {
+            return !uri.getRawAuthority().endsWith(":");
+        }
+        return port != defaultPort(uri.getScheme())
+                && port > 0
+                && port <= 65535
+                && uri.getRawAuthority().endsWith(":" + port);
     }
 
     private static int defaultPort(String scheme) {
@@ -123,7 +136,7 @@ public class CorsConfig {
                         + " ("
                         + ENV
                         + "): use exact origins such as https://client.example.org (scheme http or"
-                        + " https, host, optional port), without wildcards, paths, user info or default ports");
+                        + " https, host, optional port), ASCII host names (punycode), without wildcards, paths, user info or default ports");
     }
 
     /**
