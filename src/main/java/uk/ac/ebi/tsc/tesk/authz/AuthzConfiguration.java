@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.config.security.AuthorisationProperties;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 
@@ -22,6 +23,8 @@ public class AuthzConfiguration {
                 AuthzSettings.from(environment),
                 environment.acceptsProfiles(Profiles.of("auth")),
                 () -> serviceInfoService.getServiceInfo().getId(),
-                serviceClients.isEnabled() ? serviceClients.getIssuer() : null);
+                serviceClients.isEnabled()
+                        ? StringUtils.trimWhitespace(serviceClients.getIssuer())
+                        : null);
     }
 }

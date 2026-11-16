@@ -372,6 +372,21 @@ public class TesAuthzTest {
         assertThat(authz(new S()).ownerId(alice())).isEmpty();
     }
 
+    /** A service client's tasks are the client's, also if its token names another sub */
+    @Test
+    public void ownerId_serviceClientWithOtherSub() {
+        Map<String, Object> claims = new HashMap<>(serviceClient(null).getClaims());
+        claims.put("sub", "some-user");
+        User client =
+                User.builder("protes")
+                        .serviceClient(true)
+                        .claims(claims)
+                        .issuer("https://clients.example.org")
+                        .build();
+        assertThat(authz(pdpSettings()).ownerId(client))
+                .contains("https://clients.example.org|protes");
+    }
+
     @Test
     public void ownerOfCreator() {
         assertThat(authz(pdpSettings()).ownerOfCreator("bob")).contains(ISS + "|bob");

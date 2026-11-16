@@ -2,6 +2,7 @@ package uk.ac.ebi.tsc.tesk.config.security;
 
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,12 +43,6 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
     /** Description of the error for all tokens that the user info endpoint doesn't accept */
     static final String INVALID_TOKEN = "Invalid access token";
 
-    /** Timeout of connections to the user info endpoint, in milliseconds */
-    static final int CONNECT_TIMEOUT_MS = 10_000;
-
-    /** Timeout of reading the answer of the user info endpoint, in milliseconds */
-    static final int READ_TIMEOUT_MS = 30_000;
-
     private static final ParameterizedTypeReference<Map<String, Object>> USER_INFO =
             new ParameterizedTypeReference<Map<String, Object>>() {};
 
@@ -67,17 +62,29 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
             String userInfoUri,
             ElixirPrincipalExtractor principalExtractor,
             GroupNamesSecurityExtractor authoritiesExtractor) {
-        this(userInfoUri, principalExtractor, authoritiesExtractor, restTemplate());
+        this(userInfoUri, principalExtractor, authoritiesExtractor, OidcTimeout.DEFAULT);
     }
 
     /**
-     * The client of the user info endpoint, with timeouts, so that a hanging endpoint doesn't hold
-     * request threads (a timeout refuses the token)
+     * As above, with the timeout of the calls to the user info endpoint
+     * (tesk.api.auth.oidc.timeout)
      */
-    static RestTemplate restTemplate() {
+    public UserInfoTokenIntrospector(
+            String userInfoUri,
+            ElixirPrincipalExtractor principalExtractor,
+            GroupNamesSecurityExtractor authoritiesExtractor,
+            Duration timeout) {
+        this(userInfoUri, principalExtractor, authoritiesExtractor, restTemplate(timeout));
+    }
+
+    /**
+     * The client of the user info endpoint, with the timeout to connect and to read the answer, so
+     * that a hanging endpoint doesn't hold request threads (a timeout refuses the token)
+     */
+    static RestTemplate restTemplate(Duration timeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        requestFactory.setReadTimeout(READ_TIMEOUT_MS);
+        requestFactory.setConnectTimeout(OidcTimeout.millis(timeout));
+        requestFactory.setReadTimeout(OidcTimeout.millis(timeout));
         return new RestTemplate(requestFactory);
     }
 

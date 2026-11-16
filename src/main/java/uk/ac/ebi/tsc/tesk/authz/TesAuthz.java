@@ -26,9 +26,9 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 
 /**
  * The authorisation hook of the profile {@code tes-authzen/1} (tesk.api.authz), as the bean {@code
- * tesAuthz}: the claim rule, an AND gate before all other rules ({@link #gate}), and, if a decision
- * service is set ({@link #isDecisionService}), one OpenID AuthZEN 1.0 Access Evaluation per
- * decision instead of TESK's group model. Without settings, nothing changes.
+ * tesAuthz}: the required claim, an AND gate before all other rules ({@link #gate}), and, if a
+ * decision service is set ({@link #isDecisionService}), one OpenID AuthZEN 1.0 Access Evaluation
+ * per decision instead of TESK's group model. Without settings, nothing changes.
  *
  * <p>The decision service gets the caller's identity (owner ID, {@code iss}, {@code sub}, and for
  * service clients {@code client_id} and {@code scope}; plus the allow-listed claims), never the
@@ -148,7 +148,9 @@ public class TesAuthz {
                 DecisionServiceClient.readCredential(Paths.get(settings.getCredentialFile()));
             } catch (IOException | RuntimeException e) {
                 throw refuse(
-                        "tesk.api.authz.decision-service.credential-file is empty or unreadable");
+                        "tesk.api.authz.decision-service.credential-file is empty or unreadable ("
+                                + e.getClass().getSimpleName()
+                                + ")");
             }
         }
         if ("http".equalsIgnoreCase(url.getScheme()) && !isLoopback(url.getHost())) {
@@ -207,8 +209,8 @@ public class TesAuthz {
     }
 
     /**
-     * The claim rule: if set, the caller's claim must have one of the values or start with one of
-     * the prefixes; else 403. Independent of the decision service and its claims.
+     * The required claim: if set, the caller's claim must have one of the values or start with one
+     * of the prefixes; else 403. Independent of the decision service and its claims.
      *
      * @throws AccessDeniedException if the rule is set and the caller doesn't pass it
      */
@@ -253,10 +255,14 @@ public class TesAuthz {
 
     /**
      * The owner ID of the caller, {@code <iss>|<sub>}, as stamped on new tasks and sent as {@code
-     * subject.id}; empty if the issuer isn't known (no tesk.api.authz.issuer for users)
+     * subject.id}; empty if the issuer isn't known (no tesk.api.authz.issuer for users). For
+     * service clients, the {@code sub} is the client ID, as in the creator label, also if their
+     * token's {@code sub} differs (tesk.api.authorisation.service-clients.require-client-subject
+     * false): their tasks are the client's.
      */
     public Optional<String> ownerId(User user) {
-        return issuer(user).map(iss -> iss + OWNER_SEPARATOR + sub(user));
+        String sub = user.isServiceClient() ? user.getUsername() : sub(user);
+        return issuer(user).map(iss -> iss + OWNER_SEPARATOR + sub);
     }
 
     /**

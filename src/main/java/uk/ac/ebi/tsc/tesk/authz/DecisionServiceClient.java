@@ -59,12 +59,16 @@ public class DecisionServiceClient {
     /**
      * Reads the credential file: its content without surrounding white space
      *
-     * @throws IOException if it can't be read, or is empty
+     * @throws IOException if it can't be read, is empty, or has control characters (e.g. several
+     *     lines), which can't be sent in a header
      */
     static String readCredential(Path file) throws IOException {
         String credential = new String(Files.readAllBytes(file), StandardCharsets.UTF_8).trim();
         if (credential.isEmpty()) {
             throw new IOException("empty");
+        }
+        if (credential.chars().anyMatch(c -> c < 0x20 || c == 0x7f)) {
+            throw new IOException("control characters");
         }
         return credential;
     }
@@ -77,6 +81,16 @@ public class DecisionServiceClient {
      * @throws Failure if the decision service gave no decision
      */
     public boolean evaluate(Map<String, Object> body, String requestId) throws Failure {
+        HttpRequest built;
+        try {
+            built = request(body, requestId);
+        } catch (RuntimeException e) {
+            throw new Failure("request not built: " + e.getClass().getSimpleName());
+        }
+        return decision(built);
+    }
+
+    private HttpRequest request(Map<String, Object> body, String requestId) throws Failure {
         HttpRequest.Builder request =
                 HttpRequest.newBuilder(this.url)
                         .timeout(this.timeout)
@@ -93,10 +107,13 @@ public class DecisionServiceClient {
                 throw new Failure("credential file unreadable");
             }
         }
+        return request.build();
+    }
+
+    private boolean decision(HttpRequest request) throws Failure {
         CompletableFuture<HttpResponse<String>> call =
                 this.client.sendAsync(
-                        request.build(),
-                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                        request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         HttpResponse<String> response;
         try {
             response = call.get(this.timeout.toMillis(), TimeUnit.MILLISECONDS);

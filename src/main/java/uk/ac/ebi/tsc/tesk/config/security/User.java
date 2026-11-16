@@ -77,8 +77,8 @@ public class User implements Serializable, UserDetails, Principal {
 
     /**
      * The claims the principal was built from: the user info of a user, or the token of a service
-     * client (for the claim rule and the decision service, tesk.api.authz); not compared by {@link
-     * #equals}
+     * client (for the required claim and the decision service, tesk.api.authz); not compared by
+     * {@link #equals}
      */
     private transient Map<String, Object> claims;
 

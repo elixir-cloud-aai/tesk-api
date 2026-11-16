@@ -7,9 +7,9 @@ import java.util.Optional;
  * Looks a claim up by name in the claims of the caller (the user info, or a service client's
  * token): the exact top-level name first (so that URI-named claims such as {@code
  * https://example.org/groups} are found), else a dotted path through nested objects. Used by the
- * claim rule ({@code tesk.api.authz.required-claim}) and the claims sent to the decision service
- * ({@code tesk.api.authz.decision-service.claims}); not by the owner of tasks, which stays the
- * {@code sub}.
+ * required claim ({@code tesk.api.authz.required-claim}) and the claims sent to the decision
+ * service ({@code tesk.api.authz.decision-service.claims}); not by the owner of tasks, which stays
+ * the {@code sub}.
  */
 public final class ClaimLookup {
 

@@ -14,7 +14,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The settings {@code tesk.api.authz.*}: the claim rule ({@code required-claim}), the decision
+ * The settings {@code tesk.api.authz.*}: the required claim ({@code required-claim}), the decision
  * service ({@code decision-service}) and the issuer of the users' tokens ({@code issuer}). All are
  * unset by default.
  *
@@ -131,7 +131,7 @@ public final class AuthzSettings {
         return issuer;
     }
 
-    /** The claim of the claim rule, or null if the rule is off */
+    /** The name of the required claim, or null if it is off */
     public String getClaimName() {
         return claimName;
     }

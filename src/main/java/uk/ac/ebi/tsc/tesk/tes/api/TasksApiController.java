@@ -46,7 +46,7 @@ public class TasksApiController implements TasksApi {
 
     private final TesService tesService;
 
-    /** The claim rule (an AND gate before all other rules) and the decision service, if set */
+    /** The required claim (an AND gate before all other rules) and the decision service, if set */
     private final TesAuthz authz;
 
     /**
@@ -96,9 +96,9 @@ public class TasksApiController implements TasksApi {
                     @RequestParam(value = "view", required = false, defaultValue = "MINIMAL")
                     String view) {
 
-        TaskView taskView = TaskView.fromString(view);
         User user = this.getUser();
         this.authz.gate(user);
+        TaskView taskView = TaskView.fromString(view);
         TesTask task = this.tesService.getTask(id, taskView, user);
         if (taskView == TaskView.MINIMAL) {
             task.setLogs(null);

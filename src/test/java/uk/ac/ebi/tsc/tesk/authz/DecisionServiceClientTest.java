@@ -93,6 +93,45 @@ public class DecisionServiceClientTest {
                 .hasMessage("credential file unreadable");
     }
 
+    /** A credential of several lines can't be a header value: refused, not a 500 */
+    @Test
+    public void readCredential_controlCharacters() throws IOException {
+        Path file = dir.resolve("lines");
+        Files.write(file, "line-1\nline-2\n".getBytes(StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> DecisionServiceClient.readCredential(file))
+                .isInstanceOf(IOException.class);
+        Files.write(file, "a\u007fb".getBytes(StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> DecisionServiceClient.readCredential(file))
+                .isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> client(file, 2000).evaluate(BODY, "rid"))
+                .isInstanceOf(DecisionServiceClient.Failure.class)
+                .hasMessage("credential file unreadable");
+    }
+
+    /** A value whose getter fails, so that it can't be written as JSON */
+    public static class Unwritable {
+        public String getX() {
+            throw new IllegalStateException("no");
+        }
+    }
+
+    /** A request that can't be built (here: a body that can't be written) is a failure */
+    @Test
+    public void evaluate_requestNotBuilt() {
+        assertThatThrownBy(
+                        () ->
+                                client(null, 2000)
+                                        .evaluate(
+                                                java.util.Collections.singletonMap(
+                                                        "x", new Unwritable()),
+                                                "rid"))
+                .isInstanceOf(DecisionServiceClient.Failure.class)
+                .hasMessageStartingWith("request not built");
+        assertThatThrownBy(() -> client(null, 2000).evaluate(BODY, "bad\nid"))
+                .isInstanceOf(DecisionServiceClient.Failure.class)
+                .hasMessage("request not built: IllegalArgumentException");
+    }
+
     @Test
     public void readCredential_empty() throws IOException {
         Path file = dir.resolve("empty");

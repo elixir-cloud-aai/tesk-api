@@ -5,15 +5,28 @@
 The new authorisation settings (a [required
 claim](access-control.md#required-claim) and an [external decision
 service](access-control.md#decision-service)) are off by default; without
-them, authorisation doesn't change.
+them, authorisation doesn't change. Other changes apply to all
+deployments:
 
+- **Timeout of the OpenID Connect provider.** TESK API waits at most 10
+  seconds (`TESK_API_AUTH_OIDC_TIMEOUT`, see
+  [Configuration](configuration.md)) for each read of the user info, instead
+  of 30, and 10 seconds instead of 5 to connect to and read from the issuer
+  of service clients. If your provider is slower, raise the setting.
+
+- **Owners of new tasks.** New tasks get the annotation `owner-id`
+  (`<iss>|<sub>`) whenever TESK API knows the issuer: for service clients
+  always, for users if `TESK_API_AUTHZ_ISSUER` is set, also with the decision
+  service off, so that they have owners when it is switched on.
 - **Fields set by TESK API.** `id`, `state`, `creation_time` and `logs` of
   a created task are no longer stored as the client sent them; TESK API
   ignored them before already, and sets them itself.
-- **Owners.** With the decision service on, new tasks get the annotation
-  `owner-id` (`<iss>|<sub>`). Tasks created before have none; see
-  [Owners](access-control.md#owners) for how TESK API derives theirs.
-- **Page tokens.** With the decision service on, page tokens of `GET
+
+With the decision service on:
+
+- **Owners.** Tasks created before have no annotation `owner-id`; see
+  [Owners](access-control.md#owners) for how TESK API derives their owners.
+- **Page tokens.** Page tokens of `GET
   /tasks` are bound to the task set (all or own tasks); tokens from before
   the switch give `400 Bad Request`: start again from the first page.
 
