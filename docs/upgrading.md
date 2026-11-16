@@ -30,10 +30,17 @@ read all of the items below before you upgrade.
   instead of Swagger 2.0 at `/v2/api-docs`. `/v2/api-docs` serves the same
   OpenAPI 3.1 description for now, so that its users can move; it will be
   removed in the next minor or major release
-  ([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188)). Point tools and clients that read the
-  description to `/v3/api-docs`, and check those that read Swagger 2.0 or
-  generate code from it (schema names, e.g. `TesInput`, and the layout
-  differ). The paths, fields and status codes it describes are the same.
+  ([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188)). Point
+  tools and clients that read the description to `/v3/api-docs`, and check
+  those that read Swagger 2.0 or generate code from it (schema names, e.g.
+  `TesInput`, and the layout differ). The paths, fields and status codes it
+  describes are the same. The server URL in the description (which the
+  Swagger UI uses for "Try it out") comes from the request; behind a reverse
+  proxy, it honours `X-Forwarded-*` headers only with Spring Boot's
+  forwarded-headers support. In Kubernetes, Spring Boot turns that on by
+  itself for proxies on internal addresses; elsewhere (e.g. Docker behind
+  nginx), set `SERVER_FORWARD_HEADERS_STRATEGY` to `native` (or
+  `framework`), or the description names the internal URL.
 - **Swagger UI configuration.** With the Swagger UI on, its configuration
   is at `/v3/api-docs/swagger-config` instead of `/swagger-resources`; the
   Swagger UI itself (`/swagger-ui/index.html`), the redirect from `/` and
