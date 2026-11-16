@@ -20,7 +20,11 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.*;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -460,12 +464,68 @@ public class KubernetesClientWrapperTest {
         assertThat(argument.getValue(), is("job-type=executor"));
     }
 
+    /**
+     * The filer jobs of the listed tasks are selected by their label {@code taskmaster-name}
+     * (tesk-core#147), not all filer jobs of the namespace (issue #177)
+     */
     @Test
-    public void listAllFilerJobs() throws ApiException {
+    public void listFilerJobsOfTasks() throws ApiException {
+        V1Job inputs = new V1Job().metadata(new V1ObjectMeta().name("task-1-inputs-filer"));
+        V1Job outputs = new V1Job().metadata(new V1ObjectMeta().name("task-1-outputs-filer"));
+        given(listJobs.execute())
+                .willReturn(new V1JobList().addItemsItem(inputs).addItemsItem(outputs));
         ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        wrapper.listAllFilerJobs();
+        V1JobList result = wrapper.listFilerJobsOfTasks(Arrays.asList("task-1", "task-2"));
         verifyListJobs("test-namespace", argument);
-        assertThat(argument.getValue(), is("!job-type"));
+        assertThat(argument.getValue(), is("!job-type,taskmaster-name in (task-1,task-2)"));
+        assertThat(result.getItems(), is(Arrays.asList(inputs, outputs)));
+    }
+
+    /**
+     * Many tasks are selected in batches, so that the selector in the request's URL stays short,
+     * and the batches' jobs are returned together: 101 tasks in batches of 100 and 1 (issue #177)
+     */
+    @Test
+    public void listFilerJobsOfTasks_inBatches() throws ApiException {
+        List<String> taskIds =
+                IntStream.range(0, 101).mapToObj(i -> "task-" + i).collect(Collectors.toList());
+        V1Job first = new V1Job().metadata(new V1ObjectMeta().name("task-0-outputs-filer"));
+        V1Job last = new V1Job().metadata(new V1ObjectMeta().name("task-100-outputs-filer"));
+        given(listJobs.execute())
+                .willReturn(
+                        new V1JobList().addItemsItem(first), new V1JobList().addItemsItem(last));
+        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
+        V1JobList result = wrapper.listFilerJobsOfTasks(taskIds);
+        Mockito.verify(listJobs, Mockito.times(2)).labelSelector(argument.capture());
+        assertThat(
+                argument.getAllValues(),
+                is(
+                        Arrays.asList(
+                                "!job-type,taskmaster-name in ("
+                                        + String.join(",", taskIds.subList(0, 100))
+                                        + ")",
+                                "!job-type,taskmaster-name in (task-100)")));
+        assertThat(result.getItems(), is(Arrays.asList(first, last)));
+    }
+
+    /** No task, no request */
+    @Test
+    public void listFilerJobsOfTasks_noTasks() {
+        V1JobList result = wrapper.listFilerJobsOfTasks(Collections.emptyList());
+        assertThat(result.getItems(), is(Collections.emptyList()));
+        Mockito.verifyNoInteractions(batchApi);
+    }
+
+    /**
+     * The filer jobs of tasks started by taskmasters before tesk-core#147 have no label {@code
+     * taskmaster-name}: they are listed by the absence of both labels (issue #177)
+     */
+    @Test
+    public void listUnlabelledFilerJobs() throws ApiException {
+        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
+        wrapper.listUnlabelledFilerJobs();
+        verifyListJobs("test-namespace", argument);
+        assertThat(argument.getValue(), is("!job-type,!taskmaster-name"));
     }
 
     @Test

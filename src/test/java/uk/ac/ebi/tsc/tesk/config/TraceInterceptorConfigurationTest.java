@@ -46,7 +46,8 @@ public class TraceInterceptorConfigurationTest {
                         "listAllTaskmasterJobsForUser",
                         "listSingleTaskExecutorJobs",
                         "listAllTaskExecutorJobs",
-                        "listAllFilerJobs",
+                        "listFilerJobsOfTasks",
+                        "listUnlabelledFilerJobs",
                         "listSingleJobPods",
                         "listAllJobPods");
     }

@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk.tes.service;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_JOB_TYPE;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.K8S_BATCH_API_VERSION;
 
@@ -17,7 +18,9 @@ import io.kubernetes.client.openapi.models.V1Secret;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -312,13 +315,13 @@ public class TesServiceImpl implements TesService {
             return new TesListTasksResponse().tasks(new ArrayList<>()).nextPageToken(nextPageToken);
         }
         V1JobList executorJobs = this.kubernetesClientWrapper.listAllTaskExecutorJobs();
-        V1JobList filerJobs = this.kubernetesClientWrapper.listAllFilerJobs();
+        List<V1Job> filerJobs = this.listFilerJobs(matchingTaskmasterJobs);
         V1PodList jobPods = this.kubernetesClientWrapper.listAllJobPods();
         TaskBuilder taskListBuilder =
                 TaskBuilder.newTaskList()
                         .addJobList(matchingTaskmasterJobs)
                         .addJobList(executorJobs.getItems())
-                        .addJobList(filerJobs.getItems())
+                        .addJobList(filerJobs)
                         .addPodList(jobPods.getItems());
         List<TesTask> tasks =
                 taskListBuilder.getTaskList().stream()
@@ -332,6 +335,41 @@ public class TesServiceImpl implements TesService {
                         .map(task -> this.getTask(task, view, true))
                         .collect(Collectors.toList());
         return new TesListTasksResponse().tasks(tasks).nextPageToken(nextPageToken);
+    }
+
+    /**
+     * The filer jobs of the tasks of these taskmaster jobs: selected by their label {@code
+     * taskmaster-name}, which taskmasters with tesk-core#147 put on them (issue #177). The filer
+     * jobs of older taskmasters have no label: if a task that may have filer jobs (its stored task
+     * has inputs, outputs or volumes, or can't be read) has no labelled filer job, all unlabelled
+     * filer jobs are listed as well. Tasks with a labelled filer job, e.g. the inputs filer's, need
+     * no fallback, as a taskmaster labels all its filer jobs or none.
+     */
+    private List<V1Job> listFilerJobs(List<V1Job> taskmasterJobs) {
+        List<String> taskIds =
+                taskmasterJobs.stream()
+                        .map(job -> job.getMetadata().getName())
+                        .collect(Collectors.toList());
+        List<V1Job> filerJobs =
+                new ArrayList<>(
+                        this.kubernetesClientWrapper.listFilerJobsOfTasks(taskIds).getItems());
+        Set<String> tasksWithLabelledFilers =
+                filerJobs.stream()
+                        .map(job -> job.getMetadata().getLabels())
+                        .filter(Objects::nonNull)
+                        .map(labels -> labels.get(LABEL_TESTASK_ID_KEY))
+                        .collect(Collectors.toSet());
+        boolean fallback =
+                taskmasterJobs.stream()
+                        .filter(
+                                job ->
+                                        !tasksWithLabelledFilers.contains(
+                                                job.getMetadata().getName()))
+                        .anyMatch(this.converter::mayHaveFilerJobs);
+        if (fallback) {
+            filerJobs.addAll(this.kubernetesClientWrapper.listUnlabelledFilerJobs().getItems());
+        }
+        return filerJobs;
     }
 
     /** The name of a taskmaster job's task (annotation {@code tes-task-name}), or null. */

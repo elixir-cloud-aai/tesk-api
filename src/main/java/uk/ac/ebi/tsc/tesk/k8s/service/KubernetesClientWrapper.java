@@ -16,6 +16,7 @@ import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1Secret;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +38,13 @@ import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 public class KubernetesClientWrapper {
 
     private static Logger logger = LoggerFactory.getLogger(KubernetesClientWrapper.class);
+
+    /**
+     * Maximum number of tasks in the label selector of a request for their filer jobs, so that the
+     * request's URL stays short: about 1.4 KB for the task IDs that TESK API generates ({@code
+     * task-} and 8 hexadecimal digits).
+     */
+    static final int FILER_SELECTOR_BATCH_SIZE = 100;
 
     private final BatchV1Api batchApi;
 
@@ -351,8 +359,43 @@ public class KubernetesClientWrapper {
         return this.listJobs(null, labelSelector, null);
     }
 
-    public V1JobList listAllFilerJobs() {
-        String labelSelector = "!" + LABEL_JOBTYPE_KEY;
+    /**
+     * Lists the filer jobs (inputs and outputs) of the given tasks: their jobs without the label
+     * {@code job-type} and with the label {@code taskmaster-name}, which taskmasters with
+     * tesk-core#147 put on the filer jobs (issue #177). The tasks are selected in batches of {@link
+     * #FILER_SELECTOR_BATCH_SIZE}, one request each, so that the request's URL stays short. Filer
+     * jobs of tasks started by older taskmasters don't have the label: see {@link
+     * #listUnlabelledFilerJobs()}.
+     *
+     * @param taskIds - IDs of the tasks (names of their taskmasters' jobs)
+     * @return the filer jobs of the tasks, of all batches; no request if there are no tasks
+     */
+    public V1JobList listFilerJobsOfTasks(List<String> taskIds) {
+        V1JobList result = new V1JobList();
+        for (int from = 0; from < taskIds.size(); from += FILER_SELECTOR_BATCH_SIZE) {
+            List<String> batch =
+                    taskIds.subList(
+                            from, Math.min(from + FILER_SELECTOR_BATCH_SIZE, taskIds.size()));
+            String labelSelector =
+                    "!"
+                            + LABEL_JOBTYPE_KEY
+                            + ","
+                            + LABEL_TESTASK_ID_KEY
+                            + " in ("
+                            + String.join(",", batch)
+                            + ")";
+            this.listJobs(null, labelSelector, null).getItems().forEach(result::addItemsItem);
+        }
+        return result;
+    }
+
+    /**
+     * Lists the filer jobs without the label {@code taskmaster-name}: those of tasks started by
+     * taskmasters before tesk-core#147, in the whole namespace. Their number only shrinks once all
+     * taskmasters label their filer jobs (issue #177).
+     */
+    public V1JobList listUnlabelledFilerJobs() {
+        String labelSelector = "!" + LABEL_JOBTYPE_KEY + ",!" + LABEL_TESTASK_ID_KEY;
         return this.listJobs(null, labelSelector, null);
     }
 

@@ -125,8 +125,10 @@ class MockUtil {
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dexecutor")
                         .willReturn(aResponse().withBodyFile("list/executors.json")));
 
+        // no filer jobs: neither of the listed tasks (by the label taskmaster-name) nor unlabelled
         mockKubernetes.givenThat(
-                WireMock.get("/apis/batch/v1/namespaces/default/jobs?labelSelector=%21job-type")
+                WireMock.get(urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs"))
+                        .withQueryParam("labelSelector", matching("!job-type,.*"))
                         .willReturn(okJson("{\n" + "  \"items\": []\n" + "}")));
 
         mockKubernetes.givenThat(

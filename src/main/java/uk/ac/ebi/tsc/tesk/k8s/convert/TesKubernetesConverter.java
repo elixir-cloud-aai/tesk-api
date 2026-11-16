@@ -477,11 +477,41 @@ public class TesKubernetesConverter {
     }
 
     /**
+     * Whether the task stored with the taskmaster's job (annotation {@code json-input}) may have
+     * filer jobs: taskmasters of all tesk-core releases run filers only for tasks with inputs,
+     * outputs or volumes (before tesk-core 0.11.0, the outputs filer for any of them). Used to
+     * decide whether the unlabelled filer jobs of older taskmasters are needed (issue #177).
+     *
+     * @param taskMasterJob - taskmaster's job
+     * @return false only if the stored task can be read and has no inputs, outputs and volumes
+     */
+    public boolean mayHaveFilerJobs(V1Job taskMasterJob) {
+        JsonNode task = this.readStoredTask(taskMasterJob);
+        if (task == null || task.get("executors") == null) {
+            return true;
+        }
+        return Arrays.asList("inputs", "outputs", "volumes").stream()
+                .map(task::get)
+                .anyMatch(field -> field != null && field.isArray() && field.size() > 0);
+    }
+
+    /**
      * Reads a field of the task stored with the taskmaster's job (annotation {@code json-input}).
      *
      * @return the field, or null if the task isn't stored, can't be read, or has no such field
      */
     private JsonNode readStoredTaskField(V1Job taskMasterJob, String field) {
+        return Optional.ofNullable(this.readStoredTask(taskMasterJob))
+                .map(tree -> tree.get(field))
+                .orElse(null);
+    }
+
+    /**
+     * Reads the task stored with the taskmaster's job (annotation {@code json-input}).
+     *
+     * @return the task's JSON tree, or null if the task isn't stored or can't be read
+     */
+    private JsonNode readStoredTask(V1Job taskMasterJob) {
         String inputJson =
                 Optional.ofNullable(taskMasterJob.getMetadata().getAnnotations())
                         .map(ann -> ann.get(ANN_JSON_INPUT_KEY))
@@ -492,13 +522,10 @@ public class TesKubernetesConverter {
         try {
             // readTree gives null or a missing node for empty input, depending on the Jackson
             // version
-            return Optional.ofNullable(this.objectMapper.readTree(inputJson))
-                    .map(tree -> tree.get(field))
-                    .orElse(null);
+            return this.objectMapper.readTree(inputJson);
         } catch (JacksonException ex) {
             logger.info(
-                    "Reading the {} of task {} from JSON failed; {}",
-                    field,
+                    "Reading the task {} from JSON failed; {}",
                     taskMasterJob.getMetadata().getName(),
                     ex.getMessage());
             return null;

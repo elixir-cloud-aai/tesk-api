@@ -370,7 +370,8 @@ public class NoAuthIT {
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dexecutor")
                         .willReturn(okJson("{\"items\": []}")));
         mockKubernetes.givenThat(
-                WireMock.get("/apis/batch/v1/namespaces/default/jobs?labelSelector=%21job-type")
+                WireMock.get(urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs"))
+                        .withQueryParam("labelSelector", matching("!job-type,.*"))
                         .willReturn(okJson("{\"items\": []}")));
         mockKubernetes.givenThat(
                 WireMock.get("/api/v1/namespaces/default/pods?labelSelector=job-name")
