@@ -483,14 +483,12 @@ public class KubernetesClientWrapperTest {
 
     /**
      * Many tasks are selected in batches, so that the selector in the request's URL stays short,
-     * and the batches' jobs are returned together (issue #177)
+     * and the batches' jobs are returned together: 101 tasks in batches of 100 and 1 (issue #177)
      */
     @Test
     public void listFilerJobsOfTasks_inBatches() throws ApiException {
         List<String> taskIds =
-                IntStream.range(0, KubernetesClientWrapper.FILER_SELECTOR_BATCH_SIZE + 1)
-                        .mapToObj(i -> "task-" + i)
-                        .collect(Collectors.toList());
+                IntStream.range(0, 101).mapToObj(i -> "task-" + i).collect(Collectors.toList());
         V1Job first = new V1Job().metadata(new V1ObjectMeta().name("task-0-outputs-filer"));
         V1Job last = new V1Job().metadata(new V1ObjectMeta().name("task-100-outputs-filer"));
         given(listJobs.execute())
@@ -504,12 +502,7 @@ public class KubernetesClientWrapperTest {
                 is(
                         Arrays.asList(
                                 "!job-type,taskmaster-name in ("
-                                        + String.join(
-                                                ",",
-                                                taskIds.subList(
-                                                        0,
-                                                        KubernetesClientWrapper
-                                                                .FILER_SELECTOR_BATCH_SIZE))
+                                        + String.join(",", taskIds.subList(0, 100))
                                         + ")",
                                 "!job-type,taskmaster-name in (task-100)")));
         assertThat(result.getItems(), is(Arrays.asList(first, last)));
