@@ -4,7 +4,9 @@ import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.io.Serializable;
 import java.security.Principal;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -73,8 +75,32 @@ public class User implements Serializable, UserDetails, Principal {
      */
     private Set<String> teskManagedGroups;
 
+    /**
+     * The claims the principal was built from: the user info of a user, or the token of a service
+     * client (for the claim rule and the decision service, tesk.api.authz); not compared by {@link
+     * #equals}
+     */
+    private transient Map<String, Object> claims;
+
+    /**
+     * The issuer of a service client's token, as validated; null for users, whose tokens are
+     * validated at the user info endpoint (see tesk.api.authz.issuer); not compared by {@link
+     * #equals}
+     */
+    private String issuer;
+
     public String getName() {
         return name;
+    }
+
+    /** The claims of the user info, or of a service client's token (empty if not known) */
+    public Map<String, Object> getClaims() {
+        return claims == null ? Collections.emptyMap() : claims;
+    }
+
+    /** The validated issuer of a service client's token, or null */
+    public String getIssuer() {
+        return issuer;
     }
 
     public boolean isTeskAdmin() {
@@ -212,7 +238,9 @@ public class User implements Serializable, UserDetails, Principal {
             boolean teskAdmin,
             boolean claimAuthorised,
             boolean serviceClient,
-            boolean legacyUserLabels) {
+            boolean legacyUserLabels,
+            Map<String, Object> claims,
+            String issuer) {
         this.userId = userId;
         this.preferredUsername = preferredUsername;
         this.name = name;
@@ -226,6 +254,8 @@ public class User implements Serializable, UserDetails, Principal {
         this.claimAuthorised = claimAuthorised;
         this.serviceClient = serviceClient;
         this.legacyUserLabels = legacyUserLabels;
+        this.claims = claims;
+        this.issuer = issuer;
     }
 
     @Override
@@ -370,6 +400,8 @@ public class User implements Serializable, UserDetails, Principal {
         private boolean claimAuthorised = false;
         private boolean serviceClient = false;
         private boolean legacyUserLabels = false;
+        private Map<String, Object> claims;
+        private String issuer;
 
         UserBuilder(String userId) {
             this.userId = userId;
@@ -438,6 +470,18 @@ public class User implements Serializable, UserDetails, Principal {
             return this;
         }
 
+        /** The claims of the user info or of the service client's token (kept unmodifiable) */
+        public UserBuilder claims(Map<String, Object> claims) {
+            this.claims = Collections.unmodifiableMap(new LinkedHashMap<>(claims));
+            return this;
+        }
+
+        /** The validated issuer of a service client's token */
+        public UserBuilder issuer(String issuer) {
+            this.issuer = issuer;
+            return this;
+        }
+
         public User build() {
             return new User(
                     userId,
@@ -452,7 +496,9 @@ public class User implements Serializable, UserDetails, Principal {
                     teskAdmin,
                     claimAuthorised,
                     serviceClient,
-                    legacyUserLabels);
+                    legacyUserLabels,
+                    claims,
+                    issuer);
         }
     }
 }

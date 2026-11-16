@@ -23,7 +23,7 @@ public interface TesService {
      * (tesk.api.authorisation.service-clients) create tasks without a group.
      */
     @PreAuthorize(
-            "(hasRole(@authorisationProperties.baseGroupFull) AND"
+            "@tesAuthz.decisionService OR (hasRole(@authorisationProperties.baseGroupFull) AND"
                     + "(#user.member OR #user.teskAdmin) AND"
                     + "(#task.tags?.get('GROUP_NAME') == null OR #user.isGroupMember(#task.tags['GROUP_NAME'])))"
                     + " OR (#user.authorisedWithoutGroup AND #task.tags?.get('GROUP_NAME') == null)")
@@ -38,7 +38,7 @@ public interface TesService {
      * @return - TES task details
      */
     @PostAuthorize(
-            "(#user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupMember(returnObject.logs[0].metadata['GROUP_NAME']))"
+            "@tesAuthz.decisionService OR (#user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupMember(returnObject.logs[0].metadata['GROUP_NAME']))"
                     + " OR (#user.teskAdmin)"
                     + " OR (returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupManager(returnObject.logs[0].metadata['GROUP_NAME']))"
                     + " OR (#user.authorisedWithoutGroup AND #user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] == null)")
@@ -59,7 +59,8 @@ public interface TesService {
      * @return - the page of tasks, with the continue token of the next page, if there is one
      */
     @PreAuthorize(
-            "#user.teskAdmin OR #user.manager OR #user.member OR #user.authorisedWithoutGroup")
+            "@tesAuthz.decisionService OR #user.teskAdmin OR #user.manager OR #user.member"
+                    + " OR #user.authorisedWithoutGroup")
     TesListTasksResponse listTasks(
             TaskFilter filter, Long pageSize, String pageToken, TaskView view, User user);
 
@@ -75,4 +76,15 @@ public interface TesService {
             "hasRole(@authorisationProperties.baseGroupFull)"
                     + " OR (principal instanceof T(uk.ac.ebi.tsc.tesk.config.security.User) AND principal.authorisedWithoutGroup)")
     void cancelTask(String taskId);
+
+    /**
+     * Cancels a task as the decision service (tesk.api.authz.decision-service) allows; only with
+     * one. The decision service is asked also for missing tasks: 404 if the task is missing or the
+     * user may not get it, 403 if the user may get it, but not cancel it.
+     *
+     * @param taskId - TES task ID (==taskmaster's job name)
+     * @param user - the authenticated user
+     */
+    @PreAuthorize("@tesAuthz.decisionService")
+    void cancelTask(String taskId, User user);
 }

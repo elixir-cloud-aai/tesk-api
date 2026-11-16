@@ -47,6 +47,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import uk.ac.ebi.tsc.tesk.authz.TesAuthz;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
@@ -104,6 +105,7 @@ public class TasksApiControllerTest {
 
     @MockitoBean private TesService tesService;
     @MockitoBean ServiceInfoService serviceInfoService;
+    @MockitoBean TesAuthz tesAuthz;
 
     @Test
     public void createTask_valid() throws Exception {
@@ -370,6 +372,53 @@ public class TasksApiControllerTest {
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
         verify(this.tesService, never()).cancelTask(anyString());
+    }
+
+    /** With a decision service, the cancellation is decided in one call, without getTask first */
+    @Test
+    public void cancelTask_withDecisionService() throws Exception {
+        given(this.tesAuthz.isDecisionService()).willReturn(true);
+        this.mvc
+                .perform(
+                        post(TASK_URL + "/{id}:cancel", "task-123")
+                                .header("Authorization", "Bearer BAR")
+                                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{}", true));
+        verify(this.tesService).cancelTask(eq("task-123"), argThat(isAdmin()));
+        verify(this.tesService, never()).getTask(anyString(), any(), any());
+        verify(this.tesService, never()).cancelTask(anyString());
+    }
+
+    /** The claim rule (tesk.api.authz.required-claim) runs first, for every task endpoint */
+    @Test
+    public void claimRule_deniesEveryTaskEndpoint() throws Exception {
+        org.mockito.Mockito.doThrow(
+                        new org.springframework.security.access.AccessDeniedException("denied"))
+                .when(this.tesAuthz)
+                .gate(any());
+        this.mvc
+                .perform(
+                        post(TASK_URL)
+                                .content(
+                                        getFileContentFromResources(
+                                                "fromTesToK8s_minimal/task.json"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isForbidden());
+        this.mvc
+                .perform(get(TASK_URL + "/{id}", "task-123").header("Authorization", "Bearer BAR"))
+                .andExpect(status().isForbidden());
+        this.mvc
+                .perform(get(TASK_URL).header("Authorization", "Bearer BAR"))
+                .andExpect(status().isForbidden());
+        this.mvc
+                .perform(
+                        post(TASK_URL + "/{id}:cancel", "task-123")
+                                .header("Authorization", "Bearer BAR"))
+                .andExpect(status().isForbidden());
+        verify(this.tesAuthz, times(4)).gate(argThat(isAdmin()));
+        org.mockito.Mockito.verifyNoInteractions(this.tesService);
     }
 
     /** Matches the user of the test's token (see {@link ResourceServerConfiguration}) */

@@ -162,6 +162,7 @@ public class ElixirPrincipalExtractor {
                 .teskAdmin(isAdmin)
                 .claimAuthorised(isClaimAuthorised(map))
                 .legacyUserLabels(authorisationProperties.isLegacyUserLabels())
+                .claims(map)
                 .build();
     }
 }

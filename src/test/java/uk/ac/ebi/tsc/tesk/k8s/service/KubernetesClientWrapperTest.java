@@ -338,6 +338,20 @@ public class KubernetesClientWrapperTest {
         assertThat(result.getMetadata().getContinue(), is("next"));
     }
 
+    /** With a decision service: all taskmaster jobs, or those of a creator (by the hash label) */
+    @Test
+    public void listTaskmasterJobsOfCreator() throws ApiException {
+        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
+        given(listJobs.execute()).willReturn(this.resultList());
+        assertThat(wrapper.listTaskmasterJobsOfCreator(null, 5, null), is(this.resultList()));
+        wrapper.listTaskmasterJobsOfCreator("token", 5, "alice");
+        Mockito.verify(listJobs, Mockito.times(2)).labelSelector(argument.capture());
+        assertThat(argument.getAllValues().get(0), is("job-type=taskmaster"));
+        assertThat(
+                argument.getAllValues().get(1),
+                is("job-type=taskmaster,creator-user-hash=" + CreatorLabels.hash("alice")));
+    }
+
     /** A job is deleted with its pods, in the background */
     @Test
     public void deleteJob() throws ApiException {

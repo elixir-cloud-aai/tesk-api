@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
+import uk.ac.ebi.tsc.tesk.authz.TesAuthz;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
@@ -55,7 +56,7 @@ class TesServiceImplListTest {
         this.client = mock(KubernetesClientWrapper.class);
         TesKubernetesConverter converter =
                 new TesKubernetesConverter(null, null, new ObjectMapper(), null, null);
-        this.service = new TesServiceImpl(this.client, converter);
+        this.service = new TesServiceImpl(this.client, converter, mock(TesAuthz.class));
         when(this.client.listAllTaskExecutorJobs()).thenReturn(new V1JobList());
         when(this.client.listFilerJobsOfTasks(any())).thenReturn(new V1JobList());
         when(this.client.listUnlabelledFilerJobs()).thenReturn(new V1JobList());

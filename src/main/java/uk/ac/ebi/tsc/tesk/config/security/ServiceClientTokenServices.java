@@ -274,6 +274,8 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
                         .allGroups(Collections.emptySet())
                         .serviceClient(true)
                         .legacyUserLabels(false)
+                        .claims(claims.getClaimsMap())
+                        .issuer(String.valueOf(claims.getClaimValue("iss")))
                         .build();
         return new AuthenticatedUser(user, claims.getClaimsMap(), AuthorityUtils.NO_AUTHORITIES);
     }
