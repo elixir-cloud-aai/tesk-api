@@ -1,5 +1,22 @@
 # Upgrading
 
+## To 2.1.0
+
+The new authorisation settings (a [required
+claim](access-control.md#required-claim) and an [external decision
+service](access-control.md#decision-service)) are off by default; without
+them, authorisation doesn't change.
+
+- **Fields set by TESK API.** `id`, `state`, `creation_time` and `logs` of
+  a created task are no longer stored as the client sent them; TESK API
+  ignored them before already, and sets them itself.
+- **Owners.** With the decision service on, new tasks get the annotation
+  `owner-id` (`<iss>|<sub>`). Tasks created before have none; see
+  [Owners](access-control.md#owners) for how TESK API derives theirs.
+- **Page tokens.** With the decision service on, page tokens of `GET
+  /tasks` are bound to the task set (all or own tasks); tokens from before
+  the switch give `400 Bad Request`: start again from the first page.
+
 ## To 2.0.0
 
 From 1.2.0, deployments may have to check their JVM options, the order in
