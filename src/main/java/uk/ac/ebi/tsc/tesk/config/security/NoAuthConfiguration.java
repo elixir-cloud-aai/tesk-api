@@ -20,7 +20,8 @@ public class NoAuthConfiguration {
     /**
      * Lets all requests in as anonymous, without Spring Security's other defaults (CSRF protection,
      * security headers, sessions, request cache, logout), as before with {@code
-     * WebSecurityConfigurerAdapter(disableDefaults = true)}
+     * WebSecurityConfigurerAdapter(disableDefaults = true)}; with allowed origins of CORS, Spring
+     * Security adds the CORS filter of {@link CorsConfig}
      */
     @Bean
     public SecurityFilterChain noAuthFilterChain(HttpSecurity http) throws Exception {
