@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -45,7 +46,7 @@ public class UrlStripperTest {
 
     @Test
     public void golden_hasAllRows() throws IOException {
-        assertThat(golden().count()).isGreaterThanOrEqualTo(31);
+        assertThat(golden().count()).isGreaterThanOrEqualTo(34);
     }
 
     @Test
@@ -57,6 +58,13 @@ public class UrlStripperTest {
     @Test
     public void strip_noSchemeKeepsFragment() {
         assertThat(UrlStripper.strip("/local/path#x")).isEqualTo("/local/path#x");
+    }
+
+    /** Step 0: a tab, line feed or carriage return anywhere omits the value */
+    @ParameterizedTest
+    @ValueSource(strings = {"https://h/a\tb", "https://h/a\nb", "https://h/a\rb", "/a\tb"})
+    public void strip_controlWhitespace(String url) {
+        assertThat(UrlStripper.strip(url)).isNull();
     }
 
     @Test

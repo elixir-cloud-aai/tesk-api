@@ -11,6 +11,8 @@ import java.util.regex.Pattern;
  * very secrets that are removed (userinfo, presigned signatures, SAS tokens).
  *
  * <ol>
+ *   <li>(Step 0) A value with a tab, line feed or carriage return anywhere is left out: WHATWG
+ *       parsers delete them, so {@code https://<TAB>/u:p@h/p} would send {@code u:p} to {@code h}.
  *   <li>A scheme counts only if the value starts with a valid RFC 3986 scheme directly followed by
  *       {@code ://}; the part W runs from there to the first {@code /} (or the end).
  *   <li>If W has an {@code @} after its first {@code ?} or {@code #}, or a backslash (which WHATWG
@@ -38,7 +40,10 @@ public final class UrlStripper {
      * @param url the URL as the client sent it
      */
     public static String strip(String url) {
-        if (url == null) {
+        if (url == null
+                || url.indexOf('\t') >= 0
+                || url.indexOf('\n') >= 0
+                || url.indexOf('\r') >= 0) {
             return null;
         }
         Matcher scheme = SCHEME.matcher(url);
