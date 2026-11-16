@@ -44,8 +44,11 @@ read all of the items below before you upgrade.
   internal address (e.g. `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
   loopback), now also outside Kubernetes (e.g. Docker behind nginx): the
   new default `SERVER_FORWARD_HEADERS_STRATEGY=native` replaces the property
-  `server.use-forward-headers`, which Spring Boot no longer read. In
-  Kubernetes, Spring Boot already did this; up to 1.2.0, Springfox also
+  `server.use-forward-headers`, which Spring Boot no longer reads. Behind
+  a proxy that terminates TLS and sends `X-Forwarded-Proto: https`, answers
+  with the `auth` profile then also carry Spring Security's
+  `Strict-Transport-Security` header (one year, `includeSubDomains`). In
+  Kubernetes, Spring Boot already did both; up to 1.2.0, Springfox also
   read `X-Forwarded-Host` of any client for the API description. If your
   proxy has a public address, set `SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES`
   to ranges that contain it. If clients reach TESK API from internal
@@ -206,16 +209,19 @@ read all of the items below before you upgrade.
   task's JSON, which could neither run nor be read back. This doesn't
   happen with valid TES tasks.
 
-New, off until you use them: tokens of allow-listed service clients
-(`TESK_API_AUTHORISATION_SERVICE_CLIENTS_*`, see [Tokens of
-services](access-control.md#tokens-of-services); in the Helm chart of TESK
-after 0.3.0: `auth.tokenClients`), CORS for browser clients of the origins
-listed in `TESK_API_CORS_ALLOWED_ORIGINS` (see [Cross-origin
-requests](configuration.md#cross-origin-requests-cors); list only origins
-that you trust with your users' tokens) and private executor images, an experimental
-workaround that needs `create` and `delete` on `secrets` (see [Private
-executor images](api.md#private-executor-images) and
-[Deployment](deployment.md)).
+New, off until you use them:
+
+- tokens of allow-listed service clients
+  (`TESK_API_AUTHORISATION_SERVICE_CLIENTS_*`, see [Tokens of
+  services](access-control.md#tokens-of-services); in the Helm chart of TESK
+  after 0.3.0: `auth.tokenClients`);
+- CORS for browser clients of the origins listed in
+  `TESK_API_CORS_ALLOWED_ORIGINS` (see [Cross-origin
+  requests](configuration.md#cross-origin-requests-cors)); list only origins
+  that you trust with your users' tokens;
+- private executor images, an experimental workaround that needs `create`
+  and `delete` on `secrets` (see [Private executor
+  images](api.md#private-executor-images) and [Deployment](deployment.md)).
 
 ## To 1.2.0
 
