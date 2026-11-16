@@ -4,8 +4,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -17,9 +18,9 @@ import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.util.ClientBuilder;
 import java.util.Collections;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.config.KubernetesClientConfig;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
@@ -35,11 +36,13 @@ public class KubernetesClientWrapperHttpTest {
 
     private static final String PODS = "/api/v1/namespaces/tesk/pods";
 
-    @Rule public WireMockRule kubernetes = new WireMockRule(wireMockConfig().dynamicPort());
+    @RegisterExtension
+    public WireMockExtension kubernetes =
+            WireMockExtension.newInstance().options(wireMockConfig().dynamicPort()).build();
 
     private KubernetesClientWrapper wrapper;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         KubernetesClientConfig config = new KubernetesClientConfig();
         ApiClient client = new ClientBuilder().setBasePath(kubernetes.baseUrl()).build();
@@ -119,12 +122,12 @@ public class KubernetesClientWrapperHttpTest {
     }
 
     /** A job that doesn't exist (404) is a task that doesn't exist */
-    @Test(expected = TaskNotFoundException.class)
+    @Test
     public void readMissingJob() {
         kubernetes.givenThat(
                 get(urlPathEqualTo(JOBS + "/task-1"))
                         .willReturn(aResponse().withStatus(404).withBody("{}")));
-        wrapper.readTaskmasterJob("task-1");
+        assertThrows(TaskNotFoundException.class, () -> wrapper.readTaskmasterJob("task-1"));
     }
 
     /** The minimum memory of the namespace's LimitRanges, in GB */

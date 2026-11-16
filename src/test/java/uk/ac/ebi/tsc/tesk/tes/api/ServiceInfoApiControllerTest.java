@@ -1,13 +1,13 @@
 package uk.ac.ebi.tsc.tesk.tes.api;
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.SERVICE_INFO_URL;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -21,13 +21,13 @@ public class ServiceInfoApiControllerTest {
 
     private MockMvc mvc;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         ServiceInfoService service =
                 new ServiceInfoService(
                         new FileSystemResource("src/main/resources/service-info.yaml"));
         service.setUp();
-        assertNotNull("built-in service-info.yaml could not be parsed", service.getServiceInfo());
+        assertNotNull(service.getServiceInfo(), "built-in service-info.yaml could not be parsed");
         mvc =
                 MockMvcBuilders.standaloneSetup(new ServiceInfoApiController(service))
                         .addPlaceholderValue(

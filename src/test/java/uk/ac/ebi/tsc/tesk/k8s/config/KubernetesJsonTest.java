@@ -15,7 +15,7 @@ import io.kubernetes.client.openapi.models.V1Volume;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** Reading the Kubernetes objects of clusters newer than the client */
 public class KubernetesJsonTest {

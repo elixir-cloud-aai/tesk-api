@@ -10,7 +10,7 @@ import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.util.Config;
@@ -22,11 +22,10 @@ import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.NumericDate;
 import org.jose4j.lang.JoseException;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -35,7 +34,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
@@ -47,7 +45,6 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
  * tokens are validated at the user info endpoint as before. The identity provider (discovery, keys
  * and user info), and the Kubernetes API are WireMocked.
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(
@@ -69,16 +66,22 @@ public class ServiceClientAuthIT {
 
     @Autowired private MockMvc mvc;
 
-    @Rule public WireMockRule mockUserInfo = new WireMockRule(8090);
+    @RegisterExtension
+    public WireMockExtension mockUserInfo =
+            WireMockExtension.newInstance().options(wireMockConfig().port(8090)).build();
 
-    @Rule public WireMockRule mockIssuer = new WireMockRule(8091);
+    @RegisterExtension
+    public WireMockExtension mockIssuer =
+            WireMockExtension.newInstance().options(wireMockConfig().port(8091)).build();
 
-    @Rule
-    public WireMockRule mockKubernetes =
-            new WireMockRule(
-                    wireMockConfig()
-                            .port(9000)
-                            .usingFilesUnderDirectory("src/integration-test/resources"));
+    @RegisterExtension
+    public WireMockExtension mockKubernetes =
+            WireMockExtension.newInstance()
+                    .options(
+                            wireMockConfig()
+                                    .port(9000)
+                                    .usingFilesUnderDirectory("src/integration-test/resources"))
+                    .build();
 
     @TestConfiguration
     static class KubernetesClientMock {
@@ -90,13 +93,13 @@ public class ServiceClientAuthIT {
         }
     }
 
-    @BeforeClass
+    @BeforeAll
     public static void generateKey() throws JoseException {
         key = RsaJwkGenerator.generateJwk(2048);
         key.setKeyId("key-1");
     }
 
-    @Before
+    @BeforeEach
     public void mockIssuer() {
         mockIssuer.givenThat(
                 WireMock.get("/oidc/.well-known/openid-configuration")

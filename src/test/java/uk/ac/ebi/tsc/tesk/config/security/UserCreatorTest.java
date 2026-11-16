@@ -1,17 +1,17 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERHASH_KEY;
 
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.Collections;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 

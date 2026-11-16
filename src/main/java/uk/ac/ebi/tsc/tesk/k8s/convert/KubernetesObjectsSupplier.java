@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
+import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
 import org.yaml.snakeyaml.Yaml;
@@ -52,37 +53,40 @@ public class KubernetesObjectsSupplier {
             JobNameGenerator jobNameGenerator,
             TaskmasterEnvProperties taskmasterEnvProperties,
             @Value("${tesk.api.k8s.namespace}") String namespace,
-            CoreV1Api coreApi)
+            CoreV1Api coreApi,
+            Environment environment)
             throws IOException, ApiException {
         this.gson = gson;
         this.jobNameGenerator = jobNameGenerator;
         this.taskmasterEnvProperties = taskmasterEnvProperties;
         this.namespace = namespace;
-        this.securityContext = createSecurityContext(coreApi, namespace);
+        this.securityContext = createSecurityContext(coreApi, namespace, environment);
         try (InputStream template = new ClassPathResource("taskmaster.json").getInputStream()) {
             this.taskmasterTemplateJson =
                     StreamUtils.copyToString(template, StandardCharsets.UTF_8);
         }
     }
 
+    /**
+     * The security context of the executors' pods, from the ConfigMap that the environment
+     * variables {@code CONFIGMAP}, {@code CONFIGMAPNAMESPACE} and {@code CONFIGMAPKEY} name. They
+     * are read through Spring's {@link Environment}, which includes the environment variables (and
+     * lets the tests set them).
+     */
     private static V1PodSecurityContext createSecurityContext(
-            CoreV1Api coreApi, String default_namespace) throws ApiException {
-        if (System.getenv(envConfigMap) == null) {
+            CoreV1Api coreApi, String default_namespace, Environment environment)
+            throws ApiException {
+        String confmap_name = environment.getProperty(envConfigMap);
+        if (confmap_name == null) {
             return null;
         }
 
-        String confmap_namespace = default_namespace;
-        if (System.getenv(envConfigMapNamespace) != null) {
-            confmap_namespace = System.getenv(envConfigMapNamespace);
-        }
+        String confmap_namespace =
+                environment.getProperty(envConfigMapNamespace, default_namespace);
         V1ConfigMap config =
-                coreApi.readNamespacedConfigMap(System.getenv(envConfigMap), confmap_namespace)
-                        .execute();
+                coreApi.readNamespacedConfigMap(confmap_name, confmap_namespace).execute();
 
-        String config_key = "securityContext";
-        if (System.getenv(envConfigMapKey) != null) {
-            config_key = System.getenv(envConfigMapKey);
-        }
+        String config_key = environment.getProperty(envConfigMapKey, "securityContext");
 
         V1PodSecurityContext security_context = new V1PodSecurityContext();
         if (config.getData().containsKey(config_key)) {

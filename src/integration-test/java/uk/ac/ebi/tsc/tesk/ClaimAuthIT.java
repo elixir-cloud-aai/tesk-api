@@ -10,12 +10,11 @@ import static uk.ac.ebi.tsc.tesk.TestUtils.getFileContentFromResources;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -24,7 +23,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -34,7 +32,6 @@ import org.springframework.test.web.servlet.ResultActions;
  * claim may create tasks without a group and see only their own tasks; group members and admins
  * keep their rights. Kubernetes API and OIDC userInfo endpoint are WireMocked.
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(
@@ -54,14 +51,18 @@ public class ClaimAuthIT {
 
     @Autowired private MockMvc mvc;
 
-    @Rule public WireMockRule mockElixir = new WireMockRule(8090);
+    @RegisterExtension
+    public WireMockExtension mockElixir =
+            WireMockExtension.newInstance().options(wireMockConfig().port(8090)).build();
 
-    @Rule
-    public WireMockRule mockKubernetes =
-            new WireMockRule(
-                    wireMockConfig()
-                            .port(9000)
-                            .usingFilesUnderDirectory("src/integration-test/resources"));
+    @RegisterExtension
+    public WireMockExtension mockKubernetes =
+            WireMockExtension.newInstance()
+                    .options(
+                            wireMockConfig()
+                                    .port(9000)
+                                    .usingFilesUnderDirectory("src/integration-test/resources"))
+                    .build();
 
     @TestConfiguration
     static class KubernetesClientMock {

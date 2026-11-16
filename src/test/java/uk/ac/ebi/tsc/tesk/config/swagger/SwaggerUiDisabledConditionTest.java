@@ -1,11 +1,12 @@
 package uk.ac.ebi.tsc.tesk.config.swagger;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.mock.env.MockEnvironment;
 
@@ -42,18 +43,18 @@ public class SwaggerUiDisabledConditionTest {
         assertFalse(matches("True"));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void off_isRejected() {
-        matches("off");
+        assertThrows(IllegalArgumentException.class, () -> matches("off"));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void yes_isRejected() {
-        matches("yes");
+        assertThrows(IllegalArgumentException.class, () -> matches("yes"));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void empty_isRejected() {
-        matches("");
+        assertThrows(IllegalArgumentException.class, () -> matches(""));
     }
 }

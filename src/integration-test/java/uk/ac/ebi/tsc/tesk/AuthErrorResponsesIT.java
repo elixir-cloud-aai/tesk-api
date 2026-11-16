@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,12 +13,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -26,7 +26,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -35,7 +34,6 @@ import org.springframework.test.web.servlet.ResultActions;
  * status, the headers ({@code WWW-Authenticate}) and the JSON body. The user info endpoint is
  * WireMocked.
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(
@@ -55,7 +53,9 @@ public class AuthErrorResponsesIT {
 
     @Autowired private MockMvc mvc;
 
-    @Rule public WireMockRule mockUserInfo = new WireMockRule(8090);
+    @RegisterExtension
+    public WireMockExtension mockUserInfo =
+            WireMockExtension.newInstance().options(wireMockConfig().port(8090)).build();
 
     @TestConfiguration
     static class KubernetesClientMock {

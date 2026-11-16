@@ -1,16 +1,17 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Authorisation without groups (issue #78): the setting {@code tesk.api.authorisation.claim.*}, the
@@ -95,26 +96,28 @@ public class ClaimAuthorisationTest {
         assertFalse(user.isClaimAuthorised());
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void enabled_noName() {
-        extract(properties(true, " ", MEDIUM), MEDIUM);
+        assertThrows(
+                IllegalStateException.class, () -> extract(properties(true, " ", MEDIUM), MEDIUM));
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void enabled_noValues() {
-        extract(properties(true, CLAIM), MEDIUM);
+        assertThrows(IllegalStateException.class, () -> extract(properties(true, CLAIM), MEDIUM));
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void enabled_onlyBlankValues() {
-        extract(properties(true, CLAIM, ""), MEDIUM);
+        assertThrows(
+                IllegalStateException.class, () -> extract(properties(true, CLAIM, ""), MEDIUM));
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void enabled_nullValues() {
         AuthorisationProperties properties = properties(true, CLAIM);
         properties.getClaim().setValues(null);
-        extract(properties, MEDIUM);
+        assertThrows(IllegalStateException.class, () -> extract(properties, MEDIUM));
     }
 
     /** Configured values are trimmed, the claim's values aren't */

@@ -1,12 +1,14 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert.data;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.*;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_TESTASK_ID_KEY;
 
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class TaskListStrategyTest {
 
@@ -99,10 +101,10 @@ public class TaskListStrategyTest {
                 is(true));
     }
 
-    @Test(expected = UnsupportedOperationException.class)
+    @Test
     public void getTask_unsupported() {
         BuildStrategy taskListMaker = new TaskListStrategy();
-        taskListMaker.getTask();
+        assertThrows(UnsupportedOperationException.class, () -> taskListMaker.getTask());
     }
 
     /** The outputs filer of a task that isn't in the list (e.g. on another page) is left out */

@@ -9,19 +9,19 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
@@ -45,11 +45,13 @@ import org.jose4j.jwt.consumer.JwtConsumer;
 import org.jose4j.keys.EllipticCurves;
 import org.jose4j.keys.HmacKey;
 import org.jose4j.lang.JoseException;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.springframework.boot.test.system.OutputCaptureRule;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
@@ -60,6 +62,7 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
  * Tokens of allow-listed service clients (issue #153), signed with test keys and checked against a
  * JSON Web Key Set and discovery document served by WireMock
  */
+@ExtendWith(OutputCaptureExtension.class)
 public class ServiceClientTokenServicesTest {
 
     private static final String CLIENT = "gateway-client";
@@ -68,14 +71,22 @@ public class ServiceClientTokenServicesTest {
     private static RsaJsonWebKey key;
     private static RsaJsonWebKey otherKey;
 
-    @Rule public WireMockRule idp = new WireMockRule(options().dynamicPort());
-    @Rule public OutputCaptureRule output = new OutputCaptureRule();
+    @RegisterExtension
+    public WireMockExtension idp =
+            WireMockExtension.newInstance().options(options().dynamicPort()).build();
+
+    private CapturedOutput output;
+
+    @BeforeEach
+    public void captureOutput(CapturedOutput output) {
+        this.output = output;
+    }
 
     private OpaqueTokenIntrospector userInfo;
     private OAuth2AuthenticatedPrincipal userPrincipal;
     private AuthorisationProperties properties;
 
-    @BeforeClass
+    @BeforeAll
     public static void generateKeys() throws JoseException {
         key = RsaJwkGenerator.generateJwk(2048);
         key.setKeyId("key-1");
@@ -83,7 +94,7 @@ public class ServiceClientTokenServicesTest {
         otherKey.setKeyId("key-2");
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         userInfo = mock(OpaqueTokenIntrospector.class);
         userPrincipal = mock(OAuth2AuthenticatedPrincipal.class);
@@ -98,7 +109,7 @@ public class ServiceClientTokenServicesTest {
     }
 
     private String issuer() {
-        return "http://localhost:" + idp.port() + "/oidc/";
+        return "http://localhost:" + idp.getPort() + "/oidc/";
     }
 
     private void discovery(String documentIssuer) {
@@ -111,7 +122,7 @@ public class ServiceClientTokenServicesTest {
         return "{\"issuer\":\""
                 + documentIssuer
                 + "\",\"jwks_uri\":\"http://localhost:"
-                + idp.port()
+                + idp.getPort()
                 + "/oidc/jwk\"}";
     }
 
@@ -394,7 +405,9 @@ public class ServiceClientTokenServicesTest {
 
     @Test
     public void jwksUri_isUsedWithoutDiscovery_ifSet() throws Exception {
-        properties.getServiceClients().setJwksUri("http://localhost:" + idp.port() + "/oidc/jwk");
+        properties
+                .getServiceClients()
+                .setJwksUri("http://localhost:" + idp.getPort() + "/oidc/jwk");
 
         accepted(sign(claims(CLIENT)));
 
@@ -514,7 +527,9 @@ public class ServiceClientTokenServicesTest {
     /** A failed or empty key set isn't fetched again within the interval, also without discovery */
     @Test
     public void failedKeySet_isNotRefetchedWithinTheInterval() throws Exception {
-        properties.getServiceClients().setJwksUri("http://localhost:" + idp.port() + "/oidc/jwk");
+        properties
+                .getServiceClients()
+                .setJwksUri("http://localhost:" + idp.getPort() + "/oidc/jwk");
         String token = sign(claims(CLIENT));
         for (boolean empty : new boolean[] {false, true}) {
             idp.resetRequests();
@@ -743,7 +758,7 @@ public class ServiceClientTokenServicesTest {
                         .willReturn(okJson(new JsonWebKeySet(key).toJson()).withFixedDelay(3000)));
         ServiceClientTokenServices.ThrottledHttpsJwks jwks =
                 new ServiceClientTokenServices.ThrottledHttpsJwks(
-                        "http://localhost:" + idp.port() + "/oidc/jwk", 0);
+                        "http://localhost:" + idp.getPort() + "/oidc/jwk", 0);
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             Future<?> first =

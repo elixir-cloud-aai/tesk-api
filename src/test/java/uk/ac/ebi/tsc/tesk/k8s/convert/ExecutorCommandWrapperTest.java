@@ -1,11 +1,11 @@
 package uk.ac.ebi.tsc.tesk.k8s.convert;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.util.Arrays;
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
 
 public class ExecutorCommandWrapperTest {

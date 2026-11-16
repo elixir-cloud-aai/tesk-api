@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.google.gson.Gson;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.JSON;
@@ -23,9 +23,8 @@ import io.kubernetes.client.openapi.models.V1LabelSelector;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.util.Config;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -33,7 +32,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -42,7 +40,6 @@ import org.springframework.test.web.servlet.MockMvc;
  * {@code <task>-outputs-filer} as the outputs filer (issue #182). The Kubernetes API is WireMocked;
  * its job lists are stubbed per label selector with the jobs that Kubernetes would select by it.
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(
@@ -61,7 +58,9 @@ public class SingleTaskJobsIT {
 
     @Autowired private MockMvc mvc;
 
-    @Rule public WireMockRule mockKubernetes = new WireMockRule(wireMockConfig().port(9000));
+    @RegisterExtension
+    public WireMockExtension mockKubernetes =
+            WireMockExtension.newInstance().options(wireMockConfig().port(9000)).build();
 
     @TestConfiguration
     static class KubernetesClientMock {

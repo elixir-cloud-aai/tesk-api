@@ -1,14 +1,14 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
 /** The task fields that TES 1.1 added (TESK#276) */
@@ -160,10 +160,10 @@ public class Tes11FieldsTest {
         for (String path : WILDCARD_PATHS) {
             for (String url : OTHER_URLS) {
                 String label = url + " " + path;
-                assertFalse(label, output(url, path).isPathPrefixGivenForPattern());
-                assertFalse(label, output(url, path).pathPrefix("").isPathPrefixGivenForPattern());
+                assertFalse(output(url, path).isPathPrefixGivenForPattern(), label);
+                assertFalse(output(url, path).pathPrefix("").isPathPrefixGivenForPattern(), label);
                 assertTrue(
-                        label, output(url, path).pathPrefix("/data").isPathPrefixGivenForPattern());
+                        output(url, path).pathPrefix("/data").isPathPrefixGivenForPattern(), label);
             }
         }
     }
@@ -176,7 +176,7 @@ public class Tes11FieldsTest {
     public void output_fileUrlsNeedNoPathPrefix() {
         for (String path : WILDCARD_PATHS) {
             for (String url : new String[] {"file:///out", "FILE:///out", "/out", "out", ":x"}) {
-                assertTrue(url + " " + path, output(url, path).isPathPrefixGivenForPattern());
+                assertTrue(output(url, path).isPathPrefixGivenForPattern(), url + " " + path);
             }
         }
         assertTrue(TesOutput.isFileUrl("file:out"));

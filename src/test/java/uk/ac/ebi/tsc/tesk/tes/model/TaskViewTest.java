@@ -2,7 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** The {@code view} parameter of GetTask and ListTasks */
 public class TaskViewTest {

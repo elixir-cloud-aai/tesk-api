@@ -6,7 +6,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.UnaryOperator;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** The account, group and equality rules of {@link User} */
 public class UserTest {

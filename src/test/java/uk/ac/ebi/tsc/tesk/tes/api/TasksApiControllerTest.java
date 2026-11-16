@@ -2,7 +2,7 @@ package uk.ac.ebi.tsc.tesk.tes.api;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -26,8 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 import org.mockito.InOrder;
@@ -45,7 +44,6 @@ import org.springframework.security.oauth2.server.resource.introspection.OpaqueT
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -63,7 +61,6 @@ import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 import uk.ac.ebi.tsc.tesk.tes.service.TaskFilter;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
-@RunWith(SpringRunner.class)
 @WebMvcTest(TasksApiController.class)
 // the auth profile, as the security configuration below stands for it (and the noauth one, which
 // application.properties sets, has a security configuration of its own)
