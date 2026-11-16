@@ -29,7 +29,8 @@ read all of the items below before you upgrade.
   springdoc-openapi instead of Springfox),
   instead of Swagger 2.0 at `/v2/api-docs`. `/v2/api-docs` serves the same
   OpenAPI 3.1 description for now, so that its users can move; it will be
-  removed in a later release. Point tools and clients that read the
+  removed in the next minor or major release
+  ([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188)). Point tools and clients that read the
   description to `/v3/api-docs`, and check those that read Swagger 2.0 or
   generate code from it (schema names, e.g. `TesInput`, and the layout
   differ). The paths, fields and status codes it describes are the same.

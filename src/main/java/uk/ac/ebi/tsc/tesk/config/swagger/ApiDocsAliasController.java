@@ -7,7 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 /**
  * Serves the API description also at its former path {@code /v2/api-docs} (Springfox, until 2.0.0),
  * for clients that read it there: the same OpenAPI 3 description as at {@code /v3/api-docs}
- * (springdoc). Deprecated: to be dropped in a later release (see {@code docs/upgrading.md}).
+ * (springdoc). Deprecated: to be dropped in the next minor or major release (issue #188; see {@code
+ * docs/upgrading.md}).
  */
 @Hidden
 @Controller
