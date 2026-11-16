@@ -340,11 +340,10 @@ public class TesServiceImpl implements TesService {
     /**
      * The filer jobs of the tasks of these taskmaster jobs: selected by their label {@code
      * taskmaster-name}, which taskmasters with tesk-core#147 put on them (issue #177). The filer
-     * jobs of older taskmasters have no label: if a task that may have an outputs filer (its stored
-     * task has outputs, or can't be read) has no labelled filer job, all unlabelled filer jobs are
-     * listed as well. Tasks with a labelled filer job, e.g. the inputs filer's, need no fallback,
-     * as a taskmaster labels all its filer jobs or none; tasks without outputs have no outputs
-     * filer, the only filer job that counts for the task.
+     * jobs of older taskmasters have no label: if a task that may have filer jobs (its stored task
+     * has inputs, outputs or volumes, or can't be read) has no labelled filer job, all unlabelled
+     * filer jobs are listed as well. Tasks with a labelled filer job, e.g. the inputs filer's, need
+     * no fallback, as a taskmaster labels all its filer jobs or none.
      */
     private List<V1Job> listFilerJobs(List<V1Job> taskmasterJobs) {
         List<String> taskIds =
@@ -366,10 +365,7 @@ public class TesServiceImpl implements TesService {
                                 job ->
                                         !tasksWithLabelledFilers.contains(
                                                 job.getMetadata().getName()))
-                        .anyMatch(
-                                job ->
-                                        !Boolean.FALSE.equals(
-                                                this.converter.extractHasOutputs(job)));
+                        .anyMatch(this.converter::mayHaveFilerJobs);
         if (fallback) {
             filerJobs.addAll(this.kubernetesClientWrapper.listUnlabelledFilerJobs().getItems());
         }

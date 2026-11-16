@@ -438,12 +438,11 @@ class TesServiceImplListTest {
     }
 
     /**
-     * A task without outputs has no outputs filer, the only filer job that counts: it needs no
-     * fallback, also without a labelled filer job (e.g. a task without inputs and outputs, which
-     * never gets one). A task with outputs and without a labelled filer job does (issue #177).
+     * A task without inputs, outputs and volumes never has filer jobs: it needs no fallback, also
+     * without a labelled filer job (issue #177).
      */
     @Test
-    void fallsBackOnlyForTasksWithOutputs() {
+    void noFallbackForTasksWithoutFilers() {
         this.page(
                 null,
                 null,
@@ -452,13 +451,28 @@ class TesServiceImplListTest {
                 stored("task-2", "{\"executors\":[{}]}"));
         this.service.listTasks(TaskFilter.byNamePrefix(null), null, null, TaskView.MINIMAL, USER);
         verify(this.client, never()).listUnlabelledFilerJobs();
+    }
 
+    /**
+     * Older taskmasters (before tesk-core 0.11.0) ran the outputs filer also for tasks with inputs
+     * but no outputs: such a task without a labelled filer job needs the fallback (issue #177).
+     */
+    @Test
+    void fallsBackForTasksWithInputsOnly() {
         this.page(
                 null,
                 null,
                 null,
                 stored("task-1", "{\"executors\":[{}],\"outputs\":[]}"),
-                stored("task-3", "{\"executors\":[{}],\"outputs\":[{\"url\":\"s3://b/o\"}]}"));
+                stored("task-2", "{\"executors\":[{}],\"inputs\":[{}],\"outputs\":[]}"));
+        this.service.listTasks(TaskFilter.byNamePrefix(null), null, null, TaskView.MINIMAL, USER);
+        verify(this.client).listUnlabelledFilerJobs();
+    }
+
+    /** A task whose stored task can't be read may have filer jobs: it needs the fallback. */
+    @Test
+    void fallsBackForUnreadableTasks() {
+        this.page(null, null, null, stored("task-1", "not JSON"));
         this.service.listTasks(TaskFilter.byNamePrefix(null), null, null, TaskView.MINIMAL, USER);
         verify(this.client).listUnlabelledFilerJobs();
     }

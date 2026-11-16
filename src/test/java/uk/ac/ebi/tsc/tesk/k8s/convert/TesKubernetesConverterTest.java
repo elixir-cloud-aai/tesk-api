@@ -1060,6 +1060,33 @@ public class TesKubernetesConverterTest {
         assertNull(this.hasOutputsOf(null));
     }
 
+    /**
+     * A task may have filer jobs if its stored task has inputs, outputs or volumes, or can't be
+     * read: older taskmasters (before tesk-core 0.11.0) ran the outputs filer for any of them
+     * (issue #177).
+     */
+    @Test
+    public void mayHaveFilerJobs() throws IOException {
+        String executors = "\"executors\": [{}]";
+        assertTrue(this.mayHaveFilerJobsOf("{" + executors + ", \"inputs\": [{}]}"));
+        assertTrue(this.mayHaveFilerJobsOf("{" + executors + ", \"outputs\": [{}]}"));
+        assertTrue(this.mayHaveFilerJobsOf("{" + executors + ", \"volumes\": [\"/data\"]}"));
+        assertFalse(
+                this.mayHaveFilerJobsOf(
+                        "{" + executors + ", \"inputs\": [], \"outputs\": [], \"volumes\": []}"));
+        assertFalse(this.mayHaveFilerJobsOf("{" + executors + ", \"inputs\": {}}"));
+        assertFalse(this.mayHaveFilerJobsOf("{" + executors + "}"));
+        assertTrue(this.mayHaveFilerJobsOf("{}"));
+        assertTrue(this.mayHaveFilerJobsOf("not JSON"));
+        assertTrue(this.mayHaveFilerJobsOf(null));
+    }
+
+    private boolean mayHaveFilerJobsOf(String storedTask) throws IOException {
+        V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
+        taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
+        return this.converter.mayHaveFilerJobs(taskmaster);
+    }
+
     private Boolean hasOutputsOf(String storedTask) throws IOException {
         V1Job taskmaster = this.prepareBaseTaskBuider().getTask().getTaskmaster().getJob();
         taskmaster.getMetadata().getAnnotations().put(Constants.ANN_JSON_INPUT_KEY, storedTask);
