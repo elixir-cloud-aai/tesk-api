@@ -45,7 +45,7 @@ public class UrlStripperTest {
 
     @Test
     public void golden_hasAllRows() throws IOException {
-        assertThat(golden().count()).isGreaterThanOrEqualTo(27);
+        assertThat(golden().count()).isGreaterThanOrEqualTo(31);
     }
 
     @Test
