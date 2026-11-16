@@ -1,0 +1,191 @@
+package uk.ac.ebi.tsc.tesk.config.security;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.type.AnnotatedTypeMetadata;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+/**
+ * Cross-origin requests (CORS) of browser clients. Off by default: without allowed origins ({@value
+ * #PROPERTY}), there is no {@link #corsConfigurationSource()} bean, so the security filter chains
+ * have no CORS filter and answers carry no CORS headers. With allowed origins, Spring Security adds
+ * the CORS filter with this bean to the security filter chains of both profiles ({@link
+ * ResourceServerConfiguration}, {@link NoAuthConfiguration}; it does so for every chain when a bean
+ * of type {@link UrlBasedCorsConfigurationSource} exists), before authentication, so that preflight
+ * requests need no token. Only the allowed origins, given exactly (scheme, host and port, no
+ * wildcards), may then call the API from a browser, with the methods and headers that the TES API
+ * uses, and without credentials (cookies), as clients send tokens in the {@code Authorization}
+ * header. Requests with an {@code Origin} header of another origin are refused (403). Invalid
+ * origins stop the app at startup.
+ */
+@Configuration
+public class CorsConfig {
+
+    static final String PROPERTY = "tesk.api.cors.allowed-origins";
+    private static final String ENV = "TESK_API_CORS_ALLOWED_ORIGINS";
+
+    /** A label that browsers read as a number (WHATWG URL Standard: "ends in a number") */
+    private static final Pattern NUMBER = Pattern.compile("(?i)[0-9]+|0x[0-9a-f]*");
+
+    private static final String OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
+
+    /** An IPv4 address as browsers write it: four decimal numbers without leading zeros */
+    private static final Pattern IPV4 =
+            Pattern.compile(OCTET + "\\." + OCTET + "\\." + OCTET + "\\." + OCTET);
+
+    private final List<String> allowedOrigins;
+
+    /**
+     * Reads {@value #PROPERTY} as {@link Enabled} does, so that both see the same origins
+     *
+     * @throws IllegalArgumentException for an invalid origin (see {@link #origins(List)})
+     */
+    @Autowired
+    public CorsConfig(Environment environment) {
+        this(configured(environment));
+    }
+
+    /**
+     * @param allowedOrigins the origins of {@value #PROPERTY}
+     * @throws IllegalArgumentException for an invalid origin (see {@link #origins(List)})
+     */
+    CorsConfig(List<String> allowedOrigins) {
+        this.allowedOrigins = origins(allowedOrigins);
+    }
+
+    /**
+     * The entries of {@value #PROPERTY} in any form that Spring Boot binds to a list (e.g. comma
+     * separated, or indexed), none if unset
+     */
+    static List<String> configured(Environment environment) {
+        return Binder.get(environment)
+                .bind(PROPERTY, Bindable.listOf(String.class))
+                .orElse(List.of());
+    }
+
+    /**
+     * The allowed origins, trimmed, without blank entries
+     *
+     * @throws IllegalArgumentException for an origin that isn't an exact {@code http} or {@code
+     *     https} origin, so that the app fails to start
+     */
+    static List<String> origins(List<String> allowedOrigins) {
+        List<String> origins = new ArrayList<>();
+        for (String origin : allowedOrigins) {
+            String trimmed = origin.trim();
+            if (!trimmed.isEmpty()) {
+                origins.add(validated(trimmed));
+            }
+        }
+        return List.copyOf(origins);
+    }
+
+    /** An exact origin (scheme {@code http} or {@code https}, host, optional port), as given */
+    private static String validated(String origin) {
+        URI uri;
+        try {
+            uri = new URI(origin);
+        } catch (URISyntaxException e) {
+            throw invalid(origin);
+        }
+        String path = uri.getRawPath();
+        boolean valid =
+                ("http".equalsIgnoreCase(uri.getScheme())
+                                || "https".equalsIgnoreCase(uri.getScheme()))
+                        // null also for hosts that aren't valid host names, e.g. with wildcards
+                        && uri.getHost() != null
+                        && uri.getRawUserInfo() == null
+                        && (path.isEmpty() || "/".equals(path))
+                        && uri.getRawQuery() == null
+                        && uri.getRawFragment() == null
+                        && canonicalHost(uri.getHost())
+                        && canonicalPort(uri);
+        if (!valid) {
+            throw invalid(origin);
+        }
+        return origin;
+    }
+
+    /**
+     * A host as browsers send it: a host whose last label is a number (decimal or hex) is an IPv4
+     * address to browsers, which they send as four decimal numbers (e.g. {@code 127.1} as {@code
+     * 127.0.0.1}), so only that form is accepted for it
+     */
+    private static boolean canonicalHost(String host) {
+        String lastLabel = host.substring(host.lastIndexOf('.') + 1);
+        return !NUMBER.matcher(lastLabel).matches() || IPV4.matcher(host).matches();
+    }
+
+    /**
+     * No port, or one written as browsers send it (origins are compared as strings): not empty, not
+     * the scheme's default (which browsers leave out), from 1 to 65535, without leading zeros
+     */
+    private static boolean canonicalPort(URI uri) {
+        int port = uri.getPort();
+        if (port == -1) {
+            return !uri.getRawAuthority().endsWith(":");
+        }
+        return port != defaultPort(uri.getScheme())
+                && port > 0
+                && port <= 65535
+                && uri.getRawAuthority().endsWith(":" + port);
+    }
+
+    private static int defaultPort(String scheme) {
+        return "https".equalsIgnoreCase(scheme) ? 443 : 80;
+    }
+
+    private static IllegalArgumentException invalid(String origin) {
+        return new IllegalArgumentException(
+                "Invalid origin '"
+                        + origin
+                        + "' in "
+                        + PROPERTY
+                        + " ("
+                        + ENV
+                        + "): use exact origins such as https://client.example.org (scheme http or"
+                        + " https, host, optional port), ASCII host names (punycode), without wildcards, paths, user info or default ports");
+    }
+
+    /**
+     * The CORS settings of all paths, only with allowed origins. Of type {@link
+     * UrlBasedCorsConfigurationSource}, the type by which Spring Security finds it for the filter
+     * chains
+     */
+    @Bean
+    @Conditional(Enabled.class)
+    public UrlBasedCorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedMethods(List.of("GET", "HEAD", "POST"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setExposedHeaders(List.of("WWW-Authenticate"));
+        config.setAllowCredentials(false);
+        config.setMaxAge(1800L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    /** Matches if {@value #PROPERTY} lists at least one origin (and all its origins are valid) */
+    static class Enabled implements Condition {
+
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            return !origins(configured(context.getEnvironment())).isEmpty();
+        }
+    }
+}

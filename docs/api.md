@@ -173,9 +173,11 @@ know about:
   and may lack files of tasks with very
   many outputs or of TES 1.0 wildcard outputs (see [Output file
   logs](#output-file-logs)).
-- TESK API sends no CORS headers. To use it from web pages of other origins,
-  as TES asks of such implementations, configure CORS where you expose it,
-  e.g. in your ingress controller.
+- TESK API sends no CORS headers by default. To use it from web pages of
+  other origins, as TES asks of such implementations, list them in
+  `TESK_API_CORS_ALLOWED_ORIGINS` (see [Cross-origin
+  requests](configuration.md#cross-origin-requests-cors)); TESK API allows
+  only these origins, never all.
 
 ## Resources
 
