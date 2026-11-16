@@ -63,6 +63,33 @@ public class KubernetesObjectsSupplierTest {
         assertThat(securityContext()).isEqualTo(new V1PodSecurityContext().runAsUser(1001L));
     }
 
+    /**
+     * {@code CONFIGMAPNAMESPACE} and {@code CONFIGMAPKEY} choose the namespace and the key, and all
+     * settings of the YAML are taken over
+     */
+    @Test
+    public void customNamespaceAndKey() throws Exception {
+        environment.setProperty("CONFIGMAP", "security");
+        environment.setProperty("CONFIGMAPNAMESPACE", "config");
+        environment.setProperty("CONFIGMAPKEY", "executors");
+        configMap(
+                "security",
+                "config",
+                new V1ConfigMap()
+                        .putDataItem("securityContext", "runAsUser: 1")
+                        .putDataItem(
+                                "executors",
+                                "fsGroup: 2000\nrunAsUser: 2001\nrunAsGroup: 2002\nnonRoot: TRUE"));
+
+        assertThat(securityContext())
+                .isEqualTo(
+                        new V1PodSecurityContext()
+                                .fsGroup(2000L)
+                                .runAsUser(2001L)
+                                .runAsGroup(2002L)
+                                .runAsNonRoot(true));
+    }
+
     /** Settings that the YAML leaves out stay unset */
     @Test
     public void emptySecurityContext() throws Exception {

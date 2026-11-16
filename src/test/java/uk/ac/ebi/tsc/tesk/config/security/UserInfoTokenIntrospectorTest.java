@@ -21,7 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import java.io.IOException;
-import java.net.ServerSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -152,13 +154,13 @@ public class UserInfoTokenIntrospectorTest {
 
     @Test
     public void userInfoUnreachable_isRefused() throws IOException {
-        // a port that was free a moment ago, with nothing listening on it
-        int closedPort;
-        try (ServerSocket socket = new ServerSocket(0)) {
-            closedPort = socket.getLocalPort();
+        // a port that this socket holds, bound but not listening: connections are refused, and
+        // no other process can listen on it meanwhile
+        try (Socket socket = new Socket()) {
+            socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+            introspector = introspector(socket.getLocalPort());
+            refused();
         }
-        introspector = introspector(closedPort);
-        refused();
     }
 
     @Test
