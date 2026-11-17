@@ -3,3 +3,6 @@
 
 # style: format the Java code (#109)
 5ba7f6c0fe9c4d56d564ae86ae8280157fe64a00
+
+# style: update google-java-format (#201)
+debc4b5ee44003e029528392e776a999ce7700ef
