@@ -388,12 +388,11 @@
             </plugin>
             <!-- Formatting (google-java-format, AOSP style) and lint (checkstyle.xml):
                  ./mvnw spotless:apply to format, ./mvnw spotless:check checkstyle:check to check
-                 (CI job Lint), on Java 8: google-java-format 1.7 does not run on Java 21, and
-                 newer versions format differently (docs/development.md). -->
+                 (CI job Lint). -->
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>2.30.0</version>
+                <version>3.11.0</version>
                 <configuration>
                     <java>
                         <includes>
@@ -428,7 +427,7 @@
                             <exclude>src/main/java/uk/ac/ebi/tsc/tesk/tes/model/TesTaskLog.java</exclude>
                         </excludes>
                         <googleJavaFormat>
-                            <version>1.7</version>
+                            <version>2.0.0</version>
                             <style>AOSP</style>
                         </googleJavaFormat>
                         <removeUnusedImports/>
@@ -438,12 +437,12 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>3.3.1</version>
+                <version>3.6.0</version>
                 <dependencies>
                     <dependency>
                         <groupId>com.puppycrawl.tools</groupId>
                         <artifactId>checkstyle</artifactId>
-                        <version>9.3</version>
+                        <version>14.4.0</version>
                     </dependency>
                 </dependencies>
                 <configuration>
