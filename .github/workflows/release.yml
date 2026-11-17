@@ -357,12 +357,14 @@ jobs:
           notes: docs/releases/${{ needs.prepare.outputs.version }}.md
           commit: ${{ needs.prepare.outputs.sha }}
 
-  # One call to Pubgrade (publish mode, elixir-cloud-aai/Pubgrade#33), which
-  # notifies the subscribed deployments of the published image; it doesn't wait
-  # for the GitHub release (`publish`). No retries: a failed run says so, and
-  # re-running this job sends it again. The token is a secret of the `release`
-  # environment, like the other release credentials, so this job needs an
-  # approval there, too. The job only runs if the variable `PUBGRADE_URL` is
+  # Registers the image at Pubgrade (publish mode, elixir-cloud-aai/Pubgrade#33)
+  # with Pubgrade's action `actions/notify`, which notifies the subscribed
+  # deployments; it doesn't wait for the GitHub release (`publish`). The action
+  # checks its inputs, masks the token and retries only requests that never
+  # reached Pubgrade (no connection), so that a build isn't registered twice; a
+  # failed run says so, and re-running this job sends it again. The token is a
+  # secret of the `release` environment, like the other release credentials,
+  # so this job needs an approval there, too. The job only runs if the variable `PUBGRADE_URL` is
   # set for the repository: variables of an environment aren't visible to a
   # job's `if:` (it is evaluated before the job enters the environment), and a
   # check in a step would leave every release without Pubgrade waiting for an
@@ -377,31 +379,12 @@ jobs:
     timeout-minutes: 10
     environment: release
     permissions: {}
-    env:
-      PUBGRADE_URL: ${{ vars.PUBGRADE_URL }}
-      PUBGRADE_REPOSITORY_ID: ${{ vars.PUBGRADE_REPOSITORY_ID }}
-      PUBGRADE_TOKEN: ${{ secrets.PUBGRADE_TOKEN }}
-      IMAGE_REPOSITORY: ${{ vars.DOCKERHUB_ORG || 'elixircloud' }}/tesk-api
-      VERSION: ${{ needs.prepare.outputs.version }}
-      TAG: ${{ github.ref_name }}
     steps:
+      # Sends the run's tag as the Git reference (`head_commit.tag`)
       - name: Notify Pubgrade
-        run: |
-          if [[ -z "${PUBGRADE_REPOSITORY_ID}" || -z "${PUBGRADE_TOKEN}" ]]; then
-              echo "::error::PUBGRADE_URL is set, but PUBGRADE_REPOSITORY_ID or PUBGRADE_TOKEN is missing"
-              exit 1
-          fi
-          if [[ ! "${PUBGRADE_REPOSITORY_ID}" =~ ^[A-Za-z0-9_-]+$ ]]; then
-              echo "::error::Invalid PUBGRADE_REPOSITORY_ID"
-              exit 1
-          fi
-          body="$(jq --null-input \
-              --arg name "${IMAGE_REPOSITORY}:${VERSION}" --arg tag "${TAG}" \
-              '{images: [{name: $name}], head_commit: {tag: $tag}}')"
-          # HTTPS only (also for redirects, which aren't followed anyway); the
-          # token goes in through stdin, not the command line
-          curl --proto '=https' --silent --show-error --fail-with-body --max-time 300 \
-              --request POST "${PUBGRADE_URL%/}/repositories/${PUBGRADE_REPOSITORY_ID}/builds" \
-              --header 'Content-Type: application/json' \
-              --data "${body}" \
-              --config - <<< "header = \"X-Project-Access-Token: ${PUBGRADE_TOKEN}\""
+        uses: elixir-cloud-aai/Pubgrade/actions/notify@0694d0346b05df4d8907cb9a751496a93c1d5668 # unreleased (dev)
+        with:
+          url: ${{ vars.PUBGRADE_URL }}
+          repository-id: ${{ vars.PUBGRADE_REPOSITORY_ID }}
+          token: ${{ secrets.PUBGRADE_TOKEN }}
+          image: ${{ vars.DOCKERHUB_ORG || 'elixircloud' }}/tesk-api:${{ needs.prepare.outputs.version }}

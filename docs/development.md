@@ -225,10 +225,13 @@ job: re-run it the same way. Releases are
 never edited afterwards: fix mistakes in the notes of the next release.
 
 After publishing the image (without waiting for the GitHub release), the
-workflow makes one `POST /repositories/{id}/builds` to
-[Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade), which notifies the
-deployments that subscribed to upgrades, also for pre-releases, if they
-subscribed to those. This needs Pubgrade's publish mode
+workflow registers it, with the release tag, at
+[Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade) (`POST
+/repositories/{id}/builds`, through Pubgrade's action `actions/notify`),
+which notifies the deployments that subscribed to upgrades, also for
+pre-releases, if they subscribed to those. The action masks the token and
+retries a request only if it never reached Pubgrade, so that a build is never
+registered twice. This needs Pubgrade's publish mode
 ([#33](https://github.com/elixir-cloud-aai/Pubgrade/issues/33)) and these
 settings:
 
