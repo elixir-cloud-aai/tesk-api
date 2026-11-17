@@ -255,11 +255,12 @@ if one of the other settings is missing or invalid: the identifier and the
 token may only hold letters, digits, `.`, `~` and `-` (as Pubgrade issues
 them). If only this job fails or is rejected, the image is published all the
 same: fix the settings and re-run the job, or leave it; don't release a new
-version for it. If it failed on a timeout or an error answer (5xx), Pubgrade
+version for it. Unless it failed on an invalid setting or with "Could not
+reach Pubgrade (curl exit status 6)" or "(… 7)" (no connection), Pubgrade
 may have registered the build all the same: check the repository's builds
 (`GET /repositories/{id}/builds`) before re-running it, as re-running
-notifies the subscribed deployments again. Settings of the
-former `pubgrade` environment are no longer read: move them as above.
+notifies the subscribed deployments again. Settings of the former `pubgrade`
+environment are no longer read: move them as above.
 
 ## Generating a new API stub
 
