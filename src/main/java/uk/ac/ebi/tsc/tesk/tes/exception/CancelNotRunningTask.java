@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 /**
  * 400 - cancel task in status other than RUNNING
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class CancelNotRunningTask extends RuntimeException {

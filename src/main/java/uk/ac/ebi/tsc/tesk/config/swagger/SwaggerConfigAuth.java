@@ -17,7 +17,7 @@ import org.springframework.context.annotation.Profile;
  * endpoints and scopes of {@link OAuth2ClientProperties}; the Swagger UI gets its client ID from
  * {@code springdoc.swagger-ui.oauth.client-id} ({@code application.properties}).
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 @Profile("auth")

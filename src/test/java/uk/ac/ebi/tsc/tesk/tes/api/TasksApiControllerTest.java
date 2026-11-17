@@ -89,13 +89,11 @@ public class TasksApiControllerTest {
                                     "N/A",
                                     principal.getAuthorities());
             http.authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
-                    .oauth2ResourceServer(
-                            resourceServer ->
-                                    resourceServer.opaqueToken(
-                                            opaqueToken ->
-                                                    opaqueToken
-                                                            .introspector(introspector)
-                                                            .authenticationConverter(converter)));
+                    .oauth2ResourceServer(resourceServer ->
+                            resourceServer.opaqueToken(opaqueToken ->
+                                    opaqueToken
+                                            .introspector(introspector)
+                                            .authenticationConverter(converter)));
             return http.build();
         }
     }
@@ -199,13 +197,8 @@ public class TasksApiControllerTest {
                 .andExpect(status().isOk());
         verify(this.tesService)
                 .createTask(
-                        argThat(
-                                (TesTask created) ->
-                                        "token"
-                                                .equals(
-                                                        created.getExecutors()
-                                                                .get(0)
-                                                                .getDockerPass())),
+                        argThat((TesTask created) ->
+                                "token".equals(created.getExecutors().get(0).getDockerPass())),
                         any());
     }
 

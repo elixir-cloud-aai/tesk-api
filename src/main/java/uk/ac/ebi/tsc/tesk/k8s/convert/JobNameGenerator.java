@@ -8,7 +8,9 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.springframework.stereotype.Component;
 
-/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
+/**
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
+ */
 @Component
 public class JobNameGenerator {
 

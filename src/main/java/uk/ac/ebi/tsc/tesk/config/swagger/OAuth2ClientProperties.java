@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Properties for SwaggerUI acting as OAuth2 client
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 @ConfigurationProperties(prefix = "tesk.api.swagger-oauth")
@@ -28,6 +28,7 @@ public class OAuth2ClientProperties {
 
     /** Authorisation server token endpoint */
     private String tokenEndpoint;
+
     /** OAuth2 Client ID */
     private String clientId;
 
@@ -36,6 +37,7 @@ public class OAuth2ClientProperties {
 
     /** List of Scopes, a client will request (a list of entries: scope name: description) */
     private List<String> scopes;
+
     /** Whether implicit (true) or auth code flow (false) */
     private Boolean implicit;
 

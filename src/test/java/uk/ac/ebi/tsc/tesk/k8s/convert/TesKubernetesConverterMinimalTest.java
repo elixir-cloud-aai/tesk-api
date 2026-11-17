@@ -68,7 +68,9 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
 
-/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
+/**
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
+ */
 @JsonTest
 @TestPropertySource(locations = {"classpath:application.properties"})
 @EnableConfigurationProperties(TaskmasterEnvProperties.class)
@@ -746,12 +748,10 @@ public class TesKubernetesConverterMinimalTest {
     @Test
     public void unchecked_wrapsIOException() {
         assertThat(TesKubernetesConverter.unchecked(() -> "done")).isEqualTo("done");
-        assertThatThrownBy(
-                        () ->
-                                TesKubernetesConverter.unchecked(
-                                        () -> {
-                                            throw new IOException("disk full");
-                                        }))
+        assertThatThrownBy(() ->
+                        TesKubernetesConverter.unchecked(() -> {
+                            throw new IOException("disk full");
+                        }))
                 .isInstanceOf(UncheckedIOException.class)
                 .hasMessageContaining("disk full");
     }

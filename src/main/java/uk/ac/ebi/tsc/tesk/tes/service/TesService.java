@@ -13,7 +13,7 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
  * Implementation of controller endpoints. Orchestrates all kubernetes client calls (via wrapper)
  * and converting inputs and outputs with the help of the converter.
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public interface TesService {
     /**

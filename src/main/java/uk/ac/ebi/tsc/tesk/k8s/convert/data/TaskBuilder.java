@@ -20,7 +20,7 @@ import java.util.Map;
  * object's list by implementing {@link BuildStrategy#addTaskMasterJob(Job)} and {@link
  * BuildStrategy#addExecutorJob(Job)}}.
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class TaskBuilder {
 

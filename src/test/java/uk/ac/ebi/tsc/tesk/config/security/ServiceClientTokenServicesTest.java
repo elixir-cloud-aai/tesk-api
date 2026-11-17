@@ -759,11 +759,10 @@ public class ServiceClientTokenServicesTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             Future<?> first =
-                    executor.submit(
-                            () -> {
-                                jwks.refresh();
-                                return null;
-                            });
+                    executor.submit(() -> {
+                        jwks.refresh();
+                        return null;
+                    });
             awaitRequest("/oidc/jwk");
 
             jwks.refresh();

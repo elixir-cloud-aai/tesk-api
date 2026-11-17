@@ -140,7 +140,8 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             long jwksRefreshIntervalMs) {
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
         Set<String> ids =
-                Optional.ofNullable(settings.getClientIds()).orElse(Collections.emptyList())
+                Optional.ofNullable(settings.getClientIds())
+                        .orElse(Collections.emptyList())
                         .stream()
                         .filter(StringUtils::hasText)
                         .map(String::trim)
@@ -339,6 +340,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     static final class ThrottledHttpsJwks extends HttpsJwks {
         private final long intervalMs;
         private final ReentrantLock refreshLock = new ReentrantLock();
+
         /** When the last fetch started (epoch milliseconds); 0 for never */
         private long lastAttempt = 0;
 

@@ -162,28 +162,25 @@ public class CorsConfigTest {
         contextRunner
                 .withPropertyValues(
                         CorsConfig.PROPERTY + "=https://a.example.org, https://b.example.org")
-                .run(
-                        context -> {
-                            CorsConfiguration config =
-                                    configFor(
-                                            context.getBean(UrlBasedCorsConfigurationSource.class),
-                                            "/ga4gh/tes/v1/tasks");
-                            assertEquals(
-                                    List.of("https://a.example.org", "https://b.example.org"),
-                                    config.getAllowedOrigins());
-                        });
+                .run(context -> {
+                    CorsConfiguration config =
+                            configFor(
+                                    context.getBean(UrlBasedCorsConfigurationSource.class),
+                                    "/ga4gh/tes/v1/tasks");
+                    assertEquals(
+                            List.of("https://a.example.org", "https://b.example.org"),
+                            config.getAllowedOrigins());
+                });
     }
 
     @Test
     public void context_withoutOrigins_hasNoSource() {
         contextRunner
                 .withPropertyValues(CorsConfig.PROPERTY + "=")
-                .run(
-                        context ->
-                                assertTrue(
-                                        context.getBeansOfType(
-                                                        UrlBasedCorsConfigurationSource.class)
-                                                .isEmpty()));
+                .run(context ->
+                        assertTrue(
+                                context.getBeansOfType(UrlBasedCorsConfigurationSource.class)
+                                        .isEmpty()));
     }
 
     @Test
@@ -197,16 +194,14 @@ public class CorsConfigTest {
     public void context_withIndexedOrigins_hasSourceWithTheseOrigins() {
         contextRunner
                 .withPropertyValues(CorsConfig.PROPERTY + "[0]=https://a.example.org")
-                .run(
-                        context ->
-                                assertEquals(
-                                        List.of("https://a.example.org"),
-                                        configFor(
-                                                        context.getBean(
-                                                                UrlBasedCorsConfigurationSource
-                                                                        .class),
-                                                        "/ga4gh/tes/v1/tasks")
-                                                .getAllowedOrigins()));
+                .run(context ->
+                        assertEquals(
+                                List.of("https://a.example.org"),
+                                configFor(
+                                                context.getBean(
+                                                        UrlBasedCorsConfigurationSource.class),
+                                                "/ga4gh/tes/v1/tasks")
+                                        .getAllowedOrigins()));
     }
 
     @Test

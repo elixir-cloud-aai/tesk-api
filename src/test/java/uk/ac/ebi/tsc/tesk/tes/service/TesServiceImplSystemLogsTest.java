@@ -135,14 +135,12 @@ class TesServiceImplSystemLogsTest {
         when(this.client.listSingleJobPods(executor))
                 .thenReturn(new V1PodList().addItemsItem(executorPod));
         when(this.converter.fromK8sJobsToTesTaskBasic(any(Task.class), anyBoolean()))
-                .thenAnswer(
-                        invocation ->
-                                new TesTask()
-                                        .id(TASK_ID)
-                                        .addLogsItem(
-                                                new TesTaskLog()
-                                                        .addLogsItem(
-                                                                new TesExecutorLog().stdout(""))));
+                .thenAnswer(invocation ->
+                        new TesTask()
+                                .id(TASK_ID)
+                                .addLogsItem(
+                                        new TesTaskLog()
+                                                .addLogsItem(new TesExecutorLog().stdout(""))));
     }
 
     /** The executor's stdout is the log of its pod */

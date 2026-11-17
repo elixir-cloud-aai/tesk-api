@@ -81,10 +81,8 @@ public final class TaskStateResolver {
                         Stream.concat(
                                 Stream.of(task.getTaskmaster()), task.getExecutors().stream()),
                         task.getOutputFiler().map(Stream::of).orElseGet(Stream::empty));
-        return jobs.anyMatch(
-                job ->
-                        isActive(job.getJob())
-                                || job.getPods().stream().anyMatch(pod -> !hasEnded(pod)));
+        return jobs.anyMatch(job ->
+                isActive(job.getJob()) || job.getPods().stream().anyMatch(pod -> !hasEnded(pod)));
     }
 
     /**
@@ -131,11 +129,10 @@ public final class TaskStateResolver {
                         .map(V1PodStatus::getConditions)
                         .orElse(Collections.emptyList());
         return conditions.stream()
-                .anyMatch(
-                        condition ->
-                                "DisruptionTarget".equals(condition.getType())
-                                        && "True".equals(condition.getStatus())
-                                        && DISRUPTION_REASONS.contains(condition.getReason()));
+                .anyMatch(condition ->
+                        "DisruptionTarget".equals(condition.getType())
+                                && "True".equals(condition.getStatus())
+                                && DISRUPTION_REASONS.contains(condition.getReason()));
     }
 
     /**
@@ -253,10 +250,9 @@ public final class TaskStateResolver {
         boolean annotated =
                 Optional.ofNullable(job.getMetadata())
                         .map(V1ObjectMeta::getAnnotations)
-                        .map(
-                                annotations ->
-                                        ANN_IGNORE_ERROR_VALUE.equals(
-                                                annotations.get(ANN_IGNORE_ERROR_KEY)))
+                        .map(annotations ->
+                                ANN_IGNORE_ERROR_VALUE.equals(
+                                        annotations.get(ANN_IGNORE_ERROR_KEY)))
                         .orElse(false);
         return annotated && !endedByDeadline(job);
     }
@@ -319,10 +315,9 @@ public final class TaskStateResolver {
                         .map(V1JobStatus::getConditions)
                         .orElse(Collections.emptyList());
         return conditions.stream()
-                .anyMatch(
-                        condition ->
-                                FAILED_CONDITIONS.contains(condition.getType())
-                                        && "True".equals(condition.getStatus()));
+                .anyMatch(condition ->
+                        FAILED_CONDITIONS.contains(condition.getType())
+                                && "True".equals(condition.getStatus()));
     }
 
     private static boolean hasSucceeded(V1Job job) {
