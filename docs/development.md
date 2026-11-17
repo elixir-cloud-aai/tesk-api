@@ -117,7 +117,7 @@ neither):
 ./mvnw spotless:check checkstyle:check
 ```
 
-These two commands run on Java 21, as building and testing do.
+Like building and testing, these two commands need Java 21.
 
 The commits that only reformatted the code are listed in
 `.git-blame-ignore-revs`. GitHub skips them in its blame view; for `git blame`,
