@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.API_DOCS_URL;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.FORMER_API_DOCS_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.HOME_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.SWAGGER_UI_URLS;
 
@@ -60,5 +61,14 @@ public class SwaggerUiAuthIT {
     @Test
     public void apiDocsYamlWithoutToken_isOk() throws Exception {
         this.mvc.perform(get(API_DOCS_URL + ".yaml")).andExpect(status().isOk());
+    }
+
+    /**
+     * The former path of the API description, an alias in 2.0.0, is gone (#188): it is no longer
+     * public, so a request without a token is unauthorized, as for any other path
+     */
+    @Test
+    public void formerApiDocsWithoutToken_isUnauthorized() throws Exception {
+        this.mvc.perform(get(FORMER_API_DOCS_URL)).andExpect(status().isUnauthorized());
     }
 }
