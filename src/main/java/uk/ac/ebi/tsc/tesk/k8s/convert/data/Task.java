@@ -13,16 +13,18 @@ import java.util.stream.Collectors;
  * A composite that represents Kubernetes object's graph of a single TES task: taskmaster job with
  * its pods and executor jobs with its pods
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class Task {
     /** Taskmaster job (with corresponding pods) */
     private Job taskmaster;
+
     /**
      * All executor objects (each with corresponding pods) mapped by their K8s job object name
      * (Random order -> sorting in getExecutors)
      */
     private Map<String, Job> executorsByName = new HashMap<>();
+
     /** Outputs filer job (with corresponding pods) - used to capture failure of handling outputs */
     private Job outputFiler;
 

@@ -9,13 +9,14 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Properties affecting taskmaster's job template
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 @ConfigurationProperties(prefix = "tesk.api.taskmaster")
 public class TaskmasterEnvProperties {
     /** Taskmaster image name */
     private String imageName;
+
     /** Taskmaster image version */
     private String imageVersion;
 
@@ -24,6 +25,7 @@ public class TaskmasterEnvProperties {
 
     /** Filer image version */
     private String filerImageVersion;
+
     /** Test FTP account settings */
     private Ftp ftp;
 
@@ -114,20 +116,21 @@ public class TaskmasterEnvProperties {
             return false;
         }
         return this.getFtp().enabled;
-    };
+    }
 
     public boolean isExecutorSecretEnabled() {
         if (this.getExecutorSecret() == null) {
             return false;
         }
         return this.getExecutorSecret().enabled;
-    };
+    }
 
     /** Test FTP account settings */
     public static class Ftp {
 
         /** Name of the secret with FTP acoount credentials */
         private String secretName;
+
         /**
          * If FTP account enabled (based on non-emptiness of secretName) Does not check the
          * existence of real secret via API

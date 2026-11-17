@@ -59,9 +59,8 @@ To deploy TESK to a cluster, use the Helm chart of [TESK][tesk].
 
 ## Development
 
-TESK API builds and runs on Java 21 (the formatter and linter still need
-Java 8; see [Development][docs-development]). To build it and run the unit
-and integration tests (no cluster needed):
+TESK API builds and runs on Java 21. To build it and run the unit and
+integration tests (no cluster needed):
 
 ```bash
 ./mvnw clean verify

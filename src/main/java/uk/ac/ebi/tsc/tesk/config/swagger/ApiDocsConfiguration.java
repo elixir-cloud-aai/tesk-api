@@ -32,11 +32,10 @@ public class ApiDocsConfiguration {
             }
             Map<String, Schema> properties = new LinkedHashMap<>();
             executor.getProperties()
-                    .forEach(
-                            (name, property) ->
-                                    properties.put(
-                                            WRITE_ONLY_EXECUTOR_PROPERTIES.getOrDefault(name, name),
-                                            property));
+                    .forEach((name, property) ->
+                            properties.put(
+                                    WRITE_ONLY_EXECUTOR_PROPERTIES.getOrDefault(name, name),
+                                    property));
             executor.setProperties(properties);
         };
     }

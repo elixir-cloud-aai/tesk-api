@@ -76,10 +76,12 @@ class TaskStateResolverTest {
 
     private static final Set<JobState> FAILING =
             EnumSet.of(JobState.FAILED, JobState.FAILURE_TARGET);
+
     /** Job states with a pod that is pending or running (also a terminating one). */
     private static final Set<JobState> ACTIVE_POD =
             EnumSet.of(
                     JobState.PENDING, JobState.RUNNING, JobState.FAILURE_TARGET, JobState.RETRYING);
+
     /** Taskmaster states that end the task's other jobs; failed pods alone may still be retried. */
     private static final Set<JobState> ENDED_TM =
             EnumSet.of(
@@ -311,17 +313,16 @@ class TaskStateResolverTest {
     void everyRowOfTheTableIsReached() {
         Set<Integer> reached = new HashSet<>();
         combinations()
-                .forEach(
-                        arguments -> {
-                            Object[] a = arguments.get();
-                            reached.add(
-                                    matchingRow(
-                                            (Boolean) a[0],
-                                            (JobState) a[1],
-                                            (JobState) a[2],
-                                            (JobState) a[3],
-                                            (JobState) a[4]));
-                        });
+                .forEach(arguments -> {
+                    Object[] a = arguments.get();
+                    reached.add(
+                            matchingRow(
+                                    (Boolean) a[0],
+                                    (JobState) a[1],
+                                    (JobState) a[2],
+                                    (JobState) a[3],
+                                    (JobState) a[4]));
+                });
         assertThat(reached).hasSize(TABLE.size());
     }
 

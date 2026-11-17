@@ -30,7 +30,7 @@ import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsAliasController;
  * UserInfoTokenIntrospector}), or, with tesk.api.authorisation.service-clients enabled, the tokens
  * of the listed service clients locally ({@link ServiceClientTokenServices}).
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 @EnableMethodSecurity
@@ -97,36 +97,32 @@ public class ResourceServerConfiguration {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(
-                        requests ->
-                                // Error dispatches (to /error) aren't authorised again, as before
-                                requests.dispatcherTypeMatchers(DispatcherType.ERROR)
-                                        .permitAll()
-                                        .requestMatchers(HttpMethod.GET, allowedUrlsArray)
-                                        .permitAll()
-                                        .requestMatchers(HttpMethod.HEAD, allowedUrlsArray)
-                                        .permitAll()
-                                        .anyRequest()
-                                        .authenticated())
+                .authorizeHttpRequests(requests ->
+                        // Error dispatches (to /error) aren't authorised again, as before
+                        requests.dispatcherTypeMatchers(DispatcherType.ERROR)
+                                .permitAll()
+                                .requestMatchers(HttpMethod.GET, allowedUrlsArray)
+                                .permitAll()
+                                .requestMatchers(HttpMethod.HEAD, allowedUrlsArray)
+                                .permitAll()
+                                .anyRequest()
+                                .authenticated())
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(entryPoint))
-                .oauth2ResourceServer(
-                        resourceServer ->
-                                resourceServer
-                                        .authenticationEntryPoint(entryPoint)
-                                        .opaqueToken(
-                                                opaqueToken ->
-                                                        opaqueToken
-                                                                .introspector(introspector)
-                                                                .authenticationConverter(
-                                                                        AuthenticatedUser
-                                                                                ::toAuthentication)));
+                .oauth2ResourceServer(resourceServer ->
+                        resourceServer
+                                .authenticationEntryPoint(entryPoint)
+                                .opaqueToken(opaqueToken ->
+                                        opaqueToken
+                                                .introspector(introspector)
+                                                .authenticationConverter(
+                                                        AuthenticatedUser::toAuthentication)));
         return http.build();
     }
 
     /**
-     * Validates the tokens at the user info endpoint, and, with tesk.api.authorisation.service-
-     * clients enabled, the tokens of the listed service clients locally ({@link
-     * ServiceClientTokenServices})
+     * Validates the tokens at the user info endpoint, and, with
+     * tesk.api.authorisation.service-clients enabled, the tokens of the listed service clients
+     * locally ({@link ServiceClientTokenServices})
      */
     @Bean
     public OpaqueTokenIntrospector tokenIntrospector() {

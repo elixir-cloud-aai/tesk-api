@@ -9,7 +9,7 @@ import java.util.List;
  * A container for a single Kubernetes job object (can be both a taskmaster and an executor) and its
  * list of worker pods (Kubernetes Pod objects)
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class Job {
     /** Kubernetes job object */

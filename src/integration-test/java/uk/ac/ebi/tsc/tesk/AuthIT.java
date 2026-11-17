@@ -34,7 +34,7 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
  * Integration testing of security (authentication and authorisation using OIDC and Elixir groups)
  * Kubernetes API and OIDC userInfo endpoint are WireMocked
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @SpringBootTest
 @AutoConfigureMockMvc

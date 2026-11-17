@@ -34,7 +34,7 @@ import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
 /**
  * Conversion of TES objects to and from Kubernetes Objects
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Component
 public class TesKubernetesConverter {
@@ -134,15 +134,14 @@ public class TesKubernetesConverter {
         }
         List<V1Job> executorsAsJobs =
                 IntStream.range(0, task.getExecutors().size())
-                        .mapToObj(
-                                i ->
-                                        this.fromTesExecutorToK8sJob(
-                                                taskMasterConfigMap.getMetadata().getName(),
-                                                task.getName(),
-                                                task.getExecutors().get(i),
-                                                i,
-                                                task.getResources(),
-                                                user))
+                        .mapToObj(i ->
+                                this.fromTesExecutorToK8sJob(
+                                        taskMasterConfigMap.getMetadata().getName(),
+                                        task.getName(),
+                                        task.getExecutors().get(i),
+                                        i,
+                                        task.getResources(),
+                                        user))
                         .collect(Collectors.toList());
         List<TesInput> inputs = task.getInputs() == null ? new ArrayList<>() : task.getInputs();
         List<TesOutput> outputs = task.getOutputs() == null ? new ArrayList<>() : task.getOutputs();
@@ -290,9 +289,8 @@ public class TesKubernetesConverter {
                 .forEach(container::addCommandItem);
         if (executor.getEnv() != null) {
             executor.getEnv()
-                    .forEach(
-                            (key, value) ->
-                                    container.addEnvItem(new V1EnvVar().name(key).value(value)));
+                    .forEach((key, value) ->
+                            container.addEnvItem(new V1EnvVar().name(key).value(value)));
         }
         container.setWorkingDir(executor.getWorkdir());
         // CPU cores (validated: at most 6 integer digits and 3 decimals) as both the request and
@@ -300,28 +298,23 @@ public class TesKubernetesConverter {
         Optional.ofNullable(resources)
                 .map(TesResources::getCpuCores)
                 .map(cpuCores -> new QuantityFormatter().parse(cpuCores.toPlainString()))
-                .ifPresent(
-                        cpu ->
-                                container
-                                        .getResources()
-                                        .putLimitsItem(RESOURCE_CPU_KEY, cpu)
-                                        .putRequestsItem(RESOURCE_CPU_KEY, cpu));
+                .ifPresent(cpu ->
+                        container
+                                .getResources()
+                                .putLimitsItem(RESOURCE_CPU_KEY, cpu)
+                                .putRequestsItem(RESOURCE_CPU_KEY, cpu));
         // Limit number of decimals to 6
         Optional.ofNullable(resources)
                 .map(TesResources::getRamGb)
-                .ifPresent(
-                        ramGb ->
-                                container
-                                        .getResources()
-                                        .putRequestsItem(
-                                                RESOURCE_MEM_KEY,
-                                                new QuantityFormatter()
-                                                        .parse(
-                                                                String.format(
-                                                                                Locale.ROOT,
-                                                                                "%.6f",
-                                                                                ramGb)
-                                                                        + RESOURCE_MEM_UNIT)));
+                .ifPresent(ramGb ->
+                        container
+                                .getResources()
+                                .putRequestsItem(
+                                        RESOURCE_MEM_KEY,
+                                        new QuantityFormatter()
+                                                .parse(
+                                                        String.format(Locale.ROOT, "%.6f", ramGb)
+                                                                + RESOURCE_MEM_UNIT)));
 
         return job;
     }
@@ -673,10 +666,8 @@ public class TesKubernetesConverter {
 
     public Optional<String> getNameOfFirstRunningPod(V1PodList podList) {
         return podList.getItems().stream()
-                .filter(
-                        pod ->
-                                pod.getStatus() != null
-                                        && "Running".equals(pod.getStatus().getPhase()))
+                .filter(pod ->
+                        pod.getStatus() != null && "Running".equals(pod.getStatus().getPhase()))
                 .findFirst()
                 .map(pod -> pod.getMetadata().getName());
     }

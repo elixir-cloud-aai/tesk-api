@@ -11,7 +11,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
+/**
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
+ */
 @Configuration
 public class KubernetesClientConfig {
 

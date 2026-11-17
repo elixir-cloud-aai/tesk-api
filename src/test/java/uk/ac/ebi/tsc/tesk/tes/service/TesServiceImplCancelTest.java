@@ -77,17 +77,16 @@ class TesServiceImplCancelTest {
                                         .putLabelsItem("job-name", TASK + "-ex-00"))
                         .status(new V1PodStatus().phase("Running"));
         when(this.client.listSingleJobPods(any(V1Job.class)))
-                .thenAnswer(
-                        invocation -> {
-                            V1Job job = invocation.getArgument(0);
-                            if (TASK.equals(job.getMetadata().getName())) {
-                                return this.taskmasterPods;
-                            }
-                            if ((TASK + "-ex-00").equals(job.getMetadata().getName())) {
-                                return new V1PodList().addItemsItem(executorPod);
-                            }
-                            return new V1PodList().items(Collections.emptyList());
-                        });
+                .thenAnswer(invocation -> {
+                    V1Job job = invocation.getArgument(0);
+                    if (TASK.equals(job.getMetadata().getName())) {
+                        return this.taskmasterPods;
+                    }
+                    if ((TASK + "-ex-00").equals(job.getMetadata().getName())) {
+                        return new V1PodList().addItemsItem(executorPod);
+                    }
+                    return new V1PodList().items(Collections.emptyList());
+                });
         when(this.client.getSingleTaskOutputFilerJob(TASK)).thenReturn(Optional.empty());
         when(this.client.listSingleTaskExecutorJobs(TASK)).thenReturn(new V1JobList());
     }
@@ -420,15 +419,10 @@ class TesServiceImplCancelTest {
                                                         .status("True")
                                                         .reason("EvictionByEvictionAPI")));
         when(this.client.listSingleJobPods(any(V1Job.class)))
-                .thenAnswer(
-                        invocation ->
-                                TASK.equals(
-                                                invocation
-                                                        .<V1Job>getArgument(0)
-                                                        .getMetadata()
-                                                        .getName())
-                                        ? this.taskmasterPods
-                                        : new V1PodList().addItemsItem(evictedPod));
+                .thenAnswer(invocation ->
+                        TASK.equals(invocation.<V1Job>getArgument(0).getMetadata().getName())
+                                ? this.taskmasterPods
+                                : new V1PodList().addItemsItem(evictedPod));
         assertThatThrownBy(() -> this.service.cancelTask(TASK))
                 .isInstanceOf(CancelNotRunningTask.class);
         this.verifyNothingPatched();

@@ -3,7 +3,7 @@ package uk.ac.ebi.tsc.tesk.k8s.constant;
 /**
  * Kubernetes specific constants (parts of K8s API)
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class K8sConstants {
 
@@ -40,8 +40,10 @@ public class K8sConstants {
 
     /** Executor CPU resource label */
     public static final String RESOURCE_CPU_KEY = "cpu";
+
     /** Executor memory resource label */
     public static final String RESOURCE_MEM_KEY = "memory";
+
     /** Executor memory resource unit */
     public static final String RESOURCE_MEM_UNIT = "Gi";
 

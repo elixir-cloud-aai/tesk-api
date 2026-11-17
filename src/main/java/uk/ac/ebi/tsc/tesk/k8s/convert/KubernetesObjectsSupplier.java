@@ -26,7 +26,7 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 /**
  * Templates for tasmaster's and executor's job object.
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 public class KubernetesObjectsSupplier {
@@ -161,35 +161,26 @@ public class KubernetesObjectsSupplier {
                 job.getSpec().getTemplate().getSpec().getContainers().get(0).getEnv();
         containerEnvironment.addAll(
                 taskmasterEnvProperties.getEnvironment().entrySet().stream()
-                        .map(
-                                e ->
-                                        new V1EnvVar()
-                                                .name(
-                                                        e.getKey()
-                                                                .toUpperCase()
-                                                                .replaceAll("\\.", "_"))
-                                                .value(e.getValue()))
+                        .map(e ->
+                                new V1EnvVar()
+                                        .name(e.getKey().toUpperCase().replaceAll("\\.", "_"))
+                                        .value(e.getValue()))
                         .collect(Collectors.toList()));
         containerEnvironment.stream()
-                .filter(
-                        env ->
-                                FTP_SECRET_USERNAME_ENV.equals(env.getName())
-                                        || FTP_SECRET_PASSWORD_ENV.equals(env.getName()))
-                .forEach(
-                        env -> {
-                            if (taskmasterEnvProperties.isFTPEnabled()) {
-                                // update secret name, if FTP enabled
-                                env.getValueFrom()
-                                        .getSecretKeyRef()
-                                        .setName(
-                                                this.taskmasterEnvProperties
-                                                        .getFtp()
-                                                        .getSecretName());
-                            } else {
-                                // remove FTP secrets otherwise
-                                toBeRemoved.add(env);
-                            }
-                        });
+                .filter(env ->
+                        FTP_SECRET_USERNAME_ENV.equals(env.getName())
+                                || FTP_SECRET_PASSWORD_ENV.equals(env.getName()))
+                .forEach(env -> {
+                    if (taskmasterEnvProperties.isFTPEnabled()) {
+                        // update secret name, if FTP enabled
+                        env.getValueFrom()
+                                .getSecretKeyRef()
+                                .setName(this.taskmasterEnvProperties.getFtp().getSecretName());
+                    } else {
+                        // remove FTP secrets otherwise
+                        toBeRemoved.add(env);
+                    }
+                });
 
         toBeRemoved.stream().forEach(containerEnvironment::remove);
         return job;

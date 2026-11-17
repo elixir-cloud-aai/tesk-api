@@ -27,10 +27,9 @@ public class SwaggerConfigAuthTest {
         OpenAPI api = new SwaggerConfigAuth(properties(implicit)).api();
         assertThat(api.getSecurity())
                 .singleElement()
-                .satisfies(
-                        requirement ->
-                                assertThat(requirement)
-                                        .containsOnlyKeys(SwaggerConfigAuth.SECURITY_SCHEME));
+                .satisfies(requirement ->
+                        assertThat(requirement)
+                                .containsOnlyKeys(SwaggerConfigAuth.SECURITY_SCHEME));
         SecurityScheme scheme =
                 api.getComponents().getSecuritySchemes().get(SwaggerConfigAuth.SECURITY_SCHEME);
         assertThat(scheme.getType()).isEqualTo(SecurityScheme.Type.OAUTH2);

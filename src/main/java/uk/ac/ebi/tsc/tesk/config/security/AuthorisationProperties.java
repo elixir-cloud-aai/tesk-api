@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
  * Configuration of group based authorisation, and of the optional authorisation by a claim without
  * groups ({@link Claim})
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 @ConfigurationProperties(prefix = "tesk.api.authorisation")
@@ -19,6 +19,7 @@ public class AuthorisationProperties {
 
     /** The prefix before actual group name */
     private String groupPrefix;
+
     /** The suffix after actual group name */
     private String groupSuffix = "";
 
@@ -27,8 +28,10 @@ public class AuthorisationProperties {
      * + suffix)
      */
     private String baseGroupFull;
+
     /** (Prefix) + Base group name + delimiter (to use as a prefix to even more nested groups) */
     private String baseGroupPrefix;
+
     /** Subgroup representing admins of its parent group */
     private String adminSubgroup;
 
@@ -57,8 +60,10 @@ public class AuthorisationProperties {
     public static class Claim {
         /** Whether the claim authorises users without groups */
         private boolean enabled = false;
+
         /** Name of the claim in the user info, e.g. eduperson_assurance */
         private String name;
+
         /** Values of the claim, one of which a user needs (compared exactly) */
         private List<String> values = new ArrayList<>();
 
@@ -97,24 +102,32 @@ public class AuthorisationProperties {
     public static class ServiceClients {
         /** Whether tokens of the listed clients are accepted */
         private boolean enabled = false;
+
         /** Issuer of the tokens, compared exactly with their {@code iss} claim */
         private String issuer;
+
         /** JWKS URI of the issuer; if unset, from the issuer's OpenID Connect discovery */
         private String jwksUri;
+
         /** Claim that names the client (RFC 9068: {@code client_id}; some providers: azp) */
         private String clientClaim = "client_id";
+
         /** IDs of the clients whose tokens are accepted (compared exactly) */
         private List<String> clientIds = new ArrayList<>();
+
         /** If set, the token's {@code aud} must be or contain this value */
         private String audience;
+
         /** Whether the token's header must have {@code typ} {@code at+jwt} (RFC 9068) */
         private boolean requireAccessTokenType = true;
+
         /**
          * Whether the token's {@code sub} must be the client's ID, as for tokens of the client
          * credentials grant (RFC 9068, section 2.2); tokens of users obtained through a listed
          * client have the user's {@code sub} and are then validated as user tokens
          */
         private boolean requireClientSubject = true;
+
         /** Leeway for {@code exp}, {@code nbf} and {@code iat} (in the future), in seconds */
         private int clockSkewSeconds = 60;
 

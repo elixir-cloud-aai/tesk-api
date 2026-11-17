@@ -5,7 +5,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import uk.ac.ebi.tsc.tesk.k8s.config.KubernetesJson;
 
-/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
+/**
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
+ */
 @Configuration
 public class GsonConfig {
 

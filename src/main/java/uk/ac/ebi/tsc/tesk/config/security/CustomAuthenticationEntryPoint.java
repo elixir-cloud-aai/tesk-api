@@ -35,7 +35,7 @@ import org.springframework.web.util.WebUtils;
  * resource server of the former Spring Security OAuth: {@code unauthorized} without a token, {@code
  * invalid_token} for a token that isn't valid.
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
