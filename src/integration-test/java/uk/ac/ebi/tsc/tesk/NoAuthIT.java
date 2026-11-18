@@ -45,7 +45,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Integration testing of switched off security Kubernetes API is WireMocked
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @SpringBootTest
 @AutoConfigureMockMvc

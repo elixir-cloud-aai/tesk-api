@@ -47,7 +47,7 @@ import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
  * Implementation of controller endpoints. Orchestrates all kubernetes client calls (via wrapper)
  * and converting inputs and outputs with the help of the converter.
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Service
 public class TesServiceImpl implements TesService {
@@ -103,11 +103,10 @@ public class TesServiceImpl implements TesService {
                 // the owner for the decision service, if the issuer is known
                 this.authz
                         .ownerId(user)
-                        .ifPresent(
-                                owner ->
-                                        taskMasterJob
-                                                .getMetadata()
-                                                .putAnnotationsItem(ANN_OWNER_KEY, owner));
+                        .ifPresent(owner ->
+                                taskMasterJob
+                                        .getMetadata()
+                                        .putAnnotationsItem(ANN_OWNER_KEY, owner));
                 IgnoredBackendParameters.annotate(
                         taskMasterJob.getMetadata(), ignoredBackendParameters);
                 V1ConfigMap taskMasterConfigMap =
@@ -394,11 +393,9 @@ public class TesServiceImpl implements TesService {
         List<V1Job> matchingTaskmasterJobs =
                 taskmasterJobs.getItems().stream()
                         .filter(job -> filter.matchesName(taskName(job)))
-                        .filter(
-                                job ->
-                                        !filter.hasTags()
-                                                || filter.matchesTags(
-                                                        this.converter.extractTags(job)))
+                        .filter(job ->
+                                !filter.hasTags()
+                                        || filter.matchesTags(this.converter.extractTags(job)))
                         .collect(Collectors.toList());
         if (matchingTaskmasterJobs.isEmpty()) {
             // nothing to combine: spare the lists of all executors, filers and pods
@@ -416,12 +413,10 @@ public class TesServiceImpl implements TesService {
         List<TesTask> tasks =
                 taskListBuilder.getTaskList().stream()
                         // the state is derived only if the filter needs it
-                        .filter(
-                                task ->
-                                        !filter.hasState()
-                                                || filter.matchesState(
-                                                        this.converter.extractStateFromK8sJobs(
-                                                                task)))
+                        .filter(task ->
+                                !filter.hasState()
+                                        || filter.matchesState(
+                                                this.converter.extractStateFromK8sJobs(task)))
                         .map(task -> this.getTask(task, view, true))
                         .collect(Collectors.toList());
         return new TesListTasksResponse().tasks(tasks).nextPageToken(nextPageToken);
@@ -451,10 +446,8 @@ public class TesServiceImpl implements TesService {
                         .collect(Collectors.toSet());
         boolean fallback =
                 taskmasterJobs.stream()
-                        .filter(
-                                job ->
-                                        !tasksWithLabelledFilers.contains(
-                                                job.getMetadata().getName()))
+                        .filter(job ->
+                                !tasksWithLabelledFilers.contains(job.getMetadata().getName()))
                         .anyMatch(this.converter::mayHaveFilerJobs);
         if (fallback) {
             filerJobs.addAll(this.kubernetesClientWrapper.listUnlabelledFilerJobs().getItems());
@@ -524,16 +517,12 @@ public class TesServiceImpl implements TesService {
         // first: it decides; the pending pods' labels are a courtesy, as Kubernetes removes them
         this.kubernetesClientWrapper.cancelJobBeforeStart(taskId);
         taskMasterPods.getItems().stream()
-                .filter(
-                        pod ->
-                                pod.getStatus() != null
-                                        && PodPhase.PENDING
-                                                .getCode()
-                                                .equals(pod.getStatus().getPhase()))
-                .forEach(
-                        pod ->
-                                this.labelPodAsCancelledIfPossible(
-                                        pod.getMetadata().getName(), "its job ends anyway"));
+                .filter(pod ->
+                        pod.getStatus() != null
+                                && PodPhase.PENDING.getCode().equals(pod.getStatus().getPhase()))
+                .forEach(pod ->
+                        this.labelPodAsCancelledIfPossible(
+                                pod.getMetadata().getName(), "its job ends anyway"));
     }
 
     private static boolean isStartedAndNotLabelledCancelled(V1Pod pod) {

@@ -15,7 +15,7 @@ import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
  * at level TRACE: arguments and results of the writing calls (except {@code createSecret}, whose
  * argument holds credentials), and arguments of the reading calls
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 @EnableAspectJAutoProxy(proxyTargetClass = true)

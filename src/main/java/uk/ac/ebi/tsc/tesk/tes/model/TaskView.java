@@ -4,7 +4,7 @@ package uk.ac.ebi.tsc.tesk.tes.model;
  * All values of view parameter in {@link uk.ac.ebi.tsc.tesk.tes.api.V1Api#getTask(String, String)}
  * and {@link uk.ac.ebi.tsc.tesk.tes.api.V1Api#listTasks(String, Long, String, String)}
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public enum TaskView {
     MINIMAL("MINIMAL"),

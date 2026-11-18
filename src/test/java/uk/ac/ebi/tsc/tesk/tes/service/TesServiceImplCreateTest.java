@@ -65,14 +65,9 @@ class TesServiceImplCreateTest {
         when(this.converter.fromTesTaskToK8sImagePullSecrets(any(TesTask.class), any(V1Job.class)))
                 .thenReturn(Collections.emptyList());
         when(this.converter.fromK8sJobToTesCreateTaskResponse(any(V1Job.class)))
-                .thenAnswer(
-                        invocation ->
-                                new TesCreateTaskResponse()
-                                        .id(
-                                                invocation
-                                                        .<V1Job>getArgument(0)
-                                                        .getMetadata()
-                                                        .getName()));
+                .thenAnswer(invocation ->
+                        new TesCreateTaskResponse()
+                                .id(invocation.<V1Job>getArgument(0).getMetadata().getName()));
     }
 
     /** The converter makes a job and a ConfigMap with this name; Kubernetes gives the job a UID. */
@@ -80,26 +75,24 @@ class TesServiceImplCreateTest {
         when(this.converter.fromTesTaskToK8sJob(this.task, USER))
                 .thenReturn(new V1Job().metadata(new V1ObjectMeta().name(name)));
         when(this.converter.fromTesTaskToK8sConfigMap(any(TesTask.class), any(User.class), any()))
-                .thenAnswer(
-                        invocation ->
-                                new V1ConfigMap()
-                                        .metadata(
-                                                new V1ObjectMeta()
-                                                        .name(
-                                                                invocation
-                                                                        .<V1Job>getArgument(2)
-                                                                        .getMetadata()
-                                                                        .getName())));
+                .thenAnswer(invocation ->
+                        new V1ConfigMap()
+                                .metadata(
+                                        new V1ObjectMeta()
+                                                .name(
+                                                        invocation
+                                                                .<V1Job>getArgument(2)
+                                                                .getMetadata()
+                                                                .getName())));
         when(this.client.createJob(any(V1Job.class)))
-                .thenAnswer(
-                        invocation -> {
-                            V1Job job = invocation.getArgument(0);
-                            return new V1Job()
-                                    .metadata(
-                                            new V1ObjectMeta()
-                                                    .name(job.getMetadata().getName())
-                                                    .uid("uid-" + job.getMetadata().getName()));
-                        });
+                .thenAnswer(invocation -> {
+                    V1Job job = invocation.getArgument(0);
+                    return new V1Job()
+                            .metadata(
+                                    new V1ObjectMeta()
+                                            .name(job.getMetadata().getName())
+                                            .uid("uid-" + job.getMetadata().getName()));
+                });
     }
 
     private static KubernetesException kubernetesError(HttpStatus status) {
@@ -170,16 +163,15 @@ class TesServiceImplCreateTest {
         order.verify(this.client).createConfigMap(configMap.capture());
         assertThat(configMap.getValue().getMetadata().getOwnerReferences())
                 .singleElement()
-                .satisfies(
-                        owner -> {
-                            assertThat(owner.getApiVersion()).isEqualTo("batch/v1");
-                            assertThat(owner.getKind()).isEqualTo("Job");
-                            assertThat(owner.getName()).isEqualTo("task-1");
-                            assertThat(owner.getUid()).isEqualTo("uid-task-1");
-                            // blockOwnerDeletion would need the right to update the job's
-                            // finalizers
-                            assertThat(owner.getBlockOwnerDeletion()).isNull();
-                        });
+                .satisfies(owner -> {
+                    assertThat(owner.getApiVersion()).isEqualTo("batch/v1");
+                    assertThat(owner.getKind()).isEqualTo("Job");
+                    assertThat(owner.getName()).isEqualTo("task-1");
+                    assertThat(owner.getUid()).isEqualTo("uid-task-1");
+                    // blockOwnerDeletion would need the right to update the job's
+                    // finalizers
+                    assertThat(owner.getBlockOwnerDeletion()).isNull();
+                });
         verify(this.client, never()).deleteJob(anyString());
     }
 
@@ -260,12 +252,11 @@ class TesServiceImplCreateTest {
 
         assertThat(checkedOwners)
                 .singleElement()
-                .satisfies(
-                        owner -> {
-                            assertThat(owner.getKind()).isEqualTo("Job");
-                            assertThat(owner.getName()).isEqualTo("task-1");
-                            assertThat(owner.getUid()).isNotEmpty().isNotEqualTo("uid-task-1");
-                        });
+                .satisfies(owner -> {
+                    assertThat(owner.getKind()).isEqualTo("Job");
+                    assertThat(owner.getName()).isEqualTo("task-1");
+                    assertThat(owner.getUid()).isNotEmpty().isNotEqualTo("uid-task-1");
+                });
     }
 
     /**
@@ -355,11 +346,10 @@ class TesServiceImplCreateTest {
         this.task.resources(new TesResources().backendParameters(parameters));
         this.converts("task-1");
         when(this.converter.fromTesTaskToK8sJob(this.task, USER))
-                .thenAnswer(
-                        invocation -> {
-                            assertThat(this.task.getResources().getBackendParameters()).isNull();
-                            return new V1Job().metadata(new V1ObjectMeta().name("task-1"));
-                        });
+                .thenAnswer(invocation -> {
+                    assertThat(this.task.getResources().getBackendParameters()).isNull();
+                    return new V1Job().metadata(new V1ObjectMeta().name("task-1"));
+                });
         when(this.client.createJob(any(V1Job.class)))
                 .thenThrow(kubernetesError(HttpStatus.CONFLICT))
                 .thenAnswer(invocation -> invocation.getArgument(0));

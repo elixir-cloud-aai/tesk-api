@@ -142,11 +142,9 @@ class TaskFilterTest {
     /** More values than keys are refused, also empty ones, as the issue asks. */
     @Test
     void zipTagsRefusesMoreValuesThanKeys() {
-        assertThatThrownBy(
-                        () ->
-                                TaskFilter.zipTags(
-                                        Collections.singletonList("foo"),
-                                        Arrays.asList("bar", "baz")))
+        assertThatThrownBy(() ->
+                        TaskFilter.zipTags(
+                                Collections.singletonList("foo"), Arrays.asList("bar", "baz")))
                 .isInstanceOf(InvalidTagFilterException.class)
                 .hasMessageContaining("tag_value")
                 .hasMessageContaining("tag_key");
@@ -154,10 +152,9 @@ class TaskFilterTest {
                 .isInstanceOf(InvalidTagFilterException.class);
         assertThatThrownBy(() -> TaskFilter.zipTags(null, Collections.singletonList("")))
                 .isInstanceOf(InvalidTagFilterException.class);
-        assertThatThrownBy(
-                        () ->
-                                TaskFilter.zipTags(
-                                        Collections.singletonList("foo"), Arrays.asList("bar", "")))
+        assertThatThrownBy(() ->
+                        TaskFilter.zipTags(
+                                Collections.singletonList("foo"), Arrays.asList("bar", "")))
                 .isInstanceOf(InvalidTagFilterException.class);
     }
 

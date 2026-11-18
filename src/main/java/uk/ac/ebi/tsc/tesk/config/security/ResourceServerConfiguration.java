@@ -22,7 +22,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
-import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsAliasController;
+import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsConfiguration;
 
 /**
  * With the auth profile, protects (all but the public) endpoints with OAuth2 bearer tokens, using
@@ -31,22 +31,20 @@ import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsAliasController;
  * UserInfoTokenIntrospector}), or, with tesk.api.authorisation.service-clients enabled, the tokens
  * of the listed service clients locally ({@link ServiceClientTokenServices}).
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 @EnableMethodSecurity
 @Profile("auth")
 public class ResourceServerConfiguration {
 
-    // The API description (/v3/api-docs, also as YAML, with its former path /v2/api-docs as an
-    // alias), and the Swagger UI paths, which are only mapped (else 404) with
-    // tesk.api.swagger-ui.enabled
+    // The API description (/v3/api-docs, also as YAML), and the Swagger UI paths, which are only
+    // mapped (else 404) with tesk.api.swagger-ui.enabled
     private static final String[] ALLOWED_URLS = {
         "/",
-        ApiDocsAliasController.API_DOCS,
-        ApiDocsAliasController.API_DOCS + "/**",
-        ApiDocsAliasController.API_DOCS + ".yaml",
-        ApiDocsAliasController.ALIAS,
+        ApiDocsConfiguration.API_DOCS,
+        ApiDocsConfiguration.API_DOCS + "/**",
+        ApiDocsConfiguration.API_DOCS + ".yaml",
         "/swagger-ui/**",
         "/webjars/**"
     };
@@ -101,36 +99,32 @@ public class ResourceServerConfiguration {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(
-                        requests ->
-                                // Error dispatches (to /error) aren't authorised again, as before
-                                requests.dispatcherTypeMatchers(DispatcherType.ERROR)
-                                        .permitAll()
-                                        .requestMatchers(HttpMethod.GET, allowedUrlsArray)
-                                        .permitAll()
-                                        .requestMatchers(HttpMethod.HEAD, allowedUrlsArray)
-                                        .permitAll()
-                                        .anyRequest()
-                                        .authenticated())
+                .authorizeHttpRequests(requests ->
+                        // Error dispatches (to /error) aren't authorised again, as before
+                        requests.dispatcherTypeMatchers(DispatcherType.ERROR)
+                                .permitAll()
+                                .requestMatchers(HttpMethod.GET, allowedUrlsArray)
+                                .permitAll()
+                                .requestMatchers(HttpMethod.HEAD, allowedUrlsArray)
+                                .permitAll()
+                                .anyRequest()
+                                .authenticated())
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(entryPoint))
-                .oauth2ResourceServer(
-                        resourceServer ->
-                                resourceServer
-                                        .authenticationEntryPoint(entryPoint)
-                                        .opaqueToken(
-                                                opaqueToken ->
-                                                        opaqueToken
-                                                                .introspector(introspector)
-                                                                .authenticationConverter(
-                                                                        AuthenticatedUser
-                                                                                ::toAuthentication)));
+                .oauth2ResourceServer(resourceServer ->
+                        resourceServer
+                                .authenticationEntryPoint(entryPoint)
+                                .opaqueToken(opaqueToken ->
+                                        opaqueToken
+                                                .introspector(introspector)
+                                                .authenticationConverter(
+                                                        AuthenticatedUser::toAuthentication)));
         return http.build();
     }
 
     /**
-     * Validates the tokens at the user info endpoint, and, with tesk.api.authorisation.service-
-     * clients enabled, the tokens of the listed service clients locally ({@link
-     * ServiceClientTokenServices})
+     * Validates the tokens at the user info endpoint, and, with
+     * tesk.api.authorisation.service-clients enabled, the tokens of the listed service clients
+     * locally ({@link ServiceClientTokenServices})
      */
     @Bean
     public OpaqueTokenIntrospector tokenIntrospector() {

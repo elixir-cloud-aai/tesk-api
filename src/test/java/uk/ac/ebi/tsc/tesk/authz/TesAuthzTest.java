@@ -90,16 +90,15 @@ public class TesAuthzTest {
     private void decisions(Boolean... answers) throws Exception {
         final int[] next = {0};
         when(this.client.evaluate(any(), anyString()))
-                .thenAnswer(
-                        invocation -> {
-                            this.bodies.add((Map<String, Object>) invocation.getArgument(0));
-                            this.requestIds.add(invocation.getArgument(1));
-                            Boolean answer = answers[Math.min(next[0]++, answers.length - 1)];
-                            if (answer == null) {
-                                throw new DecisionServiceClient.Failure("down");
-                            }
-                            return answer;
-                        });
+                .thenAnswer(invocation -> {
+                    this.bodies.add((Map<String, Object>) invocation.getArgument(0));
+                    this.requestIds.add(invocation.getArgument(1));
+                    Boolean answer = answers[Math.min(next[0]++, answers.length - 1)];
+                    if (answer == null) {
+                        throw new DecisionServiceClient.Failure("down");
+                    }
+                    return answer;
+                });
     }
 
     private static User user(String sub, Map<String, Object> userInfo) {
@@ -296,38 +295,31 @@ public class TesAuthzTest {
         TesAuthz authz =
                 rule("eduperson_entitlement", Collections.emptyList(), Arrays.asList(VO + ":"));
         assertThatCode(() -> authz.gate(alice())).doesNotThrowAnyException();
-        assertThatThrownBy(
-                        () ->
-                                authz.gate(
-                                        user(
-                                                "u",
-                                                Collections.singletonMap(
-                                                        "eduperson_entitlement",
-                                                        Arrays.asList(VO + "x#y")))))
+        assertThatThrownBy(() ->
+                        authz.gate(
+                                user(
+                                        "u",
+                                        Collections.singletonMap(
+                                                "eduperson_entitlement",
+                                                Arrays.asList(VO + "x#y")))))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
     public void gate_dottedPathAndUriName() {
         TesAuthz path = rule("ctx.groups", Arrays.asList("a"), Collections.emptyList());
-        assertThatCode(
-                        () ->
-                                path.gate(
-                                        user(
-                                                "u",
+        assertThatCode(() ->
+                        path.gate(
+                                user(
+                                        "u",
+                                        Collections.singletonMap(
+                                                "ctx",
                                                 Collections.singletonMap(
-                                                        "ctx",
-                                                        Collections.singletonMap(
-                                                                "groups", Arrays.asList("a"))))))
+                                                        "groups", Arrays.asList("a"))))))
                 .doesNotThrowAnyException();
         TesAuthz uri = rule("https://e.org/groups", Arrays.asList("a"), Collections.emptyList());
-        assertThatCode(
-                        () ->
-                                uri.gate(
-                                        user(
-                                                "u",
-                                                Collections.singletonMap(
-                                                        "https://e.org/groups", "a"))))
+        assertThatCode(() ->
+                        uri.gate(user("u", Collections.singletonMap("https://e.org/groups", "a"))))
                 .doesNotThrowAnyException();
     }
 
@@ -531,13 +523,10 @@ public class TesAuthzTest {
     @Test
     public void checkCancel_readableButNotCancellable() throws Exception {
         decisions(false, true);
-        assertThatThrownBy(
-                        () ->
-                                authz(pdpSettings())
-                                        .checkCancel(
-                                                alice(),
-                                                "t",
-                                                new TesAuthz.TaskMeta("o", "RUNNING", null)))
+        assertThatThrownBy(() ->
+                        authz(pdpSettings())
+                                .checkCancel(
+                                        alice(), "t", new TesAuthz.TaskMeta("o", "RUNNING", null)))
                 .isInstanceOf(AccessDeniedException.class);
         assertThat(json(this.bodies.get(1)).at("/action"))
                 .isEqualTo(JSON.readTree("{\"name\": \"GetTask\", \"properties\": {}}"));
@@ -546,13 +535,10 @@ public class TesAuthzTest {
     @Test
     public void checkCancel_notReadable() throws Exception {
         decisions(false, false);
-        assertThatThrownBy(
-                        () ->
-                                authz(pdpSettings())
-                                        .checkCancel(
-                                                alice(),
-                                                "t",
-                                                new TesAuthz.TaskMeta("o", "RUNNING", null)))
+        assertThatThrownBy(() ->
+                        authz(pdpSettings())
+                                .checkCancel(
+                                        alice(), "t", new TesAuthz.TaskMeta("o", "RUNNING", null)))
                 .isInstanceOf(TaskNotFoundException.class);
     }
 

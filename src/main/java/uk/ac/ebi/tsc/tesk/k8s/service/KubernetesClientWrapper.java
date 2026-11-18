@@ -34,7 +34,9 @@ import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 
-/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
+/**
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
+ */
 @Component
 public class KubernetesClientWrapper {
 
@@ -259,10 +261,9 @@ public class KubernetesClientWrapper {
             // hash label only selects, and the old label can't be selected for the user)
             result.setItems(
                     result.getItems().stream()
-                            .filter(
-                                    job ->
-                                            user.isGroupManager(groupOf(job))
-                                                    || user.isCreatorOf(job.getMetadata()))
+                            .filter(job ->
+                                    user.isGroupManager(groupOf(job))
+                                            || user.isCreatorOf(job.getMetadata()))
                             .collect(Collectors.toList()));
         }
         return result;

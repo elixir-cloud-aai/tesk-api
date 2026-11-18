@@ -117,14 +117,7 @@ neither):
 ./mvnw spotless:check checkstyle:check
 ```
 
-These two commands need Java 8 (e.g. `JAVA_HOME` pointing to a Java 8 JDK),
-as the CI job `Lint` runs them: google-java-format 1.7 (with
-spotless-maven-plugin 2.30.0) doesn't run on Java 21, and the newer versions
-that do format the code differently. The update, with the reformat it brings,
-is [#163](https://github.com/elixir-cloud-aai/tesk-api/issues/163). Building and
-testing need Java 21. Until then, write code that Java 8 can parse (no
-records, text blocks, `switch` expressions or `instanceof` patterns), or the
-formatter fails.
+Like building and testing, these two commands need Java 21.
 
 The commits that only reformatted the code are listed in
 `.git-blame-ignore-revs`. GitHub skips them in its blame view; for `git blame`,

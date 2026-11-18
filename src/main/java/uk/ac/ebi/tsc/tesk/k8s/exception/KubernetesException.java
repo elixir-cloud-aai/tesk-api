@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 /**
  * General wrapper for exception thrown by Kubernetes API
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
 public class KubernetesException extends RuntimeException {

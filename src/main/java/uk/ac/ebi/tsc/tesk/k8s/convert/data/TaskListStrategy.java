@@ -21,7 +21,7 @@ import java.util.Map;
  *   <li>pods by {@link TaskBuilder#addPodList(List)}
  * </ol>
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class TaskListStrategy implements BuildStrategy {
 

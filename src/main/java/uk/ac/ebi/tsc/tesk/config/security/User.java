@@ -22,7 +22,7 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 /**
  * POJO for auhenticated user's data
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class User implements Serializable, UserDetails, Principal {
 
@@ -34,8 +34,10 @@ public class User implements Serializable, UserDetails, Principal {
     private String givenName;
     private String familyName;
     private String email;
+
     /** Full list of elixir group full names, to which the user belongs */
     private Set<String> allGroups;
+
     /** Is the user a TESK installation admin (belongs to a group with that meaning) */
     private boolean teskAdmin = false;
 

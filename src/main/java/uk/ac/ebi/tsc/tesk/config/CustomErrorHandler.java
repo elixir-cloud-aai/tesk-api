@@ -41,7 +41,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  *       sensible HTTP status codes for Spring internal exceptions
  * </ol>
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @ControllerAdvice
 public class CustomErrorHandler extends ResponseEntityExceptionHandler {

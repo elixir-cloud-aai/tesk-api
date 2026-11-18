@@ -13,7 +13,7 @@ import org.springframework.util.StringUtils;
  * Inspired by {@code FixedAuthoritiesExtractor} of Spring Security OAuth. Used by {@link
  * UserInfoTokenIntrospector}.
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class GroupNamesSecurityExtractor {
 

@@ -118,13 +118,11 @@ public class DecisionServiceClientTest {
     /** A request that can't be built (here: a body that can't be written) is a failure */
     @Test
     public void evaluate_requestNotBuilt() {
-        assertThatThrownBy(
-                        () ->
-                                client(null, 2000)
-                                        .evaluate(
-                                                java.util.Collections.singletonMap(
-                                                        "x", new Unwritable()),
-                                                "rid"))
+        assertThatThrownBy(() ->
+                        client(null, 2000)
+                                .evaluate(
+                                        java.util.Collections.singletonMap("x", new Unwritable()),
+                                        "rid"))
                 .isInstanceOf(DecisionServiceClient.Failure.class)
                 .hasMessageStartingWith("request not built");
         assertThatThrownBy(() -> client(null, 2000).evaluate(BODY, "bad\nid"))

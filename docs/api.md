@@ -14,12 +14,9 @@ Method | Path | Operation
 `POST` | `/tasks/{id}:cancel` | Cancel a task (answers with an empty object, `{}`)
 
 The API description (OpenAPI 3.1) is at `/v3/api-docs` (JSON) and
-`/v3/api-docs.yaml` (YAML). `/v2/api-docs`
-serves the same description, for clients of releases before 2.0.0 (which
-served Swagger 2.0 there); it is deprecated and will be removed in the next
-minor or major release
-([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188); see
-[Upgrading](upgrading.md#to-200)).
+`/v3/api-docs.yaml` (YAML). Its former path, `/v2/api-docs` (Swagger 2.0
+before 2.0.0, an alias of `/v3/api-docs` in 2.0.0), is gone in 2.1.0 and
+later (see [Upgrading](upgrading.md#to-210)).
 
 With the `auth` profile, all endpoints need a valid access token, except the
 API description, the Swagger UI (if it is on) and, unless

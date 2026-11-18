@@ -15,7 +15,7 @@ import org.springframework.util.StringUtils;
  * Custom principal extractor (puts all of the info from userinfo to custom {@link User} object).
  * Used by {@link UserInfoTokenIntrospector}.
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class ElixirPrincipalExtractor {
 
@@ -23,8 +23,10 @@ public class ElixirPrincipalExtractor {
     private final AuthorisationProperties authorisationProperties;
     private final Pattern MEMBERED_GROUP;
     private final Pattern MANAGED_GROUP;
+
     /** Name of the claim that authorises users without groups; null if that setting is off */
     private final String claimName;
+
     /** Values of that claim, one of which authorises a user */
     private final Set<String> claimValues;
 
@@ -125,33 +127,29 @@ public class ElixirPrincipalExtractor {
                         .collect(Collectors.toSet());
         Set<String> memberedGroups =
                 allGroups.stream()
-                        .filter(
-                                name ->
-                                        MEMBERED_GROUP.matcher(name).matches()
-                                                && !authorisationProperties
-                                                        .getAdminGroupFull()
-                                                        .equals(name))
-                        .map(
-                                name -> {
-                                    Matcher matcher = MEMBERED_GROUP.matcher(name);
-                                    matcher.matches();
-                                    return matcher.group(1);
-                                })
+                        .filter(name ->
+                                MEMBERED_GROUP.matcher(name).matches()
+                                        && !authorisationProperties
+                                                .getAdminGroupFull()
+                                                .equals(name))
+                        .map(name -> {
+                            Matcher matcher = MEMBERED_GROUP.matcher(name);
+                            matcher.matches();
+                            return matcher.group(1);
+                        })
                         .collect(Collectors.toSet());
         Set<String> managedGroups =
                 allGroups.stream()
-                        .filter(
-                                name ->
-                                        MANAGED_GROUP.matcher(name).matches()
-                                                && !authorisationProperties
-                                                        .getAdminGroupFull()
-                                                        .equals(name))
-                        .map(
-                                name -> {
-                                    Matcher matcher = MANAGED_GROUP.matcher(name);
-                                    matcher.matches();
-                                    return matcher.group(1);
-                                })
+                        .filter(name ->
+                                MANAGED_GROUP.matcher(name).matches()
+                                        && !authorisationProperties
+                                                .getAdminGroupFull()
+                                                .equals(name))
+                        .map(name -> {
+                            Matcher matcher = MANAGED_GROUP.matcher(name);
+                            matcher.matches();
+                            return matcher.group(1);
+                        })
                         .collect(Collectors.toSet());
         boolean isAdmin =
                 allGroups.stream()

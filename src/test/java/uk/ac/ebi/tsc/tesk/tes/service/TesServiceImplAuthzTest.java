@@ -241,10 +241,9 @@ class TesServiceImplAuthzTest {
     void listTasks_tokenOfOtherScope() {
         when(this.authz.listsAll(ALICE, TaskView.MINIMAL)).thenReturn(false);
 
-        assertThatThrownBy(
-                        () ->
-                                this.service.listTasks(
-                                        TaskFilter.NONE, 2L, "all:x", TaskView.MINIMAL, ALICE))
+        assertThatThrownBy(() ->
+                        this.service.listTasks(
+                                TaskFilter.NONE, 2L, "all:x", TaskView.MINIMAL, ALICE))
                 .isInstanceOf(InvalidPageTokenException.class);
         verify(this.client, never()).listTaskmasterJobsOfCreator(any(), any(), any());
     }
@@ -254,10 +253,8 @@ class TesServiceImplAuthzTest {
         when(this.authz.listsAll(ALICE, TaskView.MINIMAL))
                 .thenThrow(new AccessDeniedException("denied"));
 
-        assertThatThrownBy(
-                        () ->
-                                this.service.listTasks(
-                                        TaskFilter.NONE, 2L, null, TaskView.MINIMAL, ALICE))
+        assertThatThrownBy(() ->
+                        this.service.listTasks(TaskFilter.NONE, 2L, null, TaskView.MINIMAL, ALICE))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
@@ -266,10 +263,8 @@ class TesServiceImplAuthzTest {
         when(this.authz.listsAll(ALICE, TaskView.MINIMAL)).thenReturn(false);
         when(this.authz.ownerId(ALICE)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(
-                        () ->
-                                this.service.listTasks(
-                                        TaskFilter.NONE, 2L, null, TaskView.MINIMAL, ALICE))
+        assertThatThrownBy(() ->
+                        this.service.listTasks(TaskFilter.NONE, 2L, null, TaskView.MINIMAL, ALICE))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

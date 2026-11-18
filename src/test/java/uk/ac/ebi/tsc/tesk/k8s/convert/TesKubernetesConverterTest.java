@@ -56,7 +56,9 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
 
-/** @author Ania Niewielska <aniewielska@ebi.ac.uk> */
+/**
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
+ */
 @JsonTest
 @TestPropertySource(
         locations = {"classpath:application.properties"},
@@ -741,11 +743,10 @@ public class TesKubernetesConverterTest {
                 .getLogs()
                 .get(0)
                 .getLogs()
-                .forEach(
-                        log -> {
-                            assertNull(log.getStartTime());
-                            assertNull(log.getEndTime());
-                        });
+                .forEach(log -> {
+                    assertNull(log.getStartTime());
+                    assertNull(log.getEndTime());
+                });
     }
 
     @Test

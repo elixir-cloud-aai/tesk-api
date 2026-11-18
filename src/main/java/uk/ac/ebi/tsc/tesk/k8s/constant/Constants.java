@@ -7,7 +7,7 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 /**
  * TESK implementation specific constants
  *
- * @author Ania Niewielska <aniewielska@ebi.ac.uk>
+ * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 public class Constants {
 
@@ -27,10 +27,13 @@ public class Constants {
 
     /** Constant prefix of taskmaster's job name (== TES task ID) */
     public static final String JOB_NAME_TASKM_PREFIX = "task-";
+
     /** Part of executor's job name, that follows taskmaster's name */
     public static final String JOB_NAME_EXEC_PREFIX = "-ex-";
+
     /** No of bytes of random part of task master's name (which end up encoded to hex) */
     public static final int JOB_NAME_TASKM_RAND_PART_LENGTH = 4;
+
     /**
      * No of digits reserved for executor number in executor's job name. Ends up padded with '0' for
      * numbers < 10
@@ -143,6 +146,7 @@ public class Constants {
 
     /** Name of taskmaster's ENV variable with username of FTP account used for storage */
     public static final String FTP_SECRET_USERNAME_ENV = "TESK_FTP_USERNAME";
+
     /** Name of taskmaster's ENV variable with password of FTP account used for storage */
     public static final String FTP_SECRET_PASSWORD_ENV = "TESK_FTP_PASSWORD";
 
