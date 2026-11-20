@@ -382,7 +382,7 @@ jobs:
     permissions: {}
     steps:
       - name: Notify Pubgrade
-        uses: elixir-cloud-aai/Pubgrade/actions/notify@0694d0346b05df4d8907cb9a751496a93c1d5668 # unreleased (dev)
+        uses: elixir-cloud-aai/Pubgrade/actions/notify@344a58adc1c871135f86c404eb33ed91011886ad # v0.3.0
         with:
           url: ${{ vars.PUBGRADE_URL }}
           repository-id: ${{ vars.PUBGRADE_REPOSITORY_ID }}

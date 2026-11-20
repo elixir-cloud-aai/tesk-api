@@ -228,7 +228,7 @@ After publishing the image (without waiting for the GitHub release), the
 workflow registers it, with the release tag, at
 [Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade) (`POST
 /repositories/{id}/builds`, through Pubgrade's action
-[`actions/notify`](https://github.com/elixir-cloud-aai/Pubgrade/tree/0694d0346b05df4d8907cb9a751496a93c1d5668/actions/notify)),
+[`actions/notify`](https://github.com/elixir-cloud-aai/Pubgrade/tree/344a58adc1c871135f86c404eb33ed91011886ad/actions/notify)),
 which notifies the deployments that subscribed to upgrades, also for
 pre-releases, if they subscribed to those. The action masks the token and
 retries a request only if it never reached Pubgrade, so that one run
