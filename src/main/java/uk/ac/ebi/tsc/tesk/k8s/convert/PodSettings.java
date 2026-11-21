@@ -11,10 +11,14 @@ import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.databind.json.JsonMapper;
 import uk.ac.ebi.tsc.tesk.k8s.config.KubernetesJson;
 
 /**
@@ -67,7 +71,50 @@ final class PodSettings {
                                                     .getAsString())
                     .create();
 
+    /** Jackson, which refuses duplicate names */
+    private static final JsonMapper STRICT_JSON =
+            JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
+
+    /** Fields of security contexts with user or group IDs */
+    private static final List<String> ID_FIELDS = List.of("runAsUser", "runAsGroup", "fsGroup");
+
+    /** The types of seccomp profiles that Kubernetes knows */
+    private static final Set<String> SECCOMP_TYPES =
+            Set.of("RuntimeDefault", "Localhost", "Unconfined");
+
     private PodSettings() {}
+
+    /**
+     * Checks values of security contexts that the API server would refuse: user and group IDs
+     * outside 0 to 2147483647, and unknown seccomp profiles (types checked before)
+     */
+    private static void checkValues(JsonObject json) {
+        ID_FIELDS.stream().filter(json::has).forEach(field -> checkId(field, json.get(field)));
+        if (json.has("supplementalGroups")) {
+            json.getAsJsonArray("supplementalGroups")
+                    .forEach(id -> checkId("supplementalGroups", id));
+        }
+        if (json.has("seccompProfile")) {
+            JsonObject profile = json.getAsJsonObject("seccompProfile");
+            // The model requires the type
+            String profileType = profile.get("type").getAsString();
+            if (!SECCOMP_TYPES.contains(profileType)) {
+                throw new IllegalArgumentException(
+                        "seccompProfile.type must be one of " + SECCOMP_TYPES);
+            }
+            if ("Localhost".equals(profileType) != profile.has("localhostProfile")) {
+                throw new IllegalArgumentException(
+                        "seccompProfile.localhostProfile must be set with the type Localhost only");
+            }
+        }
+    }
+
+    private static void checkId(String field, JsonElement id) {
+        long value = id.getAsLong();
+        if (value < 0 || value > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(field + " must be between 0 and 2147483647");
+        }
+    }
 
     /**
      * A JSON object of a setting, checked against a Kubernetes object.
@@ -86,7 +133,8 @@ final class PodSettings {
         }
         JsonObject json;
         try {
-            JsonElement element = JsonParser.parseString(value);
+            // Strict JSON (Gson's parser takes unquoted names, and the last of duplicate names)
+            JsonElement element = JsonParser.parseString(STRICT_JSON.readTree(value).toString());
             if (!element.isJsonObject()) {
                 throw new IllegalArgumentException("not a JSON object");
             }
@@ -94,6 +142,7 @@ final class PodSettings {
             validator.validate(json);
             // Also checks the types of the values (and quantities)
             STRICT_GSON.fromJson(json, type);
+            checkValues(json);
         } catch (IOException | RuntimeException e) {
             throw invalid(name, type.getSimpleName(), e);
         }
@@ -113,21 +162,26 @@ final class PodSettings {
                         V1ResourceRequirements::validateJsonElement);
         if (json != null) {
             V1ResourceRequirements resources = fromJson(json, V1ResourceRequirements.class);
-            // The models start with empty maps; null only to be safe
-            Map<String, Quantity> limits =
-                    Objects.requireNonNullElse(resources.getLimits(), Map.of());
-            Objects.requireNonNullElse(resources.getRequests(), Map.<String, Quantity>of())
-                    .forEach((resource, request) -> {
-                        Quantity limit = limits.get(resource);
-                        if (limit != null && request.getNumber().compareTo(limit.getNumber()) > 0) {
-                            throw new IllegalArgumentException(
-                                    "Invalid setting "
-                                            + name
-                                            + ": the request of "
-                                            + resource
-                                            + " is above its limit");
-                        }
+            Map<String, Quantity> limits = resources.getLimits();
+            Map<String, Quantity> requests = resources.getRequests();
+            Stream.concat(limits.values().stream(), requests.values().stream())
+                    .filter(quantity -> quantity.getNumber().signum() < 0)
+                    .findAny()
+                    .ifPresent(quantity -> {
+                        throw new IllegalArgumentException(
+                                "Invalid setting " + name + ": negative quantity");
                     });
+            requests.forEach((resource, request) -> {
+                Quantity limit = limits.get(resource);
+                if (limit != null && request.getNumber().compareTo(limit.getNumber()) > 0) {
+                    throw new IllegalArgumentException(
+                            "Invalid setting "
+                                    + name
+                                    + ": the request of "
+                                    + resource
+                                    + " is above its limit");
+                }
+            });
         }
         return json;
     }

@@ -191,8 +191,13 @@ stay integers, also if given with an exponent (`1e3` is returned as `1000`).
 and negative numbers are refused with `400 Bad Request`. `ram_gb` must be at
 least `0.000001`, the smallest amount that TESK API requests (it rounds RAM
 to 6 decimals before it asks Kubernetes). Leave a field out instead: TESK API
-then requests no CPU or RAM (the defaults of the namespace's LimitRange may
-apply), and 0.1 GB for the task's volume.
+then gives the executors the deployment's default CPU
+(`TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU`, 1 by default, as both the
+request and the limit; see [Pod security and
+resources](configuration.md#pod-security-and-resources)), requests no RAM
+(the defaults of the namespace's LimitRange may apply), and 0.1 GB for the
+task's volume. `cpu_cores` and `ram_gb` are both the request and the limit
+of every executor.
 
 ## Private executor images
 

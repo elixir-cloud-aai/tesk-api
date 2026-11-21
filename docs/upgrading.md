@@ -23,7 +23,10 @@
   set no `resources.cpu_cores` request and are limited to 1 CPU (before:
   none, or a `LimitRange`'s defaults). Change it with
   `TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU`, or set it to an empty value
-  for none.
+  for none. In namespaces with a `LimitRange` whose CPU maximum is below 1
+  (or minimum above 1), lower (or raise) it, or set it empty: otherwise
+  Kubernetes refuses these executors, and their tasks end in
+  `SYSTEM_ERROR`.
 - **Memory limits of executors (behaviour change).** Executors of tasks that
   set `resources.ram_gb` get it as the memory limit too, also with
   `resources.cpu_cores` (before: only without `cpu_cores`, when the
@@ -36,7 +39,10 @@
   that enforce the `restricted` Pod Security Standard
   ([#209](https://github.com/elixir-cloud-aai/tesk-api/issues/209); see
   [Restricted clusters](configuration.md#restricted-clusters)). They are
-  unset by default, and the pods' security contexts stay as they were. The
+  unset by default, and the pods' security contexts stay as they were. In
+  such namespaces, the filers need taskmaster 0.12.0 or later
+  (`TESK_API_TASKMASTER_IMAGE_VERSION` and
+  `TESK_API_TASKMASTER_FILER_IMAGE_VERSION`; the default is still 0.11.0). The
   executors' pod security context from the ConfigMap `CONFIGMAP` still
   works; the new setting goes on top of it.
 

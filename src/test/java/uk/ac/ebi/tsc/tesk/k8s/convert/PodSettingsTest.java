@@ -88,6 +88,17 @@ public class PodSettingsTest {
                 "{\"runAsUser\": 1.5}",
                 "{\"runAsUser\": true}",
                 "{\"runAsUser\": {}}",
+                "{runAsNonRoot: true}",
+                "{'runAsNonRoot': true}",
+                "{\"runAsNonRoot\": true, \"runAsNonRoot\": false}",
+                "{\"runAsUser\": -1}",
+                "{\"runAsGroup\": 2147483648}",
+                "{\"fsGroup\": 4294967296}",
+                "{\"supplementalGroups\": [1, -2]}",
+                "{\"seccompProfile\": {\"type\": \"Bogus\"}}",
+                "{\"seccompProfile\": {}}",
+                "{\"seccompProfile\": {\"type\": \"Localhost\"}}",
+                "{\"seccompProfile\": {\"type\": \"RuntimeDefault\", \"localhostProfile\": \"p\"}}",
                 "{\"runAsNonRoot\": {}}",
                 "{\"seccompProfile\": \"RuntimeDefault\"}",
                 "{\"seccompProfile\": {\"type\": 1}}",
@@ -98,6 +109,19 @@ public class PodSettingsTest {
         assertThatThrownBy(() -> podSecurityContext(value))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("Invalid setting " + NAME + ": not a valid ");
+    }
+
+    /** IDs from 0 to 2147483647 and the seccomp profiles of Kubernetes are taken */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "{\"runAsUser\": 0, \"runAsGroup\": 2147483647, \"fsGroup\": 100}",
+                "{\"supplementalGroups\": [0, 1000]}",
+                "{\"seccompProfile\": {\"type\": \"Unconfined\"}}",
+                "{\"seccompProfile\": {\"type\": \"Localhost\", \"localhostProfile\": \"p.json\"}}"
+            })
+    public void validValues(String value) {
+        assertThat(podSecurityContext(value)).isEqualTo(json(value));
     }
 
     /** The same for the container's security context */
@@ -139,6 +163,8 @@ public class PodSettingsTest {
                 "{\"limit\": {\"cpu\": \"1\"}}",
                 "{\"limits\": [\"cpu\"]}",
                 "{\"requests\": {\"cpu\": \"2\"}, \"limits\": {\"cpu\": \"1\"}}",
+                "{\"requests\": {\"cpu\": \"-1\"}}",
+                "{\"limits\": {\"cpu\": \"-500m\"}}",
                 "{\"requests\": {\"memory\": \"512Mi\"}, \"limits\": {\"memory\": \"256Mi\"}}"
             })
     public void invalidResources_refused(String value) {
