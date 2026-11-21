@@ -43,6 +43,43 @@ public class TaskmasterEnvProperties {
     /** Environment variables, that will be passed to taskmaster */
     private Map<String, String> environment = new HashMap<>();
 
+    /**
+     * Security context of the taskmaster's pod, a JSON object with the fields of Kubernetes'
+     * PodSecurityContext; empty or {@code {}}: none
+     */
+    private String podSecurityContext;
+
+    /**
+     * Security context of the taskmaster's container, a JSON object with the fields of Kubernetes'
+     * SecurityContext; empty or {@code {}}: none
+     */
+    private String securityContext;
+
+    /**
+     * Resource requests and limits of the taskmaster's container, a JSON object with the fields of
+     * Kubernetes' ResourceRequirements; empty or {@code {}}: none
+     */
+    private String resources;
+
+    /**
+     * Security context of the executors' pods, a JSON object with the fields of Kubernetes'
+     * PodSecurityContext, on top of the one from the ConfigMap {@code CONFIGMAP} (its fields
+     * replace those of the ConfigMap); empty or {@code {}}: only the ConfigMap's
+     */
+    private String executorPodSecurityContext;
+
+    /**
+     * Security context of the executors' containers, a JSON object with the fields of Kubernetes'
+     * SecurityContext; empty or {@code {}}: none
+     */
+    private String executorSecurityContext;
+
+    /**
+     * CPU request and limit (a Kubernetes quantity, e.g. {@code 1} or {@code 500m}) of executors
+     * whose task sets no {@code resources.cpu_cores}; empty: none
+     */
+    private String executorDefaultCpu;
+
     public Ftp getFtp() {
         return ftp;
     }
@@ -101,6 +138,54 @@ public class TaskmasterEnvProperties {
 
     public Map<String, String> getEnvironment() {
         return environment;
+    }
+
+    public String getPodSecurityContext() {
+        return podSecurityContext;
+    }
+
+    public void setPodSecurityContext(String podSecurityContext) {
+        this.podSecurityContext = podSecurityContext;
+    }
+
+    public String getSecurityContext() {
+        return securityContext;
+    }
+
+    public void setSecurityContext(String securityContext) {
+        this.securityContext = securityContext;
+    }
+
+    public String getResources() {
+        return resources;
+    }
+
+    public void setResources(String resources) {
+        this.resources = resources;
+    }
+
+    public String getExecutorPodSecurityContext() {
+        return executorPodSecurityContext;
+    }
+
+    public void setExecutorPodSecurityContext(String executorPodSecurityContext) {
+        this.executorPodSecurityContext = executorPodSecurityContext;
+    }
+
+    public String getExecutorSecurityContext() {
+        return executorSecurityContext;
+    }
+
+    public void setExecutorSecurityContext(String executorSecurityContext) {
+        this.executorSecurityContext = executorSecurityContext;
+    }
+
+    public String getExecutorDefaultCpu() {
+        return executorDefaultCpu;
+    }
+
+    public void setExecutorDefaultCpu(String executorDefaultCpu) {
+        this.executorDefaultCpu = executorDefaultCpu;
     }
 
     public ExecutorSecret getExecutorSecret() {

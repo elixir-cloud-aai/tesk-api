@@ -37,6 +37,12 @@
                 "image": "ubuntu",
                 "name": "task-98605447-ex-00",
                 "resources": {
+                  "requests": {
+                    "cpu": "1"
+                  },
+                  "limits": {
+                    "cpu": "1"
+                  }
                 }
               }
             ],

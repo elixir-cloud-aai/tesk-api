@@ -1132,6 +1132,56 @@ public class TesKubernetesConverterTest {
     }
 
     /**
+     * CPU cores and RAM are both the requests and the limits, also together: the taskmaster fills
+     * in limits from requests only if there are no limits at all, which left executors with CPU
+     * cores without a memory limit (elixir-cloud-aai/tesk-core#160)
+     */
+    @Test
+    public void fromTesExecutorToK8sJob_cpuAndRamAreRequestsAndLimits() throws IOException {
+        TesResources resources =
+                this.objectMapper.readValue(
+                        "{\"cpu_cores\": 2, \"ram_gb\": 1}", TesResources.class);
+        TesExecutor executor = new TesExecutor().image("alpine").addCommandItem("true");
+        V1Job job =
+                this.converter.fromTesExecutorToK8sJob(
+                        "task-123",
+                        "name",
+                        executor,
+                        0,
+                        resources,
+                        User.builder("test-user-id").build());
+        V1ResourceRequirements requirements =
+                job.getSpec().getTemplate().getSpec().getContainers().get(0).getResources();
+        assertEquals(requirements.getRequests(), requirements.getLimits());
+        assertEquals("2", requirements.getLimits().get("cpu").toSuffixedString());
+        assertEquals("1073741824", requirements.getLimits().get("memory").toSuffixedString());
+    }
+
+    /** The task's CPU cores replace the default CPU of executors (1, application.properties) */
+    @Test
+    public void fromTesExecutorToK8sJob_defaultCpu() throws IOException {
+        TesExecutor executor = new TesExecutor().image("alpine").addCommandItem("true");
+        V1ResourceRequirements withoutCpu =
+                this.converter
+                        .fromTesExecutorToK8sJob(
+                                "task-123",
+                                "name",
+                                executor,
+                                0,
+                                null,
+                                User.builder("test-user-id").build())
+                        .getSpec()
+                        .getTemplate()
+                        .getSpec()
+                        .getContainers()
+                        .get(0)
+                        .getResources();
+        assertEquals("1", withoutCpu.getRequests().get("cpu").toSuffixedString());
+        assertEquals("1", withoutCpu.getLimits().get("cpu").toSuffixedString());
+        assertEquals(1, withoutCpu.getLimits().size());
+    }
+
+    /**
      * An executor that ignores errors gets the annotation with which the taskmaster goes on after
      * it fails; other executors get none (issue #159)
      */
