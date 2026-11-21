@@ -73,7 +73,8 @@
                     "memory": "16106127360"
                   },
                   "limits": {
-                    "cpu": "4"
+                    "cpu": "4",
+                    "memory": "16106127360"
                   }
                 },
                 "volumeMounts": [
@@ -152,7 +153,8 @@
                     "memory": "16106127360"
                   },
                   "limits": {
-                    "cpu": "4"
+                    "cpu": "4",
+                    "memory": "16106127360"
                   }
                 },
                 "workingDir": "/starthere",

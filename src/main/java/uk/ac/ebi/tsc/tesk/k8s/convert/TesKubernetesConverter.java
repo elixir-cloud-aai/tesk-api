@@ -294,7 +294,7 @@ public class TesKubernetesConverter {
         }
         container.setWorkingDir(executor.getWorkdir());
         // CPU cores (validated: at most 6 integer digits and 3 decimals) as both the request and
-        // the limit
+        // the limit, instead of the default of the executors' template, if any
         Optional.ofNullable(resources)
                 .map(TesResources::getCpuCores)
                 .map(cpuCores -> new QuantityFormatter().parse(cpuCores.toPlainString()))
@@ -303,18 +303,20 @@ public class TesKubernetesConverter {
                                 .getResources()
                                 .putLimitsItem(RESOURCE_CPU_KEY, cpu)
                                 .putRequestsItem(RESOURCE_CPU_KEY, cpu));
-        // Limit number of decimals to 6
+        // RAM (limited to 6 decimals) as both the request and the limit: the taskmaster fills in
+        // limits from requests only if there are no limits at all (e.g. none with CPU cores)
         Optional.ofNullable(resources)
                 .map(TesResources::getRamGb)
-                .ifPresent(ramGb ->
+                .map(ramGb ->
+                        new QuantityFormatter()
+                                .parse(
+                                        String.format(Locale.ROOT, "%.6f", ramGb)
+                                                + RESOURCE_MEM_UNIT))
+                .ifPresent(memory ->
                         container
                                 .getResources()
-                                .putRequestsItem(
-                                        RESOURCE_MEM_KEY,
-                                        new QuantityFormatter()
-                                                .parse(
-                                                        String.format(Locale.ROOT, "%.6f", ramGb)
-                                                                + RESOURCE_MEM_UNIT)));
+                                .putRequestsItem(RESOURCE_MEM_KEY, memory)
+                                .putLimitsItem(RESOURCE_MEM_KEY, memory));
 
         return job;
     }

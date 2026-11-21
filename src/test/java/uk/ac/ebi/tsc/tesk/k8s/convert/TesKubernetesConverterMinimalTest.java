@@ -231,7 +231,7 @@ public class TesKubernetesConverterMinimalTest {
         taskMasterInputJson
                 .extractingJsonPathMapValue(
                         "executors[0].spec.template.spec.containers[0].resources")
-                .isEmpty();
+                .isEqualTo(Map.of("requests", Map.of("cpu", "1"), "limits", Map.of("cpu", "1")));
 
         taskMasterInputJson
                 .extractingJsonPathArrayValue(
@@ -254,12 +254,14 @@ public class TesKubernetesConverterMinimalTest {
     }
 
     /**
-     * An executor with memory but no CPU gets no limits in the taskmaster's input: not even empty
-     * ones, as the taskmaster sets the limits to the requests only if there are none (a pod without
-     * limits could use all memory of its node)
+     * An executor with memory but no CPU gets the default CPU (1, from {@code
+     * application.properties}) and its memory as both the requests and the limits: the taskmaster
+     * fills in limits from requests only if there are no limits at all, so tesk-api sets the memory
+     * limit itself (a pod without a memory limit could use all memory of its node, and one without
+     * a CPU limit is refused under a {@code limits.cpu} ResourceQuota)
      */
     @Test
-    public void ramOnlyExecutorHasNoLimits() throws IOException {
+    public void ramOnlyExecutorGetsDefaultCpuAndMemoryLimit() throws IOException {
         given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-98605447");
         TesTask task =
                 new TesTask()
@@ -287,8 +289,11 @@ public class TesKubernetesConverterMinimalTest {
                             .get(0)
                             .getAsJsonObject()
                             .getAsJsonObject("resources");
-            assertThat(resources.has("limits")).isFalse();
-            assertThat(resources.getAsJsonObject("requests").has("memory")).isTrue();
+            JsonObject expected = new JsonObject();
+            expected.addProperty("cpu", "1");
+            expected.addProperty("memory", "2147483648");
+            assertThat(resources.getAsJsonObject("requests")).isEqualTo(expected);
+            assertThat(resources.getAsJsonObject("limits")).isEqualTo(expected);
         }
     }
 

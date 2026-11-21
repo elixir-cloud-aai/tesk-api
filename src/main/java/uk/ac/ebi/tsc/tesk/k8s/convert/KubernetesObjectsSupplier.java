@@ -4,6 +4,8 @@ import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.*;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.*;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.*;
@@ -21,6 +23,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
 import org.yaml.snakeyaml.Yaml;
+import uk.ac.ebi.tsc.tesk.k8s.config.KubernetesJson;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
 
 /**
@@ -40,6 +43,27 @@ public class KubernetesObjectsSupplier {
     private final String namespace;
 
     private final V1PodSecurityContext securityContext;
+
+    /** Security context of the taskmaster's pod (setting), or {@code null} */
+    private final JsonObject taskmasterPodSecurityContext;
+
+    /** Security context of the taskmaster's container (setting), or {@code null} */
+    private final JsonObject taskmasterSecurityContext;
+
+    /** Resources of the taskmaster's container (setting), or {@code null} */
+    private final JsonObject taskmasterResources;
+
+    /**
+     * Security context of the executors' pods: that of the ConfigMap with the setting's fields on
+     * top, or {@code null} if the setting is empty (then {@link #securityContext} as before)
+     */
+    private final JsonObject executorPodSecurityContext;
+
+    /** Security context of the executors' containers (setting), or {@code null} */
+    private final JsonObject executorSecurityContext;
+
+    /** CPU request and limit of executors whose task sets no CPU cores, or {@code null} */
+    private final Quantity executorDefaultCpu;
 
     /** The taskmaster's job template ({@code taskmaster.json}) */
     private final String taskmasterTemplateJson;
@@ -61,6 +85,47 @@ public class KubernetesObjectsSupplier {
         this.taskmasterEnvProperties = taskmasterEnvProperties;
         this.namespace = namespace;
         this.securityContext = createSecurityContext(coreApi, namespace, environment);
+        String prefix = "tesk.api.taskmaster.";
+        this.taskmasterPodSecurityContext =
+                PodSettings.object(
+                        prefix + "pod-security-context",
+                        taskmasterEnvProperties.getPodSecurityContext(),
+                        V1PodSecurityContext.class,
+                        V1PodSecurityContext::validateJsonElement);
+        this.taskmasterSecurityContext =
+                PodSettings.object(
+                        prefix + "security-context",
+                        taskmasterEnvProperties.getSecurityContext(),
+                        V1SecurityContext.class,
+                        V1SecurityContext::validateJsonElement);
+        this.taskmasterResources =
+                PodSettings.resources(prefix + "resources", taskmasterEnvProperties.getResources());
+        JsonObject executorPodSettings =
+                PodSettings.object(
+                        prefix + "executor-pod-security-context",
+                        taskmasterEnvProperties.getExecutorPodSecurityContext(),
+                        V1PodSecurityContext.class,
+                        V1PodSecurityContext::validateJsonElement);
+        this.executorPodSecurityContext =
+                executorPodSettings == null
+                        ? null
+                        : PodSettings.merge(
+                                this.securityContext == null
+                                        ? null
+                                        : KubernetesJson.GSON_WITHOUT_EMPTY_COLLECTIONS
+                                                .toJsonTree(this.securityContext)
+                                                .getAsJsonObject(),
+                                executorPodSettings);
+        this.executorSecurityContext =
+                PodSettings.object(
+                        prefix + "executor-security-context",
+                        taskmasterEnvProperties.getExecutorSecurityContext(),
+                        V1SecurityContext.class,
+                        V1SecurityContext::validateJsonElement);
+        this.executorDefaultCpu =
+                PodSettings.quantity(
+                        prefix + "executor-default-cpu",
+                        taskmasterEnvProperties.getExecutorDefaultCpu());
         try (InputStream template = new ClassPathResource("taskmaster.json").getInputStream()) {
             this.taskmasterTemplateJson =
                     StreamUtils.copyToString(template, StandardCharsets.UTF_8);
@@ -153,6 +218,17 @@ public class KubernetesObjectsSupplier {
         if (this.taskmasterEnvProperties.isDebug()) {
             taskmasterContainer.addArgsItem("-d").setImagePullPolicy("Always");
         }
+        // From the settings; none if they are empty, as before 2.1.0 (new objects for every job)
+        job.getSpec()
+                .getTemplate()
+                .getSpec()
+                .setSecurityContext(
+                        PodSettings.fromJson(
+                                this.taskmasterPodSecurityContext, V1PodSecurityContext.class));
+        taskmasterContainer.setSecurityContext(
+                PodSettings.fromJson(this.taskmasterSecurityContext, V1SecurityContext.class));
+        taskmasterContainer.setResources(
+                PodSettings.fromJson(this.taskmasterResources, V1ResourceRequirements.class));
         job.getMetadata().putLabelsItem(LABEL_JOBTYPE_KEY, LABEL_JOBTYPE_VALUE_TASKM);
         String taskMasterName = this.jobNameGenerator.getTaskMasterName();
         new Job(job).changeJobName(taskMasterName);
@@ -195,7 +271,19 @@ public class KubernetesObjectsSupplier {
     @Bean
     @Scope(value = "prototype")
     public V1Job executorTemplate() {
-        V1Container container = new V1Container().resources(new V1ResourceRequirements());
+        V1ResourceRequirements resources = new V1ResourceRequirements();
+        // The default CPU request and limit; the task's CPU cores replace them
+        if (this.executorDefaultCpu != null) {
+            resources
+                    .putRequestsItem(RESOURCE_CPU_KEY, this.executorDefaultCpu)
+                    .putLimitsItem(RESOURCE_CPU_KEY, this.executorDefaultCpu);
+        }
+        V1Container container =
+                new V1Container()
+                        .resources(resources)
+                        .securityContext(
+                                PodSettings.fromJson(
+                                        this.executorSecurityContext, V1SecurityContext.class));
         if (this.taskmasterEnvProperties.isExecutorSecretEnabled()) {
             container.addVolumeMountsItem(
                     new V1VolumeMount()
@@ -210,7 +298,10 @@ public class KubernetesObjectsSupplier {
         V1PodSpec podSpec =
                 new V1PodSpec().addContainersItem(container).restartPolicy(JOB_RESTART_POLICY);
 
-        if (securityContext != null) {
+        if (executorPodSecurityContext != null) {
+            podSpec.securityContext(
+                    PodSettings.fromJson(executorPodSecurityContext, V1PodSecurityContext.class));
+        } else if (securityContext != null) {
             podSpec.securityContext(securityContext);
         }
 

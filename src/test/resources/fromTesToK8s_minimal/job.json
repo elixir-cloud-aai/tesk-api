@@ -26,6 +26,10 @@
             ],
             "image": "docker.io/elixircloud/tesk-core-taskmaster:0.11.0",
             "name": "task-98605447",
+            "resources": {
+              "requests": {"cpu": "100m", "memory": "128Mi"},
+              "limits": {"cpu": "500m", "memory": "256Mi"}
+            },
 	    "env": [],
             "volumeMounts": [
               {
