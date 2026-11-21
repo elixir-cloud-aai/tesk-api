@@ -15,6 +15,7 @@
 [![Coverage][badge-coverage]][badge-url-coverage]
 [![GitHub_tag][badge-github-tag]][badge-url-github-tag]
 [![Docker_image][badge-docker]][badge-url-docker]
+[![DOI][badge-doi]][badge-url-doi]
 
 The API server of [TESK][tesk], an implementation of the [GA4GH Task
 Execution Service (TES) API][tes] for [Kubernetes](https://kubernetes.io),
@@ -71,7 +72,10 @@ the docs build and releases.
 
 ## Citation
 
-If you use TESK API, please cite it with the metadata in
+If you use TESK API, please cite it with its DOI
+[10.5281/zenodo.24093508](https://doi.org/10.5281/zenodo.24093508), which
+always resolves to the latest version on [Zenodo](https://zenodo.org/); the
+Zenodo record lists the DOI of each version, too. The citation metadata is in
 [`CITATION.cff`](CITATION.cff): on GitHub, "Cite this repository" in the
 sidebar of the repository formats it as APA or BibTeX.
 
@@ -83,12 +87,14 @@ guide][contributing], and mind our [code of conduct][code-of-conduct].
 [badge-build-status]: <https://github.com/elixir-cloud-aai/tesk-api/actions/workflows/ci.yml/badge.svg?branch=dev>
 [badge-coverage]: <https://codecov.io/gh/elixir-cloud-aai/tesk-api/branch/dev/graph/badge.svg?branch=dev>
 [badge-docker]: <https://img.shields.io/docker/v/elixircloud/tesk-api?sort=semver&label=image&color=C39BD3>
+[badge-doi]: <https://zenodo.org/badge/DOI/10.5281/zenodo.24093508.svg>
 [badge-docs]: <https://img.shields.io/readthedocs/tesk>
 [badge-github-tag]: <https://img.shields.io/github/v/tag/elixir-cloud-aai/tesk-api?color=C39BD3>
 [badge-license]: <https://img.shields.io/badge/license-Apache%202.0-blue.svg>
 [badge-url-build-status]: <https://github.com/elixir-cloud-aai/tesk-api/actions/workflows/ci.yml?query=branch%3Adev>
 [badge-url-coverage]: <https://codecov.io/gh/elixir-cloud-aai/tesk-api?branch=dev>
 [badge-url-docker]: <https://hub.docker.com/r/elixircloud/tesk-api/tags>
+[badge-url-doi]: <https://doi.org/10.5281/zenodo.24093508>
 [badge-url-docs]: <https://tesk.readthedocs.io/en/latest/tesk-api/>
 [badge-url-github-tag]: <https://github.com/elixir-cloud-aai/tesk-api/tags>
 [badge-url-license]: <https://www.apache.org/licenses/LICENSE-2.0>
