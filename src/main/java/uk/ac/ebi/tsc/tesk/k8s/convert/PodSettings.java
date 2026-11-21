@@ -13,11 +13,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import tools.jackson.core.StreamReadFeature;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 import uk.ac.ebi.tsc.tesk.k8s.config.KubernetesJson;
 
@@ -71,9 +73,12 @@ final class PodSettings {
                                                     .getAsString())
                     .create();
 
-    /** Jackson, which refuses duplicate names */
+    /** Jackson, which refuses duplicate names and content after the value */
     private static final JsonMapper STRICT_JSON =
-            JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
+            JsonMapper.builder()
+                    .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                    .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .build();
 
     /** Fields of security contexts with user or group IDs */
     private static final List<String> ID_FIELDS = List.of("runAsUser", "runAsGroup", "fsGroup");
@@ -89,12 +94,17 @@ final class PodSettings {
      * outside 0 to 2147483647, and unknown seccomp profiles (types checked before)
      */
     private static void checkValues(JsonObject json) {
-        ID_FIELDS.stream().filter(json::has).forEach(field -> checkId(field, json.get(field)));
-        if (json.has("supplementalGroups")) {
-            json.getAsJsonArray("supplementalGroups")
+        // null is valid for every field: Kubernetes treats it as unset (and it drops a field of
+        // the ConfigMap's security context in the merge)
+        ID_FIELDS.stream()
+                .filter(field -> present(json, field))
+                .forEach(field -> checkId(field, json.get(field)));
+        if (present(json, "supplementalGroups")) {
+            json.getAsJsonArray("supplementalGroups").asList().stream()
+                    .filter(id -> !id.isJsonNull())
                     .forEach(id -> checkId("supplementalGroups", id));
         }
-        if (json.has("seccompProfile")) {
+        if (present(json, "seccompProfile")) {
             JsonObject profile = json.getAsJsonObject("seccompProfile");
             // The model requires the type
             String profileType = profile.get("type").getAsString();
@@ -102,13 +112,19 @@ final class PodSettings {
                 throw new IllegalArgumentException(
                         "seccompProfile.type must be one of " + SECCOMP_TYPES);
             }
-            if ("Localhost".equals(profileType) != profile.has("localhostProfile")) {
+            if ("Localhost".equals(profileType) != present(profile, "localhostProfile")) {
                 throw new IllegalArgumentException(
                         "seccompProfile.localhostProfile must be set with the type Localhost only");
             }
         }
     }
 
+    /** If the object has the field with a value other than null */
+    private static boolean present(JsonObject json, String field) {
+        return json.has(field) && !json.get(field).isJsonNull();
+    }
+
+    /** Checks a user or group ID (a whole number, checked before) */
     private static void checkId(String field, JsonElement id) {
         long value = id.getAsLong();
         if (value < 0 || value > Integer.MAX_VALUE) {
@@ -162,9 +178,13 @@ final class PodSettings {
                         V1ResourceRequirements::validateJsonElement);
         if (json != null) {
             V1ResourceRequirements resources = fromJson(json, V1ResourceRequirements.class);
-            Map<String, Quantity> limits = resources.getLimits();
-            Map<String, Quantity> requests = resources.getRequests();
+            // JSON null (unset for Kubernetes) gives null maps and values
+            Map<String, Quantity> limits =
+                    Objects.requireNonNullElse(resources.getLimits(), Map.of());
+            Map<String, Quantity> requests =
+                    Objects.requireNonNullElse(resources.getRequests(), Map.of());
             Stream.concat(limits.values().stream(), requests.values().stream())
+                    .filter(Objects::nonNull)
                     .filter(quantity -> quantity.getNumber().signum() < 0)
                     .findAny()
                     .ifPresent(quantity -> {
@@ -173,7 +193,9 @@ final class PodSettings {
                     });
             requests.forEach((resource, request) -> {
                 Quantity limit = limits.get(resource);
-                if (limit != null && request.getNumber().compareTo(limit.getNumber()) > 0) {
+                if (request != null
+                        && limit != null
+                        && request.getNumber().compareTo(limit.getNumber()) > 0) {
                     throw new IllegalArgumentException(
                             "Invalid setting "
                                     + name

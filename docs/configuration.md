@@ -29,7 +29,7 @@ Environment variable | Meaning
 `CONFIGMAP` | Name of a ConfigMap with the pod security context of the executors, which TESK API reads at startup. Its value at the key `CONFIGMAPKEY` (default `securityContext`) is a YAML map with any of `fsGroup`, `runAsUser`, `runAsGroup` (numbers) and `nonRoot` (for `runAsNonRoot`: `true`, in any case; any other value counts as `false`, also an empty string such as `nonRoot: ''`); a ConfigMap without that key gives an empty security context. TESK API doesn't start if the ConfigMap can't be read, has no data, or its value isn't a YAML map (e.g. is empty), or if `fsGroup`, `runAsUser`, `runAsGroup` or `nonRoot` has no value (e.g. `nonRoot:`), or `fsGroup`, `runAsUser` or `runAsGroup` isn't a whole number. `CONFIGMAPNAMESPACE` is its namespace (default: that of `TESK_API_K8S_NAMESPACE`). Default: none, and the executors' pods get no security context from it (but from `TESK_API_TASKMASTER_EXECUTOR_POD_SECURITY_CONTEXT`, if set).
 `TESK_API_TASKMASTER_POD_SECURITY_CONTEXT`, `TESK_API_TASKMASTER_SECURITY_CONTEXT` | Security context of the taskmaster's pod and of its container, as JSON objects with the fields of Kubernetes' `PodSecurityContext` and `SecurityContext` (e.g. `{"runAsNonRoot": true}`). Default: none, and an empty value or `{}` sets none. See [Pod security and resources](#pod-security-and-resources). Since 2.1.0.
 `TESK_API_TASKMASTER_RESOURCES` | Resource requests and limits of the taskmaster's container, as a JSON object with the fields of Kubernetes' `ResourceRequirements`. Default: `{"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "500m", "memory": "256Mi"}}`; an empty value or `{}` sets none, as before 2.1.0. Since 2.1.0.
-`TESK_API_TASKMASTER_EXECUTOR_POD_SECURITY_CONTEXT` | Security context of the executors' pods, as a JSON object with the fields of Kubernetes' `PodSecurityContext`, on top of the one from `CONFIGMAP`: its fields replace those of the ConfigMap (objects such as `seccompProfile` as a whole), the ConfigMap's other fields stay. Default: none, and an empty value or `{}` adds nothing. Since 2.1.0.
+`TESK_API_TASKMASTER_EXECUTOR_POD_SECURITY_CONTEXT` | Security context of the executors' pods, as a JSON object with the fields of Kubernetes' `PodSecurityContext`, on top of the one from `CONFIGMAP`: its fields replace those of the ConfigMap (objects such as `seccompProfile` as a whole), the ConfigMap's other fields stay, and a field set to `null` removes that of the ConfigMap. Default: none, and an empty value or `{}` adds nothing. Since 2.1.0.
 `TESK_API_TASKMASTER_EXECUTOR_SECURITY_CONTEXT` | Security context of the executors' containers, as a JSON object with the fields of Kubernetes' `SecurityContext`. Default: none, and an empty value or `{}` sets none. Since 2.1.0.
 `TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU` | CPU request and limit of the executors of tasks that set no `resources.cpu_cores`, as a Kubernetes quantity (e.g. `1`, `0.5` or `500m`). Default: `1`; an empty value sets none, as before 2.1.0. Since 2.1.0.
 `TESK_API_SERVICE_INFO_LOCATION` | The YAML file of [service info](#service-info). Default: the built-in `classpath:service-info.yaml`.
@@ -62,13 +62,14 @@ manifest (camelCase, e.g. `runAsNonRoot`, not `run_as_non_root`).
 Quantities are strings (`"500m"`) or numbers. TESK API doesn't start if a
 value isn't a JSON object, has a field that the Kubernetes object doesn't
 know, or a value of another type (e.g. `"true"` for `true`, `"1000"` for
-`1000`, `1.5` for a whole number), if a quantity isn't valid, or if a
-request is above its limit or negative. In security contexts, it also checks
+`1000`, `1.5` for a whole number), if a quantity isn't valid or is
+negative, or if a request is above its limit. In security contexts, it also checks
 that user and group IDs are between 0 and 2147483647, and that
 `seccompProfile.type` is `RuntimeDefault`, `Localhost` (with
 `localhostProfile`) or `Unconfined`; other values that Kubernetes refuses
-(e.g. unknown resource names) make the creation of the jobs fail instead. The executors' CPU and memory come from the
-task: `resources.cpu_cores` and `resources.ram_gb` are both the request and
+(e.g. unknown resource names) make the creation of the jobs fail instead.
+
+The executors' CPU and memory come from the task: `resources.cpu_cores` and `resources.ram_gb` are both the request and
 the limit; without `cpu_cores`, the executors get
 `TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU`.
 

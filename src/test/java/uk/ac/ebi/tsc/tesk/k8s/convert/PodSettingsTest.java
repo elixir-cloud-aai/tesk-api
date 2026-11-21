@@ -89,6 +89,8 @@ public class PodSettingsTest {
                 "{\"runAsUser\": true}",
                 "{\"runAsUser\": {}}",
                 "{runAsNonRoot: true}",
+                "{} x",
+                "{\"runAsNonRoot\": true} {}",
                 "{'runAsNonRoot': true}",
                 "{\"runAsNonRoot\": true, \"runAsNonRoot\": false}",
                 "{\"runAsUser\": -1}",
@@ -98,6 +100,7 @@ public class PodSettingsTest {
                 "{\"seccompProfile\": {\"type\": \"Bogus\"}}",
                 "{\"seccompProfile\": {}}",
                 "{\"seccompProfile\": {\"type\": \"Localhost\"}}",
+                "{\"seccompProfile\": {\"type\": \"Localhost\", \"localhostProfile\": null}}",
                 "{\"seccompProfile\": {\"type\": \"RuntimeDefault\", \"localhostProfile\": \"p\"}}",
                 "{\"runAsNonRoot\": {}}",
                 "{\"seccompProfile\": \"RuntimeDefault\"}",
@@ -118,10 +121,17 @@ public class PodSettingsTest {
                 "{\"runAsUser\": 0, \"runAsGroup\": 2147483647, \"fsGroup\": 100}",
                 "{\"supplementalGroups\": [0, 1000]}",
                 "{\"seccompProfile\": {\"type\": \"Unconfined\"}}",
+                "{\"fsGroup\": null, \"runAsUser\": null, \"seccompProfile\": null}",
+                "{\"supplementalGroups\": null}",
+                "{\"supplementalGroups\": [1, null]}",
+                "{\"seccompProfile\": {\"type\": \"RuntimeDefault\", \"localhostProfile\": null}}",
                 "{\"seccompProfile\": {\"type\": \"Localhost\", \"localhostProfile\": \"p.json\"}}"
             })
     public void validValues(String value) {
         assertThat(podSecurityContext(value)).isEqualTo(json(value));
+        if (!value.contains("Groups") && !value.contains("fsGroup")) {
+            assertThat(securityContext(value)).isEqualTo(json(value));
+        }
     }
 
     /** The same for the container's security context */
@@ -131,7 +141,11 @@ public class PodSettingsTest {
                 "{\"allowPrivilegeEscalation\": \"false\"}",
                 "{\"capabilities\": {\"drop\": \"ALL\"}}",
                 "{\"capabilities\": {\"remove\": [\"ALL\"]}}",
-                "{\"runAsNonRoot\": 1}"
+                "{\"runAsNonRoot\": 1}",
+                "{\"runAsUser\": -1}",
+                "{\"runAsGroup\": 2147483648}",
+                "{\"seccompProfile\": {\"type\": \"Bogus\"}}",
+                "{\"privileged\": false, \"privileged\": true}"
             })
     public void invalidSecurityContext_refused(String value) {
         assertThatThrownBy(() -> securityContext(value))
@@ -148,7 +162,12 @@ public class PodSettingsTest {
                         + " \"limits\": {\"cpu\": \"500m\", \"memory\": \"256Mi\"}}",
                 "{\"requests\": {\"cpu\": \"1\"}, \"limits\": {\"cpu\": 1}}",
                 "{\"limits\": {\"cpu\": \"1\"}}",
-                "{\"requests\": {\"memory\": \"1Gi\"}, \"limits\": {\"cpu\": \"1\"}}"
+                "{\"requests\": {\"memory\": \"1Gi\"}, \"limits\": {\"cpu\": \"1\"}}",
+                "{\"limits\": null, \"requests\": {\"cpu\": \"1\"}}",
+                "{\"requests\": null}",
+                "{\"requests\": {\"cpu\": null}, \"limits\": {\"cpu\": \"1\"}}",
+                "{\"requests\": {\"cpu\": \"1\"}, \"limits\": {\"cpu\": null}}",
+                "{\"requests\": {\"cpu\": \"0\"}}"
             })
     public void resources(String value) {
         assertThat(PodSettings.resources(NAME, value)).isEqualTo(json(value));
