@@ -18,6 +18,7 @@ import io.kubernetes.client.openapi.models.V1PodList;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import uk.ac.ebi.tsc.tesk.authz.TesAuthz;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
@@ -46,7 +47,7 @@ class TesServiceImplSystemLogsTest {
     void setUp() {
         this.client = mock(KubernetesClientWrapper.class);
         this.converter = mock(TesKubernetesConverter.class);
-        this.service = new TesServiceImpl(this.client, this.converter);
+        this.service = new TesServiceImpl(this.client, this.converter, mock(TesAuthz.class));
         this.taskmaster =
                 new V1Job()
                         .metadata(

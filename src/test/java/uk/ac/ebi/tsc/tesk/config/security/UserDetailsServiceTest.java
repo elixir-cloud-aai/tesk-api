@@ -20,7 +20,7 @@ public class UserDetailsServiceTest {
     public void auth_hasNoUsers() {
         ResourceServerConfiguration configuration =
                 new ResourceServerConfiguration(
-                        null, null, new AuthorisationProperties(), "/ga4gh/tes/v1", true, "");
+                        null, null, new AuthorisationProperties(), "/ga4gh/tes/v1", true, "", "");
         assertThat(configuration.userDetailsService().loadUserByUsername("user")).isNull();
     }
 }

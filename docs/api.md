@@ -35,7 +35,10 @@ Kubernetes lists their taskmaster jobs (by task ID), in the views `MINIMAL`
   without `page_size` can also return a `next_page_token`: follow it to get
   all tasks. Other values, also those that aren't whole numbers, are
   refused with `400 Bad Request`. `next_page_token` is the continue token
-  of Kubernetes; pass it as `page_token` to get the next page.
+  of Kubernetes (with the [decision service](access-control.md#what-tesk-api-asks)
+  on, prefixed with the task set it lists, `all:` or `own:`; a token of the
+  other set gives `400 Bad Request`); pass it as `page_token` to get the
+  next page.
   It is left out on the last page. Kubernetes accepts it for a limited time
   only (by default about 5 minutes, until etcd compacts its history).
 - `name_prefix` lists only the tasks whose names start with it
@@ -360,5 +363,6 @@ Status code | Meaning
 400 | Bad request: validation error, or cancellation of a task that doesn't run
 401 | Unauthorized: no access token in the request, or an invalid token (see [Token validation](access-control.md#token-validation) for the `WWW-Authenticate` header and the body)
 403 | Forbidden: the user may not do this (usually, not in the required group, or without the required claim)
-404 | Not found: no task with this ID
+404 | Not found: no task with this ID, or (with the [decision service](access-control.md#decision-service)) one that the caller may not see
 500 | Something else went wrong (possibly the configuration)
+503 | Service unavailable: the [decision service](access-control.md#decision-service) gave no decision

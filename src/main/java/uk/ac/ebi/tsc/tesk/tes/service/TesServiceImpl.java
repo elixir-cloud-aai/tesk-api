@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_OWNER_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_TESTASK_NAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.COMPLETED_STATES;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_CREATE_ATTEMPTS_NO;
@@ -27,8 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import uk.ac.ebi.tsc.tesk.authz.TesAuthz;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.PodPhase;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.convert.IgnoredBackendParameters;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TaskStateResolver;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
@@ -36,6 +39,7 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.data.*;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;
+import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.*;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 
@@ -54,10 +58,15 @@ public class TesServiceImpl implements TesService {
 
     private final TesKubernetesConverter converter;
 
+    private final TesAuthz authz;
+
     public TesServiceImpl(
-            KubernetesClientWrapper kubernetesClientWrapper, TesKubernetesConverter converter) {
+            KubernetesClientWrapper kubernetesClientWrapper,
+            TesKubernetesConverter converter,
+            TesAuthz authz) {
         this.kubernetesClientWrapper = kubernetesClientWrapper;
         this.converter = converter;
+        this.authz = authz;
     }
 
     /**
@@ -67,6 +76,13 @@ public class TesServiceImpl implements TesService {
     @Override
     public TesCreateTaskResponse createTask(TesTask task, User user) {
 
+        // TESK assigns the ID (the job's name), the state, the creation time and the logs; values
+        // sent by the client are dropped, also from the stored task
+        task.setId(null);
+        task.setState(null);
+        task.setCreationTime(null);
+        task.setLogs(null);
+        this.authz.checkCreate(user, task);
         // TESK supports no backend parameters: they are neither stored nor returned (TES 1.1)
         List<String> ignoredBackendParameters = IgnoredBackendParameters.removeFrom(task);
         int attemptsNo = 0;
@@ -84,6 +100,13 @@ public class TesServiceImpl implements TesService {
                 }
 
                 V1Job taskMasterJob = this.converter.fromTesTaskToK8sJob(task, user);
+                // the owner for the decision service, if the issuer is known
+                this.authz
+                        .ownerId(user)
+                        .ifPresent(owner ->
+                                taskMasterJob
+                                        .getMetadata()
+                                        .putAnnotationsItem(ANN_OWNER_KEY, owner));
                 IgnoredBackendParameters.annotate(
                         taskMasterJob.getMetadata(), ignoredBackendParameters);
                 V1ConfigMap taskMasterConfigMap =
@@ -190,7 +213,51 @@ public class TesServiceImpl implements TesService {
      */
     @Override
     public TesTask getTask(String taskId, TaskView view, User user) {
-        return this.getTask(this.readTask(taskId), view, false);
+        if (!this.authz.isDecisionService()) {
+            return this.getTask(this.readTask(taskId), view, false);
+        }
+        // the decision service is asked also for missing tasks: 404 either way
+        Task task = this.readTaskIfExists(taskId);
+        if (!this.authz.mayRead(user, taskId, this.meta(task), view) || task == null) {
+            throw new TaskNotFoundException(taskId);
+        }
+        return this.getTask(task, view, false);
+    }
+
+    /** The task's objects, or null if it doesn't exist */
+    private Task readTaskIfExists(String taskId) {
+        try {
+            return this.readTask(taskId);
+        } catch (TaskNotFoundException e) {
+            return null;
+        }
+    }
+
+    /** Owner, state and tags of the task for the decision service, or null for a missing task */
+    private TesAuthz.TaskMeta meta(Task task) {
+        if (task == null) {
+            return null;
+        }
+        V1Job job = task.getTaskmaster().getJob();
+        return new TesAuthz.TaskMeta(
+                this.ownerOf(job.getMetadata()),
+                this.converter.extractStateFromK8sJobs(task).getValue(),
+                this.converter.extractTags(job));
+    }
+
+    /**
+     * The owner of a taskmaster job: its annotation, or, for tasks created before it, the owner
+     * derived from the creator (see {@link TesAuthz#ownerOfCreator}); null if not known
+     */
+    private String ownerOf(V1ObjectMeta metadata) {
+        String owner =
+                metadata.getAnnotations() == null
+                        ? null
+                        : metadata.getAnnotations().get(ANN_OWNER_KEY);
+        if (owner != null) {
+            return owner;
+        }
+        return this.authz.ownerOfCreator(CreatorLabels.creatorId(metadata)).orElse(null);
     }
 
     /**
@@ -295,12 +362,34 @@ public class TesServiceImpl implements TesService {
     public TesListTasksResponse listTasks(
             TaskFilter filter, Long pageSize, String pageToken, TaskView view, User user) {
 
-        V1JobList taskmasterJobs =
-                this.kubernetesClientWrapper.listAllTaskmasterJobsForUser(
-                        pageToken,
-                        Optional.ofNullable(pageSize).map(Long::intValue).orElse(null),
-                        user);
-        String nextPageToken = taskmasterJobs.getMetadata().getContinue();
+        Integer limit = Optional.ofNullable(pageSize).map(Long::intValue).orElse(null);
+        V1JobList taskmasterJobs;
+        String nextPageToken;
+        if (this.authz.isDecisionService()) {
+            ListScope scope = ListScope.of(this.authz.listsAll(user, view));
+            String continueToken = scope.continueToken(pageToken);
+            if (scope == ListScope.ALL) {
+                taskmasterJobs =
+                        this.kubernetesClientWrapper.listTaskmasterJobsOfCreator(
+                                continueToken, limit, null);
+            } else {
+                // the hash label selects, the exact owner decides
+                String owner = this.authz.ownerId(user).orElseThrow(IllegalStateException::new);
+                taskmasterJobs =
+                        this.kubernetesClientWrapper.listTaskmasterJobsOfCreator(
+                                continueToken, limit, user.getUsername());
+                taskmasterJobs.setItems(
+                        taskmasterJobs.getItems().stream()
+                                .filter(job -> owner.equals(this.ownerOf(job.getMetadata())))
+                                .collect(Collectors.toList()));
+            }
+            nextPageToken = scope.pageToken(taskmasterJobs.getMetadata().getContinue());
+        } else {
+            taskmasterJobs =
+                    this.kubernetesClientWrapper.listAllTaskmasterJobsForUser(
+                            pageToken, limit, user);
+            nextPageToken = taskmasterJobs.getMetadata().getContinue();
+        }
         List<V1Job> matchingTaskmasterJobs =
                 taskmasterJobs.getItems().stream()
                         .filter(job -> filter.matchesName(taskName(job)))
@@ -382,9 +471,24 @@ public class TesServiceImpl implements TesService {
      */
     @Override
     public void cancelTask(String taskId) {
+        this.cancel(taskId, this.readTask(taskId));
+    }
+
+    /**
+     * Cancels a task as the decision service allows (tesk.api.authz): asked also for missing tasks;
+     * 404 if the task is missing or the caller may not get it, 403 if the caller may get it, but
+     * not cancel it
+     */
+    @Override
+    public void cancelTask(String taskId, User user) {
+        Task task = this.readTaskIfExists(taskId);
+        this.authz.checkCancel(user, taskId, this.meta(task));
+        this.cancel(taskId, task);
+    }
+
+    private void cancel(String taskId, Task task) {
         // the state of all the task's jobs, as for getTask: a task that ended (e.g. an executor
         // failed) isn't cancelled
-        Task task = this.readTask(taskId);
         TesState state = this.converter.extractStateFromK8sJobs(task);
         if (COMPLETED_STATES.contains(state)) {
             throw new CancelNotRunningTask(taskId);

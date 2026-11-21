@@ -48,7 +48,7 @@ with the authorisation code grant, and with the redirect URI
 provider must issue tokens to it without a client secret and without PKCE.
 
 ### Token validation
-TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint, using the resource server of Spring Security. A token is valid if the endpoint answers it (`200 OK`) with a JSON object that has a `sub` (not blank) and no `error`. TESK API waits at most 10 seconds to connect to the endpoint and 30 seconds for each read of its answer (these limits don't cover the name lookup of its host, nor the answer as a whole); if the endpoint can't be reached or doesn't answer in time, the token is refused like an invalid one. An invalid token, or lack of thereof in the `Authorization: Bearer` header, will result in `HTTP 401 Unauthorized` error. Tokens of allow-listed services are checked locally instead, if that is on (see [Tokens of services](#tokens-of-services)).
+TESK API validates the token by hitting Elixir AAI `user_info` endpoint on each request and extracting information returned from that endpoint, using the resource server of Spring Security. A token is valid if the endpoint answers it (`200 OK`) with a JSON object that has a `sub` (not blank) and no `error`. TESK API waits at most `TESK_API_AUTH_OIDC_TIMEOUT` seconds (default 10) to connect to the endpoint and as long for each read of its answer (these limits don't cover the name lookup of its host, nor the answer as a whole); if the endpoint can't be reached or doesn't answer in time, the token is refused like an invalid one. An invalid token, or lack of thereof in the `Authorization: Bearer` header, will result in `HTTP 401 Unauthorized` error. Tokens of allow-listed services are checked locally instead, if that is on (see [Tokens of services](#tokens-of-services)).
 
 TESK API takes the token from the `Authorization` header only (`Bearer <token>`, as in [RFC 6750, section 2.1](https://datatracker.ietf.org/doc/html/rfc6750#section-2.1)), not from an `access_token` parameter in the URL or in a form. A header whose token is empty or has characters that bearer tokens can't have (anything but letters, digits and `-._~+/`, with `=` only at the end; e.g. spaces) is refused without a call to the user info endpoint.
 
@@ -304,7 +304,8 @@ Environment variable | Meaning | Default
 If the setting is on without an issuer or without a non-blank client ID, or
 with a negative leeway, TESK API doesn't start. The discovery document and
 the keys are fetched at the first service token, not at startup, with
-timeouts of 5 seconds. Until that succeeds, service tokens are refused; after
+the timeouts of `TESK_API_AUTH_OIDC_TIMEOUT` (default 10 seconds) to connect
+and for each read. Until that succeeds, service tokens are refused; after
 a failure (also a key set without keys), TESK API refuses them at once for 10
 seconds before it asks the issuer again, so a recovered issuer can take up to
 10 seconds to be used. Once fetched, the keys are kept for up to 15 minutes
@@ -370,3 +371,126 @@ its users may see and cancel which task.
   can give it keys of their own: with other URLs in the settings, TESK API
   doesn't start, and a discovery document with another `jwks_uri` is
   refused.
+
+## Required claim
+
+Independently of the rules above, TESK API can admit only callers with a
+given claim: the required claim is a gate that every request to the task
+endpoints must pass first, before the group rules, the [claim
+authorisation](#authorisation-without-groups) or the [decision
+service](#decision-service). It grants nothing: a caller who passes it still
+needs the rights of one of these. The setting is off by default; it needs the
+`auth` profile.
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHZ_REQUIRED_CLAIM_NAME` | Name of the claim, e.g. `eduperson_entitlement`. TESK API looks for a claim of exactly this name first (also names with `.` or `/`, e.g. `https://example.org/groups`), then follows it as a path of nested objects (`ctx.groups`). For users, the claims come from the user info endpoint; for [service clients](#tokens-of-services), from their token. | none (off)
+`TESK_API_AUTHZ_REQUIRED_CLAIM_VALUES` | Values of the claim; one of them admits the caller, compared exactly. | none
+`TESK_API_AUTHZ_REQUIRED_CLAIM_PREFIXES` | Prefixes; a value of the claim that starts with one of them admits the caller (e.g. `urn:geant:lifescience-ri.eu:group:myvo:` for all groups of a virtual organisation). | none
+
+The claim can be a string or a list of strings. A missing claim, another
+type, or no matching value gives `403 Forbidden`. The values and prefixes are
+comma-separated, or, as values can contain commas, a JSON array of strings
+(e.g. `["urn:x:a,b", "urn:x:c"]`; a setting that starts with `[` must be
+one). In YAML configuration files, they can also be lists.
+
+The required claim is checked once the request has been read: a request
+that TESK API can't read (e.g. an invalid task, or a `page_size` that isn't a
+number) gets `400 Bad Request` first.
+
+TESK API doesn't start with values or prefixes but no name, with a name but
+neither values nor prefixes, with an empty value or prefix, or with the
+setting but without the `auth` profile.
+
+Service clients' tokens rarely carry the claims of users. If service clients
+(e.g. a gateway such as proTES) call TESK API, leave the required claim unset
+and let the gateway or the decision service decide.
+
+## Decision service
+
+Instead of the group rules and the claim authorisation, TESK API can ask an
+external decision service whether a caller may create, get, cancel or list
+tasks. TESK API speaks the [OpenID AuthZEN 1.0 Access Evaluation
+API](https://openid.net/specs/authorization-api-1_0.html) with the profile
+`tes-authzen/1`, which other TES implementations share: one `POST` with a JSON
+evaluation request per decision, answered by `{"decision": true}` or
+`{"decision": false}`. The setting is off by default; with it off, nothing
+changes. It needs the `auth` profile. The [required claim](#required-claim),
+if set, still applies first.
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHZ_DECISION_SERVICE_URL` | The evaluation endpoint, an `http` or `https` URL with a host (e.g. `https://pdp.example.org/access/v1/evaluation`). Setting it turns the decision service on. | none (off)
+`TESK_API_AUTHZ_ISSUER` | The issuer of the users' tokens (their `iss`, e.g. `https://login.aai.lifescience-ri.eu/oidc/`). The user info doesn't tell TESK API the issuer, which it needs for the owner IDs below. Required with the decision service. | none
+`TESK_API_AUTHZ_DECISION_SERVICE_TIMEOUT` | Seconds that a call may take as a whole (decimals allowed). | `2`
+`TESK_API_AUTHZ_DECISION_SERVICE_CLAIMS` | Claims of the caller to send, with the same lookup as for the required claim; comma-separated or a JSON array. Send only what the decision service needs. | none
+`TESK_API_AUTHZ_DECISION_SERVICE_CREDENTIAL_FILE` | A file whose content (without surrounding white space) TESK API sends as `Authorization: Bearer …` to the decision service. It is read on each call, so that a rotated file (e.g. a mounted Kubernetes secret) takes effect without a restart. | none
+
+TESK API doesn't start with any of these settings but no URL, with a URL
+that isn't `http` or `https` or has no host, without the issuer, with a
+timeout that isn't a number of seconds above 0, with a credential file that
+is empty, can't be read or has control characters (e.g. several lines), or
+without the `auth` profile. It logs a warning
+for a plain `http` URL to a host other than `localhost`, `127.x.x.x` or
+`[::1]`: secure that connection otherwise (e.g. with mTLS in a service mesh).
+
+### What TESK API asks
+
+The subject is the caller, as TESK API validated them; their access token is
+never sent. Its `id` is the owner ID `<iss>|<sub>`, and its properties are
+`iss`, `sub`, the configured `claims` (always present, maybe empty) and, for
+service clients only, `client_id` and `scope`. The issuer of service clients
+is their token's `iss`; that of users is `TESK_API_AUTHZ_ISSUER`.
+
+Endpoint | Action | Resource
+--- | --- | ---
+`POST /tasks` | `CreateTask` | `tes_task_set` `own`, with the task: `name`, `tags`, `resources`, `volumes`, the executors' `image`, and the inputs' and outputs' `url`, `path` and `type` (no commands, environments or contents). URLs are stripped of user info, query and fragment.
+`GET /tasks/{id}` | `GetTask`, with the action property `view` (`MINIMAL`, `BASIC` or `FULL`) | `tes_task` `{id}`, with `owner` (if known), `state` and `tags`
+`POST /tasks/{id}:cancel` | `CancelTask`; if refused or the task is missing, also `GetTask` | as for `GetTask`
+`GET /tasks` | `ListTasks`, twice, with the action property `view` | `tes_task_set` `all` and `own`
+
+The context names the profile and, as `service_id`, the `id` of the
+[service info](configuration.md#service-info), so that one decision service
+can serve several TES instances. Each call has a new `X-Request-ID`, which
+TESK API logs with the decision, the action and the resource (`INFO`), so
+that the decision service's log can be matched.
+
+TESK API asks also for tasks that don't exist (without properties), so that
+answers don't tell callers which task IDs exist: a refused or missing task
+gives `404 Not Found` alike. A refused cancel gives `403 Forbidden` if the
+caller may get the task, else `404 Not Found`.
+
+For listing, TESK API asks for both sets. With `all`, the caller lists all
+tasks; with only `own`, the tasks they own; with neither, `403 Forbidden`.
+Page tokens are bound to the set they were issued for: a token of another
+set gives `400 Bad Request`.
+
+Any failure of the decision service (timeout, no connection, a status other
+than 200, an answer without a boolean `decision`) gives `503 Service
+Unavailable` without details; TESK API logs the reason (`ERROR`). There are
+no retries and no cached decisions.
+
+### Owners
+
+New tasks record their owner ID `<iss>|<sub>` in the annotation `owner-id`
+of the taskmaster's job, in addition to the [creator](#task-creators),
+whenever TESK API knows the issuer (also with the decision service off). For
+service clients, `<sub>` is the client ID, also if their token's `sub` is
+another (`…_REQUIRE_CLIENT_SUBJECT` `false`): their tasks are the client's.
+Tasks created before have no such annotation: TESK API derives their owner
+from the creator and `TESK_API_AUTHZ_ISSUER`, unless [service
+clients](#tokens-of-services) of another issuer are on, which could have
+created them; then the owner is left out, and the decision service decides
+without it. This derivation assumes that a creator is a user: if service
+clients created tasks earlier and are now off, a user whose `sub` is such a
+client's ID would own that client's earlier tasks.
+
+### Trust implications of the decision service
+
+* The decision service decides who may run which containers on your
+  cluster. Run it where only you can change its policies, and protect the
+  connection to it (`https`, or mTLS in a service mesh).
+* If it is down, TESK API refuses all task requests (`503`); tasks that are
+  already running keep running.
+* The group rules and the claim authorisation don't apply with the decision
+  service on; only the required claim does.

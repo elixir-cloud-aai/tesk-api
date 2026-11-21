@@ -66,6 +66,9 @@ public class ElixirPrincipalExtractorTest {
         User user2 = (User) result2;
         assertThat(user1, is(modelUser));
         assertThat(user2, is(modelUser));
+        // all claims of the user info, for the required claim and the decision service
+        assertThat(user1.getClaims(), is(map));
+        assertThat(user1.getIssuer(), is(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

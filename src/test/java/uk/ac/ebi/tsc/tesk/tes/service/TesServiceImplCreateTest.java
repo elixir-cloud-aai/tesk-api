@@ -32,6 +32,7 @@ import org.mockito.InOrder;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
+import uk.ac.ebi.tsc.tesk.authz.TesAuthz;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
@@ -52,13 +53,15 @@ class TesServiceImplCreateTest {
     private KubernetesClientWrapper client;
     private TesKubernetesConverter converter;
     private TesServiceImpl service;
+    private TesAuthz authz;
     private final TesTask task = new TesTask();
 
     @BeforeEach
     void setUp() {
         this.client = mock(KubernetesClientWrapper.class);
         this.converter = mock(TesKubernetesConverter.class);
-        this.service = new TesServiceImpl(this.client, this.converter);
+        this.authz = mock(TesAuthz.class);
+        this.service = new TesServiceImpl(this.client, this.converter, this.authz);
         when(this.converter.fromTesTaskToK8sImagePullSecrets(any(TesTask.class), any(V1Job.class)))
                 .thenReturn(Collections.emptyList());
         when(this.converter.fromK8sJobToTesCreateTaskResponse(any(V1Job.class)))
@@ -427,5 +430,61 @@ class TesServiceImplCreateTest {
 
         assertThat(this.task.getResources().getRamGb()).isNull();
         verify(this.client, never()).minimumRamGb();
+    }
+
+    /** The server assigns ID, state, creation time and logs (spec: server-assigned IDs) */
+    @Test
+    void clientIdStateCreationTimeAndLogsAreDropped() {
+        this.converts("task-1");
+        this.task.setId("client-chosen-id");
+        this.task.setState(uk.ac.ebi.tsc.tesk.tes.model.TesState.COMPLETE);
+        this.task.setCreationTime("2020-01-01T00:00:00Z");
+        this.task.setLogs(Collections.singletonList(new uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog()));
+
+        assertThat(this.service.createTask(this.task, USER).getId()).isEqualTo("task-1");
+
+        assertThat(this.task.getId()).isNull();
+        assertThat(this.task.getState()).isNull();
+        assertThat(this.task.getCreationTime()).isNull();
+        assertThat(this.task.getLogs()).isNull();
+        verify(this.authz).checkCreate(USER, this.task);
+    }
+
+    /** New tasks get the owner <iss>|<sub>, if the issuer is known */
+    @Test
+    void ownerIsStamped() {
+        this.converts("task-1");
+        when(this.authz.ownerId(USER)).thenReturn(java.util.Optional.of("https://idp|admin"));
+
+        this.service.createTask(this.task, USER);
+
+        ArgumentCaptor<V1Job> job = ArgumentCaptor.forClass(V1Job.class);
+        verify(this.client).createJob(job.capture());
+        assertThat(job.getValue().getMetadata().getAnnotations())
+                .containsEntry("owner-id", "https://idp|admin");
+    }
+
+    @Test
+    void noOwnerWithoutIssuer() {
+        this.converts("task-1");
+        when(this.authz.ownerId(USER)).thenReturn(java.util.Optional.empty());
+
+        this.service.createTask(this.task, USER);
+
+        ArgumentCaptor<V1Job> job = ArgumentCaptor.forClass(V1Job.class);
+        verify(this.client).createJob(job.capture());
+        assertThat(job.getValue().getMetadata().getAnnotations()).doesNotContainKey("owner-id");
+    }
+
+    /** A denied creation (decision service) creates nothing */
+    @Test
+    void deniedCreatesNothing() {
+        this.converts("task-1");
+        org.springframework.security.access.AccessDeniedException denied =
+                new org.springframework.security.access.AccessDeniedException("denied");
+        doThrow(denied).when(this.authz).checkCreate(USER, this.task);
+
+        assertThatThrownBy(() -> this.service.createTask(this.task, USER)).isSameAs(denied);
+        verify(this.client, never()).createJob(any(V1Job.class));
     }
 }

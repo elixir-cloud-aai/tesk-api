@@ -191,6 +191,18 @@ public class ServiceClientTokenServicesTest {
         verify(userInfo).introspect(token);
     }
 
+    /** The requests to the issuer have the timeout (tesk.api.auth.oidc.timeout) */
+    @Test
+    public void httpGet_hasTimeout() {
+        org.jose4j.http.Get get =
+                new ServiceClientTokenServices(
+                                userInfo, properties, java.time.Duration.ofMillis(1500))
+                        .httpGet();
+        assertEquals(1500, ReflectionTestUtils.getField(get, "connectTimeout"));
+        assertEquals(1500, ReflectionTestUtils.getField(get, "readTimeout"));
+        assertEquals(10_000, ReflectionTestUtils.getField(services().httpGet(), "readTimeout"));
+    }
+
     @Test
     public void listedClient_isAccepted_asPrincipalOfItsOwn(CapturedOutput output)
             throws Exception {
@@ -205,6 +217,9 @@ public class ServiceClientTokenServicesTest {
         assertFalse(user.isMember());
         assertFalse(user.isTeskAdmin());
         assertTrue(user.getAuthorities().isEmpty());
+        assertEquals(issuer(), user.getIssuer());
+        assertEquals(CLIENT, user.getClaims().get("client_id"));
+        assertEquals("openid", user.getClaims().get("scope"));
         assertThat(output.getOut(), containsString("Accepted token of service client " + CLIENT));
         assertThat(output.getOut(), not(containsString(token)));
     }

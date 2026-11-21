@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -85,9 +86,6 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      */
     static final long JWKS_REFRESH_INTERVAL_MS = 10_000;
 
-    /** Connect and read timeouts of the requests to the issuer, in milliseconds */
-    private static final int HTTP_TIMEOUT_MS = 5_000;
-
     /** Age of a token (by iat) beyond which it is refused, whatever its exp: a year */
     private static final int MAX_TOKEN_AGE_SECONDS = 365 * 24 * 3600;
 
@@ -105,6 +103,9 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     private final int clockSkewSeconds;
 
     private final long jwksRefreshIntervalMs;
+
+    /** Connect and read timeouts of the requests to the issuer, in milliseconds */
+    private final int httpTimeoutMs;
 
     /** Parses tokens without checking them, to tell whether they are service clients' tokens */
     private final JwtConsumer parser =
@@ -130,7 +131,18 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      */
     public ServiceClientTokenServices(
             OpaqueTokenIntrospector userInfoIntrospector, AuthorisationProperties properties) {
-        this(userInfoIntrospector, properties, JWKS_REFRESH_INTERVAL_MS);
+        this(userInfoIntrospector, properties, OidcTimeout.DEFAULT);
+    }
+
+    /**
+     * As above, with the timeout of the requests for the discovery document and the keys
+     * (tesk.api.auth.oidc.timeout)
+     */
+    public ServiceClientTokenServices(
+            OpaqueTokenIntrospector userInfoIntrospector,
+            AuthorisationProperties properties,
+            Duration timeout) {
+        this(userInfoIntrospector, properties, JWKS_REFRESH_INTERVAL_MS, timeout);
     }
 
     /** As above, with the least time between two fetches of the key set (for tests) */
@@ -138,6 +150,14 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             OpaqueTokenIntrospector userInfoIntrospector,
             AuthorisationProperties properties,
             long jwksRefreshIntervalMs) {
+        this(userInfoIntrospector, properties, jwksRefreshIntervalMs, OidcTimeout.DEFAULT);
+    }
+
+    private ServiceClientTokenServices(
+            OpaqueTokenIntrospector userInfoIntrospector,
+            AuthorisationProperties properties,
+            long jwksRefreshIntervalMs,
+            Duration timeout) {
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
         Set<String> ids =
                 Optional.ofNullable(settings.getClientIds())
@@ -173,6 +193,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
         this.requireClientSubject = settings.isRequireClientSubject();
         this.clockSkewSeconds = settings.getClockSkewSeconds();
         this.jwksRefreshIntervalMs = jwksRefreshIntervalMs;
+        this.httpTimeoutMs = OidcTimeout.millis(timeout);
         if (!isSecure(this.issuer) || (this.jwksUri != null && !isSecure(this.jwksUri))) {
             throw new IllegalStateException(
                     "tesk.api.authorisation.service-clients.issuer and .jwks-uri must be https"
@@ -269,12 +290,14 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     }
 
     /** The client, as a principal of its own without groups, with the claims of its token */
-    private static OAuth2AuthenticatedPrincipal principal(String clientId, JwtClaims claims) {
+    private OAuth2AuthenticatedPrincipal principal(String clientId, JwtClaims claims) {
         User user =
                 User.builder(clientId)
                         .allGroups(Collections.emptySet())
                         .serviceClient(true)
                         .legacyUserLabels(false)
+                        .claims(claims.getClaimsMap())
+                        .issuer(this.issuer)
                         .build();
         return new AuthenticatedUser(user, claims.getClaimsMap(), AuthorityUtils.NO_AUTHORITIES);
     }
@@ -367,11 +390,11 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
         }
     }
 
-    /** HTTP client of the discovery and the key set, with short timeouts */
-    private static Get httpGet() {
+    /** HTTP client of the discovery and the key set, with the timeout */
+    Get httpGet() {
         Get get = new Get();
-        get.setConnectTimeout(HTTP_TIMEOUT_MS);
-        get.setReadTimeout(HTTP_TIMEOUT_MS);
+        get.setConnectTimeout(this.httpTimeoutMs);
+        get.setReadTimeout(this.httpTimeoutMs);
         get.setRetries(0);
         return get;
     }

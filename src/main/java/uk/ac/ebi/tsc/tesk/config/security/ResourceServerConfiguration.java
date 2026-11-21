@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
 import jakarta.servlet.DispatcherType;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -55,6 +56,7 @@ public class ResourceServerConfiguration {
     private final String baseUrl;
     private final boolean serviceInfoPublic;
     private final String userInfoUri;
+    private final Duration oidcTimeout;
 
     public ResourceServerConfiguration(
             ErrorAttributes errorAttributes,
@@ -62,7 +64,8 @@ public class ResourceServerConfiguration {
             AuthorisationProperties authorisationProperties,
             @Value("${openapi.taskExecutionService.base-path:/ga4gh/tes/v1}") String baseUrl,
             @Value("${tesk.api.service-info.public:true}") boolean serviceInfoPublic,
-            @Value("${security.oauth2.resource.user-info-uri:}") String userInfoUri) {
+            @Value("${security.oauth2.resource.user-info-uri:}") String userInfoUri,
+            @Value("${tesk.api.auth.oidc.timeout:}") String oidcTimeout) {
 
         this.errorAttributes = errorAttributes;
         this.messageConvertersCustomizers = messageConvertersCustomizers;
@@ -70,6 +73,7 @@ public class ResourceServerConfiguration {
         this.baseUrl = baseUrl;
         this.serviceInfoPublic = serviceInfoPublic;
         this.userInfoUri = userInfoUri;
+        this.oidcTimeout = OidcTimeout.parse(oidcTimeout);
     }
 
     /**
@@ -132,9 +136,11 @@ public class ResourceServerConfiguration {
                 new UserInfoTokenIntrospector(
                         userInfoUri,
                         new ElixirPrincipalExtractor(authoritiesExtractor, authorisationProperties),
-                        authoritiesExtractor);
+                        authoritiesExtractor,
+                        oidcTimeout);
         if (authorisationProperties.getServiceClients().isEnabled()) {
-            return new ServiceClientTokenServices(userInfoIntrospector, authorisationProperties);
+            return new ServiceClientTokenServices(
+                    userInfoIntrospector, authorisationProperties, oidcTimeout);
         }
         return userInfoIntrospector;
     }

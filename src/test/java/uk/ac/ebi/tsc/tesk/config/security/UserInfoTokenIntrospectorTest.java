@@ -256,18 +256,31 @@ public class UserInfoTokenIntrospectorTest {
         refused();
     }
 
-    /** The client of the user info endpoint has timeouts */
+    /** The client of the user info endpoint has the timeout to connect and to read */
     @Test
     public void restTemplate_hasTimeouts() {
         SimpleClientHttpRequestFactory factory =
                 (SimpleClientHttpRequestFactory)
-                        UserInfoTokenIntrospector.restTemplate().getRequestFactory();
+                        UserInfoTokenIntrospector.restTemplate(java.time.Duration.ofMillis(1500))
+                                .getRequestFactory();
+        assertEquals(1500, ReflectionTestUtils.getField(factory, "connectTimeout"));
+        assertEquals(1500, ReflectionTestUtils.getField(factory, "readTimeout"));
+    }
+
+    /** The public constructor with a timeout uses it (tesk.api.auth.oidc.timeout) */
+    @Test
+    public void constructor_withTimeout() {
+        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
+        UserInfoTokenIntrospector introspector =
+                new UserInfoTokenIntrospector(
+                        "https://login.example.org/userinfo",
+                        new ElixirPrincipalExtractor(groups, new AuthorisationProperties()),
+                        groups,
+                        java.time.Duration.ofSeconds(3));
+        RestTemplate template =
+                (RestTemplate) ReflectionTestUtils.getField(introspector, "restOperations");
         assertEquals(
-                UserInfoTokenIntrospector.CONNECT_TIMEOUT_MS,
-                ReflectionTestUtils.getField(factory, "connectTimeout"));
-        assertEquals(
-                UserInfoTokenIntrospector.READ_TIMEOUT_MS,
-                ReflectionTestUtils.getField(factory, "readTimeout"));
+                3000, ReflectionTestUtils.getField(template.getRequestFactory(), "readTimeout"));
     }
 
     /** Host names that URI doesn't parse as hosts (e.g. with _, as in Docker Compose) work */

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import uk.ac.ebi.tsc.tesk.authz.TesAuthz;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageSizeException;
 import uk.ac.ebi.tsc.tesk.tes.model.*;
@@ -45,6 +46,9 @@ public class TasksApiController implements TasksApi {
 
     private final TesService tesService;
 
+    /** The required claim (an AND gate before all other rules) and the decision service, if set */
+    private final TesAuthz authz;
+
     /**
      * Keeps each value of a repeated parameter as it is: Spring would split a single value at
      * commas (e.g. {@code tag_key=a,b} into two keys), but tag keys and values may contain them.
@@ -58,17 +62,25 @@ public class TasksApiController implements TasksApi {
 
     public ResponseEntity<Object> cancelTask(
             @Parameter(required = true) @PathVariable("id") String id) {
-        // getTask - for authZ purposes (cancellation only possible for the same tasks, a user can
-        // actually see
-        this.tesService.getTask(id, TaskView.MINIMAL, getUser());
-        this.tesService.cancelTask(id);
+        User user = this.getUser();
+        this.authz.gate(user);
+        if (this.authz.isDecisionService()) {
+            this.tesService.cancelTask(id, user);
+        } else {
+            // getTask - for authZ purposes (cancellation only possible for the same tasks, a user
+            // can actually see
+            this.tesService.getTask(id, TaskView.MINIMAL, user);
+            this.tesService.cancelTask(id);
+        }
         // the specification's CancelTaskResponse is an empty object
         return new ResponseEntity<>(Collections.emptyMap(), HttpStatus.OK);
     }
 
     public ResponseEntity<TesCreateTaskResponse> createTask(
             @Parameter(required = true) @Valid @RequestBody TesTask body) {
-        TesCreateTaskResponse response = this.tesService.createTask(body, this.getUser());
+        User user = this.getUser();
+        this.authz.gate(user);
+        TesCreateTaskResponse response = this.tesService.createTask(body, user);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
@@ -84,8 +96,10 @@ public class TasksApiController implements TasksApi {
                     @RequestParam(value = "view", required = false, defaultValue = "MINIMAL")
                     String view) {
 
+        User user = this.getUser();
+        this.authz.gate(user);
         TaskView taskView = TaskView.fromString(view);
-        TesTask task = this.tesService.getTask(id, taskView, this.getUser());
+        TesTask task = this.tesService.getTask(id, taskView, user);
         if (taskView == TaskView.MINIMAL) {
             task.setLogs(null);
         }
@@ -138,6 +152,8 @@ public class TasksApiController implements TasksApi {
                     @RequestParam(value = "view", required = false, defaultValue = "MINIMAL")
                     String view) {
 
+        User user = this.getUser();
+        this.authz.gate(user);
         long size = pageSize == null ? DEFAULT_PAGE_SIZE : pageSize;
         if (size < 1 || size > MAX_PAGE_SIZE) {
             throw new InvalidPageSizeException(MAX_PAGE_SIZE);
@@ -146,8 +162,7 @@ public class TasksApiController implements TasksApi {
                 new TaskFilter(
                         namePrefix, state, TaskFilter.zipTags(asList(tagKey), asList(tagValue)));
         TesListTasksResponse response =
-                this.tesService.listTasks(
-                        filter, size, pageToken, TaskView.fromString(view), this.getUser());
+                this.tesService.listTasks(filter, size, pageToken, TaskView.fromString(view), user);
         return new ResponseEntity<TesListTasksResponse>(response, HttpStatus.OK);
     }
 

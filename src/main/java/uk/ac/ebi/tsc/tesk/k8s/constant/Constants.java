@@ -118,6 +118,12 @@ public class Constants {
      */
     public static final String ANN_USERID_KEY = "creator-user-id";
 
+    /**
+     * Key of the annotation with the task's owner, {@code <iss>|<sub>} of its creator, for the
+     * decision service (tesk.api.authz); only on taskmaster jobs, and only if the issuer is known
+     */
+    public static final String ANN_OWNER_KEY = "owner-id";
+
     /** Key of the label, that holds user's group name */
     public static final String LABEL_GROUPNAME_KEY = "creator-group-name";
 

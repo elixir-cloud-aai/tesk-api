@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
@@ -249,17 +250,54 @@ public class KubernetesClientWrapper {
      */
     public V1JobList listAllTaskmasterJobsForUser(
             String pageToken, Integer itemsPerPage, User user) {
+        // additional label selectors; limiting results to jobs belonging to chosen groups (where
+        // the user is member and/or manager) and optionally also to only those jobs, which were
+        // created by the user
+        V1JobList result =
+                this.listTaskmasterJobs(pageToken, itemsPerPage, user.getLabelSelector());
+        if (user.getLabelSelector() != null) {
+            // the selector only narrows the jobs down: keep those of the groups the user manages
+            // and those the user created, comparing the annotation with the full ID exactly (the
+            // hash label only selects, and the old label can't be selected for the user)
+            result.setItems(
+                    result.getItems().stream()
+                            .filter(job ->
+                                    user.isGroupManager(groupOf(job))
+                                            || user.isCreatorOf(job.getMetadata()))
+                            .collect(Collectors.toList()));
+        }
+        return result;
+    }
+
+    /**
+     * Gets a page of taskmaster jobs: all of them, or those whose hash label names the creator (for
+     * the decision service, tesk.api.authz; the caller compares the exact owner)
+     *
+     * @param pageToken - continue token of Kubernetes, from the previous page
+     * @param itemsPerPage - maximum number of jobs
+     * @param creatorId - the creator's ID, or null for the jobs of all creators
+     */
+    public V1JobList listTaskmasterJobsOfCreator(
+            String pageToken, Integer itemsPerPage, String creatorId) {
+        return this.listTaskmasterJobs(
+                pageToken,
+                itemsPerPage,
+                creatorId == null
+                        ? null
+                        : LABEL_USERHASH_KEY + "=" + CreatorLabels.hash(creatorId));
+    }
+
+    /** A page of taskmaster jobs, narrowed by the label selector if not null */
+    private V1JobList listTaskmasterJobs(
+            String pageToken, Integer itemsPerPage, String extraLabelSelector) {
         // Jobs of taskmaster type
         String labelSelector =
                 new StringJoiner("=")
                         .add(LABEL_JOBTYPE_KEY)
                         .add(LABEL_JOBTYPE_VALUE_TASKM)
                         .toString();
-        if (user.getLabelSelector() != null) {
-            // additional label selectors; limiting results to jobs belonging to chosen groups
-            // (where the user is member and/or manager)
-            // and optionally also to only those jobs, which were created bu the user
-            labelSelector += "," + user.getLabelSelector();
+        if (extraLabelSelector != null) {
+            labelSelector += "," + extraLabelSelector;
         }
         V1JobList result;
         try {
@@ -277,17 +315,6 @@ public class KubernetesClientWrapper {
                 result.getItems().stream()
                         .filter(job -> !isBeingDeleted(job))
                         .collect(Collectors.toList()));
-        if (user.getLabelSelector() != null) {
-            // the selector only narrows the jobs down: keep those of the groups the user manages
-            // and those the user created, comparing the annotation with the full ID exactly (the
-            // hash label only selects, and the old label can't be selected for the user)
-            result.setItems(
-                    result.getItems().stream()
-                            .filter(job ->
-                                    user.isGroupManager(groupOf(job))
-                                            || user.isCreatorOf(job.getMetadata()))
-                            .collect(Collectors.toList()));
-        }
         return result;
     }
 
