@@ -38,6 +38,13 @@ authors:
     family-names: Perard
   - given-names: Erik
     family-names: van den Bergh
+doi: 10.5281/zenodo.24093508
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.24093508
+    description: >-
+      Concept DOI of all versions on Zenodo; it always resolves to the latest
+      version
 repository-code: "https://github.com/elixir-cloud-aai/tesk-api"
 url: "https://tesk.readthedocs.io/"
 keywords:
