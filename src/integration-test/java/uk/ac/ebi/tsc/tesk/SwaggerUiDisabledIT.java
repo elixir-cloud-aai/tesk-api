@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.API_DOCS_URL;
+import static uk.ac.ebi.tsc.tesk.UrlConstants.FORMER_API_DOCS_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.HOME_URL;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.SWAGGER_UI_URLS;
 
@@ -40,5 +41,11 @@ public class SwaggerUiDisabledIT {
     @Test
     public void apiDocs_isOk() throws Exception {
         this.mvc.perform(get(API_DOCS_URL)).andExpect(status().isOk());
+    }
+
+    /** The former path of the API description, an alias in 2.0.0, is gone (#188) */
+    @Test
+    public void formerApiDocs_isNotFound() throws Exception {
+        this.mvc.perform(get(FORMER_API_DOCS_URL)).andExpect(status().isNotFound());
     }
 }

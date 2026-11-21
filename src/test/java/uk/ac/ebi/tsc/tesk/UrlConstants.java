@@ -1,6 +1,6 @@
 package uk.ac.ebi.tsc.tesk;
 
-import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsAliasController;
+import uk.ac.ebi.tsc.tesk.config.swagger.ApiDocsConfiguration;
 
 /**
  * @author aniewielska
@@ -13,10 +13,13 @@ public class UrlConstants {
     public static final String HOME_URL = "/";
 
     /** The API description (springdoc) */
-    public static final String API_DOCS_URL = ApiDocsAliasController.API_DOCS;
+    public static final String API_DOCS_URL = ApiDocsConfiguration.API_DOCS;
 
-    /** The former path of the API description (Springfox), an alias of {@link #API_DOCS_URL} */
-    public static final String API_DOCS_ALIAS_URL = ApiDocsAliasController.ALIAS;
+    /**
+     * The former path of the API description (Springfox, until 2.0.0; an alias of {@link
+     * #API_DOCS_URL} in 2.0.0), which is no longer served
+     */
+    public static final String FORMER_API_DOCS_URL = "/v2/api-docs";
 
     /**
      * The Swagger UI, its static resources (served by springdoc) and the endpoints that configure

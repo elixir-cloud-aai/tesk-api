@@ -11,6 +11,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ApiDocsConfiguration {
 
+    /** The path of the API description ({@code springdoc.api-docs.path}) */
+    public static final String API_DOCS = "/v3/api-docs";
+
     /** The properties of TesExecutor that are only written (in requests), by their JSON names */
     private static final Map<String, String> WRITE_ONLY_EXECUTOR_PROPERTIES =
             Map.of("dockerLogin", "docker_login", "dockerPass", "docker_pass");

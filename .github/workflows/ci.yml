@@ -221,20 +221,19 @@ jobs:
           start
           check "${api}/service-info" 200
           curl --silent --fail "${host}${api}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'
-          # The Swagger UI is off by default; the API description is not, also
-          # at its former path (an alias, to be dropped later)
+          # The Swagger UI is off by default; the API description is not.
+          # Its former path, an alias in 2.0.0, is gone (#188)
           check / 404
           check /swagger-ui/index.html 404
           check /v3/api-docs/swagger-config 404
           check /v3/api-docs 200
-          check /v2/api-docs 200
-          curl --silent --fail "${host}/v2/api-docs" | jq -e '.openapi | startswith("3.")'
+          check /v2/api-docs 404
           stop
           start --env SPRING_PROFILES_ACTIVE=auth
           check "${api}/service-info" 200
           check "${api}/tasks" 401
           check /v3/api-docs 200
-          check /v2/api-docs 200
+          check /v2/api-docs 401
           stop
           start --env SPRING_PROFILES_ACTIVE=auth --env TESK_API_SERVICE_INFO_PUBLIC=false
           check "${api}/service-info" 401
