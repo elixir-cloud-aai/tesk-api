@@ -225,10 +225,15 @@ job: re-run it the same way. Releases are
 never edited afterwards: fix mistakes in the notes of the next release.
 
 After publishing the image (without waiting for the GitHub release), the
-workflow makes one `POST /repositories/{id}/builds` to
-[Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade), which notifies the
-deployments that subscribed to upgrades, also for pre-releases, if they
-subscribed to those. This needs Pubgrade's publish mode
+workflow registers it, with the release tag, at
+[Pubgrade](https://github.com/elixir-cloud-aai/Pubgrade) (`POST
+/repositories/{id}/builds`, through Pubgrade's action
+[`actions/notify`](https://github.com/elixir-cloud-aai/Pubgrade/tree/344a58adc1c871135f86c404eb33ed91011886ad/actions/notify)),
+which notifies the deployments that subscribed to upgrades, also for
+pre-releases, if they subscribed to those. The action masks the token and
+retries a request only if it never reached Pubgrade, so that one run
+registers the build at most once; re-running the job registers it again.
+This needs Pubgrade's publish mode
 ([#33](https://github.com/elixir-cloud-aai/Pubgrade/issues/33)) and these
 settings:
 
@@ -246,10 +251,16 @@ would override the repository's URL within the job). An organization
 variable would switch it on for every repository it is shared with, also
 those without a Pubgrade token. With `PUBGRADE_URL`, the job waits for an
 approval in the `release` environment, like pushing and publishing, and fails
-if one of the other settings is missing. If only this job fails or is
-rejected, the image is published all the same: fix the settings and re-run
-the job, or leave it; don't release a new version for it. Settings of the
-former `pubgrade` environment are no longer read: move them as above.
+if one of the other settings is missing or invalid: the identifier and the
+token may only hold letters, digits, `.`, `~` and `-` (as Pubgrade issues
+them). If only this job fails or is rejected, the image is published all the
+same: fix the settings and re-run the job, or leave it; don't release a new
+version for it. Unless it failed on an invalid setting or with "Could not
+reach Pubgrade (curl exit status 6)" or "(… 7)" (no connection), Pubgrade
+may have registered the build all the same: check the repository's builds
+(`GET /repositories/{id}/builds`) before re-running it, as re-running
+notifies the subscribed deployments again. Settings of the former `pubgrade`
+environment are no longer read: move them as above.
 
 ## Generating a new API stub
 
