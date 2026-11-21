@@ -27,6 +27,11 @@ Environment variable | Meaning
 `TESK_API_TASKMASTER_EXECUTOR_SECRET_NAME` | Name of a Kubernetes secret to mount into every executor as a volume (all its files). Default: none.
 `TESK_API_TASKMASTER_EXECUTOR_SECRET_MOUNT_PATH` | Where that secret is mounted. Default: `/secret`.
 `CONFIGMAP` | Name of a ConfigMap with the pod security context of the executors, which TESK API reads at startup. Its value at the key `CONFIGMAPKEY` (default `securityContext`) is a YAML map with any of `fsGroup`, `runAsUser`, `runAsGroup` (numbers) and `nonRoot` (for `runAsNonRoot`: `true`, in any case; any other value counts as `false`, also an empty string such as `nonRoot: ''`); a ConfigMap without that key gives an empty security context. TESK API doesn't start if the ConfigMap can't be read, has no data, or its value isn't a YAML map (e.g. is empty), or if `fsGroup`, `runAsUser`, `runAsGroup` or `nonRoot` has no value (e.g. `nonRoot:`), or `fsGroup`, `runAsUser` or `runAsGroup` isn't a whole number. `CONFIGMAPNAMESPACE` is its namespace (default: that of `TESK_API_K8S_NAMESPACE`). Default: none, and the executors' pods get no security context from TESK API.
+`TESK_API_TASKMASTER_POD_SECURITY_CONTEXT`, `TESK_API_TASKMASTER_SECURITY_CONTEXT` | Security context of the taskmaster's pod and of its container, as JSON objects with the fields of Kubernetes' `PodSecurityContext` and `SecurityContext` (e.g. `{"runAsNonRoot": true}`). Default: none, and an empty value or `{}` sets none. See [Pod security and resources](#pod-security-and-resources). Since 2.1.0.
+`TESK_API_TASKMASTER_RESOURCES` | Resource requests and limits of the taskmaster's container, as a JSON object with the fields of Kubernetes' `ResourceRequirements`. Default: `{"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "500m", "memory": "256Mi"}}`; an empty value or `{}` sets none, as before 2.1.0. Since 2.1.0.
+`TESK_API_TASKMASTER_EXECUTOR_POD_SECURITY_CONTEXT` | Security context of the executors' pods, as a JSON object with the fields of Kubernetes' `PodSecurityContext`, on top of the one from `CONFIGMAP`: its fields replace those of the ConfigMap (objects such as `seccompProfile` as a whole), the ConfigMap's other fields stay. Default: none, and an empty value or `{}` adds nothing. Since 2.1.0.
+`TESK_API_TASKMASTER_EXECUTOR_SECURITY_CONTEXT` | Security context of the executors' containers, as a JSON object with the fields of Kubernetes' `SecurityContext`. Default: none, and an empty value or `{}` sets none. Since 2.1.0.
+`TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU` | CPU request and limit of the executors of tasks that set no `resources.cpu_cores`, as a Kubernetes quantity (e.g. `1`, `0.5` or `500m`). Default: `1`; an empty value sets none, as before 2.1.0. Since 2.1.0.
 `TESK_API_SERVICE_INFO_LOCATION` | The YAML file of [service info](#service-info). Default: the built-in `classpath:service-info.yaml`.
 `TESK_API_SERVICE_INFO_PUBLIC` | With the `auth` profile: `true` (default) lets `GET` and `HEAD /service-info` answer without a token; `false` makes them need a valid token (no group membership). No effect with `noauth`, where all endpoints are open. Since 1.2.0.
 `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` | User info endpoint of the OpenID Connect provider, which validates tokens; see [Access control](access-control.md#token-validation). Required with the `auth` profile: TESK API doesn't start unless it is an absolute `http` or `https` URL. The name comes from Spring Security OAuth, which TESK API no longer uses; it is the only one of its `SECURITY_OAUTH2_*` settings that TESK API reads. Default: ELIXIR AAI.
@@ -41,6 +46,79 @@ Environment variable | Meaning
 `TESK_API_TRS_URIPATTERN` | Pattern of executor images that TESK API looks up in a [GA4GH Tool Registry Service](#tool-images-from-a-tool-registry) (TRS). Default: `trs://{host}/{id}/versions/{version}`.
 `TESK_API_TRS_URLPATTERN` | URL that TESK API asks for such an image. Default: `https://{host}/ga4gh/trs/v2/tools/{id}/versions/{version}`.
 `SERVER_FORWARD_HEADERS_STRATEGY` | How TESK API learns its public URL behind a reverse proxy (e.g. for the server URL in the [API description](api.md), which the Swagger UI uses for "Try it out"). `native` (default): the embedded Tomcat takes scheme, host and port from the `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port` headers, and the client address from `X-Forwarded-For`, but only of requests from internal addresses (Spring Boot's default: `10.0.0.0/8, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10, fc00::/7, 172.16.0.0/12, ::1/128, 127.0.0.0/8, fe80::/10`); headers from other addresses are ignored. If your proxy has another address, set `SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES` to a comma-separated list of CIDR ranges that contains it, and no addresses of untrusted clients. `none`: ignores the headers. Since 2.0.0; before, Spring Boot honoured the headers only in Kubernetes, and up to 1.2.0, Springfox read `X-Forwarded-Host` for the API description itself.
+
+## Pod security and resources
+
+TESK API creates the taskmaster's job, and passes the jobs of the executors
+to the taskmaster, which creates them as they are; the taskmaster creates
+the filers' jobs with its own settings (`FILER_POD_SECURITY_CONTEXT`,
+`FILER_SECURITY_CONTEXT` and `FILER_RESOURCES`, see the [taskmaster's
+documentation](https://github.com/elixir-cloud-aai/tesk-core/blob/dev/docs/taskmaster.md#environment-variables);
+pass them with `TESK_API_TASKMASTER_ENVIRONMENT_*`).
+
+The security contexts and resources of the taskmaster's and the executors'
+pods are JSON objects with the fields of the Kubernetes API, as in a
+manifest (camelCase, e.g. `runAsNonRoot`, not `run_as_non_root`).
+Quantities are strings (`"500m"`) or numbers. TESK API doesn't start if a
+value isn't a JSON object, has a field that the Kubernetes object doesn't
+know, or a value of another type (e.g. `"true"` for `true`, `"1000"` for
+`1000`, `1.5` for a whole number), if a quantity isn't valid, or if a
+request is above its limit. The executors' CPU and memory come from the
+task: `resources.cpu_cores` and `resources.ram_gb` are both the request and
+the limit; without `cpu_cores`, the executors get
+`TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU`.
+
+### Restricted clusters
+
+Namespaces that enforce the `restricted` [Pod Security
+Standard](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
+(label `pod-security.kubernetes.io/enforce: restricted`) refuse pods
+without these settings: the taskmaster's job is created, but never gets a
+pod, and the task stays `QUEUED`. With these values, the taskmaster's and
+the executors' pods meet the standard (the filers' pods meet it by default
+since taskmaster 0.12.0):
+
+```yaml
+env:
+  - name: TESK_API_TASKMASTER_POD_SECURITY_CONTEXT
+    value: '{"runAsNonRoot": true, "seccompProfile": {"type": "RuntimeDefault"}}'
+  - name: TESK_API_TASKMASTER_SECURITY_CONTEXT
+    value: '{"allowPrivilegeEscalation": false, "capabilities": {"drop": ["ALL"]}}'
+  - name: TESK_API_TASKMASTER_EXECUTOR_POD_SECURITY_CONTEXT
+    value: '{"runAsNonRoot": true, "runAsUser": 100, "seccompProfile": {"type": "RuntimeDefault"}}'
+  - name: TESK_API_TASKMASTER_EXECUTOR_SECURITY_CONTEXT
+    value: '{"allowPrivilegeEscalation": false, "capabilities": {"drop": ["ALL"]}}'
+```
+
+The taskmaster's image runs as the non-root user 100, so its pod needs no
+`runAsUser`. Executors run whatever image a task names, and most tool images
+run as root, which `runAsNonRoot` refuses unless `runAsUser` gives another
+user: here 100, the user of the filers, so that the executors can read the
+inputs and write the outputs that the filers stage on the task's volume.
+Images that need root don't run in such a namespace. On clusters that assign
+users themselves (e.g. OpenShift with `restricted-v2`), leave `runAsUser`
+out. Leave these settings unset on clusters that refuse
+`seccompProfile: RuntimeDefault` or set their own security contexts (e.g.
+CSC Rahti): there, the pods are as before 2.1.0.
+
+### CPU quotas
+
+Namespaces with a `ResourceQuota` on `limits.cpu` (or `requests.cpu`) refuse
+containers without a CPU limit (or request): `must specify limits.cpu`. The
+taskmaster's container gets one by default (`TESK_API_TASKMASTER_RESOURCES`),
+and so do executors, from the task's `resources.cpu_cores` or from
+`TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU`. The filers get theirs from the
+taskmaster's `FILER_RESOURCES`, e.g.:
+
+```yaml
+env:
+  - name: TESK_API_TASKMASTER_ENVIRONMENT_FILER_RESOURCES
+    value: '{"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "1", "memory": "512Mi"}}'
+```
+
+A quota on `limits.memory` also needs memory limits: executors get one only
+from `resources.ram_gb`, so give the namespace a `LimitRange` with a default
+memory limit for executors of tasks without it.
 
 ## Tool images from a tool registry
 

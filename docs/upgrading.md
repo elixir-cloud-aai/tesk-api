@@ -11,6 +11,35 @@
   `/v3/api-docs.yaml` (YAML), which serve the same OpenAPI 3.1 description
   as before.
 
+- **Resources of the taskmaster (behaviour change).** The taskmaster's
+  container requests CPU 100m and memory 128Mi, and is limited to CPU 500m
+  and memory 256Mi (before: no requests or limits, or a `LimitRange`'s
+  defaults), so that it is admitted in namespaces with a CPU quota
+  ([#209](https://github.com/elixir-cloud-aai/tesk-api/issues/209)). A
+  taskmaster uses about 80 MB; check the limits against your largest tasks,
+  and change them with `TESK_API_TASKMASTER_RESOURCES`, or set it to `{}`
+  for none (see [Configuration](configuration.md#pod-security-and-resources)).
+- **Default CPU of executors (behaviour change).** Executors of tasks that
+  set no `resources.cpu_cores` request and are limited to 1 CPU (before:
+  none, or a `LimitRange`'s defaults). Change it with
+  `TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU`, or set it to an empty value
+  for none.
+- **Memory limits of executors (behaviour change).** Executors of tasks that
+  set `resources.ram_gb` get it as the memory limit too, also with
+  `resources.cpu_cores` (before: only without `cpu_cores`, when the
+  taskmaster set the limits to the requests; with `cpu_cores`, there was no
+  memory limit, or a `LimitRange`'s default, which could be below the
+  request, so that the executor never started; see
+  [tesk-core#160](https://github.com/elixir-cloud-aai/tesk-core/issues/160)).
+- **Security contexts.** New settings give the taskmaster's and the
+  executors' pods and containers security contexts, e.g. for namespaces
+  that enforce the `restricted` Pod Security Standard
+  ([#209](https://github.com/elixir-cloud-aai/tesk-api/issues/209); see
+  [Restricted clusters](configuration.md#restricted-clusters)). They are
+  unset by default, and the pods' security contexts stay as they were. The
+  executors' pod security context from the ConfigMap `CONFIGMAP` still
+  works; the new setting goes on top of it.
+
 ## To 2.0.0
 
 From 1.2.0, deployments may have to check their JVM options, the order in
