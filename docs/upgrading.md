@@ -19,6 +19,9 @@
   taskmaster uses about 80 MB; check the limits against your largest tasks,
   and change them with `TESK_API_TASKMASTER_RESOURCES`, or set it to `{}`
   for none (see [Configuration](configuration.md#pod-security-and-resources)).
+  In namespaces with a `LimitRange` whose minimum is above these requests or
+  whose maximum is below these limits, set them to fit: otherwise Kubernetes
+  refuses the taskmaster's pod and tasks stay `QUEUED`.
 - **Default CPU of executors (behaviour change).** Executors of tasks that
   set no `resources.cpu_cores` request and are limited to 1 CPU (before:
   none, or a `LimitRange`'s defaults). Change it with

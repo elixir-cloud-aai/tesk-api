@@ -100,6 +100,9 @@ public class PodSettingsTest {
                 "{\"seccompProfile\": {\"type\": \"Bogus\"}}",
                 "{\"seccompProfile\": {}}",
                 "{\"seccompProfile\": {\"type\": \"Localhost\"}}",
+                "{\"supplementalGroups\": [1, null]}",
+                "{\"seccompProfile\": {\"type\": \"Localhost\", \"localhostProfile\": \"\"}}",
+                "{\"seccompProfile\": {\"type\": \"RuntimeDefault\", \"localhostProfile\": \"\"}}",
                 "{\"seccompProfile\": {\"type\": \"Localhost\", \"localhostProfile\": null}}",
                 "{\"seccompProfile\": {\"type\": \"RuntimeDefault\", \"localhostProfile\": \"p\"}}",
                 "{\"runAsNonRoot\": {}}",
@@ -123,7 +126,6 @@ public class PodSettingsTest {
                 "{\"seccompProfile\": {\"type\": \"Unconfined\"}}",
                 "{\"fsGroup\": null, \"runAsUser\": null, \"seccompProfile\": null}",
                 "{\"supplementalGroups\": null}",
-                "{\"supplementalGroups\": [1, null]}",
                 "{\"seccompProfile\": {\"type\": \"RuntimeDefault\", \"localhostProfile\": null}}",
                 "{\"seccompProfile\": {\"type\": \"Localhost\", \"localhostProfile\": \"p.json\"}}"
             })

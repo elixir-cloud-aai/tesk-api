@@ -100,8 +100,8 @@ final class PodSettings {
                 .filter(field -> present(json, field))
                 .forEach(field -> checkId(field, json.get(field)));
         if (present(json, "supplementalGroups")) {
-            json.getAsJsonArray("supplementalGroups").asList().stream()
-                    .filter(id -> !id.isJsonNull())
+            // Not null elements, though: Kubernetes would read them as group 0
+            json.getAsJsonArray("supplementalGroups")
                     .forEach(id -> checkId("supplementalGroups", id));
         }
         if (present(json, "seccompProfile")) {
@@ -112,9 +112,13 @@ final class PodSettings {
                 throw new IllegalArgumentException(
                         "seccompProfile.type must be one of " + SECCOMP_TYPES);
             }
-            if ("Localhost".equals(profileType) != present(profile, "localhostProfile")) {
+            boolean localhost = "Localhost".equals(profileType);
+            boolean withProfile = present(profile, "localhostProfile");
+            if (localhost != withProfile
+                    || localhost && profile.get("localhostProfile").getAsString().isEmpty()) {
                 throw new IllegalArgumentException(
-                        "seccompProfile.localhostProfile must be set with the type Localhost only");
+                        "seccompProfile.localhostProfile must be set (not empty) with the type"
+                                + " Localhost only");
             }
         }
     }
@@ -126,6 +130,9 @@ final class PodSettings {
 
     /** Checks a user or group ID (a whole number, checked before) */
     private static void checkId(String field, JsonElement id) {
+        if (id.isJsonNull()) {
+            throw new IllegalArgumentException(field + " must not contain null");
+        }
         long value = id.getAsLong();
         if (value < 0 || value > Integer.MAX_VALUE) {
             throw new IllegalArgumentException(field + " must be between 0 and 2147483647");

@@ -70,6 +70,10 @@ also works with older and newer Kubernetes versions:
   field drops it, and may answer with a warning. The executors' jobs in the
   taskmaster's input leave them out, as before: the taskmaster tells unset
   fields (e.g. no limits, which it sets to the requests) by their absence.
+  Since 2.1.0, executors usually have limits (the task's CPU cores and RAM,
+  or the default CPU `TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU`), so the
+  taskmaster keeps them as they are; see [Pod security and
+  resources](configuration.md#pod-security-and-resources).
 
 Passing private executor image credentials in TES requests is an
 [experimental workaround for proof-of-concept use only](api.md#private-executor-images),
