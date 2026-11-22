@@ -22,9 +22,9 @@
         "containers": [
           {
             "args": [
-              "-f", "/jsoninput/JSON_INPUT.gz", "-n", "default", "-fn", "docker.io/elixircloud/tesk-core-filer", "-fv", "0.11.0"
+              "-f", "/jsoninput/JSON_INPUT.gz", "-n", "default", "-fn", "docker.io/elixircloud/tesk-core-filer", "-fv", "0.13.0"
             ],
-            "image": "docker.io/elixircloud/tesk-core-taskmaster:0.11.0",
+            "image": "docker.io/elixircloud/tesk-core-taskmaster:0.13.0",
             "name": "task-98605447",
             "resources": {
               "requests": {"cpu": "100m", "memory": "128Mi"},

@@ -14,7 +14,7 @@
         "containers": [
           {
             "name": "taskmaster",
-            "image": "docker.io/elixircloud/tesk-core-taskmaster:0.11.0",
+            "image": "docker.io/elixircloud/tesk-core-taskmaster:0.13.0",
             "args": [
 	      "-f",	    
               "/jsoninput/JSON_INPUT.gz"

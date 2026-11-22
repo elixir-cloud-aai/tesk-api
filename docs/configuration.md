@@ -17,9 +17,9 @@ Environment variable | Meaning
 `SPRING_PROFILES_ACTIVE` | `noauth` (default): no authentication or authorisation. `auth`: both on; see [Access control](access-control.md).
 `TESK_API_K8S_NAMESPACE` | Kubernetes namespace of all the jobs that TESK API creates. Default: `default`.
 `TESK_API_TASKMASTER_IMAGE_NAME` | Image of the taskmaster. Default: `docker.io/elixircloud/tesk-core-taskmaster`.
-`TESK_API_TASKMASTER_IMAGE_VERSION` | Tag of the taskmaster image. Default: `0.11.0`.
+`TESK_API_TASKMASTER_IMAGE_VERSION` | Tag of the taskmaster image. Default: `0.13.0` (before 2.1.0: `0.11.0`).
 `TESK_API_TASKMASTER_FILER_IMAGE_NAME` | Image of the filer, passed on to the taskmaster, which creates the inputs and outputs filers with it. Default: `docker.io/elixircloud/tesk-core-filer`.
-`TESK_API_TASKMASTER_FILER_IMAGE_VERSION` | Tag of the filer image. Default: `0.11.0`.
+`TESK_API_TASKMASTER_FILER_IMAGE_VERSION` | Tag of the filer image. Default: `0.13.0` (before 2.1.0: `0.11.0`).
 `TESK_API_TASKMASTER_SERVICE_ACCOUNT_NAME` | Service account of the taskmaster jobs; it needs the rights to manage jobs, pods and persistent volume claims (e.g., the built-in `edit` role). Default: `default`.
 `TESK_API_TASKMASTER_DEBUG` | `true`: more verbose taskmaster logs (in the `FULL` view of a task). Default: `false`.
 `TESK_API_TASKMASTER_FTP_SECRET_NAME` | Name of a Kubernetes secret with the credentials of an FTP account, passed to the taskmaster as environment variables, for uploading outputs to that FTP server. Default: none.
@@ -81,10 +81,11 @@ Standard](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
 without these settings: the taskmaster's job is created, but never gets a
 pod, and the task stays `QUEUED`. With these values, the taskmaster's and
 the executors' pods meet the standard (the filers' pods meet it by default
-since taskmaster 0.12.0; set `TESK_API_TASKMASTER_IMAGE_VERSION` and
-`TESK_API_TASKMASTER_FILER_IMAGE_VERSION` to `0.12.0` or later, as the
-default 0.11.0 creates filers without security contexts, which such
-namespaces refuse):
+since taskmaster 0.12.0, the default since 2.1.0 being 0.13.0; if you set
+`TESK_API_TASKMASTER_IMAGE_VERSION` and
+`TESK_API_TASKMASTER_FILER_IMAGE_VERSION`, keep them at `0.12.0` or later,
+as 0.11.0 creates filers without security contexts, which such namespaces
+refuse):
 
 ```yaml
 env:
@@ -116,13 +117,16 @@ containers without a CPU limit (or request): `must specify limits.cpu`. The
 taskmaster's container gets one by default (`TESK_API_TASKMASTER_RESOURCES`),
 and so do executors, from the task's `resources.cpu_cores` or from
 `TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU`. The filers get theirs from the
-taskmaster's `FILER_RESOURCES` (taskmaster 0.12.0 or later; 0.11.0 ignores
-it), e.g.:
+taskmaster: since taskmaster 0.13.0 (the default since 2.1.0), they request
+CPU 100m and memory 128Mi and are limited to CPU 1 and memory 512Mi by
+default. The taskmaster's `FILER_RESOURCES` replaces these (taskmaster
+0.12.0 or later; 0.11.0 ignores it, and 0.12.0 sets none without it), e.g.
+for larger transfers:
 
 ```yaml
 env:
   - name: TESK_API_TASKMASTER_ENVIRONMENT_FILER_RESOURCES
-    value: '{"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "1", "memory": "512Mi"}}'
+    value: '{"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "2", "memory": "1Gi"}}'
 ```
 
 To turn a default off, set the variable to an empty value (`value: ""`;
