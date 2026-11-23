@@ -46,8 +46,11 @@
   get the team name in the annotation `creator-group-name`, and the label of
   that name is a hash for such names (see [Task
   creators](access-control.md#task-creators)). Other team names are labelled
-  as before, so existing tasks keep their teams. After a downgrade to 2.0.0
-  or earlier, tasks of teams with hashed labels are visible to super admins
+  as before, so existing tasks keep their teams. To select the tasks of
+  such a team with `kubectl`, use the hash (e.g. `kubectl get jobs -l
+  creator-group-name=sha256-$(printf %s 'BioHackCloud%20Admins' | sha256sum
+  | cut -c1-32)`), or read the annotation. After a downgrade to 2.0.0 or
+  earlier, tasks of teams with hashed labels are visible to super admins
   only.
 - **Security contexts.** New settings give the taskmaster's and the
   executors' pods and containers security contexts, e.g. for namespaces

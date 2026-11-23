@@ -128,7 +128,7 @@ public class Constants {
      * Key of the annotation with the task's full group (team) name (same key as {@link
      * #LABEL_GROUPNAME_KEY}, which is a label)
      */
-    public static final String ANN_GROUPNAME_KEY = "creator-group-name";
+    public static final String ANN_GROUPNAME_KEY = LABEL_GROUPNAME_KEY;
 
     /** Pattern to validate paths */
     public static final String ABSOLUTE_PATH_REGEXP = "^\\/.*";

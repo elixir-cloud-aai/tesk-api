@@ -552,11 +552,6 @@ public class TesKubernetesConverter {
     }
 
     /**
-     * Puts the creating user's ID into the log's metadata ({@code USER_ID}): the full ID of tasks
-     * with the hash label (if the annotation matches it), or the value of the old label of tasks
-     * created before, which the log marks as such (see {@link CreatorLabels})
-     */
-    /**
      * The group (team) that a new task belongs to: the one in {@code tags['GROUP_NAME']}, otherwise
      * any group of its creator; null for none
      */
@@ -575,6 +570,11 @@ public class TesKubernetesConverter {
         }
     }
 
+    /**
+     * Puts the creating user's ID into the log's metadata ({@code USER_ID}): the full ID of tasks
+     * with the hash label (if the annotation matches it), or the value of the old label of tasks
+     * created before, which the log marks as such (see {@link CreatorLabels})
+     */
     private static void putCreator(TesTaskLog log, V1ObjectMeta metadata) {
         String creator;
         if (CreatorLabels.isLegacy(metadata)) {

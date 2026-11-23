@@ -60,6 +60,34 @@ public class GroupLabelsTest {
         assertEquals(AWKWARD_NAMES.length, values.size());
     }
 
+    /** A valid name of 64 characters is one too long */
+    @Test
+    public void value_hashOfNamesLongerThan63Characters() {
+        StringBuilder name = new StringBuilder();
+        for (int i = 0; i <= GroupLabels.MAX_LENGTH; i++) {
+            name.append("x");
+        }
+        assertEquals(
+                GroupLabels.HASH_PREFIX + CreatorLabels.hash(name.toString()),
+                GroupLabels.value(name.toString()));
+    }
+
+    /**
+     * A team named like the label value of another team gets the same label, but not the same
+     * group: the annotation tells them apart
+     */
+    @Test
+    public void groupName_teamNamedLikeAHashLabel() {
+        String hashed = GroupLabels.value("a b");
+        assertEquals(hashed, GroupLabels.value(hashed));
+        V1ObjectMeta ofHashed = new V1ObjectMeta();
+        GroupLabels.put(ofHashed, hashed);
+        V1ObjectMeta ofOther = new V1ObjectMeta();
+        GroupLabels.put(ofOther, "a b");
+        assertEquals(hashed, GroupLabels.groupName(ofHashed));
+        assertEquals("a b", GroupLabels.groupName(ofOther));
+    }
+
     @Test
     public void value_hashOfTheName() {
         assertEquals(

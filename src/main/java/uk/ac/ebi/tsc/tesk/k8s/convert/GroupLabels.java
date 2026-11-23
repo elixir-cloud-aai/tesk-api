@@ -26,9 +26,9 @@ public final class GroupLabels {
     /** Start of the label value of names that aren't valid label values, before their hash */
     public static final String HASH_PREFIX = "sha256-";
 
-    /** Valid label values (also the empty one, which isn't used, see {@link #value}) */
+    /** Non-empty valid label values, apart from their length */
     private static final Pattern LABEL_VALUE =
-            Pattern.compile("(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?");
+            Pattern.compile("[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?");
 
     private GroupLabels() {}
 
@@ -38,9 +38,7 @@ public final class GroupLabels {
      * {@link CreatorLabels#hash}); label selectors must use the same value
      */
     public static String value(String groupName) {
-        if (!groupName.isEmpty()
-                && groupName.length() <= MAX_LENGTH
-                && LABEL_VALUE.matcher(groupName).matches()) {
+        if (groupName.length() <= MAX_LENGTH && LABEL_VALUE.matcher(groupName).matches()) {
             return groupName;
         }
         return HASH_PREFIX + CreatorLabels.hash(groupName);
