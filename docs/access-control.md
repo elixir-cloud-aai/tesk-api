@@ -118,7 +118,7 @@ to everyone, whatever it is.
 The table and the examples below describe `group` visibility; with `owner`
 (the default), see [Task visibility](#task-visibility).
 
-Endpoint | Objective | Condition 
+Endpoint | Objective (`group` visibility) | Condition (`group` visibility)
 ------------ |---|--
 Create a task | A task must be created by a specific user and for up to one specific team (no team or one team). | User must be a member of _any_ Team Group or a Super Admin to create a task. If a user is a member of more than one Team Group, a user can specify, for which team to create a task (by putting team name in `tags['GROUP_NAME']`. If no team is specified, task will still be created for a randomly chosen team. If a user does not belong to any team (is a Super Admin only), task is still created, but does not belong to any team (with `group` visibility, only other Super Admins will be able to see it; with `owner`, only its creator).
 Get a task | A team member can only see tasks, that were created by him/her. A team admin can see all tasks created for his/her team. A super admin can see all tasks. | User must be a member of _the_ Team Group, that the task was created for AND be _the_ task creator OR user must be an admin of _the_ Team Group, that _the_ task was created for OR user must be a Super Admin.

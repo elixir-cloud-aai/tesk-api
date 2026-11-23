@@ -215,6 +215,42 @@ public class UserTest {
         assertThat(admin.mayGet(null)).isFalse();
     }
 
+    /**
+     * The same rules hold for tasks with only the old creator label, for service clients and for
+     * logs without metadata (403 for all but admins with group visibility)
+     */
+    @Test
+    public void mayGet_legacyLabelsServiceClientsAndNoMetadata() {
+        TesTaskLog legacy = log("a_b", "TEST");
+        legacy.setUserIdFromLegacyLabel(true);
+        User.UserBuilder member = User.builder("a@b").teskMemberedGroups(Set.of("TEST"));
+        assertThat(member.legacyUserLabels(true).build().mayGet(legacy)).isTrue();
+        assertThat(member.legacyUserLabels(true).ownerOnly(true).build().mayGet(legacy)).isTrue();
+        assertThat(member.legacyUserLabels(false).build().mayGet(legacy)).isFalse();
+
+        for (boolean ownerOnly : new boolean[] {false, true}) {
+            User client = User.builder("client").serviceClient(true).ownerOnly(ownerOnly).build();
+            assertThat(client.mayGet(log("client", null))).isTrue();
+            assertThat(client.mayGet(log("client", "TEST"))).isFalse();
+            assertThat(client.mayGet(log("other", null))).isFalse();
+            assertThat(
+                            User.builder("member")
+                                    .teskMemberedGroups(Set.of("TEST"))
+                                    .ownerOnly(ownerOnly)
+                                    .build()
+                                    .mayGet(new TesTaskLog()))
+                    .isFalse();
+        }
+        assertThat(User.builder("admin").teskAdmin(true).build().mayGet(new TesTaskLog())).isTrue();
+        assertThat(
+                        User.builder("admin")
+                                .teskAdmin(true)
+                                .ownerOnly(true)
+                                .build()
+                                .mayGet(new TesTaskLog()))
+                .isFalse();
+    }
+
     /** The log of the user lists the user's data, but no credentials (there are none) */
     @Test
     public void toString_listsTheUser() {
