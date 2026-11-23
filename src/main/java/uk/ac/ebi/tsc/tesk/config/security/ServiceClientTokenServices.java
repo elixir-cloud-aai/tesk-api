@@ -95,6 +95,10 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     private static final long RETAIN_KEYS_ON_ERROR_SECONDS = 15 * 60;
 
     private final OpaqueTokenIntrospector userInfoIntrospector;
+
+    /** Whether clients see only their own tasks (tesk.api.authorisation.task-visibility=owner) */
+    private final boolean ownerOnly;
+
     private final String issuer;
     private final String jwksUri;
     private final String clientClaim;
@@ -139,6 +143,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             AuthorisationProperties properties,
             long jwksRefreshIntervalMs) {
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
+        this.ownerOnly = properties.getTaskVisibility() == TaskVisibility.OWNER;
         Set<String> ids =
                 Optional.ofNullable(settings.getClientIds())
                         .orElse(Collections.emptyList())
@@ -236,7 +241,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             throw new BadOpaqueTokenException("Invalid access token of a service client");
         }
         logger.info("Accepted token of service client {}", clientId);
-        return principal(clientId, claims);
+        return principal(clientId, claims, this.ownerOnly);
     }
 
     /**
@@ -269,12 +274,14 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     }
 
     /** The client, as a principal of its own without groups, with the claims of its token */
-    private static OAuth2AuthenticatedPrincipal principal(String clientId, JwtClaims claims) {
+    private static OAuth2AuthenticatedPrincipal principal(
+            String clientId, JwtClaims claims, boolean ownerOnly) {
         User user =
                 User.builder(clientId)
                         .allGroups(Collections.emptySet())
                         .serviceClient(true)
                         .legacyUserLabels(false)
+                        .ownerOnly(ownerOnly)
                         .build();
         return new AuthenticatedUser(user, claims.getClaimsMap(), AuthorityUtils.NO_AUTHORITIES);
     }

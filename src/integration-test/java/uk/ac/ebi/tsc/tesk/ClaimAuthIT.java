@@ -39,6 +39,8 @@ import org.springframework.test.web.servlet.ResultActions;
         properties = {
             "security.oauth2.resource.user-info-uri = http://localhost:8090",
             "spring.profiles.active=auth",
+            // the admins' rights of group visibility; owner-only: TaskVisibilityOwnerAuthIT
+            "tesk.api.authorisation.task-visibility=group",
             "tesk.api.authorisation.claim.enabled=true",
             "tesk.api.authorisation.claim.name=eduperson_assurance",
             "tesk.api.authorisation.claim.values="

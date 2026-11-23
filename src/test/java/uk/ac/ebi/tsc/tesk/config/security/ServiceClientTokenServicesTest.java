@@ -668,6 +668,14 @@ public class ServiceClientTokenServicesTest {
         assertFalse(accepted(sign(claims(CLIENT))).isLegacyUserLabels());
     }
 
+    /** Service clients follow the task visibility, as users (issue #218) */
+    @Test
+    public void serviceClient_followsTaskVisibility() throws Exception {
+        assertTrue(accepted(sign(claims(CLIENT))).isOwnerOnly());
+        properties.setTaskVisibility(TaskVisibility.GROUP);
+        assertFalse(accepted(sign(claims(CLIENT))).isOwnerOnly());
+    }
+
     /** A JWT nested in another isn't a service client's token, whatever its claims */
     @Test
     public void nestedToken_isPassedOn() throws Exception {

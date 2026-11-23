@@ -18,6 +18,7 @@ import java.util.Arrays;
 import org.springframework.http.HttpStatus;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
+import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 
 class MockUtil {
 
@@ -88,13 +89,11 @@ class MockUtil {
         V1ObjectMeta metadata =
                 new V1ObjectMeta().name("task-123").putLabelsItem("job-type", "taskmaster");
         CreatorLabels.put(metadata, userId);
-        if (group != null) {
-            metadata.putLabelsItem(Constants.LABEL_GROUPNAME_KEY, group);
-        }
+        GroupLabels.put(metadata, group);
         return taskmaster(metadata);
     }
 
-    private static V1Job taskmaster(V1ObjectMeta metadata) {
+    static V1Job taskmaster(V1ObjectMeta metadata) {
         return new V1Job()
                 .metadata(metadata)
                 .spec(

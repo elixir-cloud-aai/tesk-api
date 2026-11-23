@@ -15,6 +15,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
+import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 
 /**
@@ -58,6 +59,13 @@ public class User implements Serializable, UserDetails, Principal {
      * (tesk.api.authorisation.legacy-user-labels; see {@link CreatorLabels})
      */
     private boolean legacyUserLabels = false;
+
+    /**
+     * Whether the user may get, list and cancel only the own tasks, whatever the groups, admins
+     * included (tesk.api.authorisation.task-visibility=owner; issue #218). Set from the setting for
+     * users and service clients; off for users built without it, i.e. without authentication.
+     */
+    private boolean ownerOnly = false;
 
     /**
      * List of 'organisational' groups, to which the user belongs (last part of Elixir group names
@@ -104,6 +112,10 @@ public class User implements Serializable, UserDetails, Principal {
         return legacyUserLabels;
     }
 
+    public boolean isOwnerOnly() {
+        return ownerOnly;
+    }
+
     /**
      * Whether the user created the Kubernetes object: the hash label and the annotation give the
      * user's ID, or, for objects with only the old label and only if {@link #legacyUserLabels} is
@@ -131,6 +143,25 @@ public class User implements Serializable, UserDetails, Principal {
             return isLegacyCreator(creator);
         }
         return userId.equals(creator);
+    }
+
+    /**
+     * Whether the user may get (and so cancel) the task of the log, as {@code TesService#getTask}
+     * checks it: the creator of a task of a group the user is a member of; an admin; a manager of
+     * the task's group; or, for users authorised without groups, the creator of a task without a
+     * group. With {@link #ownerOnly}, only the creator, under these rules (issue #218).
+     */
+    public boolean mayGet(TesTaskLog log) {
+        boolean creator = isCreator(log);
+        if (ownerOnly && !creator) {
+            return false;
+        }
+        Map<String, String> metadata = log == null ? null : log.getMetadata();
+        String group = metadata == null ? null : metadata.get("GROUP_NAME");
+        return (creator && group != null && isGroupMember(group))
+                || teskAdmin
+                || (group != null && isGroupManager(group))
+                || (isAuthorisedWithoutGroup() && creator && group == null);
     }
 
     private boolean isLegacyCreator(String legacyLabel) {
@@ -161,29 +192,34 @@ public class User implements Serializable, UserDetails, Principal {
     }
 
     /**
-     * Label selector of the taskmaster jobs that the user may list, in addition to the job type:
-     * none for admins (all tasks); the groups (and, unless a manager of one, the own tasks in them)
-     * for group members and managers; the own tasks without a group for users authorised by the
-     * claim only (tesk.api.authorisation.claim) and for service clients. Null also for users
-     * without any of these rights, who may not list tasks at all (see {@code
+     * Label selector of the taskmaster jobs that the user may list, in addition to the job type.
+     * With group visibility: none for admins (all tasks); the groups (and, unless a manager of one,
+     * the own tasks in them) for group members and managers; the own tasks without a group for
+     * users authorised by the claim only (tesk.api.authorisation.claim) and for service clients.
+     * Null also for users without any of these rights, who may not list tasks at all (see {@code
      * TesService#listTasks}). The own tasks are selected by the hash label, which only narrows the
      * list down: the caller checks the creator of each job ({@link #isCreatorOf}). With {@link
      * #legacyUserLabels}, the selector can't name the creator, as tasks may have either label, and
-     * only selects by group.
+     * only selects by group. With {@link #ownerOnly}, the selector always names the creator (unless
+     * with {@link #legacyUserLabels}), also for admins and managers, and {@link #isListed} keeps
+     * only the own tasks.
      */
     public String getLabelSelector() {
-        Set<String> allTeskGroups = new LinkedHashSet<>(this.teskMemberedGroups);
-        allTeskGroups.addAll(this.teskManagedGroups);
         if (isTeskAdmin()) {
-            return null;
+            // all tasks, or, with owner-only visibility, all own tasks
+            return ownerOnly && !legacyUserLabels ? creatorSelector() : null;
         }
         if (isMember() || isManager()) {
+            // the groups' label values, which are valid in a selector whatever the names are
+            Set<String> allTeskGroups = new LinkedHashSet<>();
+            this.teskMemberedGroups.forEach(group -> allTeskGroups.add(GroupLabels.value(group)));
+            this.teskManagedGroups.forEach(group -> allTeskGroups.add(GroupLabels.value(group)));
             StringBuilder sb = new StringBuilder();
             sb.append(Constants.LABEL_GROUPNAME_KEY)
                     .append(" in (")
                     .append(StringUtils.collectionToCommaDelimitedString(allTeskGroups))
                     .append(")");
-            if (!isManager() && !legacyUserLabels) {
+            if ((ownerOnly || !isManager()) && !legacyUserLabels) {
                 sb.append(",").append(creatorSelector());
             }
             return sb.toString();
@@ -195,6 +231,27 @@ public class User implements Serializable, UserDetails, Principal {
             return legacyUserLabels ? noGroup : creatorSelector() + "," + noGroup;
         }
         return null;
+    }
+
+    /**
+     * Whether the list of taskmaster jobs that {@link #getLabelSelector} selected is filtered by
+     * {@link #isListed}: if there is a selector, as it only narrows the jobs down, and always with
+     * {@link #ownerOnly}, also if no selector can name the creator
+     */
+    public boolean isListFiltered() {
+        return ownerOnly || getLabelSelector() != null;
+    }
+
+    /**
+     * Whether a selected taskmaster job is in the user's list (see {@link #isListFiltered}): the
+     * user created it, or, unless with {@link #ownerOnly}, it belongs to a group the user manages
+     * (by the full group name, see {@link GroupLabels})
+     */
+    public boolean isListed(V1ObjectMeta metadata) {
+        if (isCreatorOf(metadata)) {
+            return true;
+        }
+        return !ownerOnly && isGroupManager(GroupLabels.groupName(metadata));
     }
 
     private String creatorSelector() {
@@ -214,7 +271,8 @@ public class User implements Serializable, UserDetails, Principal {
             boolean teskAdmin,
             boolean claimAuthorised,
             boolean serviceClient,
-            boolean legacyUserLabels) {
+            boolean legacyUserLabels,
+            boolean ownerOnly) {
         this.userId = userId;
         this.preferredUsername = preferredUsername;
         this.name = name;
@@ -228,6 +286,7 @@ public class User implements Serializable, UserDetails, Principal {
         this.claimAuthorised = claimAuthorised;
         this.serviceClient = serviceClient;
         this.legacyUserLabels = legacyUserLabels;
+        this.ownerOnly = ownerOnly;
     }
 
     @Override
@@ -313,6 +372,8 @@ public class User implements Serializable, UserDetails, Principal {
                 + isServiceClient()
                 + ", legacyUserLabels="
                 + isLegacyUserLabels()
+                + ", ownerOnly="
+                + isOwnerOnly()
                 + "}";
     }
 
@@ -329,6 +390,7 @@ public class User implements Serializable, UserDetails, Principal {
                 && claimAuthorised == user.claimAuthorised
                 && serviceClient == user.serviceClient
                 && legacyUserLabels == user.legacyUserLabels
+                && ownerOnly == user.ownerOnly
                 && Objects.equals(userId, user.userId)
                 && Objects.equals(preferredUsername, user.preferredUsername)
                 && Objects.equals(name, user.name)
@@ -354,6 +416,7 @@ public class User implements Serializable, UserDetails, Principal {
                 claimAuthorised,
                 serviceClient,
                 legacyUserLabels,
+                ownerOnly,
                 teskMemberedGroups,
                 teskManagedGroups);
     }
@@ -372,6 +435,7 @@ public class User implements Serializable, UserDetails, Principal {
         private boolean claimAuthorised = false;
         private boolean serviceClient = false;
         private boolean legacyUserLabels = false;
+        private boolean ownerOnly = false;
 
         UserBuilder(String userId) {
             this.userId = userId;
@@ -440,6 +504,11 @@ public class User implements Serializable, UserDetails, Principal {
             return this;
         }
 
+        public UserBuilder ownerOnly(boolean ownerOnly) {
+            this.ownerOnly = ownerOnly;
+            return this;
+        }
+
         public User build() {
             return new User(
                     userId,
@@ -454,7 +523,8 @@ public class User implements Serializable, UserDetails, Principal {
                     teskAdmin,
                     claimAuthorised,
                     serviceClient,
-                    legacyUserLabels);
+                    legacyUserLabels,
+                    ownerOnly);
         }
     }
 }

@@ -277,24 +277,17 @@ public class KubernetesClientWrapper {
                 result.getItems().stream()
                         .filter(job -> !isBeingDeleted(job))
                         .collect(Collectors.toList()));
-        if (user.getLabelSelector() != null) {
-            // the selector only narrows the jobs down: keep those of the groups the user manages
-            // and those the user created, comparing the annotation with the full ID exactly (the
-            // hash label only selects, and the old label can't be selected for the user)
+        if (user.isListFiltered()) {
+            // the selector only narrows the jobs down: keep those the user created, comparing
+            // the annotation with the full ID exactly (the hash label only selects, and the old
+            // label can't be selected for the user), and, unless only the own tasks are visible,
+            // those of the groups the user manages (see User#isListed)
             result.setItems(
                     result.getItems().stream()
-                            .filter(job ->
-                                    user.isGroupManager(groupOf(job))
-                                            || user.isCreatorOf(job.getMetadata()))
+                            .filter(job -> user.isListed(job.getMetadata()))
                             .collect(Collectors.toList()));
         }
         return result;
-    }
-
-    /** The group of the job's task, or null */
-    private static String groupOf(V1Job job) {
-        Map<String, String> labels = job.getMetadata().getLabels();
-        return labels == null ? null : labels.get(LABEL_GROUPNAME_KEY);
     }
 
     /**

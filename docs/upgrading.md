@@ -2,14 +2,35 @@
 
 ## To 2.1.0
 
-From 2.0.0, clients that still read the API description at `/v2/api-docs`
-must move to `/v3/api-docs`, and deployments should check the new default
-resources of the taskmaster and the executors, and the new default images
-of the taskmaster and the filer, against their namespaces' quotas and
-`LimitRange`s. The new security contexts are off by default. Read all of
-the items below before you upgrade; from 1.2.0, also those of
+From 2.0.0, deployments with tokens of service clients must convert their
+settings (TESK API doesn't start with the old ones), deployments with the
+`auth` profile should check who sees which tasks now (users see only their
+own tasks by default), clients that still read the API description at
+`/v2/api-docs` must move to `/v3/api-docs`, and deployments should check
+the new default resources of the taskmaster and the executors, and the new
+default images of the taskmaster and the filer, against their namespaces'
+quotas and `LimitRange`s. The new security contexts are off by default.
+Read all of the items below before you upgrade; from 1.2.0, also those of
 [To 2.0.0](#to-200).
 
+- **Tasks visible to their owner only (behaviour change, security).** With
+  the `auth` profile, users get, list and cancel only their own tasks,
+  whatever their groups
+  ([#218](https://github.com/elixir-cloud-aai/tesk-api/issues/218)): super
+  admins no longer see all tasks of the installation, and team admins no
+  longer see the tasks of other members of their teams; requests for other
+  users' tasks give `403 Forbidden`, and lists leave them out. Groups still
+  decide who may create tasks. Handle stuck or abusive tasks through
+  Kubernetes (e.g. with `kubectl`). To keep the previous
+  behaviour, set `TESK_API_AUTHORISATION_TASK_VISIBILITY=group` (see [Task
+  visibility](access-control.md#task-visibility)); the Helm chart of TESK
+  can't set it yet. With `owner`, tasks created before 1.2.0, which have
+  only the old creator label, are visible to nobody unless
+  `TESK_API_AUTHORISATION_LEGACY_USER_LABELS` is on (with `group`, team
+  admins and super admins still see them). No effect with the `noauth`
+  profile. During a rolling update, pods of the old version still answer
+  with the old rules: owner-only visibility holds once the rollout has
+  completed.
 - **`/v2/api-docs` is gone.** The alias of the API description at its
   former path, deprecated in 2.0.0, is removed
   ([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188)):
@@ -45,6 +66,21 @@ the items below before you upgrade; from 1.2.0, also those of
   memory limit, or a `LimitRange`'s default, which could be below the
   request, so that the executor never started; see
   [tesk-core#160](https://github.com/elixir-cloud-aai/tesk-core/issues/160)).
+- **Team names in labels.** Members of teams whose names aren't valid
+  Kubernetes label values (e.g. `BioHackCloud%20Admins` from LS Login, names
+  with other characters than `[A-Za-z0-9._-]`, or longer than 63
+  characters) can create and list tasks; before, both failed with `500
+  Internal Server Error`
+  ([#216](https://github.com/elixir-cloud-aai/tesk-api/issues/216)). Tasks
+  get the team name in the annotation `creator-group-name`, and the label of
+  that name is a hash for such names (see [Task
+  creators](access-control.md#task-creators)). Other team names are labelled
+  as before, so existing tasks keep their teams. To select the tasks of
+  such a team with `kubectl`, use the hash (e.g. `kubectl get jobs -l
+  creator-group-name=sha256-$(printf %s 'BioHackCloud%20Admins' | sha256sum
+  | cut -c1-32)`), or read the annotation. After a downgrade to 2.0.0 or
+  earlier, tasks of teams with hashed labels are visible to super admins
+  only.
 - **Security contexts.** New settings give the taskmaster's and the
   executors' pods and containers security contexts, e.g. for namespaces
   that enforce the `restricted` Pod Security Standard
@@ -295,7 +331,8 @@ What's new:
   creators](access-control.md#task-creators)). `logs[0].metadata.USER_ID`
   shows the `sub` unchanged (e.g. `user@example.org` instead of
   `user_example.org`). Tasks created before the upgrade keep the old label:
-  team admins and super admins see them as before, but their creators can no
+  team admins and super admins see them as before (until 2.1.0, see [To
+  2.1.0](#to-210) for owner-only visibility), but their creators can no
   longer list, get or cancel them. What to do:
     - Upgrade when no tasks run, or let running tasks end first; if you want
       their creators to keep access for a while, set

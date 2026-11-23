@@ -52,6 +52,8 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
         properties = {
             "security.oauth2.resource.user-info-uri = http://localhost:8090",
             "spring.profiles.active=auth",
+            // the admins' rights of group visibility; owner-only: TaskVisibilityOwnerAuthIT
+            "tesk.api.authorisation.task-visibility=group",
             "tesk.api.authorisation.service-clients.enabled=true",
             "tesk.api.authorisation.service-clients.issuer=" + ServiceClientAuthIT.ISSUER,
             "tesk.api.authorisation.service-clients.client-ids=gateway,other-gateway",
