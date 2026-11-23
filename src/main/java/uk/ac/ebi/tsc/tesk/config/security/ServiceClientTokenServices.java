@@ -31,6 +31,7 @@ import org.jose4j.keys.resolvers.VerificationKeyResolver;
 import org.jose4j.lang.JoseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
@@ -225,18 +226,27 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      * Refuses the settings of 2.0.0 that 2.1.0 removed (issue #215), so that an upgrade that keeps
      * them fails at startup with a hint, instead of ignoring them
      *
-     * @throws IllegalStateException if one of them is set, also as a list (e.g. {@code
-     *     client-ids[0]} or {@code ..._CLIENT_IDS_0})
+     * @throws IllegalStateException if one of them is set, also empty or as a list (e.g. {@code
+     *     client-ids[0]} or {@code ..._CLIENT_IDS_0}), or can't be read (e.g. a list with a gap)
      */
     static void refuseRemovedSettings(Environment environment) {
         Binder binder = Binder.get(environment);
         for (String name : REMOVED_PROPERTIES) {
-            if (binder.bind(name, Bindable.listOf(String.class)).isBound()) {
+            boolean set;
+            BindException error = null;
+            try {
+                set = binder.bind(name, Bindable.listOf(String.class)).isBound();
+            } catch (BindException e) {
+                set = true;
+                error = e;
+            }
+            if (set) {
                 throw new IllegalStateException(
                         name
                                 + " was removed in 2.1.0: list the clients with their audiences in "
                                 + CLIENTS_PROPERTY
-                                + " (see the upgrading notes)");
+                                + " (see the upgrading notes)",
+                        error);
             }
         }
     }

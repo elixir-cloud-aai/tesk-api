@@ -584,6 +584,24 @@ public class ServiceClientTokenServicesTest {
         assertThrows(
                 IllegalStateException.class,
                 () -> ServiceClientTokenServices.refuseRemovedSettings(list));
+
+        // a list with a gap can't be bound: refused with the hint all the same
+        MockEnvironment gap =
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.client-ids[1]", "x");
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> ServiceClientTokenServices.refuseRemovedSettings(gap));
+        assertThat(e.getMessage(), containsString("removed in 2.1.0"));
+
+        // also empty
+        MockEnvironment empty =
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.audience", "");
+        assertThrows(
+                IllegalStateException.class,
+                () -> ServiceClientTokenServices.refuseRemovedSettings(empty));
     }
 
     /** The token introspector of the auth profile refuses the removed settings, if enabled */

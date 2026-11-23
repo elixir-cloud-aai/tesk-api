@@ -10,8 +10,8 @@
   JSON variable, `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS`, replaces
   `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS` and
   `TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE`, which are removed:
-  with either of them still set, or without the new one, TESK API doesn't
-  start. Convert them as follows (see [Tokens of
+  with either of them still set (also to an empty value: remove them), or
+  without the new one, TESK API doesn't start. Convert them as follows (see [Tokens of
   services](access-control.md#settings)):
 
     ```bash
