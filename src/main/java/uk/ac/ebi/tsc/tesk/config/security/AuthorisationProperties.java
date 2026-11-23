@@ -53,6 +53,12 @@ public class AuthorisationProperties {
     private boolean legacyUserLabels = false;
 
     /**
+     * Which tasks users may get, list and cancel: only their own ({@link TaskVisibility#OWNER}, the
+     * default), or as their groups decide ({@link TaskVisibility#GROUP}; issue #218)
+     */
+    private TaskVisibility taskVisibility = TaskVisibility.OWNER;
+
+    /**
      * Authorisation without groups (issue #78): if enabled, users whose user info has one of the
      * values in the claim may create tasks without a group, and see, get and cancel their own tasks
      * without a group. Group members and admins keep their rights.
@@ -218,6 +224,14 @@ public class AuthorisationProperties {
 
     public void setLegacyUserLabels(boolean legacyUserLabels) {
         this.legacyUserLabels = legacyUserLabels;
+    }
+
+    public TaskVisibility getTaskVisibility() {
+        return taskVisibility;
+    }
+
+    public void setTaskVisibility(TaskVisibility taskVisibility) {
+        this.taskVisibility = taskVisibility;
     }
 
     public String getGroupsClaim() {

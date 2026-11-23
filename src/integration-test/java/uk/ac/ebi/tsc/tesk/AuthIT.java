@@ -33,7 +33,9 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 
 /**
  * Integration testing of security (authentication and authorisation using OIDC and Elixir groups)
- * Kubernetes API and OIDC userInfo endpoint are WireMocked
+ * Kubernetes API and OIDC userInfo endpoint are WireMocked. With group visibility of tasks
+ * (tesk.api.authorisation.task-visibility=group); owner-only visibility, the default, is tested in
+ * {@link TaskVisibilityOwnerAuthIT}
  *
  * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
@@ -43,7 +45,8 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
         locations = {"classpath:application.properties"},
         properties = {
             "security.oauth2.resource.user-info-uri = http://localhost:8090",
-            "spring.profiles.active=auth"
+            "spring.profiles.active=auth",
+            "tesk.api.authorisation.task-visibility=group"
         })
 public class AuthIT {
 

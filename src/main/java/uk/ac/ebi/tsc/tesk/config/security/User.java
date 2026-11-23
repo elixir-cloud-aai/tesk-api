@@ -61,6 +61,13 @@ public class User implements Serializable, UserDetails, Principal {
     private boolean legacyUserLabels = false;
 
     /**
+     * Whether the user may get, list and cancel only the own tasks, whatever the groups, admins
+     * included (tesk.api.authorisation.task-visibility=owner; issue #218). Off for users built
+     * without it, e.g. without authentication.
+     */
+    private boolean ownerOnly = false;
+
+    /**
      * List of 'organisational' groups, to which the user belongs (last part of Elixir group names
      * only (see {@link ElixirPrincipalExtractor} to see, how that information is retrieved from
      * allGroups) TES task will be 'owned' by one of the groups, to which the creating user belongs
@@ -103,6 +110,10 @@ public class User implements Serializable, UserDetails, Principal {
 
     public boolean isLegacyUserLabels() {
         return legacyUserLabels;
+    }
+
+    public boolean isOwnerOnly() {
+        return ownerOnly;
     }
 
     /**
@@ -170,11 +181,14 @@ public class User implements Serializable, UserDetails, Principal {
      * TesService#listTasks}). The own tasks are selected by the hash label, which only narrows the
      * list down: the caller checks the creator of each job ({@link #isCreatorOf}). With {@link
      * #legacyUserLabels}, the selector can't name the creator, as tasks may have either label, and
-     * only selects by group.
+     * only selects by group. With {@link #ownerOnly}, the selector always names the creator (unless
+     * with {@link #legacyUserLabels}), also for admins and managers, and {@link #isListed} keeps
+     * only the own tasks.
      */
     public String getLabelSelector() {
         if (isTeskAdmin()) {
-            return null;
+            // all tasks, or, with owner-only visibility, all own tasks
+            return ownerOnly && !legacyUserLabels ? creatorSelector() : null;
         }
         if (isMember() || isManager()) {
             // the groups' label values, which are valid in a selector whatever the names are
@@ -186,7 +200,7 @@ public class User implements Serializable, UserDetails, Principal {
                     .append(" in (")
                     .append(StringUtils.collectionToCommaDelimitedString(allTeskGroups))
                     .append(")");
-            if (!isManager() && !legacyUserLabels) {
+            if ((ownerOnly || !isManager()) && !legacyUserLabels) {
                 sb.append(",").append(creatorSelector());
             }
             return sb.toString();
@@ -198,6 +212,27 @@ public class User implements Serializable, UserDetails, Principal {
             return legacyUserLabels ? noGroup : creatorSelector() + "," + noGroup;
         }
         return null;
+    }
+
+    /**
+     * Whether the list of taskmaster jobs that {@link #getLabelSelector} selected is filtered by
+     * {@link #isListed}: if there is a selector, as it only narrows the jobs down, and always with
+     * {@link #ownerOnly}, also if no selector can name the creator
+     */
+    public boolean isListFiltered() {
+        return ownerOnly || getLabelSelector() != null;
+    }
+
+    /**
+     * Whether a selected taskmaster job is in the user's list (see {@link #isListFiltered}): the
+     * user created it, or, unless with {@link #ownerOnly}, it belongs to a group the user manages
+     * (by the full group name, see {@link GroupLabels})
+     */
+    public boolean isListed(V1ObjectMeta metadata) {
+        if (isCreatorOf(metadata)) {
+            return true;
+        }
+        return !ownerOnly && isGroupManager(GroupLabels.groupName(metadata));
     }
 
     private String creatorSelector() {
@@ -217,7 +252,8 @@ public class User implements Serializable, UserDetails, Principal {
             boolean teskAdmin,
             boolean claimAuthorised,
             boolean serviceClient,
-            boolean legacyUserLabels) {
+            boolean legacyUserLabels,
+            boolean ownerOnly) {
         this.userId = userId;
         this.preferredUsername = preferredUsername;
         this.name = name;
@@ -231,6 +267,7 @@ public class User implements Serializable, UserDetails, Principal {
         this.claimAuthorised = claimAuthorised;
         this.serviceClient = serviceClient;
         this.legacyUserLabels = legacyUserLabels;
+        this.ownerOnly = ownerOnly;
     }
 
     @Override
@@ -316,6 +353,8 @@ public class User implements Serializable, UserDetails, Principal {
                 + isServiceClient()
                 + ", legacyUserLabels="
                 + isLegacyUserLabels()
+                + ", ownerOnly="
+                + isOwnerOnly()
                 + "}";
     }
 
@@ -332,6 +371,7 @@ public class User implements Serializable, UserDetails, Principal {
                 && claimAuthorised == user.claimAuthorised
                 && serviceClient == user.serviceClient
                 && legacyUserLabels == user.legacyUserLabels
+                && ownerOnly == user.ownerOnly
                 && Objects.equals(userId, user.userId)
                 && Objects.equals(preferredUsername, user.preferredUsername)
                 && Objects.equals(name, user.name)
@@ -357,6 +397,7 @@ public class User implements Serializable, UserDetails, Principal {
                 claimAuthorised,
                 serviceClient,
                 legacyUserLabels,
+                ownerOnly,
                 teskMemberedGroups,
                 teskManagedGroups);
     }
@@ -375,6 +416,7 @@ public class User implements Serializable, UserDetails, Principal {
         private boolean claimAuthorised = false;
         private boolean serviceClient = false;
         private boolean legacyUserLabels = false;
+        private boolean ownerOnly = false;
 
         UserBuilder(String userId) {
             this.userId = userId;
@@ -443,6 +485,11 @@ public class User implements Serializable, UserDetails, Principal {
             return this;
         }
 
+        public UserBuilder ownerOnly(boolean ownerOnly) {
+            this.ownerOnly = ownerOnly;
+            return this;
+        }
+
         public User build() {
             return new User(
                     userId,
@@ -457,7 +504,8 @@ public class User implements Serializable, UserDetails, Principal {
                     teskAdmin,
                     claimAuthorised,
                     serviceClient,
-                    legacyUserLabels);
+                    legacyUserLabels,
+                    ownerOnly);
         }
     }
 }
