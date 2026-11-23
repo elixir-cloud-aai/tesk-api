@@ -22,8 +22,13 @@
     TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS='{"gateway": {"audiences": ["https://tesk.example.org"]}, "smoke": {"audiences": ["https://tesk.example.org"]}}'
     ```
 
-    Without `…_AUDIENCE` (any audience), give each client
-    `{"allowAnyAudience": true}` instead, or better its audiences. With the
+    Each client gets the former shared audience; then give each client its
+    own audiences where your provider allows, so that one client's tokens
+    aren't accepted for another's. Without `…_AUDIENCE` (any audience), give
+    each client `{"allowAnyAudience": true}` instead, or better its
+    audiences: any audience is no longer the default. For a downgrade to
+    2.0.0, restore `…_CLIENT_IDS` and `…_AUDIENCE`: 2.0.0 ignores
+    `…_CLIENTS`, and without `…_CLIENT_IDS` it doesn't start. With the
     Helm chart of TESK, use the chart release that renders the new variable
     (`auth.tokenClients.clients` as a map from client ID to `audiences`, see
     [TESK#336](https://github.com/elixir-cloud-aai/TESK/issues/336)); older

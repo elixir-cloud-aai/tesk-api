@@ -53,6 +53,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
@@ -553,6 +555,86 @@ public class ServiceClientTokenServicesTest {
         ServiceClientTokenServices.refuseRemovedSettings(
                 new MockEnvironment()
                         .withProperty("tesk.api.authorisation.service-clients.clients", "{}"));
+    }
+
+    /** Also as environment variables, and as lists (e.g. of YAML) */
+    @Test
+    public void removedSettings_asEnvironmentVariablesOrLists_failAtStartup() {
+        for (String name :
+                Arrays.asList(
+                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS",
+                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS_0",
+                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE")) {
+            StandardEnvironment environment = new StandardEnvironment();
+            environment
+                    .getPropertySources()
+                    .replace(
+                            StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                            new SystemEnvironmentPropertySource(
+                                    StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                                    Collections.singletonMap(name, "x")));
+            assertThrows(
+                    IllegalStateException.class,
+                    () -> ServiceClientTokenServices.refuseRemovedSettings(environment),
+                    name);
+        }
+        MockEnvironment list =
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.client-ids[0]", "x");
+        assertThrows(
+                IllegalStateException.class,
+                () -> ServiceClientTokenServices.refuseRemovedSettings(list));
+    }
+
+    /** The token introspector of the auth profile refuses the removed settings, if enabled */
+    @Test
+    public void tokenIntrospector_refusesRemovedSettings() {
+        ResourceServerConfiguration configuration =
+                new ResourceServerConfiguration(
+                        null, null, properties, "/ga4gh/tes/v1", true, "http://localhost/userinfo");
+        MockEnvironment old =
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.client-ids", "x");
+
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class, () -> configuration.tokenIntrospector(old));
+        assertThat(e.getMessage(), containsString("client-ids"));
+        assertTrue(
+                configuration.tokenIntrospector(new MockEnvironment())
+                        instanceof ServiceClientTokenServices);
+
+        // without service clients, the removed settings have no effect
+        properties.getServiceClients().setEnabled(false);
+        assertFalse(configuration.tokenIntrospector(old) instanceof ServiceClientTokenServices);
+    }
+
+    /** The messages say what is wrong with the clients */
+    @Test
+    public void invalidClients_sayWhy() {
+        String[][] cases = {
+            {null, "removed in 2.1.0"},
+            {
+                "{\"a\": {\"audiences\": [\"t\"]}, \" a\": {\"audiences\": [\"t\"]}}",
+                "client a twice"
+            },
+            {"{\"a\": {\"audiences\": [\"t\"], \"allowAnyAudience\": true}}", "both"},
+            {"{\"a\": {\"audience\": \"t\"}}", "unknown field audience"},
+            {"{\"a\": {}}", "client a: no audiences"},
+            {"{\"a\": {\"audiences\": [\" \"]}}", "non-blank string"},
+            {"{\"a\": {\"allowAnyAudience\": 1}}", "not true or false"},
+            {"{}", "no client"},
+            {"[]", "not a JSON object"},
+            {"{", "not valid JSON"},
+        };
+        for (String[] c : cases) {
+            IllegalStateException e =
+                    assertThrows(
+                            IllegalStateException.class,
+                            () -> ServiceClientTokenServices.clients(c[0]),
+                            c[0]);
+            assertThat(e.getMessage(), containsString(c[1]));
+        }
     }
 
     @Test

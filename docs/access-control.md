@@ -387,9 +387,10 @@ If the setting is on without an issuer, with a negative leeway, or with
 `…_CLIENTS` unset or invalid (not a JSON object, no client, a blank or
 duplicate client ID, a client without `audiences` or with an empty list or
 a blank audience, both `audiences` and `allowAnyAudience`, or another
-field), TESK API doesn't start, and says why. It doesn't start either if
-the removed settings `…_CLIENT_IDS` or `…_AUDIENCE` of 2.0.0 are still set
-(see [Upgrading](upgrading.md#to-210)). The discovery document and
+field), TESK API doesn't start, and says why. With the setting on, it
+doesn't start either if the removed settings `…_CLIENT_IDS` or `…_AUDIENCE`
+of 2.0.0 are still set (see [Upgrading](upgrading.md#to-210)); with it off,
+they have no effect. The discovery document and
 the keys are fetched at the first service token, not at startup, with
 timeouts of 5 seconds. Until that succeeds, service tokens are refused; after
 a failure (also a key set without keys), TESK API refuses them at once for 10

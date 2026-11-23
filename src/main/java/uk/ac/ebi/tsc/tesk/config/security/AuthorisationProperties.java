@@ -122,7 +122,8 @@ public class AuthorisationProperties {
          * The clients whose tokens are accepted, with the audiences of each (issue #215): a JSON
          * object from client ID (compared exactly) to the client's settings, {@code {"audiences":
          * [...]}} (the token's {@code aud} must be or contain one of them) or {@code
-         * {"allowAnyAudience": true}}; checked by {@link ServiceClientTokenServices#clients}
+         * {"allowAnyAudience": true}}; checked by {@link
+         * ServiceClientTokenServices#clients(String)}
          */
         private String clients;
 

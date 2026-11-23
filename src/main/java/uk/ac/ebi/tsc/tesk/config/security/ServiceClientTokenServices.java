@@ -31,7 +31,9 @@ import org.jose4j.keys.resolvers.VerificationKeyResolver;
 import org.jose4j.lang.JoseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.env.PropertyResolver;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
@@ -223,11 +225,13 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      * Refuses the settings of 2.0.0 that 2.1.0 removed (issue #215), so that an upgrade that keeps
      * them fails at startup with a hint, instead of ignoring them
      *
-     * @throws IllegalStateException if one of them is set
+     * @throws IllegalStateException if one of them is set, also as a list (e.g. {@code
+     *     client-ids[0]} or {@code ..._CLIENT_IDS_0})
      */
-    static void refuseRemovedSettings(PropertyResolver environment) {
+    static void refuseRemovedSettings(Environment environment) {
+        Binder binder = Binder.get(environment);
         for (String name : REMOVED_PROPERTIES) {
-            if (environment.containsProperty(name)) {
+            if (binder.bind(name, Bindable.listOf(String.class)).isBound()) {
                 throw new IllegalStateException(
                         name
                                 + " was removed in 2.1.0: list the clients with their audiences in "
@@ -247,7 +251,10 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      */
     static Map<String, Client> clients(String json) {
         if (!StringUtils.hasText(json)) {
-            throw invalidClients("not set");
+            // also for the removed settings in forms that refuseRemovedSettings doesn't see
+            throw invalidClients(
+                    "not set (client-ids and audience were removed in 2.1.0, see the upgrading"
+                            + " notes)");
         }
         JsonNode root;
         try {
@@ -394,7 +401,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             logger.warn("Refused token of service client {}: unexpected error", clientId, e);
             throw new BadOpaqueTokenException("Invalid access token of a service client");
         }
-        if (!audienceOf(clientId, claims)) {
+        if (!hasAcceptedAudience(clientId, claims)) {
             logger.warn("Refused token of service client {}: wrong audience", clientId);
             throw new BadOpaqueTokenException("Invalid access token of a service client");
         }
@@ -435,7 +442,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
      * Whether the token's {@code aud} (a string or a list of strings) is or contains one of the
      * client's audiences, or the client may have any
      */
-    private boolean audienceOf(String clientId, JwtClaims claims) {
+    private boolean hasAcceptedAudience(String clientId, JwtClaims claims) {
         Client client = this.clients.get(clientId);
         if (client.anyAudience()) {
             return true;
