@@ -33,7 +33,10 @@
     (`auth.tokenClients.clients` as a map from client ID to `audiences`, see
     [TESK#336](https://github.com/elixir-cloud-aai/TESK/issues/336)); older
     chart releases render the removed variables, which stop TESK API 2.1.0
-    from starting. Without service clients, nothing changes.
+    from starting. During a rolling update, pods of 2.0.0 still accept
+    every listed client's tokens for the former shared audience: the
+    audiences per client hold once the rollout has completed. Without
+    service clients, nothing changes.
 - **Tasks visible to their owner only (behaviour change, security).** With
   the `auth` profile, users get, list and cancel only their own tasks,
   whatever their groups

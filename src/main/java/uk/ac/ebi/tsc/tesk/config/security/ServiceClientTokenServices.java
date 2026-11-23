@@ -278,7 +278,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
         }
         Map<String, Client> listed = new LinkedHashMap<>();
         for (Map.Entry<String, JsonNode> entry : root.properties()) {
-            String id = entry.getKey().trim();
+            String id = entry.getKey().strip();
             if (id.isEmpty()) {
                 throw invalidClients("a blank client ID");
             }
@@ -339,7 +339,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
                 throw invalidClients(
                         "client " + id + ": an audience that isn't a non-blank string");
             }
-            values.add(audience.stringValue().trim());
+            values.add(audience.stringValue().strip());
         }
         return new Client(Collections.unmodifiableSet(values), false);
     }

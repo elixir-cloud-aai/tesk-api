@@ -356,7 +356,7 @@ Environment variable | Meaning | Default
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_CLIENT_SUBJECT` | `true`: the token's `sub` must be the client ID, as in tokens of the client credentials grant; tokens of users obtained through a listed client go through the user info endpoint, as user tokens. `false`: any `sub`; then every token that a user gets through a listed client is accepted as the client's. | `true`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLOCK_SKEW_SECONDS` | Leeway for `exp`, `nbf` and `iat` (in the future), in seconds. | `60`
 
-Each client's settings are an object with one of these fields:
+Each client's settings are an object with these fields:
 
 * `audiences`: a non-empty list of audiences (non-blank strings); the
   client's tokens are accepted if their `aud` is or contains one of them.
@@ -365,8 +365,8 @@ Each client's settings are an object with one of these fields:
   so that tokens that a client got for other services aren't accepted.
 * `allowAnyAudience`: `true` accepts the client's tokens for any audience,
   or none, as before 2.1.0 without `…_AUDIENCE` (see [Trust
-  implications](#trust-implications)); `false` is the default and needs
-  `audiences`.
+  implications](#trust-implications)), and can't be combined with
+  `audiences`; `false`, the default, needs `audiences`.
 
 For example, a gateway's client accepted at TESK's own audience, and a
 client for smoke tests at two:

@@ -511,6 +511,8 @@ public class ServiceClientTokenServicesTest {
                                 + " [\"tesk\"]}}",
                         "{\" \": {\"audiences\": [\"tesk\"]}}",
                         "{\"\": {\"audiences\": [\"tesk\"]}}",
+                        // only Unicode whitespace, which String.trim() would keep
+                        "{\"\u2003\": {\"audiences\": [\"tesk\"]}}",
                         "{\"a\": {\"audiences\": [\"tesk\"]}, \"a\": {\"allowAnyAudience\":"
                                 + " true}}",
                         "{\"a\": {\"audiences\": [\"tesk\"]}, \" a\": {\"audiences\":"
