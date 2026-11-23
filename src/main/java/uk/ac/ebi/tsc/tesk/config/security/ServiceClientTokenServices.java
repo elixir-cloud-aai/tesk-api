@@ -4,10 +4,11 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -18,6 +19,7 @@ import org.jose4j.jwa.AlgorithmConstraints;
 import org.jose4j.jwk.HttpsJwks;
 import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.MalformedClaimException;
 import org.jose4j.jwt.consumer.ErrorCodeValidator;
 import org.jose4j.jwt.consumer.ErrorCodes;
 import org.jose4j.jwt.consumer.InvalidJwtException;
@@ -29,11 +31,20 @@ import org.jose4j.keys.resolvers.VerificationKeyResolver;
 import org.jose4j.lang.JoseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.properties.bind.BindException;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Accepts access tokens of allow-listed service clients (issue #153; settings in {@link
@@ -49,9 +60,10 @@ import org.springframework.util.StringUtils;
  * against the issuer's JSON Web Key Set (from the configured URI or the issuer's OpenID Connect
  * discovery, cached, and fetched again for an unknown key ID), with asymmetric algorithms only, the
  * exact issuer, {@code exp} (required) and {@code nbf} with a leeway, the header {@code typ} {@code
- * at+jwt} and the audience, if these are configured. If any of these fails, the request is refused
- * ({@code 401}), without asking the user info endpoint. The client is authenticated as a {@link
- * User} of its own (the client's ID, no groups, {@link User#isServiceClient()}).
+ * at+jwt}, if configured, and the audience: {@code aud} must be or contain one of the audiences of
+ * that client (issue #215), unless the client may have any. If any of these fails, the request is
+ * refused ({@code 401}), without asking the user info endpoint. The client is authenticated as a
+ * {@link User} of its own (the client's ID, no groups, {@link User#isServiceClient()}).
  *
  * <p>Logs the client's ID for accepted and refused tokens, never the token.
  *
@@ -94,6 +106,39 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     /** How long the keys are kept if fetching them again fails, in seconds */
     private static final long RETAIN_KEYS_ON_ERROR_SECONDS = 15 * 60;
 
+    /** The settings of the clients, by name of the property, for the messages */
+    static final String CLIENTS_PROPERTY = "tesk.api.authorisation.service-clients.clients";
+
+    /** Settings of 2.0.0, removed in 2.1.0 (issue #215) */
+    static final List<String> REMOVED_PROPERTIES =
+            List.of(
+                    "tesk.api.authorisation.service-clients.client-ids",
+                    "tesk.api.authorisation.service-clients.audience");
+
+    /** Fields of the settings of a client */
+    private static final String AUDIENCES = "audiences";
+
+    private static final String ALLOW_ANY_AUDIENCE = "allowAnyAudience";
+
+    /** Jackson, which refuses duplicate names and content after the value */
+    private static final JsonMapper STRICT_JSON =
+            JsonMapper.builder()
+                    .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                    .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .build();
+
+    /**
+     * Settings of a listed client: the audiences at which its tokens are accepted, or none with
+     * {@code anyAudience}
+     */
+    record Client(Set<String> audiences, boolean anyAudience) {
+
+        /** Whether one of these values of a token's {@code aud} is one of this client's */
+        boolean accepts(List<String> tokenAudiences) {
+            return tokenAudiences.stream().anyMatch(this.audiences::contains);
+        }
+    }
+
     private final OpaqueTokenIntrospector userInfoIntrospector;
 
     /** Whether clients see only their own tasks (tesk.api.authorisation.task-visibility=owner) */
@@ -102,8 +147,10 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     private final String issuer;
     private final String jwksUri;
     private final String clientClaim;
-    private final Set<String> clientIds;
-    private final String audience;
+
+    /** The listed clients by ID */
+    private final Map<String, Client> clients;
+
     private final boolean requireAccessTokenType;
     private final boolean requireClientSubject;
     private final int clockSkewSeconds;
@@ -130,7 +177,8 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
     /**
      * @param userInfoIntrospector validates all other tokens, at the user info endpoint
      * @param properties the settings; {@code service-clients} must be enabled
-     * @throws IllegalStateException if the settings lack the issuer or a client ID
+     * @throws IllegalStateException if the settings lack the issuer or a client, or a client lacks
+     *     audiences
      */
     public ServiceClientTokenServices(
             OpaqueTokenIntrospector userInfoIntrospector, AuthorisationProperties properties) {
@@ -144,23 +192,14 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             long jwksRefreshIntervalMs) {
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
         this.ownerOnly = properties.getTaskVisibility() == TaskVisibility.OWNER;
-        Set<String> ids =
-                Optional.ofNullable(settings.getClientIds())
-                        .orElse(Collections.emptyList())
-                        .stream()
-                        .filter(StringUtils::hasText)
-                        .map(String::trim)
-                        .collect(Collectors.toSet());
         if (!StringUtils.hasText(settings.getIssuer())
-                || ids.isEmpty()
                 || !StringUtils.hasText(settings.getClientClaim())) {
-            // fail at startup rather than accepting no service, or (with a blank ID) any
             throw new IllegalStateException(
                     "tesk.api.authorisation.service-clients.enabled needs"
-                            + " tesk.api.authorisation.service-clients.issuer, a client claim and"
-                            + " at least one non-blank ID in"
-                            + " tesk.api.authorisation.service-clients.client-ids");
+                            + " tesk.api.authorisation.service-clients.issuer and a client claim");
         }
+        // fails at startup rather than accepting no service, or (with a blank ID) any
+        Map<String, Client> listed = clients(settings.getClients());
         if (settings.getClockSkewSeconds() < 0) {
             throw new IllegalStateException(
                     "tesk.api.authorisation.service-clients.clock-skew-seconds must not be"
@@ -171,9 +210,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
         this.jwksUri =
                 StringUtils.hasText(settings.getJwksUri()) ? settings.getJwksUri().trim() : null;
         this.clientClaim = settings.getClientClaim().trim();
-        this.clientIds = Collections.unmodifiableSet(ids);
-        this.audience =
-                StringUtils.hasText(settings.getAudience()) ? settings.getAudience().trim() : null;
+        this.clients = listed;
         this.requireAccessTokenType = settings.isRequireAccessTokenType();
         this.requireClientSubject = settings.isRequireClientSubject();
         this.clockSkewSeconds = settings.getClockSkewSeconds();
@@ -183,6 +220,162 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
                     "tesk.api.authorisation.service-clients.issuer and .jwks-uri must be https"
                             + " URLs (http only for localhost)");
         }
+        warnAboutAnyAudience(listed);
+    }
+
+    /**
+     * Names the clients with {@code allowAnyAudience} in a warning: their tokens are accepted
+     * whatever their {@code aud}, also tokens meant for other services, so the setting is meant for
+     * testing and setting up a federation, not for production
+     */
+    private static void warnAboutAnyAudience(Map<String, Client> listed) {
+        List<String> anyAudience =
+                listed.entrySet().stream()
+                        .filter(entry -> entry.getValue().anyAudience())
+                        .map(Map.Entry::getKey)
+                        .toList();
+        if (!anyAudience.isEmpty()) {
+            logger.warn(
+                    "Service clients whose tokens are accepted for any audience ("
+                            + ALLOW_ANY_AUDIENCE
+                            + ", meant for testing or setting up a federation; list audiences in"
+                            + " production): {}",
+                    String.join(", ", anyAudience));
+        }
+    }
+
+    /**
+     * Refuses the settings of 2.0.0 that 2.1.0 removed (issue #215), so that an upgrade that keeps
+     * them fails at startup with a hint, instead of ignoring them
+     *
+     * @throws IllegalStateException if one of them is set, also empty or as a list (e.g. {@code
+     *     client-ids[0]} or {@code ..._CLIENT_IDS_0}), or can't be read (e.g. a list with a gap)
+     */
+    static void refuseRemovedSettings(Environment environment) {
+        Binder binder = Binder.get(environment);
+        for (String name : REMOVED_PROPERTIES) {
+            boolean set;
+            BindException error = null;
+            try {
+                set = binder.bind(name, Bindable.listOf(String.class)).isBound();
+            } catch (BindException e) {
+                set = true;
+                error = e;
+            }
+            if (set) {
+                throw new IllegalStateException(
+                        name
+                                + " was removed in 2.1.0: list the clients with their audiences in "
+                                + CLIENTS_PROPERTY
+                                + " (see the upgrading notes)",
+                        error);
+            }
+        }
+    }
+
+    /**
+     * The listed clients, from the JSON object of {@code clients}: client ID to {@code
+     * {"audiences": [...]}} or {@code {"allowAnyAudience": true}}. IDs and audiences are trimmed.
+     *
+     * @throws IllegalStateException if it lists no client, or isn't such an object: e.g. a blank or
+     *     duplicate client ID, a client without audiences or with a blank one, both fields, or
+     *     another field
+     */
+    static Map<String, Client> clients(String json) {
+        if (!StringUtils.hasText(json)) {
+            // also for the removed settings in forms that refuseRemovedSettings doesn't see
+            throw invalidClients(
+                    "not set (client-ids and audience were removed in 2.1.0, see the upgrading"
+                            + " notes)");
+        }
+        JsonNode root;
+        try {
+            root = STRICT_JSON.readTree(json);
+        } catch (JacksonException e) {
+            // the message of the parser, which may quote the settings, but not a token
+            throw invalidClients("not valid JSON (" + e.getOriginalMessage() + ")");
+        }
+        if (!root.isObject()) {
+            throw invalidClients("not a JSON object");
+        }
+        Map<String, Client> listed = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonNode> entry : root.properties()) {
+            String id = entry.getKey().strip();
+            if (id.isEmpty()) {
+                throw invalidClients("a blank client ID");
+            }
+            if (listed.put(id, client(id, entry.getValue())) != null) {
+                throw invalidClients("client " + id + " twice");
+            }
+        }
+        if (listed.isEmpty()) {
+            throw invalidClients("no client");
+        }
+        return Collections.unmodifiableMap(listed);
+    }
+
+    private static Client client(String id, JsonNode settings) {
+        if (!settings.isObject()) {
+            throw invalidClients("client " + id + ": not a JSON object");
+        }
+        for (String field : settings.propertyNames()) {
+            if (!AUDIENCES.equals(field) && !ALLOW_ANY_AUDIENCE.equals(field)) {
+                throw invalidClients(
+                        "client "
+                                + id
+                                + ": unknown field "
+                                + field
+                                + " (only "
+                                + AUDIENCES
+                                + " and "
+                                + ALLOW_ANY_AUDIENCE
+                                + ")");
+            }
+        }
+        JsonNode any = settings.get(ALLOW_ANY_AUDIENCE);
+        if (any != null && !any.isBoolean()) {
+            throw invalidClients("client " + id + ": " + ALLOW_ANY_AUDIENCE + " not true or false");
+        }
+        boolean anyAudience = any != null && any.booleanValue();
+        JsonNode audiences = settings.get(AUDIENCES);
+        if (anyAudience) {
+            if (audiences != null) {
+                throw invalidClients(
+                        "client " + id + ": " + AUDIENCES + " and " + ALLOW_ANY_AUDIENCE + " both");
+            }
+            return new Client(Collections.emptySet(), true);
+        }
+        if (audiences == null || !audiences.isArray() || audiences.isEmpty()) {
+            throw invalidClients(
+                    "client "
+                            + id
+                            + ": no "
+                            + AUDIENCES
+                            + " (a non-empty list, or "
+                            + ALLOW_ANY_AUDIENCE
+                            + " true)");
+        }
+        Set<String> values = new LinkedHashSet<>();
+        for (JsonNode audience : audiences) {
+            if (!audience.isString() || audience.stringValue().isBlank()) {
+                throw invalidClients(
+                        "client " + id + ": an audience that isn't a non-blank string");
+            }
+            values.add(audience.stringValue().strip());
+        }
+        return new Client(Collections.unmodifiableSet(values), false);
+    }
+
+    private static IllegalStateException invalidClients(String problem) {
+        return new IllegalStateException(
+                "tesk.api.authorisation.service-clients.enabled needs "
+                        + CLIENTS_PROPERTY
+                        + ": a JSON object from client ID to {\""
+                        + AUDIENCES
+                        + "\": [...]} or {\""
+                        + ALLOW_ANY_AUDIENCE
+                        + "\": true}; "
+                        + problem);
     }
 
     /**
@@ -213,7 +406,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
         if (clientId == null) {
             OAuth2AuthenticatedPrincipal principal =
                     this.userInfoIntrospector.introspect(accessToken);
-            if (this.clientIds.contains(principal.getName())) {
+            if (this.clients.containsKey(principal.getName())) {
                 // a user with a listed client's ID would share the client's tasks
                 logger.warn(
                         "Refused user token: its sub is the ID of service client {}",
@@ -240,6 +433,10 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             logger.warn("Refused token of service client {}: unexpected error", clientId, e);
             throw new BadOpaqueTokenException("Invalid access token of a service client");
         }
+        if (!hasAcceptedAudience(clientId, claims)) {
+            logger.warn("Refused token of service client {}: wrong audience", clientId);
+            throw new BadOpaqueTokenException("Invalid access token of a service client");
+        }
         logger.info("Accepted token of service client {}", clientId);
         return principal(clientId, claims, this.ownerOnly);
     }
@@ -264,13 +461,29 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
         Object client = claims.getClaimValue(this.clientClaim);
         if (!this.issuer.equals(iss)
                 || !(client instanceof String)
-                || !this.clientIds.contains(client)) {
+                || !this.clients.containsKey(client)) {
             return null;
         }
         if (this.requireClientSubject && !client.equals(claims.getClaimValue("sub"))) {
             return null; // a user's token, obtained through the client
         }
         return (String) client;
+    }
+
+    /**
+     * Whether the token's {@code aud} (a string or a list of strings) is or contains one of the
+     * client's audiences, or the client may have any
+     */
+    private boolean hasAcceptedAudience(String clientId, JwtClaims claims) {
+        Client client = this.clients.get(clientId);
+        if (client.anyAudience()) {
+            return true;
+        }
+        try {
+            return claims.hasAudience() && client.accepts(claims.getAudience());
+        } catch (MalformedClaimException e) {
+            return false; // aud neither a string nor a list of strings
+        }
     }
 
     /** The client, as a principal of its own without groups, with the claims of its token */
@@ -414,11 +627,8 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
                         .setRequireIssuedAt()
                         .setIssuedAtRestrictions(this.clockSkewSeconds, MAX_TOKEN_AGE_SECONDS)
                         .setAllowedClockSkewInSeconds(this.clockSkewSeconds);
-        if (this.audience != null) {
-            builder.setExpectedAudience(true, this.audience);
-        } else {
-            builder.setSkipDefaultAudienceValidation();
-        }
+        // the audiences differ per client: checked after the signature, in introspect
+        builder.setSkipDefaultAudienceValidation();
         if (this.requireAccessTokenType) {
             builder.setExpectedType(true, "at+jwt");
         }
@@ -447,9 +657,6 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             case ErrorCodes.ISSUER_INVALID:
             case ErrorCodes.ISSUER_MISSING:
                 return "wrong issuer";
-            case ErrorCodes.AUDIENCE_INVALID:
-            case ErrorCodes.AUDIENCE_MISSING:
-                return "wrong audience";
             case ErrorCodes.SIGNATURE_INVALID:
                 return "invalid signature";
             case ErrorCodes.SIGNATURE_MISSING:

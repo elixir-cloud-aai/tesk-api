@@ -319,7 +319,9 @@ service token, and TESK API checks it locally:
   4](https://datatracker.ietf.org/doc/html/rfc9068#section-4)), so that ID
   tokens aren't accepted as access tokens (unless
   `…_REQUIRE_ACCESS_TOKEN_TYPE` is `false`);
-* the audience: if `…_AUDIENCE` is set, `aud` must be or contain it.
+* the audience: `aud` must be or contain one of the audiences listed for
+  **that** client in `…_CLIENTS` (unless the client has `allowAnyAudience`),
+  so a client's token for another listed client's audience is refused.
 
 If all of these hold, the request is authenticated as that client, without
 a call to the user info endpoint. If one fails, the request is refused with
@@ -347,16 +349,57 @@ Environment variable | Meaning | Default
 --- | --- | ---
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED` | `true`: tokens of the clients below are accepted as described above. | `false`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_ISSUER` | Issuer of the tokens, exactly as in their `iss` claim (e.g. `https://login.example.org/oidc/`). Required if the setting is on. | none
-`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS` | Comma-separated IDs of the clients whose tokens are accepted, compared exactly. Required if the setting is on. | none
-`TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE` | If set, the token's `aud` must be or contain this value. Recommended: register the clients so that their tokens for TESK get an audience of their own (e.g. the URL of your TESK API), and set it here, so that tokens that a client got for other services aren't accepted. | none (any audience)
+`TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS` | The clients whose tokens are accepted, with the audiences of each, as a JSON object from client ID (compared exactly) to the client's settings (see below). Required if the setting is on. Since 2.1.0; replaces `…_CLIENT_IDS` and `…_AUDIENCE`. | none
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_JWKS_URI` | JWKS URI of the issuer, if it shouldn't come from the discovery document. | from discovery
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_CLAIM` | Claim that names the client. Some providers use `azp`. | `client_id`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_ACCESS_TOKEN_TYPE` | `true`: the header `typ` must be `at+jwt`. Set it to `false` only for providers that don't set it. | `true`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_REQUIRE_CLIENT_SUBJECT` | `true`: the token's `sub` must be the client ID, as in tokens of the client credentials grant; tokens of users obtained through a listed client go through the user info endpoint, as user tokens. `false`: any `sub`; then every token that a user gets through a listed client is accepted as the client's. | `true`
 `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLOCK_SKEW_SECONDS` | Leeway for `exp`, `nbf` and `iat` (in the future), in seconds. | `60`
 
-If the setting is on without an issuer or without a non-blank client ID, or
-with a negative leeway, TESK API doesn't start. The discovery document and
+Each client's settings are an object with these fields:
+
+* `audiences`: a non-empty list of audiences (non-blank strings); the
+  client's tokens are accepted if their `aud` is or contains one of them.
+  Recommended: register each client so that its tokens for TESK get an
+  audience of their own (e.g. the URL of your TESK API), and list it here,
+  so that tokens that a client got for other services aren't accepted.
+* `allowAnyAudience`: `true` accepts the client's tokens whatever their
+  `aud`, or without one, as before 2.1.0 without `…_AUDIENCE`, and can't be
+  combined with `audiences`; `false`, the default, needs `audiences`. It is
+  opt-in and meant for testing, and for setting up a federation while the
+  audiences of the clients at the identity provider are still being sorted
+  out (e.g. if you don't run the provider and can't change a client's
+  registration yourself). Its risk: every token that the trusted issuer
+  issues to that client ID is accepted, also tokens meant for other
+  services, so a token that leaks from another service, or that another
+  service replays, works at TESK API too (see [Trust
+  implications](#trust-implications)). In production, list the client's
+  `audiences` instead. TESK API logs a warning at startup that names each
+  client with `allowAnyAudience`.
+
+For example, a gateway's client accepted at TESK's own audience, and a
+client for smoke tests at two:
+
+```bash
+TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS='{
+  "gateway-client-id": {"audiences": ["https://tesk.example.org"]},
+  "smoke-test-client-id": {"audiences": ["https://tesk.example.org", "tesk-smoke"]}
+}'
+```
+
+A token of `gateway-client-id` with `aud` `tesk-smoke` is refused. In
+`application.properties`, the property
+`tesk.api.authorisation.service-clients.clients` takes the same JSON, on one
+line. Client IDs and audiences are trimmed.
+
+If the setting is on without an issuer, with a negative leeway, or with
+`…_CLIENTS` unset or invalid (not a JSON object, no client, a blank or
+duplicate client ID, a client without `audiences` or with an empty list or
+a blank audience, both `audiences` and `allowAnyAudience`, or another
+field), TESK API doesn't start, and says why. With the setting on, it
+doesn't start either if the removed settings `…_CLIENT_IDS` or `…_AUDIENCE`
+of 2.0.0 are still set (see [Upgrading](upgrading.md#to-210)); with it off,
+they have no effect. The discovery document and
 the keys are fetched at the first service token, not at startup, with
 timeouts of 5 seconds. Until that succeeds, service tokens are refused; after
 a failure (also a key set without keys), TESK API refuses them at once for 10
@@ -370,8 +413,8 @@ client credentials grant with the header `typ` `at+jwt`, signed (`RS256`)
 with a key of the issuer's JWKS, and with the claims `iss`, `client_id` and
 `sub` (both the client ID), `exp` (an hour after `iat`), `iat`, `jti`,
 `scope` and `aud`, which is set per client when the client is registered.
-The defaults fit these tokens: set the issuer, the client IDs, and the
-audience that you registered for TESK.
+The defaults fit these tokens: set the issuer, and the clients with the
+audiences that you registered for TESK.
 
 ### Authorisation of service clients
 
@@ -415,10 +458,14 @@ its users may see and cancel which task.
   expires (`exp`), also if the client is disabled at the provider in the
   meantime. Removing the client from the list (with a restart of TESK API)
   takes effect at once.
-* Without `…_AUDIENCE`, TESK API accepts a listed client's tokens for any
-  audience, also tokens that the client got for other services: whoever
-  receives such a token (e.g. that other service) can use it at TESK API
-  until it expires. Set the audience if your provider lets you choose it.
+* With `allowAnyAudience`, TESK API accepts every token that the issuer
+  issues to that client ID, whatever its `aud`, also tokens that the client
+  got for other services: whoever receives such a token (e.g. that other
+  service), or obtains one that leaked from it, can use it at TESK API until
+  it expires. Use it only for testing or while setting up a federation, and
+  list the client's `audiences` in production. Each client is checked
+  against its own audiences only, so listing an audience for one client
+  doesn't make other clients' tokens for it valid.
 * TESK API trusts every key that it gets from the issuer's discovery
   document or JWKS URI, so these must be `https://` URLs (plain `http://`
   only to `localhost`, e.g. for tests), so that nobody on the network path

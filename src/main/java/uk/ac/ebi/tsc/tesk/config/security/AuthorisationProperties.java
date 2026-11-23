@@ -118,11 +118,15 @@ public class AuthorisationProperties {
         /** Claim that names the client (RFC 9068: {@code client_id}; some providers: azp) */
         private String clientClaim = "client_id";
 
-        /** IDs of the clients whose tokens are accepted (compared exactly) */
-        private List<String> clientIds = new ArrayList<>();
-
-        /** If set, the token's {@code aud} must be or contain this value */
-        private String audience;
+        /**
+         * The clients whose tokens are accepted, with the audiences of each (issue #215): a JSON
+         * object from client ID (compared exactly) to the client's settings, {@code {"audiences":
+         * [...]}} (the token's {@code aud} must be or contain one of them) or {@code
+         * {"allowAnyAudience": true}} (any audience, also tokens meant for other services: for
+         * testing or setting up a federation, warned at startup); checked by {@link
+         * ServiceClientTokenServices#clients(String)}
+         */
+        private String clients;
 
         /** Whether the token's header must have {@code typ} {@code at+jwt} (RFC 9068) */
         private boolean requireAccessTokenType = true;
@@ -169,20 +173,12 @@ public class AuthorisationProperties {
             this.clientClaim = clientClaim;
         }
 
-        public List<String> getClientIds() {
-            return clientIds;
+        public String getClients() {
+            return clients;
         }
 
-        public void setClientIds(List<String> clientIds) {
-            this.clientIds = clientIds;
-        }
-
-        public String getAudience() {
-            return audience;
-        }
-
-        public void setAudience(String audience) {
-            this.audience = audience;
+        public void setClients(String clients) {
+            this.clients = clients;
         }
 
         public boolean isRequireAccessTokenType() {
