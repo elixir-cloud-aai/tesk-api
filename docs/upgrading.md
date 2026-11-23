@@ -25,8 +25,14 @@
     Each client gets the former shared audience; then give each client its
     own audiences where your provider allows, so that one client's tokens
     aren't accepted for another's. Without `…_AUDIENCE` (any audience), give
-    each client `{"allowAnyAudience": true}` instead, or better its
-    audiences: any audience is no longer the default. For a downgrade to
+    each client its audiences: any audience is no longer the default.
+    `{"allowAnyAudience": true}` keeps the former behaviour for a client,
+    but accepts every token that the issuer issues to it, also tokens meant
+    for other services (so a token leaked from or replayed by another
+    service works at TESK API): use it only for testing or while setting up
+    a federation, not in production (TESK API logs a warning at startup for
+    each such client; see [Trust
+    implications](access-control.md#trust-implications)). For a downgrade to
     2.0.0, restore `…_CLIENT_IDS` and `…_AUDIENCE`: 2.0.0 ignores
     `…_CLIENTS`, and without `…_CLIENT_IDS` it doesn't start. With the
     Helm chart of TESK, use the chart release that renders the new variable

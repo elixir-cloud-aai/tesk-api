@@ -363,10 +363,19 @@ Each client's settings are an object with these fields:
   Recommended: register each client so that its tokens for TESK get an
   audience of their own (e.g. the URL of your TESK API), and list it here,
   so that tokens that a client got for other services aren't accepted.
-* `allowAnyAudience`: `true` accepts the client's tokens for any audience,
-  or none, as before 2.1.0 without `…_AUDIENCE` (see [Trust
-  implications](#trust-implications)), and can't be combined with
-  `audiences`; `false`, the default, needs `audiences`.
+* `allowAnyAudience`: `true` accepts the client's tokens whatever their
+  `aud`, or without one, as before 2.1.0 without `…_AUDIENCE`, and can't be
+  combined with `audiences`; `false`, the default, needs `audiences`. It is
+  opt-in and meant for testing, and for setting up a federation while the
+  audiences of the clients at the identity provider are still being sorted
+  out (e.g. if you don't run the provider and can't change a client's
+  registration yourself). Its risk: every token that the trusted issuer
+  issues to that client ID is accepted, also tokens meant for other
+  services, so a token that leaks from another service, or that another
+  service replays, works at TESK API too (see [Trust
+  implications](#trust-implications)). In production, list the client's
+  `audiences` instead. TESK API logs a warning at startup that names each
+  client with `allowAnyAudience`.
 
 For example, a gateway's client accepted at TESK's own audience, and a
 client for smoke tests at two:
@@ -449,13 +458,14 @@ its users may see and cancel which task.
   expires (`exp`), also if the client is disabled at the provider in the
   meantime. Removing the client from the list (with a restart of TESK API)
   takes effect at once.
-* With `allowAnyAudience`, TESK API accepts that client's tokens for any
-  audience, also tokens that the client got for other services: whoever
-  receives such a token (e.g. that other service) can use it at TESK API
-  until it expires. List the client's `audiences` instead if your provider
-  lets you choose them. Each client is checked against its own audiences
-  only, so listing an audience for one client doesn't make other clients'
-  tokens for it valid.
+* With `allowAnyAudience`, TESK API accepts every token that the issuer
+  issues to that client ID, whatever its `aud`, also tokens that the client
+  got for other services: whoever receives such a token (e.g. that other
+  service), or obtains one that leaked from it, can use it at TESK API until
+  it expires. Use it only for testing or while setting up a federation, and
+  list the client's `audiences` in production. Each client is checked
+  against its own audiences only, so listing an audience for one client
+  doesn't make other clients' tokens for it valid.
 * TESK API trusts every key that it gets from the issuer's discovery
   document or JWKS URI, so these must be `https://` URLs (plain `http://`
   only to `localhost`, e.g. for tests), so that nobody on the network path
