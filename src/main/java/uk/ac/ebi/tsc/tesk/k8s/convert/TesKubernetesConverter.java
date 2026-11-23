@@ -82,13 +82,7 @@ public class TesKubernetesConverter {
         taskMasterJob.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, task.getName());
         // creating user and owning group
         CreatorLabels.put(taskMasterJob.getMetadata(), user.getUsername());
-        if (task.getTags() != null && task.getTags().containsKey("GROUP_NAME")) {
-            taskMasterJob
-                    .getMetadata()
-                    .putLabelsItem(LABEL_GROUPNAME_KEY, task.getTags().get("GROUP_NAME"));
-        } else if (user.isMember()) {
-            taskMasterJob.getMetadata().putLabelsItem(LABEL_GROUPNAME_KEY, user.getAnyGroup());
-        }
+        GroupLabels.put(taskMasterJob.getMetadata(), groupOf(task, user));
         // in order to retrieve task details, when querying for task details, whole tesTask
         // object is placed as taskMaster's annotation
         // Jackson for TES objects - because, we rely on auto-generated annotations for Json
@@ -123,15 +117,7 @@ public class TesKubernetesConverter {
         taskMasterConfigMap.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, task.getName());
         // creating user and owning group
         CreatorLabels.put(taskMasterConfigMap.getMetadata(), user.getUsername());
-        if (task.getTags() != null && task.getTags().containsKey("GROUP_NAME")) {
-            taskMasterConfigMap
-                    .getMetadata()
-                    .putLabelsItem(LABEL_GROUPNAME_KEY, task.getTags().get("GROUP_NAME"));
-        } else if (user.isMember()) {
-            taskMasterConfigMap
-                    .getMetadata()
-                    .putLabelsItem(LABEL_GROUPNAME_KEY, user.getAnyGroup());
-        }
+        GroupLabels.put(taskMasterConfigMap.getMetadata(), groupOf(task, user));
         List<V1Job> executorsAsJobs =
                 IntStream.range(0, task.getExecutors().size())
                         .mapToObj(i ->
@@ -566,6 +552,25 @@ public class TesKubernetesConverter {
     }
 
     /**
+     * The group (team) that a new task belongs to: the one in {@code tags['GROUP_NAME']}, otherwise
+     * any group of its creator; null for none
+     */
+    private static String groupOf(TesTask task, User user) {
+        if (task.getTags() != null && task.getTags().containsKey("GROUP_NAME")) {
+            return task.getTags().get("GROUP_NAME");
+        }
+        return user.isMember() ? user.getAnyGroup() : null;
+    }
+
+    /** Puts the task's group (team), if it has one, as {@code GROUP_NAME} into the log metadata */
+    private static void putGroup(TesTaskLog log, V1ObjectMeta metadata) {
+        String group = GroupLabels.groupName(metadata);
+        if (group != null) {
+            log.putMetadataItem("GROUP_NAME", group);
+        }
+    }
+
+    /**
      * Puts the creating user's ID into the log's metadata ({@code USER_ID}): the full ID of tasks
      * with the hash label (if the annotation matches it), or the value of the old label of tasks
      * created before, which the log marks as such (see {@link CreatorLabels})
@@ -595,9 +600,7 @@ public class TesKubernetesConverter {
             TesTaskLog log = new TesTaskLog();
             task.addLogsItem(log);
             putCreator(log, metadata);
-            if (metadata.getLabels().containsKey(LABEL_GROUPNAME_KEY)) {
-                log.putMetadataItem("GROUP_NAME", metadata.getLabels().get(LABEL_GROUPNAME_KEY));
-            }
+            putGroup(log, metadata);
         }
         return task;
     }
@@ -645,10 +648,7 @@ public class TesKubernetesConverter {
         // the files that the outputs filer uploaded, as the taskmaster stored them (issue #160)
         log.setOutputs(this.extractOutputFileLogs(taskmasterWithExecutors));
         putCreator(log, taskMasterJobMetadata);
-        if (taskMasterJobMetadata.getLabels().containsKey(LABEL_GROUPNAME_KEY)) {
-            log.putMetadataItem(
-                    "GROUP_NAME", taskMasterJobMetadata.getLabels().get(LABEL_GROUPNAME_KEY));
-        }
+        putGroup(log, taskMasterJobMetadata);
         log.setStartTime(
                 Optional.ofNullable(taskMasterJob.getStatus())
                         .map(V1JobStatus::getStartTime)

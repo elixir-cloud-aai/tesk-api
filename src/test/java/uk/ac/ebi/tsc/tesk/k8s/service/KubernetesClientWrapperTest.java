@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_GROUPNAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_GROUPNAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
@@ -39,6 +40,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
+import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
@@ -574,6 +576,14 @@ public class KubernetesClientWrapperTest {
         return new V1Job().metadata(metadata);
     }
 
+    /** A job of the group, labelled and annotated as TESK API does */
+    private static V1Job groupJob(String group, String userId) {
+        V1ObjectMeta metadata = new V1ObjectMeta();
+        GroupLabels.put(metadata, group);
+        CreatorLabels.put(metadata, userId);
+        return new V1Job().metadata(metadata);
+    }
+
     private static V1Job legacyJob(String group, String legacyUserLabel) {
         return new V1Job()
                 .metadata(
@@ -610,6 +620,40 @@ public class KubernetesClientWrapperTest {
         V1JobList jobList = new V1JobList().items(Arrays.asList(jobs));
         given(listJobs.execute()).willReturn(jobList);
         return jobList;
+    }
+
+    /**
+     * Groups whose names aren't valid label values are selected by their label values, and the jobs
+     * of managed groups are kept by the full names in the annotations (issue #216)
+     */
+    @Test
+    public void listAllTaskmasterJobsForUser_groupNamesThatAreNoLabelValues() throws ApiException {
+        String member = "BioHackCloud%20Admins";
+        String manager = "x) ,creator-user-hash in (y";
+        V1Job own = groupJob(member, "123");
+        V1Job othersInManaged = groupJob(manager, "124");
+        // the label of the managed group, with the annotation of another group: the group is the
+        // label, which names no group of the user
+        V1Job mismatched = job(GroupLabels.value(manager), "124");
+        mismatched.getMetadata().putAnnotationsItem(ANN_GROUPNAME_KEY, "OTHER");
+        listJobsReturning(own, groupJob(member, "124"), othersInManaged, mismatched);
+        User user =
+                User.builder("123")
+                        .teskMemberedGroups(Collections.singleton(member))
+                        .teskManagedGroups(Collections.singleton(manager))
+                        .build();
+        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
+        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, user);
+        verifyListJobs(namespace, argument);
+        assertThat(
+                argument.getValue(),
+                is(
+                        "job-type=taskmaster,creator-group-name in ("
+                                + GroupLabels.value(member)
+                                + ","
+                                + GroupLabels.value(manager)
+                                + ")"));
+        assertThat(result.getItems(), is(Arrays.asList(own, othersInManaged)));
     }
 
     /** IDs that the old label encoding merged are told apart (issue #119) */

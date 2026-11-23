@@ -6,6 +6,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,6 +35,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +62,7 @@ import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
+import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutorLog;
@@ -712,6 +715,57 @@ public class TesKubernetesConverterMinimalTest {
 
         assertEquals("ABC", job.getMetadata().getLabels().get(Constants.LABEL_GROUPNAME_KEY));
         assertEquals("ABC", configMap.getMetadata().getLabels().get(Constants.LABEL_GROUPNAME_KEY));
+    }
+
+    /**
+     * Groups whose names aren't valid label values, from the user or the tags, are labelled with
+     * valid values, and annotated with the full names (issue #216)
+     */
+    @Test
+    public void groupNamesThatAreNoLabelValues() {
+        given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-1");
+        StringBuilder longId = new StringBuilder("user|");
+        for (int i = 0; i < 70; i++) {
+            longId.append("x");
+        }
+        for (String group : GroupLabelsTest.AWKWARD_NAMES) {
+            User user =
+                    User.builder(longId.toString())
+                            .teskMemberedGroups(Collections.singleton(group))
+                            .build();
+            TesTask untagged = task();
+            TesTask tagged = task().putTagsItem("GROUP_NAME", group);
+            for (TesTask task : new TesTask[] {untagged, tagged}) {
+                V1Job job = this.converter.fromTesTaskToK8sJob(task, user);
+                V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, job);
+                for (V1ObjectMeta metadata :
+                        new V1ObjectMeta[] {job.getMetadata(), configMap.getMetadata()}) {
+                    for (String value : metadata.getLabels().values()) {
+                        assertTrue(LABEL_VALUE.matcher(value).matches(), value);
+                    }
+                    assertEquals(
+                            GroupLabels.value(group),
+                            metadata.getLabels().get(Constants.LABEL_GROUPNAME_KEY));
+                    assertEquals(group, metadata.getAnnotations().get(Constants.ANN_GROUPNAME_KEY));
+                }
+                // the task's group, as getting the task shows and authorises it
+                Task k8sTask = new Task(new Job(job.status(new V1JobStatus())));
+                TesTask read = this.converter.fromK8sJobsToTesTaskMinimal(k8sTask, false);
+                assertEquals(group, read.getLogs().get(0).getMetadata().get("GROUP_NAME"));
+            }
+        }
+    }
+
+    /** Valid label values: alphanumeric at both ends, at most 63 characters */
+    private static final Pattern LABEL_VALUE =
+            Pattern.compile("^(([A-Za-z0-9][-A-Za-z0-9_.]{0,61})?[A-Za-z0-9])?$");
+
+    private static TesTask task() {
+        return new TesTask()
+                .addExecutorsItem(
+                        new TesExecutor()
+                                .image("ubuntu")
+                                .command(Collections.singletonList("true")));
     }
 
     /**

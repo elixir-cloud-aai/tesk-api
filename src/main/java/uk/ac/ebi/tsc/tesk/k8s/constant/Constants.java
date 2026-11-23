@@ -118,8 +118,17 @@ public class Constants {
      */
     public static final String ANN_USERID_KEY = "creator-user-id";
 
-    /** Key of the label, that holds user's group name */
+    /**
+     * Key of the label with the task's group (team) name, or a hash of it if the name isn't a valid
+     * label value (see {@link uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels})
+     */
     public static final String LABEL_GROUPNAME_KEY = "creator-group-name";
+
+    /**
+     * Key of the annotation with the task's full group (team) name (same key as {@link
+     * #LABEL_GROUPNAME_KEY}, which is a label)
+     */
+    public static final String ANN_GROUPNAME_KEY = LABEL_GROUPNAME_KEY;
 
     /** Pattern to validate paths */
     public static final String ABSOLUTE_PATH_REGEXP = "^\\/.*";
