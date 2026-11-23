@@ -15,6 +15,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
+import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 
 /**
@@ -172,12 +173,14 @@ public class User implements Serializable, UserDetails, Principal {
      * only selects by group.
      */
     public String getLabelSelector() {
-        Set<String> allTeskGroups = new LinkedHashSet<>(this.teskMemberedGroups);
-        allTeskGroups.addAll(this.teskManagedGroups);
         if (isTeskAdmin()) {
             return null;
         }
         if (isMember() || isManager()) {
+            // the groups' label values, which are valid in a selector whatever the names are
+            Set<String> allTeskGroups = new LinkedHashSet<>();
+            this.teskMemberedGroups.forEach(group -> allTeskGroups.add(GroupLabels.value(group)));
+            this.teskManagedGroups.forEach(group -> allTeskGroups.add(GroupLabels.value(group)));
             StringBuilder sb = new StringBuilder();
             sb.append(Constants.LABEL_GROUPNAME_KEY)
                     .append(" in (")

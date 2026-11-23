@@ -29,6 +29,7 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
+import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 
 /**
  * Integration testing of security (authentication and authorisation using OIDC and Elixir groups)
@@ -824,6 +825,88 @@ public class AuthIT {
                         get(TASK_URL + "/{id}?view=BASIC", "task-123")
                                 .header("Authorization", "Bearer BAR"))
                 .andExpect(jsonPath("$.logs[0].metadata.USER_ID").value(id.toString()));
+    }
+
+    /**
+     * Teams whose names aren't valid label values (e.g. with a percent-encoded space, as LS Login
+     * gives them) and IDs that aren't either: tasks are created with valid label values and the
+     * full names in annotations, and got and listed by them (issue #216)
+     */
+    @Test
+    public void groupNamesThatAreNoLabelValues_createGetAndListTasks() throws Exception {
+        StringBuilder id = new StringBuilder("urn:user|");
+        for (int i = 0; i < 70; i++) {
+            id.append("x");
+        }
+        String[] groups = {
+            "BioHackCloud%20Admins",
+            "BioHackCloud Admins",
+            "ünïcödé",
+            // no comma: the groups claim is split at commas (see GroupNamesSecurityExtractor)
+            "x) in (y",
+            "Team.With.A.Rather.Long.Name.That.Goes.On.And.On.Beyond.Sixty-Three.Characters",
+        };
+        for (String group : groups) {
+            mockKubernetes.resetAll();
+            userInfo(id.toString(), "GA4GH:GA4GH-CAP:EBI", "GA4GH:GA4GH-CAP:EBI:" + group);
+            String labelValue = GroupLabels.value(group);
+            assertThat(labelValue).matches("(([A-Za-z0-9][-A-Za-z0-9_.]{0,61})?[A-Za-z0-9])?");
+            for (String path :
+                    new String[] {
+                        "/apis/batch/v1/namespaces/default/jobs",
+                        "/api/v1/namespaces/default/configmaps"
+                    }) {
+                mockKubernetes.givenThat(
+                        WireMock.post(WireMock.urlPathEqualTo(path))
+                                .withRequestBody(
+                                        matchingJsonPath(
+                                                "$.metadata.labels['creator-group-name']",
+                                                equalTo(labelValue)))
+                                .withRequestBody(
+                                        matchingJsonPath(
+                                                "$.metadata.annotations['creator-group-name']",
+                                                equalTo(group)))
+                                .withRequestBody(
+                                        matchingJsonPath(
+                                                "$.metadata.labels['creator-user-hash']",
+                                                equalTo(CreatorLabels.hash(id.toString()))))
+                                .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
+            }
+            this.mvc
+                    .perform(
+                            post(TASK_URL)
+                                    .content(
+                                            getFileContentFromResources(
+                                                    "fromTesToK8s_minimal/task.json"))
+                                    .header("Authorization", "Bearer BAR")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
+
+            MockUtil.mockGroupTaskKubernetesResponses(this.mockKubernetes, group, id.toString());
+            expectGetTask(200);
+            this.mvc
+                    .perform(
+                            get(TASK_URL + "/{id}?view=BASIC", "task-123")
+                                    .header("Authorization", "Bearer BAR"))
+                    .andExpect(jsonPath("$.logs[0].metadata.GROUP_NAME").value(group));
+
+            mockKubernetes.givenThat(
+                    WireMock.get(urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs"))
+                            .withQueryParam(
+                                    "labelSelector",
+                                    equalTo(
+                                            "job-type=taskmaster,creator-group-name in ("
+                                                    + labelValue
+                                                    + "),creator-user-hash="
+                                                    + CreatorLabels.hash(id.toString())))
+                            .willReturn(
+                                    okJson(
+                                            MockUtil.jobList(
+                                                    MockUtil.taskmaster(group, id.toString())))));
+            MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
+            performListTask(1);
+        }
     }
 
     /**

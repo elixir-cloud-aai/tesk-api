@@ -13,6 +13,7 @@ import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
+import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 
 /**
@@ -75,6 +76,26 @@ public class UserCreatorTest {
         User user = User.builder("123").teskMemberedGroups(Collections.singleton("TEST")).build();
         assertEquals(
                 "creator-group-name in (TEST),creator-user-hash=" + HASH_123,
+                user.getLabelSelector());
+    }
+
+    /**
+     * Groups whose names aren't valid label values are selected by their label values, which can't
+     * change the selector (issue #216)
+     */
+    @Test
+    public void labelSelector_groupNamesThatAreNoLabelValues() {
+        User user =
+                User.builder("123")
+                        .teskMemberedGroups(Collections.singleton("BioHackCloud%20Admins"))
+                        .teskManagedGroups(Collections.singleton("x) ,creator-user-hash in (y"))
+                        .build();
+        assertEquals(
+                "creator-group-name in ("
+                        + GroupLabels.value("BioHackCloud%20Admins")
+                        + ","
+                        + GroupLabels.value("x) ,creator-user-hash in (y")
+                        + ")",
                 user.getLabelSelector());
     }
 

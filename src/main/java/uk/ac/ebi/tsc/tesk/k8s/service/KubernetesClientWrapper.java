@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
@@ -279,22 +280,17 @@ public class KubernetesClientWrapper {
                         .collect(Collectors.toList()));
         if (user.getLabelSelector() != null) {
             // the selector only narrows the jobs down: keep those of the groups the user manages
-            // and those the user created, comparing the annotation with the full ID exactly (the
-            // hash label only selects, and the old label can't be selected for the user)
+            // (by the full group names, see GroupLabels) and those the user created, comparing
+            // the annotation with the full ID exactly (the hash label only selects, and the old
+            // label can't be selected for the user)
             result.setItems(
                     result.getItems().stream()
                             .filter(job ->
-                                    user.isGroupManager(groupOf(job))
+                                    user.isGroupManager(GroupLabels.groupName(job.getMetadata()))
                                             || user.isCreatorOf(job.getMetadata()))
                             .collect(Collectors.toList()));
         }
         return result;
-    }
-
-    /** The group of the job's task, or null */
-    private static String groupOf(V1Job job) {
-        Map<String, String> labels = job.getMetadata().getLabels();
-        return labels == null ? null : labels.get(LABEL_GROUPNAME_KEY);
     }
 
     /**

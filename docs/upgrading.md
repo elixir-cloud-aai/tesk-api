@@ -37,6 +37,18 @@
   memory limit, or a `LimitRange`'s default, which could be below the
   request, so that the executor never started; see
   [tesk-core#160](https://github.com/elixir-cloud-aai/tesk-core/issues/160)).
+- **Team names in labels.** Members of teams whose names aren't valid
+  Kubernetes label values (e.g. `BioHackCloud%20Admins` from LS Login, names
+  with other characters than `[A-Za-z0-9._-]`, or longer than 63
+  characters) can create and list tasks; before, both failed with `500
+  Internal Server Error`
+  ([#216](https://github.com/elixir-cloud-aai/tesk-api/issues/216)). Tasks
+  get the team name in the annotation `creator-group-name`, and the label of
+  that name is a hash for such names (see [Task
+  creators](access-control.md#task-creators)). Other team names are labelled
+  as before, so existing tasks keep their teams. After a downgrade to 2.0.0
+  or earlier, tasks of teams with hashed labels are visible to super admins
+  only.
 - **Security contexts.** New settings give the taskmaster's and the
   executors' pods and containers security contexts, e.g. for namespaces
   that enforce the `restricted` Pod Security Standard

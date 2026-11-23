@@ -154,7 +154,25 @@ taskmaster's job, its ConfigMap and the executors' jobs):
   only if the annotation is the user's `sub` and the label is its hash.
 
 `logs[0].metadata.USER_ID` of a task (in the `BASIC` and `FULL` views) shows
-the annotation. The team of a task is the label `creator-group-name`.
+the annotation.
+
+The team of a task is recorded on the same objects in the same way, as team
+names can be any text without `:` (e.g. `BioHackCloud%20Admins`, as LS Login
+gives a name with a space, or names with other characters or longer than 63
+characters):
+
+* the label `creator-group-name`: the team name, if it is a valid label
+  value; otherwise `sha256-` and the first 32 hexadecimal digits of the
+  SHA-256 hash of the name (in UTF-8). Kubernetes selects the tasks of teams
+  by it.
+* the annotation `creator-group-name`: the team name itself. The team of a
+  task is the annotation if the label is its value as above; otherwise (for
+  tasks created by TESK API 2.0.0 or earlier, which have only the label) the
+  label.
+
+`logs[0].metadata.GROUP_NAME` of a task shows the team name, and
+`tags['GROUP_NAME']` takes it as the user info gives it (e.g.
+`BioHackCloud%20Admins`, not `BioHackCloud Admins`).
 
 Tasks created by earlier versions of TESK API have the label `creator-user-id`
 instead, with the `sub`'s `@` replaced by `_`; their `USER_ID` shows that
