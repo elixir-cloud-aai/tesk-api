@@ -446,21 +446,29 @@ public class ServiceClientTokenServicesTest {
                                 + " \"second-client\": {\"audiences\": [\"tesk\"]},"
                                 + " \"third-client\": {\"allowAnyAudience\": true}}");
         services();
-        assertThat(
-                output.getOut(),
-                containsString(
-                        "Service clients whose tokens are accepted for any audience"
-                                + " (allowAnyAudience, meant for testing; list audiences in"
-                                + " production): gateway-client, third-client"));
-        assertThat(output.getOut(), containsString("WARN"));
-        assertThat(output.getOut(), not(containsString("second-client")));
+        String warning =
+                "Service clients whose tokens are accepted for any audience"
+                        + " (allowAnyAudience, meant for testing; list audiences in"
+                        + " production): gateway-client, third-client";
+        assertTrue(
+                output.getOut()
+                        .lines()
+                        .anyMatch(line -> line.contains("WARN") && line.endsWith(warning)),
+                output.getOut());
     }
 
     /** Without allowAnyAudience, there is no such warning */
     @Test
     public void audiencesOnly_areNotWarnedAtStartup(CapturedOutput output) {
+        properties
+                .getServiceClients()
+                .setClients(
+                        "{\"gateway-client\": {\"audiences\": [\"tesk\"]},"
+                                + " \"second-client\": {\"allowAnyAudience\": false,"
+                                + " \"audiences\": [\"tesk-2\"]}}");
         services();
-        assertThat(output.getOut(), not(containsString("allowAnyAudience")));
+        assertThat(
+                output.getOut(), not(containsString("whose tokens are accepted for any audience")));
     }
 
     @Test
