@@ -82,11 +82,45 @@ Super Admin Group | GA4GH:GA4GH-CAP:EBI:ADMIN | Direct subgroup - named ADMIN - 
 Team Group | GA4GH:GA4GH-CAP:EBI:SDO | Direct subgroup - named anything else than ADMIN - of environment group. Represents a group of co-workers. | There can be many for each TESK installation with any names other than ADMIN.
 Team Admin Group | GA4GH:GA4GH-CAP:EBI:SDO:ADMIN | Direct subgroup - named ADMIN - of team group. Represents a group of users, being admins of a team group.| One per team group; many per TESK installation.
 
+### Task visibility
+
+Groups decide who may create tasks. Which tasks a user may get, list and
+cancel depends on the setting below
+([#218](https://github.com/elixir-cloud-aai/tesk-api/issues/218)):
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHORISATION_TASK_VISIBILITY` | `owner`: users get, list and cancel only their own tasks, whatever their groups; super admins and team admins included. `group`: as the groups decide (see [Endpoint permissions](#endpoint-permissions)): team admins see all tasks of their teams, super admins all tasks of the installation. Other values stop TESK API at startup. | `owner`
+
+Tasks can reference or contain private data (inputs, outputs, logs,
+environment), and access to data is granted to individual people. With
+`owner`, the default, nobody but a task's creator sees it through the API, so
+admins can't read other users' tasks or cancel them. Operators handle stuck
+or abusive tasks through Kubernetes (e.g. with `kubectl`),
+not through the TES API. Clients that share tasks between users do so
+themselves.
+
+With `owner`, the rules of [Endpoint permissions](#endpoint-permissions) and
+of the sections below still apply, but only to the user's own tasks: a user
+gets, lists and cancels a task only if they created it (see [Task
+creators](#task-creators)) and the rules below would let them see it. A
+super admin sees all of their own tasks, of any team or none; a team admin
+the own tasks of their teams; a team member the own tasks of their teams;
+users authorised by a claim and service clients their own tasks without a
+team, as with `group`. Other users' tasks give `403 Forbidden`, and lists
+leave them out.
+
+The setting needs the `auth` profile; with `noauth`, all tasks are visible
+to everyone, whatever it is.
+
 ### Endpoint permissions
 
-Endpoint | Objective | Condition 
+The table and the examples below describe `group` visibility; with `owner`
+(the default), see [Task visibility](#task-visibility).
+
+Endpoint | Objective (`group` visibility) | Condition (`group` visibility)
 ------------ |---|--
-Create a task | A task must be created by a specific user and for up to one specific team (no team or one team). | User must be a member of _any_ Team Group or a Super Admin to create a task. If a user is a member of more than one Team Group, a user can specify, for which team to create a task (by putting team name in `tags['GROUP_NAME']`. If no team is specified, task will still be created for a randomly chosen team. If a user does not belong to any team (is a Super Admin only), task is still created, but does not belong to any team (only other Super Admins will be able to see it).
+Create a task | A task must be created by a specific user and for up to one specific team (no team or one team). | User must be a member of _any_ Team Group or a Super Admin to create a task. If a user is a member of more than one Team Group, a user can specify, for which team to create a task (by putting team name in `tags['GROUP_NAME']`. If no team is specified, task will still be created for a randomly chosen team. If a user does not belong to any team (is a Super Admin only), task is still created, but does not belong to any team (with `group` visibility, only other Super Admins will be able to see it; with `owner`, only its creator).
 Get a task | A team member can only see tasks, that were created by him/her. A team admin can see all tasks created for his/her team. A super admin can see all tasks. | User must be a member of _the_ Team Group, that the task was created for AND be _the_ task creator OR user must be an admin of _the_ Team Group, that _the_ task was created for OR user must be a Super Admin.
 Cancel a task | User can cancel those tasks that are visible to him/her (as for `Get a task`). | User must be a member of _the_ Team Group, that _the_ task was created for AND be _the_ task creator OR user must be an admin of _the_ Team Group, that _the_ task was created for OR user must be a Super Admin.
 List tasks | User can list those task that are visible to him (as for `Get a task`). | User must be a member of _any_ Team Group OR user must be an admin of _any_ Team Group OR user must be a super admin to access `List tasks` enpoint. The response contains those tasks, that are visible to the user (rules from `Get a task` apply).
@@ -103,13 +137,13 @@ List tasks | User can list those task that are visible to him (as for `Get a tas
 * User '124' with group `GA4GH:G4GH-CAP:EBI:SDO` gets a task created by user 123, for team SDO via TESK installed in `EBI`. Forbidden (not his/her task).
 * User '123' with group `GA4GH:G4GH-CAP:EBI` only, gets a task created by user 123, for team SDO via TESK installed in `EBI`. Forbidden (not SDO group member anymore).
 * User '123' with group `GA4GH:G4GH-CAP:EBI:SDO:ADMIN`, gets a task created by user 123, for team SDO via TESK installed in `EBI`. Success.
-* User '124' with group `GA4GH:G4GH-CAP:EBI:SDO:ADMIN`, gets a task created by user 123, for team SDO via TESK installed in `EBI`. Success (team group admin sees all team tasks).
-* User '124' with group `GA4GH:G4GH-CAP:EBI:ADMIN`, gets a task created by user 123, for team SDO via TESK installed in `EBI`. Success (super admin sees everything). 
+* User '124' with group `GA4GH:G4GH-CAP:EBI:SDO:ADMIN`, gets a task created by user 123, for team SDO via TESK installed in `EBI`. Success (team group admin sees all team tasks). With `owner` visibility: Forbidden (not his/her task).
+* User '124' with group `GA4GH:G4GH-CAP:EBI:ADMIN`, gets a task created by user 123, for team SDO via TESK installed in `EBI`. Success (super admin sees everything). With `owner` visibility: Forbidden (not his/her task).
 * User '123' with group `GA4GH:G4GH-CAP:EBI:SDO` gets a task list. Success. List contains all tasks created for SDO by user 123.
 * User '123' with group `GA4GH:G4GH-CAP:EBI` only, gets a task list. Forbidden (not a team member, neither team admin, nor super admin).
-* User '123' with group `GA4GH:G4GH-CAP:EBI:SDO:ADMIN`, gets a task list. Success. List contains all tasks created for team SDO by all users.
-* User '124' with group `GA4GH:G4GH-CAP:EBI:ADMIN`, gets a task list. Success. List contains all tasks created for all/no teams by all users.
-* User '123' with groups `GA4GH:G4GH-CAP:EBI:TEST` and `GA4GH:G4GH-CAP:EBI:SDO:ADMIN`, gets a task list. Success. List contains all tasks created for team TEST by user 123 and also all tasks created for team SDO by all users.
+* User '123' with group `GA4GH:G4GH-CAP:EBI:SDO:ADMIN`, gets a task list. Success. List contains all tasks created for team SDO by all users. With `owner` visibility: only those created by user 123.
+* User '124' with group `GA4GH:G4GH-CAP:EBI:ADMIN`, gets a task list. Success. List contains all tasks created for all/no teams by all users. With `owner` visibility: all tasks created by user 124, for any or no team.
+* User '123' with groups `GA4GH:G4GH-CAP:EBI:TEST` and `GA4GH:G4GH-CAP:EBI:SDO:ADMIN`, gets a task list. Success. List contains all tasks created for team TEST by user 123 and also all tasks created for team SDO by all users. With `owner` visibility: only the tasks created for TEST or SDO by user 123.
 
 ### Configuration
 Parts of Elixir groups 'authorisation framework' - particularly base group name, environment subgroup name and ADMIN subgroup name - are configurable in [the same way](configuration.md) as all settings of TESK API.
@@ -178,8 +212,9 @@ Tasks created by earlier versions of TESK API have the label `creator-user-id`
 instead, with the `sub`'s `@` replaced by `_`; their `USER_ID` shows that
 value. That encoding gives different IDs the same value (e.g. `a@b` and
 `a_b`), and doesn't fit IDs longer than 63 characters or with other
-characters, so TESK API doesn't match these tasks to users by default: team
-admins and super admins see them as before, their creators don't. For a
+characters, so TESK API doesn't match these tasks to users by default: with `group`
+[visibility](#task-visibility), team admins and super admins see them as
+before, their creators don't; with `owner`, nobody does. For a
 transition after the upgrade, the following setting matches them by the old
 label again (see [Upgrading](upgrading.md#to-120)):
 
@@ -217,9 +252,10 @@ With the setting on, a user with one of the values (a "claim user"):
 
 Group rules are unchanged and come first: a team member, team admin or super
 admin keeps the rights described [above](#endpoint-permissions), whether or
-not they have the claim. Super admins (the Super Admin Group) see all tasks,
-including those of claim users; team admins don't see them, as they belong to
-no team.
+not they have the claim. With `group` [visibility](#task-visibility), super
+admins (the Super Admin Group) see all tasks, including those of claim users;
+team admins don't see them, as they belong to no team. With `owner`, the
+default, neither do.
 
 Listing follows the group rules first, too: a user who is a team member or
 team admin and has the claim lists the tasks of their teams, but not their
@@ -350,8 +386,9 @@ has no groups, so no group rules apply. It:
 Tasks of a client record it as their creator as for users (see [Task
 creators](#task-creators)): the label `creator-user-hash` has the hash of the
 client ID, the annotation `creator-user-id` and `logs[0].metadata.USER_ID`
-the client ID. Super admins see these tasks, as all tasks; team admins
-don't, as they belong to no team. `TESK_API_AUTHORISATION_LEGACY_USER_LABELS`
+the client ID. With `group` [visibility](#task-visibility), super admins see
+these tasks, as all tasks; team admins don't, as they belong to no team.
+With `owner`, the default, neither do. `TESK_API_AUTHORISATION_LEGACY_USER_LABELS`
 doesn't apply to service clients: they never match tasks by the old label.
 
 User IDs (`sub` of the user info) and client IDs share this record, so a

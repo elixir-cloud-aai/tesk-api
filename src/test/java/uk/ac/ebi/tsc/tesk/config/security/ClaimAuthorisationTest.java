@@ -159,13 +159,20 @@ public class ClaimAuthorisationTest {
                 user.getLabelSelector());
     }
 
-    /** Admins see all tasks: no selector, also with the claim */
+    /**
+     * With group visibility, admins see all tasks: no selector, also with the claim; with
+     * owner-only visibility (the default, issue #218), their own tasks of any group or none
+     */
     @Test
     public void labelSelector_adminWithClaim() {
-        User user = extract(properties(true, CLAIM, MEDIUM), MEDIUM, "BASE_GROUP:ADMIN");
-        assertTrue(user.isTeskAdmin());
-        assertTrue(user.isClaimAuthorised());
-        assertNull(user.getLabelSelector());
+        AuthorisationProperties properties = properties(true, CLAIM, MEDIUM);
+        User owner = extract(properties, MEDIUM, "BASE_GROUP:ADMIN");
+        assertTrue(owner.isTeskAdmin());
+        assertTrue(owner.isClaimAuthorised());
+        assertEquals(
+                "creator-user-hash=d159ef624ed86697b4f1f3ff086aacdd", owner.getLabelSelector());
+        properties.setTaskVisibility(TaskVisibility.GROUP);
+        assertNull(extract(properties, MEDIUM, "BASE_GROUP:ADMIN").getLabelSelector());
     }
 
     /** Group members keep the selector of their groups, also with the claim */

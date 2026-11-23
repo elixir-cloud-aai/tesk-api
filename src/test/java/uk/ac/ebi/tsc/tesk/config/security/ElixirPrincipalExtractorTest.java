@@ -52,6 +52,7 @@ public class ElixirPrincipalExtractorTest {
                         .teskMemberedGroups(new HashSet<>())
                         .teskManagedGroups(new HashSet<>())
                         .allGroups(StringUtils.commaDelimitedListToSet("whatever:USER"))
+                        .ownerOnly(true)
                         .build();
         Map<String, Object> map = new HashMap<>();
         map.put("sub", "123");
@@ -78,6 +79,7 @@ public class ElixirPrincipalExtractorTest {
                         .allGroups(
                                 StringUtils.commaDelimitedListToSet(
                                         "OTHER,BASE_GROUP:ADMIN,BASE_GROUP:TEST,BASE_GROUP:ABC,BASE_GROUP:XYZ:ADMIN"))
+                        .ownerOnly(true)
                         .build();
         Map<String, Object> map = new HashMap<>();
         map.put("sub", "123");
@@ -104,6 +106,7 @@ public class ElixirPrincipalExtractorTest {
                         .allGroups(
                                 StringUtils.commaDelimitedListToSet(
                                         "prefix:OTHER#suffix,prefix:BASE_GROUP:ADMIN#suffix,prefix:BASE_GROUP:TEST#suffix,prefix:BASE_GROUP:ABC#suffix,prefix:BASE_GROUP:XYZ:ADMIN#suffix"))
+                        .ownerOnly(true)
                         .build();
         Map<String, Object> map = new HashMap<>();
         map.put("sub", "123");
@@ -221,5 +224,28 @@ public class ElixirPrincipalExtractorTest {
 
         assertThat(user.isTeskAdmin(), is(true));
         assertThat(user.isGroupManager("TEAM"), is(false));
+    }
+
+    /** By default, tasks are visible to their owner only (issue #218), whatever the groups */
+    @Test
+    public void taskVisibility_ownerByDefault() {
+        assertThat(new AuthorisationProperties().getTaskVisibility(), is(TaskVisibility.OWNER));
+        User admin = userWithGroups(extractorNoSuffix, "BASE_GROUP:ADMIN");
+        assertThat(admin.isOwnerOnly(), is(true));
+    }
+
+    /** With group visibility, the groups decide which tasks a user sees, as before */
+    @Test
+    public void taskVisibility_group() {
+        AuthorisationProperties properties = new AuthorisationProperties();
+        properties.setBaseGroupPrefix("BASE_GROUP:");
+        properties.setAdminSubgroup("ADMIN");
+        properties.setAdminGroupFull("BASE_GROUP:ADMIN");
+        properties.setTaskVisibility(TaskVisibility.GROUP);
+        ElixirPrincipalExtractor extractor =
+                new ElixirPrincipalExtractor(
+                        new GroupNamesSecurityExtractor("groupNames", "whatever"), properties);
+        User admin = userWithGroups(extractor, "BASE_GROUP:ADMIN");
+        assertThat(admin.isOwnerOnly(), is(false));
     }
 }
