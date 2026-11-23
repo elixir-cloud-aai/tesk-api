@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,6 +53,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
@@ -99,7 +103,9 @@ public class ServiceClientTokenServicesTest {
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
         settings.setEnabled(true);
         settings.setIssuer(issuer());
-        settings.setClientIds(Arrays.asList(CLIENT, "second-client"));
+        settings.setClients(
+                "{\"gateway-client\": {\"audiences\": [\"tesk\"]},"
+                        + " \"second-client\": {\"audiences\": [\"tesk-second\", \"tesk-2\"]}}");
         discovery(issuer());
         jwks(key);
     }
@@ -365,8 +371,7 @@ public class ServiceClientTokenServicesTest {
     }
 
     @Test
-    public void audience_isChecked_ifSet() throws Exception {
-        properties.getServiceClients().setAudience("tesk");
+    public void audience_isChecked() throws Exception {
         accepted(sign(claims(CLIENT)));
 
         JwtClaims several = claims(CLIENT);
@@ -380,14 +385,91 @@ public class ServiceClientTokenServicesTest {
         JwtClaims none = claims(CLIENT);
         none.unsetClaim("aud");
         refused(sign(none));
+
+        JwtClaims notAString = claims(CLIENT);
+        notAString.setClaim("aud", 42);
+        refused(sign(notAString));
     }
 
-    /** Without the setting, any audience (or none) is accepted */
+    /** Each client is accepted at its own audiences only, not at another client's (issue #215) */
     @Test
-    public void audience_isNotChecked_ifUnset() throws Exception {
+    public void otherClientsAudience_isRefused(CapturedOutput output) throws Exception {
+        JwtClaims second = claims("second-client");
+        second.setAudience("tesk-second");
+        accepted(sign(second));
+        second.setAudience("tesk-2");
+        accepted(sign(second));
+
+        JwtClaims firstAtSecond = claims(CLIENT);
+        firstAtSecond.setAudience("tesk-second");
+        refused(sign(firstAtSecond));
+        assertThat(
+                output.getOut(),
+                containsString("Refused token of service client " + CLIENT + ": wrong audience"));
+
+        JwtClaims secondAtFirst = claims("second-client");
+        secondAtFirst.setAudience("tesk");
+        refused(sign(secondAtFirst));
+    }
+
+    /** With allowAnyAudience, a client's tokens are accepted for any audience, or none */
+    @Test
+    public void anyAudience_isAccepted_ifAllowedForTheClient() throws Exception {
+        properties
+                .getServiceClients()
+                .setClients(
+                        "{\"gateway-client\": {\"allowAnyAudience\": true},"
+                                + " \"second-client\": {\"audiences\": [\"tesk\"]}}");
         JwtClaims none = claims(CLIENT);
         none.unsetClaim("aud");
         accepted(sign(none));
+        JwtClaims other = claims(CLIENT);
+        other.setAudience("other-service");
+        accepted(sign(other));
+
+        // not for the other client
+        JwtClaims second = claims("second-client");
+        second.setAudience("other-service");
+        refused(sign(second));
+    }
+
+    /**
+     * Clients with allowAnyAudience are named in a warning at startup, as the setting is meant for
+     * testing only; clients with audiences aren't
+     */
+    @Test
+    public void anyAudience_isWarnedAtStartup(CapturedOutput output) {
+        properties
+                .getServiceClients()
+                .setClients(
+                        "{\"gateway-client\": {\"allowAnyAudience\": true},"
+                                + " \"second-client\": {\"audiences\": [\"tesk\"]},"
+                                + " \"third-client\": {\"allowAnyAudience\": true}}");
+        services();
+        String warning =
+                "Service clients whose tokens are accepted for any audience"
+                        + " (allowAnyAudience, meant for testing or setting up a federation; list"
+                        + " audiences in"
+                        + " production): gateway-client, third-client";
+        assertTrue(
+                output.getOut()
+                        .lines()
+                        .anyMatch(line -> line.contains("WARN") && line.endsWith(warning)),
+                output.getOut());
+    }
+
+    /** Without allowAnyAudience, there is no such warning */
+    @Test
+    public void audiencesOnly_areNotWarnedAtStartup(CapturedOutput output) {
+        properties
+                .getServiceClients()
+                .setClients(
+                        "{\"gateway-client\": {\"audiences\": [\"tesk\"]},"
+                                + " \"second-client\": {\"allowAnyAudience\": false,"
+                                + " \"audiences\": [\"tesk-2\"]}}");
+        services();
+        assertThat(
+                output.getOut(), not(containsString("whose tokens are accepted for any audience")));
     }
 
     @Test
@@ -436,10 +518,182 @@ public class ServiceClientTokenServicesTest {
 
     @Test
     public void settingsWithoutClients_failAtStartup() {
-        properties.getServiceClients().setClientIds(Collections.singletonList(" "));
-        assertThrows(IllegalStateException.class, this::services);
-        properties.getServiceClients().setClientIds(null);
-        assertThrows(IllegalStateException.class, this::services);
+        for (String clients : Arrays.asList(null, "", " ", "{}")) {
+            properties.getServiceClients().setClients(clients);
+            IllegalStateException e = assertThrows(IllegalStateException.class, this::services);
+            assertThat(e.getMessage(), containsString("service-clients.clients"));
+        }
+    }
+
+    /** Settings of clients that would accept no token, or any, refuse to start (issue #215) */
+    @Test
+    public void invalidClients_failAtStartup() {
+        for (String clients :
+                Arrays.asList(
+                        "not json",
+                        "[\"gateway-client\"]",
+                        "\"gateway-client\"",
+                        "{\"gateway-client\": {}}",
+                        "{\"gateway-client\": null}",
+                        "{\"gateway-client\": [\"tesk\"]}",
+                        "{\"gateway-client\": {\"audiences\": []}}",
+                        "{\"gateway-client\": {\"audiences\": null}}",
+                        "{\"gateway-client\": {\"audiences\": \"tesk\"}}",
+                        "{\"gateway-client\": {\"audiences\": [\" \"]}}",
+                        "{\"gateway-client\": {\"audiences\": [null]}}",
+                        "{\"gateway-client\": {\"audiences\": [42]}}",
+                        "{\"gateway-client\": {\"audience\": \"tesk\"}}",
+                        "{\"gateway-client\": {\"audiences\": [\"tesk\"], \"other\": 1}}",
+                        "{\"gateway-client\": {\"allowAnyAudience\": false}}",
+                        "{\"gateway-client\": {\"allowAnyAudience\": \"true\"}}",
+                        "{\"gateway-client\": {\"allowAnyAudience\": true, \"audiences\":"
+                                + " [\"tesk\"]}}",
+                        "{\" \": {\"audiences\": [\"tesk\"]}}",
+                        "{\"\": {\"audiences\": [\"tesk\"]}}",
+                        // only Unicode whitespace, which String.trim() would keep
+                        "{\"\u2003\": {\"audiences\": [\"tesk\"]}}",
+                        "{\"a\": {\"audiences\": [\"tesk\"]}, \"a\": {\"allowAnyAudience\":"
+                                + " true}}",
+                        "{\"a\": {\"audiences\": [\"tesk\"]}, \" a\": {\"audiences\":"
+                                + " [\"x\"]}}",
+                        "{\"a\": {\"audiences\": [\"tesk\"]}} {}")) {
+            properties.getServiceClients().setClients(clients);
+            IllegalStateException e =
+                    assertThrows(IllegalStateException.class, this::services, clients);
+            assertThat(e.getMessage(), containsString("service-clients.clients"));
+        }
+    }
+
+    /** Client IDs and audiences are trimmed, as before; false allowAnyAudience is the default */
+    @Test
+    public void clients_areTrimmed() throws Exception {
+        properties
+                .getServiceClients()
+                .setClients(
+                        "{\" gateway-client \": {\"audiences\": [\" tesk \"],"
+                                + " \"allowAnyAudience\": false}}");
+        accepted(sign(claims(CLIENT)));
+        JwtClaims other = claims(CLIENT);
+        other.setAudience("other-service");
+        refused(sign(other));
+    }
+
+    /** The settings of 2.0.0, removed in 2.1.0, refuse to start with a hint (issue #215) */
+    @Test
+    public void removedSettings_failAtStartup() {
+        for (String name :
+                Arrays.asList(
+                        "tesk.api.authorisation.service-clients.client-ids",
+                        "tesk.api.authorisation.service-clients.audience")) {
+            MockEnvironment environment = new MockEnvironment().withProperty(name, "x");
+            IllegalStateException e =
+                    assertThrows(
+                            IllegalStateException.class,
+                            () -> ServiceClientTokenServices.refuseRemovedSettings(environment));
+            assertThat(e.getMessage(), containsString(name));
+            assertThat(e.getMessage(), containsString("upgrading"));
+        }
+        ServiceClientTokenServices.refuseRemovedSettings(
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.clients", "{}"));
+    }
+
+    /** Also as environment variables, and as lists (e.g. of YAML) */
+    @Test
+    public void removedSettings_asEnvironmentVariablesOrLists_failAtStartup() {
+        for (String name :
+                Arrays.asList(
+                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS",
+                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS_0",
+                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE")) {
+            StandardEnvironment environment = new StandardEnvironment();
+            environment
+                    .getPropertySources()
+                    .replace(
+                            StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                            new SystemEnvironmentPropertySource(
+                                    StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                                    Collections.singletonMap(name, "x")));
+            assertThrows(
+                    IllegalStateException.class,
+                    () -> ServiceClientTokenServices.refuseRemovedSettings(environment),
+                    name);
+        }
+        MockEnvironment list =
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.client-ids[0]", "x");
+        assertThrows(
+                IllegalStateException.class,
+                () -> ServiceClientTokenServices.refuseRemovedSettings(list));
+
+        // a list with a gap can't be bound: refused with the hint all the same
+        MockEnvironment gap =
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.client-ids[1]", "x");
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> ServiceClientTokenServices.refuseRemovedSettings(gap));
+        assertThat(e.getMessage(), containsString("removed in 2.1.0"));
+
+        // also empty
+        MockEnvironment empty =
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.audience", "");
+        assertThrows(
+                IllegalStateException.class,
+                () -> ServiceClientTokenServices.refuseRemovedSettings(empty));
+    }
+
+    /** The token introspector of the auth profile refuses the removed settings, if enabled */
+    @Test
+    public void tokenIntrospector_refusesRemovedSettings() {
+        ResourceServerConfiguration configuration =
+                new ResourceServerConfiguration(
+                        null, null, properties, "/ga4gh/tes/v1", true, "http://localhost/userinfo");
+        MockEnvironment old =
+                new MockEnvironment()
+                        .withProperty("tesk.api.authorisation.service-clients.client-ids", "x");
+
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class, () -> configuration.tokenIntrospector(old));
+        assertThat(e.getMessage(), containsString("client-ids"));
+        assertTrue(
+                configuration.tokenIntrospector(new MockEnvironment())
+                        instanceof ServiceClientTokenServices);
+
+        // without service clients, the removed settings have no effect
+        properties.getServiceClients().setEnabled(false);
+        assertFalse(configuration.tokenIntrospector(old) instanceof ServiceClientTokenServices);
+    }
+
+    /** The messages say what is wrong with the clients */
+    @Test
+    public void invalidClients_sayWhy() {
+        String[][] cases = {
+            {null, "removed in 2.1.0"},
+            {
+                "{\"a\": {\"audiences\": [\"t\"]}, \" a\": {\"audiences\": [\"t\"]}}",
+                "client a twice"
+            },
+            {"{\"a\": {\"audiences\": [\"t\"], \"allowAnyAudience\": true}}", "both"},
+            {"{\"a\": {\"audience\": \"t\"}}", "unknown field audience"},
+            {"{\"a\": {}}", "client a: no audiences"},
+            {"{\"a\": {\"audiences\": [\" \"]}}", "non-blank string"},
+            {"{\"a\": {\"allowAnyAudience\": 1}}", "not true or false"},
+            {"{}", "no client"},
+            {"[]", "not a JSON object"},
+            {"{", "not valid JSON"},
+        };
+        for (String[] c : cases) {
+            IllegalStateException e =
+                    assertThrows(
+                            IllegalStateException.class,
+                            () -> ServiceClientTokenServices.clients(c[0]),
+                            c[0]);
+            assertThat(e.getMessage(), containsString(c[1]));
+        }
     }
 
     @Test
@@ -605,7 +859,7 @@ public class ServiceClientTokenServicesTest {
         assertTrue(defaults.isRequireAccessTokenType());
         assertTrue(defaults.isRequireClientSubject());
         assertEquals(60, defaults.getClockSkewSeconds());
-        assertTrue(defaults.getClientIds().isEmpty());
+        assertNull(defaults.getClients());
     }
 
     @Test

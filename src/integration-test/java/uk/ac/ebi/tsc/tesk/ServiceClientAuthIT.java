@@ -56,8 +56,9 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
             "tesk.api.authorisation.task-visibility=group",
             "tesk.api.authorisation.service-clients.enabled=true",
             "tesk.api.authorisation.service-clients.issuer=" + ServiceClientAuthIT.ISSUER,
-            "tesk.api.authorisation.service-clients.client-ids=gateway,other-gateway",
-            "tesk.api.authorisation.service-clients.audience=tesk"
+            // audiences per client (issue #215)
+            "tesk.api.authorisation.service-clients.clients={\"gateway\": {\"audiences\":"
+                    + " [\"tesk\"]}, \"other-gateway\": {\"audiences\": [\"tesk-other\"]}}"
         })
 public class ServiceClientAuthIT {
 
@@ -306,6 +307,36 @@ public class ServiceClientAuthIT {
 
         createTask(sign(claims), "fromTesToK8s_minimal/task.json")
                 .andExpect(status().isUnauthorized());
+        noUserInfoCalls();
+    }
+
+    /** A client's token for another listed client's audience is refused (issue #215) */
+    @Test
+    public void serviceTokenForOtherClientsAudience_isUnauthorized() throws Exception {
+        JwtClaims claims = claims(CLIENT);
+        claims.setAudience("tesk-other");
+
+        listTasks(sign(claims)).andExpect(status().isUnauthorized());
+        noUserInfoCalls();
+    }
+
+    /** Each client is accepted at its own audience */
+    @Test
+    public void otherClient_ownAudience_isAccepted() throws Exception {
+        JwtClaims claims = claims("other-gateway");
+        claims.setAudience("tesk-other");
+        mockKubernetes.givenThat(
+                WireMock.get(
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
+                                        + "%2Ccreator-user-hash%3D"
+                                        + CreatorLabels.hash("other-gateway")
+                                        + "%2C%21creator-group-name"
+                                        + "&limit=256")
+                        .willReturn(okJson(MockUtil.jobList())));
+
+        listTasks(sign(claims))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tasks.length()").value(0));
         noUserInfoCalls();
     }
 

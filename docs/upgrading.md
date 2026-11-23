@@ -2,6 +2,47 @@
 
 ## To 2.1.0
 
+- **Service clients: audiences per client (breaking).** With tokens of
+  service clients on (`TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED`),
+  each client is listed with its own audiences, and a client's token is
+  accepted only for one of them
+  ([#215](https://github.com/elixir-cloud-aai/tesk-api/issues/215)): one
+  JSON variable, `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS`, replaces
+  `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS` and
+  `TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE`, which are removed:
+  with either of them still set (also to an empty value: remove them), or
+  without the new one, TESK API doesn't start. Convert them as follows (see [Tokens of
+  services](access-control.md#settings)):
+
+    ```bash
+    # 2.0.0
+    TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS=gateway,smoke
+    TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE=https://tesk.example.org
+    # 2.1.0
+    TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS='{"gateway": {"audiences": ["https://tesk.example.org"]}, "smoke": {"audiences": ["https://tesk.example.org"]}}'
+    ```
+
+    Each client gets the former shared audience; then give each client its
+    own audiences where your provider allows, so that one client's tokens
+    aren't accepted for another's. Without `…_AUDIENCE` (any audience), give
+    each client its audiences: any audience is no longer the default.
+    `{"allowAnyAudience": true}` keeps the former behaviour for a client,
+    but accepts every token that the issuer issues to it, also tokens meant
+    for other services (so a token leaked from or replayed by another
+    service works at TESK API): use it only for testing or while setting up
+    a federation, not in production (TESK API logs a warning at startup for
+    each such client; see [Trust
+    implications](access-control.md#trust-implications)). For a downgrade to
+    2.0.0, restore `…_CLIENT_IDS` and `…_AUDIENCE`: 2.0.0 ignores
+    `…_CLIENTS`, and without `…_CLIENT_IDS` it doesn't start. With the
+    Helm chart of TESK, use the chart release that renders the new variable
+    (`auth.tokenClients.clients` as a map from client ID to `audiences`, see
+    [TESK#336](https://github.com/elixir-cloud-aai/TESK/issues/336)); older
+    chart releases render the removed variables, which stop TESK API 2.1.0
+    from starting. During a rolling update, pods of 2.0.0 still accept
+    every listed client's tokens for the former shared audience: the
+    audiences per client hold once the rollout has completed. Without
+    service clients, nothing changes.
 - **Tasks visible to their owner only (behaviour change, security).** With
   the `auth` profile, users get, list and cancel only their own tasks,
   whatever their groups
