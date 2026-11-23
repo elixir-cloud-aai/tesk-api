@@ -433,6 +433,36 @@ public class ServiceClientTokenServicesTest {
         refused(sign(second));
     }
 
+    /**
+     * Clients with allowAnyAudience are named in a warning at startup, as the setting is meant for
+     * testing only; clients with audiences aren't
+     */
+    @Test
+    public void anyAudience_isWarnedAtStartup(CapturedOutput output) {
+        properties
+                .getServiceClients()
+                .setClients(
+                        "{\"gateway-client\": {\"allowAnyAudience\": true},"
+                                + " \"second-client\": {\"audiences\": [\"tesk\"]},"
+                                + " \"third-client\": {\"allowAnyAudience\": true}}");
+        services();
+        assertThat(
+                output.getOut(),
+                containsString(
+                        "Service clients whose tokens are accepted for any audience"
+                                + " (allowAnyAudience, meant for testing; list audiences in"
+                                + " production): gateway-client, third-client"));
+        assertThat(output.getOut(), containsString("WARN"));
+        assertThat(output.getOut(), not(containsString("second-client")));
+    }
+
+    /** Without allowAnyAudience, there is no such warning */
+    @Test
+    public void audiencesOnly_areNotWarnedAtStartup(CapturedOutput output) {
+        services();
+        assertThat(output.getOut(), not(containsString("allowAnyAudience")));
+    }
+
     @Test
     public void clientClaim_isConfigurable() throws Exception {
         properties.getServiceClients().setClientClaim("azp");

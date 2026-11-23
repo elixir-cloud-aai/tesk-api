@@ -220,6 +220,27 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
                     "tesk.api.authorisation.service-clients.issuer and .jwks-uri must be https"
                             + " URLs (http only for localhost)");
         }
+        warnAboutAnyAudience(listed);
+    }
+
+    /**
+     * Names the clients with {@code allowAnyAudience} in a warning: their tokens are accepted
+     * whatever their {@code aud}, also tokens meant for other services, so the setting is meant for
+     * testing and setting up a federation, not for production
+     */
+    private static void warnAboutAnyAudience(Map<String, Client> listed) {
+        List<String> anyAudience =
+                listed.entrySet().stream()
+                        .filter(entry -> entry.getValue().anyAudience())
+                        .map(Map.Entry::getKey)
+                        .toList();
+        if (!anyAudience.isEmpty()) {
+            logger.warn(
+                    "Service clients whose tokens are accepted for any audience ("
+                            + ALLOW_ANY_AUDIENCE
+                            + ", meant for testing; list audiences in production): {}",
+                    String.join(", ", anyAudience));
+        }
     }
 
     /**
