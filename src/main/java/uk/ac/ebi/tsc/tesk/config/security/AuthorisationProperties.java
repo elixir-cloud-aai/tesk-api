@@ -123,7 +123,7 @@ public class AuthorisationProperties {
          * object from client ID (compared exactly) to the client's settings, {@code {"audiences":
          * [...]}} (the token's {@code aud} must be or contain one of them) or {@code
          * {"allowAnyAudience": true}} (any audience, also tokens meant for other services: for
-         * testing only, warned at startup); checked by {@link
+         * testing or setting up a federation, warned at startup); checked by {@link
          * ServiceClientTokenServices#clients(String)}
          */
         private String clients;

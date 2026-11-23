@@ -238,7 +238,8 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             logger.warn(
                     "Service clients whose tokens are accepted for any audience ("
                             + ALLOW_ANY_AUDIENCE
-                            + ", meant for testing; list audiences in production): {}",
+                            + ", meant for testing or setting up a federation; list audiences in"
+                            + " production): {}",
                     String.join(", ", anyAudience));
         }
     }

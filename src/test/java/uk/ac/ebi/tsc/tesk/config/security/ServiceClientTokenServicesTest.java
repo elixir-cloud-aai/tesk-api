@@ -448,7 +448,8 @@ public class ServiceClientTokenServicesTest {
         services();
         String warning =
                 "Service clients whose tokens are accepted for any audience"
-                        + " (allowAnyAudience, meant for testing; list audiences in"
+                        + " (allowAnyAudience, meant for testing or setting up a federation; list"
+                        + " audiences in"
                         + " production): gateway-client, third-client";
         assertTrue(
                 output.getOut()
