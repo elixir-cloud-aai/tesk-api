@@ -11,6 +11,7 @@ import org.springframework.boot.webmvc.error.ErrorAttributes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -123,7 +124,7 @@ public class ResourceServerConfiguration {
      * locally ({@link ServiceClientTokenServices})
      */
     @Bean
-    public OpaqueTokenIntrospector tokenIntrospector() {
+    public OpaqueTokenIntrospector tokenIntrospector(Environment environment) {
         GroupNamesSecurityExtractor authoritiesExtractor =
                 new GroupNamesSecurityExtractor(
                         authorisationProperties.getGroupsClaim(),
@@ -134,6 +135,7 @@ public class ResourceServerConfiguration {
                         new ElixirPrincipalExtractor(authoritiesExtractor, authorisationProperties),
                         authoritiesExtractor);
         if (authorisationProperties.getServiceClients().isEnabled()) {
+            ServiceClientTokenServices.refuseRemovedSettings(environment);
             return new ServiceClientTokenServices(userInfoIntrospector, authorisationProperties);
         }
         return userInfoIntrospector;
