@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -174,7 +175,7 @@ public class TaskVisibilityOwnerAuthIT {
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
         // the own task-123 and task-125, also if Kubernetes returned the others
-        performListTask(2);
+        performListTask("task-123", "task-125");
     }
 
     @Test
@@ -190,7 +191,7 @@ public class TaskVisibilityOwnerAuthIT {
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
         // the own task-124 and task-126, also if Kubernetes returned the others
-        performListTask(2);
+        performListTask("task-124", "task-126");
     }
 
     private void performGetTask(ResultMatcher expected) throws Exception {
@@ -211,12 +212,14 @@ public class TaskVisibilityOwnerAuthIT {
                         .header("Authorization", "Bearer BAR"));
     }
 
-    private void performListTask(int expectedLength) throws Exception {
+    /** Lists the tasks in all views, and expects exactly the tasks with these IDs */
+    private void performListTask(String... expectedIds) throws Exception {
         for (String view : new String[] {"MINIMAL", "BASIC", "FULL"}) {
             this.mvc
                     .perform(get(TASK_URL + "?view=" + view).header("Authorization", "Bearer BAR"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.tasks.length()").value(expectedLength));
+                    .andExpect(jsonPath("$.tasks.length()").value(expectedIds.length))
+                    .andExpect(jsonPath("$.tasks[*].id", containsInAnyOrder(expectedIds)));
         }
     }
 }

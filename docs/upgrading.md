@@ -17,7 +17,9 @@
   only the old creator label, are visible to nobody unless
   `TESK_API_AUTHORISATION_LEGACY_USER_LABELS` is on (with `group`, team
   admins and super admins still see them). No effect with the `noauth`
-  profile.
+  profile. During a rolling update, pods of the old version still answer
+  with the old rules: owner-only visibility holds once the rollout has
+  completed.
 - **`/v2/api-docs` is gone.** The alias of the API description at its
   former path, deprecated in 2.0.0, is removed
   ([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188)):
