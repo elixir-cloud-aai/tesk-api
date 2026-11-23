@@ -62,8 +62,8 @@ public class User implements Serializable, UserDetails, Principal {
 
     /**
      * Whether the user may get, list and cancel only the own tasks, whatever the groups, admins
-     * included (tesk.api.authorisation.task-visibility=owner; issue #218). Off for users built
-     * without it, e.g. without authentication.
+     * included (tesk.api.authorisation.task-visibility=owner; issue #218). Set from the setting for
+     * users and service clients; off for users built without it, i.e. without authentication.
      */
     private boolean ownerOnly = false;
 
@@ -145,6 +145,25 @@ public class User implements Serializable, UserDetails, Principal {
         return userId.equals(creator);
     }
 
+    /**
+     * Whether the user may get (and so cancel) the task of the log, as {@code TesService#getTask}
+     * checks it: the creator of a task of a group the user is a member of; an admin; a manager of
+     * the task's group; or, for users authorised without groups, the creator of a task without a
+     * group. With {@link #ownerOnly}, only the creator, under these rules (issue #218).
+     */
+    public boolean mayGet(TesTaskLog log) {
+        boolean creator = isCreator(log);
+        if (ownerOnly && !creator) {
+            return false;
+        }
+        Map<String, String> metadata = log == null ? null : log.getMetadata();
+        String group = metadata == null ? null : metadata.get("GROUP_NAME");
+        return (creator && group != null && isGroupMember(group))
+                || teskAdmin
+                || (group != null && isGroupManager(group))
+                || (isAuthorisedWithoutGroup() && creator && group == null);
+    }
+
     private boolean isLegacyCreator(String legacyLabel) {
         return legacyUserLabels && CreatorLabels.legacyValue(userId).equals(legacyLabel);
     }
@@ -173,11 +192,11 @@ public class User implements Serializable, UserDetails, Principal {
     }
 
     /**
-     * Label selector of the taskmaster jobs that the user may list, in addition to the job type:
-     * none for admins (all tasks); the groups (and, unless a manager of one, the own tasks in them)
-     * for group members and managers; the own tasks without a group for users authorised by the
-     * claim only (tesk.api.authorisation.claim) and for service clients. Null also for users
-     * without any of these rights, who may not list tasks at all (see {@code
+     * Label selector of the taskmaster jobs that the user may list, in addition to the job type.
+     * With group visibility: none for admins (all tasks); the groups (and, unless a manager of one,
+     * the own tasks in them) for group members and managers; the own tasks without a group for
+     * users authorised by the claim only (tesk.api.authorisation.claim) and for service clients.
+     * Null also for users without any of these rights, who may not list tasks at all (see {@code
      * TesService#listTasks}). The own tasks are selected by the hash label, which only narrows the
      * list down: the caller checks the creator of each job ({@link #isCreatorOf}). With {@link
      * #legacyUserLabels}, the selector can't name the creator, as tasks may have either label, and

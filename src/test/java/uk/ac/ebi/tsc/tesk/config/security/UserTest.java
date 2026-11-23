@@ -5,11 +5,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
+import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 
 /** The account, group and equality rules of {@link User} */
 public class UserTest {
@@ -147,6 +151,68 @@ public class UserTest {
         User group = manager.ownerOnly(false).build();
         assertThat(group.isListed(own)).isTrue();
         assertThat(group.isListed(others)).isTrue();
+    }
+
+    /** A task log of {@code creator} for {@code group} (or none), as getTask returns it */
+    private static TesTaskLog log(String creator, String group) {
+        TesTaskLog log = new TesTaskLog();
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("USER_ID", creator);
+        if (group != null) {
+            metadata.put("GROUP_NAME", group);
+        }
+        log.setMetadata(metadata);
+        return log;
+    }
+
+    /** With group visibility, the groups decide who gets a task, as before issue #218 */
+    @Test
+    public void mayGet_groupVisibility() {
+        User admin = User.builder("admin").teskAdmin(true).build();
+        User manager = User.builder("manager").teskManagedGroups(Set.of("TEST")).build();
+        User member = User.builder("member").teskMemberedGroups(Set.of("TEST")).build();
+        User claimUser = User.builder("claim").claimAuthorised(true).build();
+
+        assertThat(admin.mayGet(log("other", "TEST"))).isTrue();
+        assertThat(admin.mayGet(log("other", null))).isTrue();
+        assertThat(manager.mayGet(log("other", "TEST"))).isTrue();
+        assertThat(manager.mayGet(log("other", "ABC"))).isFalse();
+        assertThat(member.mayGet(log("member", "TEST"))).isTrue();
+        assertThat(member.mayGet(log("other", "TEST"))).isFalse();
+        assertThat(member.mayGet(log("member", "ABC"))).isFalse();
+        assertThat(member.mayGet(log("member", null))).isFalse();
+        assertThat(claimUser.mayGet(log("claim", null))).isTrue();
+        assertThat(claimUser.mayGet(log("claim", "TEST"))).isFalse();
+        assertThat(claimUser.mayGet(log("other", null))).isFalse();
+        assertThat(member.mayGet(null)).isFalse();
+    }
+
+    /**
+     * With owner-only visibility, nobody gets another user's task, admins and managers included;
+     * creators get their own tasks under the same rules as with group visibility
+     */
+    @Test
+    public void mayGet_ownerOnly() {
+        User admin = User.builder("admin").teskAdmin(true).ownerOnly(true).build();
+        User manager =
+                User.builder("manager").teskManagedGroups(Set.of("TEST")).ownerOnly(true).build();
+        User member =
+                User.builder("member").teskMemberedGroups(Set.of("TEST")).ownerOnly(true).build();
+        User claimUser = User.builder("claim").claimAuthorised(true).ownerOnly(true).build();
+
+        assertThat(admin.mayGet(log("other", "TEST"))).isFalse();
+        assertThat(admin.mayGet(log("other", null))).isFalse();
+        assertThat(admin.mayGet(log("admin", "TEST"))).isTrue();
+        assertThat(admin.mayGet(log("admin", null))).isTrue();
+        assertThat(manager.mayGet(log("other", "TEST"))).isFalse();
+        assertThat(manager.mayGet(log("manager", "TEST"))).isTrue();
+        assertThat(manager.mayGet(log("manager", "ABC"))).isFalse();
+        assertThat(member.mayGet(log("member", "TEST"))).isTrue();
+        assertThat(member.mayGet(log("other", "TEST"))).isFalse();
+        assertThat(member.mayGet(log("member", "ABC"))).isFalse();
+        assertThat(claimUser.mayGet(log("claim", null))).isTrue();
+        assertThat(claimUser.mayGet(log("other", null))).isFalse();
+        assertThat(admin.mayGet(null)).isFalse();
     }
 
     /** The log of the user lists the user's data, but no credentials (there are none) */

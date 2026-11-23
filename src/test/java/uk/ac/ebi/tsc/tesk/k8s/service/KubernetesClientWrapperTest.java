@@ -39,6 +39,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
@@ -366,6 +367,47 @@ public class KubernetesClientWrapperTest {
         verifyListJobs("test-namespace", argument);
         assertThat(argument.getValue(), is("job-type=taskmaster"));
         assertThat(result, is(this.resultList()));
+    }
+
+    /**
+     * With owner-only visibility and the old labels, no selector names the creator of an admin's
+     * tasks, but the list keeps only the admin's own tasks, also those with only the old label
+     * (issues #218 and #119)
+     */
+    @Test
+    public void listAllTaskmasterJobsForUser_ownerOnlyAdminWithLegacyLabels() throws ApiException {
+        User admin =
+                User.builder("a@b").teskAdmin(true).ownerOnly(true).legacyUserLabels(true).build();
+        V1ObjectMeta own = new V1ObjectMeta().name("own");
+        CreatorLabels.put(own, "a@b");
+        GroupLabels.put(own, "TEST");
+        V1ObjectMeta ownLegacy =
+                new V1ObjectMeta()
+                        .name("own-legacy")
+                        .putLabelsItem(Constants.LABEL_LEGACY_USERID_KEY, "a_b");
+        V1ObjectMeta others = new V1ObjectMeta().name("others");
+        CreatorLabels.put(others, "c@d");
+        V1ObjectMeta othersLegacy =
+                new V1ObjectMeta()
+                        .name("others-legacy")
+                        .putLabelsItem(Constants.LABEL_LEGACY_USERID_KEY, "c_d");
+        given(listJobs.execute())
+                .willReturn(
+                        new V1JobList()
+                                .metadata(new V1ListMeta())
+                                .items(
+                                        Arrays.asList(
+                                                new V1Job().metadata(own),
+                                                new V1Job().metadata(ownLegacy),
+                                                new V1Job().metadata(others),
+                                                new V1Job().metadata(othersLegacy))));
+        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
+        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, admin);
+        verifyListJobs(namespace, argument);
+        assertThat(argument.getValue(), is("job-type=taskmaster"));
+        assertThat(
+                result.getItems().stream().map(job -> job.getMetadata().getName()).toList(),
+                is(Arrays.asList("own", "own-legacy")));
     }
 
     @Test

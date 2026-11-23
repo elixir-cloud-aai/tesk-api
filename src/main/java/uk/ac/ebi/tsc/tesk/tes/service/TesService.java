@@ -33,18 +33,13 @@ public interface TesService {
      * Gets single task's details based on ID. Performs a series of kubernetes API calls and
      * converts results with means of the converter. With owner-only visibility
      * (tesk.api.authorisation.task-visibility=owner, the default; issue #218), only the task's
-     * creator may get it, and only with the rights below (admins and managers their own tasks).
+     * creator may get it (see {@link User#mayGet}).
      *
      * @param taskId - TES task ID (==taskmaster's job name)
      * @param view - one of {@link TaskView} values, decides on how much detail is put in results
      * @return - TES task details
      */
-    @PostAuthorize(
-            "(NOT #user.ownerOnly OR #user.isCreator(returnObject.logs[0])) AND ("
-                    + "(#user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupMember(returnObject.logs[0].metadata['GROUP_NAME']))"
-                    + " OR (#user.teskAdmin)"
-                    + " OR (returnObject.logs[0].metadata['GROUP_NAME'] != null AND #user.isGroupManager(returnObject.logs[0].metadata['GROUP_NAME']))"
-                    + " OR (#user.authorisedWithoutGroup AND #user.isCreator(returnObject.logs[0]) AND returnObject.logs[0].metadata['GROUP_NAME'] == null))")
+    @PostAuthorize("#user.mayGet(returnObject.logs[0])")
     TesTask getTask(String taskId, TaskView view, User user);
 
     /**

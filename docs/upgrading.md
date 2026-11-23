@@ -12,10 +12,12 @@
   decide who may create tasks. Handle stuck or abusive tasks through
   Kubernetes (e.g. with `kubectl`). To keep the previous
   behaviour, set `TESK_API_AUTHORISATION_TASK_VISIBILITY=group` (see [Task
-  visibility](access-control.md#task-visibility)). Tasks created before
-  1.2.0, with only the old creator label, are then visible to nobody unless
-  `TESK_API_AUTHORISATION_LEGACY_USER_LABELS` is on. No effect with the
-  `noauth` profile.
+  visibility](access-control.md#task-visibility)); the Helm chart of TESK
+  can't set it yet. With `owner`, tasks created before 1.2.0, which have
+  only the old creator label, are visible to nobody unless
+  `TESK_API_AUTHORISATION_LEGACY_USER_LABELS` is on (with `group`, team
+  admins and super admins still see them). No effect with the `noauth`
+  profile.
 - **`/v2/api-docs` is gone.** The alias of the API description at its
   former path, deprecated in 2.0.0, is removed
   ([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188)):
@@ -316,7 +318,8 @@ What's new:
   creators](access-control.md#task-creators)). `logs[0].metadata.USER_ID`
   shows the `sub` unchanged (e.g. `user@example.org` instead of
   `user_example.org`). Tasks created before the upgrade keep the old label:
-  team admins and super admins see them as before, but their creators can no
+  team admins and super admins see them as before (until 2.1.0, see [To
+  2.1.0](#to-210) for owner-only visibility), but their creators can no
   longer list, get or cancel them. What to do:
     - Upgrade when no tasks run, or let running tasks end first; if you want
       their creators to keep access for a while, set
