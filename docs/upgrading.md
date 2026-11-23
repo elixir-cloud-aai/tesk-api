@@ -2,6 +2,20 @@
 
 ## To 2.1.0
 
+- **Tasks visible to their owner only (behaviour change, security).** With
+  the `auth` profile, users get, list and cancel only their own tasks,
+  whatever their groups
+  ([#218](https://github.com/elixir-cloud-aai/tesk-api/issues/218)): super
+  admins no longer see all tasks of the installation, and team admins no
+  longer see the tasks of other members of their teams; requests for other
+  users' tasks give `403 Forbidden`, and lists leave them out. Groups still
+  decide who may create tasks. Handle stuck or abusive tasks through
+  Kubernetes (e.g. with `kubectl`). To keep the previous
+  behaviour, set `TESK_API_AUTHORISATION_TASK_VISIBILITY=group` (see [Task
+  visibility](access-control.md#task-visibility)). Tasks created before
+  1.2.0, with only the old creator label, are then visible to nobody unless
+  `TESK_API_AUTHORISATION_LEGACY_USER_LABELS` is on. No effect with the
+  `noauth` profile.
 - **`/v2/api-docs` is gone.** The alias of the API description at its
   former path, deprecated in 2.0.0, is removed
   ([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188)):
