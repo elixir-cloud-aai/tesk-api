@@ -164,7 +164,7 @@ characters):
 * the label `creator-group-name`: the team name, if it is a valid label
   value; otherwise `sha256-` and the first 32 hexadecimal digits of the
   SHA-256 hash of the name (in UTF-8). Kubernetes selects the tasks of teams
-  by it.
+  by it (for `kubectl`, see [Upgrading](upgrading.md#to-210)).
 * the annotation `creator-group-name`: the team name itself. The team of a
   task is the annotation if the label is its value as above; otherwise (for
   tasks created by TESK API 2.0.0 or earlier, which have only the label) the
