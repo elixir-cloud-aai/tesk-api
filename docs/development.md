@@ -127,6 +127,60 @@ run once:
 git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
+## Token validation
+
+The package `uk.ac.ebi.tsc.tesk.config.security.token` holds the token
+validation of the access control redesign. It is not used by the application
+yet: requests are still authenticated as described in [Access
+control](access-control.md), until a later change switches authentication to
+it, and its settings (`tesk.api.auth.*`) have no effect until then.
+
+- `TokenValidator` is the one interface for token validation: it takes the
+  bearer token and returns the caller (`TokenPrincipal`), or throws an
+  `InvalidTokenException` whose message is the reason (never the token).
+  `TokenValidators.create` selects the implementation by
+  `tesk.api.auth.token-validator`. Only `jwt` exists; another kind (e.g.
+  introspection of opaque tokens, RFC 7662) is a new implementation and a new
+  value there, without changes to the callers.
+- `JwtAccessTokenValidator` accepts JWT access tokens (RFC 9068) only: a
+  single signed JWT whose `iss` is exactly one of the configured issuers,
+  signed with one of the configured asymmetric algorithms (default `RS256`,
+  `ES256`; `none` and HMAC can't be configured) by a key of that issuer (from
+  its OpenID Connect discovery, or a configured JWKS URI; `IssuerVerifier`
+  caches them and fetches them again at most once per interval), with `typ`
+  `at+jwt`, `exp`, `iat` and `sub` required, `nbf`, and a clock skew. Tokens
+  with an `act` claim (delegation, RFC 8693) are refused for now.
+- The caller is identified by issuer and subject together
+  (`TokenPrincipal.owner()`: `<iss>|<sub>`). A token is a listed service
+  client's if both the client claim (default `client_id`) and `sub` are the
+  ID of a client in `service-clients`; it is then accepted if `aud` is or
+  contains that client's ID. Any other token is a user's: `aud` must be or
+  contain one of the issuer's `audiences` (the client IDs of the front ends),
+  and a `sub` that equals a listed client's ID is refused.
+
+The settings, as properties (environment variables in upper snake case, e.g.
+`TESK_API_AUTH_ISSUERS_0_URL`):
+
+```properties
+tesk.api.auth.token-validator=jwt
+tesk.api.auth.issuers[0].url=https://login.aai.lifescience-ri.eu/oidc/
+tesk.api.auth.issuers[0].audiences=<front-end client ID>,<another one>
+tesk.api.auth.issuers[0].service-clients[0].client-id=<service client ID>
+# optional, with their defaults
+tesk.api.auth.issuers[0].jwks-uri=
+tesk.api.auth.issuers[0].client-claim=client_id
+tesk.api.auth.algorithms=RS256,ES256
+tesk.api.auth.require-access-token-type=true
+tesk.api.auth.clock-skew-seconds=60
+tesk.api.auth.max-token-age-seconds=86400
+tesk.api.auth.timeout-seconds=10
+```
+
+Invalid settings (e.g. no issuer, an issuer with neither audiences nor service
+clients, a plain `http` URL other than to the local host, a symmetric
+algorithm) make `JwtAccessTokenValidator` throw an `IllegalStateException`,
+so that TESK API will refuse to start with them.
+
 ## Building the image and the docs
 
 To build the image (the `Dockerfile` builds the application from source, so
