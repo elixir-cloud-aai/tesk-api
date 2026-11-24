@@ -6,9 +6,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * The caller of a request with a valid token: a user, or a listed service client (D-392). The
- * caller is identified by issuer and subject together ({@link #owner()}), since {@code sub} is only
- * unique per issuer.
+ * The caller of a request with a valid token: a user, or a listed service client. The caller is
+ * identified by issuer and subject together ({@link #owner()}), since {@code sub} is only unique
+ * per issuer.
  *
  * @param issuer the {@code iss} of the token, exactly as configured
  * @param subject the {@code sub} of the token

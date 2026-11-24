@@ -69,6 +69,9 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>An {@link OpaqueTokenIntrospector}; the name stays from before, so that the documented logger
  * name ({@code uk.ac.ebi.tsc.tesk.config.security.ServiceClientTokenServices}) keeps working.
+ *
+ * <p>Its key handling ({@code isSecure}, {@code ThrottledHttpsJwks}, the discovery) has a copy in
+ * {@code token.IssuerVerifier}, which replaces this class: keep fixes to either in sync until then.
  */
 public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
 

@@ -42,8 +42,8 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
 /**
- * The JWT access token validator (design step 1-11): tokens signed with test keys, checked against
- * a discovery document and JSON Web Key Set served by WireMock
+ * The JWT access token validator: tokens signed with test keys, checked against a discovery
+ * document and JSON Web Key Set served by WireMock
  */
 @ExtendWith(OutputCaptureExtension.class)
 public class JwtAccessTokenValidatorTest {
@@ -237,17 +237,13 @@ public class JwtAccessTokenValidatorTest {
     }
 
     @Test
-    public void listedServiceClient_isAccepted_withItsOwnIdAsAudience(CapturedOutput output)
-            throws Exception {
+    public void listedServiceClient_isAccepted_withItsOwnIdAsAudience() throws Exception {
         TokenPrincipal principal = accepted(sign(clientClaims()));
 
         assertEquals(TokenPrincipal.Kind.SERVICE_CLIENT, principal.kind());
         assertEquals(SERVICE_CLIENT, principal.subject());
         assertEquals(SERVICE_CLIENT, principal.clientId());
         assertEquals(issuer() + "|" + SERVICE_CLIENT, principal.owner());
-        assertThat(
-                output.getOut(),
-                containsString("Accepted token of service client " + SERVICE_CLIENT));
     }
 
     @Test
@@ -550,7 +546,7 @@ public class JwtAccessTokenValidatorTest {
         assertEquals("malformed claim", refused(sign(claims)));
     }
 
-    /** Delegated tokens (RFC 8693 act) wait for the decision on actors (Q6) */
+    /** Delegated tokens (RFC 8693 act) are refused until actors are supported */
     @Test
     public void delegatedToken_isRefused() throws Exception {
         JwtClaims claims = userClaims();
@@ -583,7 +579,7 @@ public class JwtAccessTokenValidatorTest {
         assertEquals("wrong audience", refused(sign(claims)));
     }
 
-    /** A service client's token for a front end is not a token for TESK (D-392) */
+    /** A service client's token for a front end is not a token for TESK */
     @Test
     public void serviceClient_withFrontEndAudience_isRefused() throws Exception {
         JwtClaims claims = clientClaims();

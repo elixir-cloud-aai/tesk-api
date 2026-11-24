@@ -7,7 +7,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.jose4j.jwa.AlgorithmConstraints;
 import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jwt.JwtClaims;
@@ -25,7 +24,7 @@ import org.springframework.util.StringUtils;
 
 /**
  * Validates JWT access tokens (RFC 9068) locally, against the keys of the configured issuers
- * ({@link TokenValidationProperties}, design section 3, steps 1-11):
+ * ({@link TokenValidationProperties}):
  *
  * <ol>
  *   <li>a single signed JWT (no opaque, encrypted or nested tokens);
@@ -35,12 +34,14 @@ import org.springframework.util.StringUtils;
  *   <li>header {@code typ} {@code at+jwt} (unless switched off);
  *   <li>{@code exp} required, {@code nbf}, and {@code iat} required, not in the future and not
  *       older than the maximum age, all with the clock skew;
- *   <li>{@code sub} present; no {@code act} (delegated tokens are refused until TESK API decides on
- *       actors, design Q6);
+ *   <li>{@code sub} present; no {@code act} (delegated tokens, RFC 8693, are refused until TESK API
+ *       supports actors);
  *   <li>a listed service client (client claim and {@code sub} both its ID) needs its own ID in
- *       {@code aud} (D-392); any other token is a user's and needs one of the issuer's audiences
- *       (the front ends' client IDs, D-408) in {@code aud}; a user whose {@code sub} is a listed
- *       client's ID is refused (they would share its tasks).
+ *       {@code aud} (the issuer puts no TESK audience into client tokens; a token for any other
+ *       audience was meant for another service); any other token is a user's and needs one of the
+ *       issuer's audiences (the client IDs of the front ends through which users call TESK API) in
+ *       {@code aud}; a user whose {@code sub} is a listed client's ID is refused (they would share
+ *       its tasks).
  * </ol>
  *
  * <p>Logs accepted service clients by ID, refusals by reason, never the token.
@@ -277,12 +278,12 @@ public final class JwtAccessTokenValidator implements TokenValidator {
         }
         TokenPrincipal.Kind kind;
         if (subject.equals(clientId) && issuer.serviceClients().contains(subject)) {
-            // a listed client's own token is meant for TESK only with its own ID (D-392)
+            // a listed client's own token is meant for TESK only with its own ID as audience
             if (!audiences.contains(subject)) {
                 throw refused(WRONG_AUDIENCE);
             }
             kind = TokenPrincipal.Kind.SERVICE_CLIENT;
-            logger.info("Accepted token of service client {}", subject);
+            logger.debug("Accepted token of service client {}", subject);
         } else {
             if (issuer.serviceClients().contains(subject)) {
                 throw refused("user with the ID of a service client");
@@ -296,7 +297,8 @@ public final class JwtAccessTokenValidator implements TokenValidator {
     }
 
     private static InvalidTokenException refused(String reason) {
-        logger.warn("Refused token: {}", reason);
+        // not WARN: callers without a valid token decide how often this is logged
+        logger.info("Refused token: {}", reason);
         return new InvalidTokenException(reason);
     }
 
@@ -307,33 +309,24 @@ public final class JwtAccessTokenValidator implements TokenValidator {
                         .map(ErrorCodeValidator.Error::getErrorCode)
                         .map(JwtAccessTokenValidator::reason)
                         .distinct()
-                        .collect(Collectors.toList());
+                        .toList();
         return reasons.isEmpty() ? "invalid token" : String.join(", ", reasons);
     }
 
     private static String reason(int code) {
-        switch (code) {
-            case ErrorCodes.EXPIRED:
-                return "expired";
-            case ErrorCodes.NOT_YET_VALID:
-                return "not yet valid";
-            case ErrorCodes.EXPIRATION_MISSING:
-                return "no expiration time";
-            case ErrorCodes.ISSUED_AT_MISSING:
-            case ErrorCodes.ISSUED_AT_INVALID_FUTURE:
-            case ErrorCodes.ISSUED_AT_INVALID_PAST:
-                return "issued at (iat) missing or out of range";
-            case ErrorCodes.SUBJECT_MISSING:
-                return NO_SUBJECT;
-            case ErrorCodes.MALFORMED_CLAIM:
-                return "malformed claim";
-            case ErrorCodes.SIGNATURE_INVALID:
-                return "invalid signature";
-            case ErrorCodes.TYPE_INVALID:
-            case ErrorCodes.TYPE_MISSING:
-                return "not an access token (typ)";
-            default:
-                return "invalid token (code " + code + ")";
-        }
+        return switch (code) {
+            case ErrorCodes.EXPIRED -> "expired";
+            case ErrorCodes.NOT_YET_VALID -> "not yet valid";
+            case ErrorCodes.EXPIRATION_MISSING -> "no expiration time";
+            case ErrorCodes.ISSUED_AT_MISSING,
+                    ErrorCodes.ISSUED_AT_INVALID_FUTURE,
+                    ErrorCodes.ISSUED_AT_INVALID_PAST ->
+                    "issued at (iat) missing or out of range";
+            case ErrorCodes.SUBJECT_MISSING -> NO_SUBJECT;
+            case ErrorCodes.MALFORMED_CLAIM -> "malformed claim";
+            case ErrorCodes.SIGNATURE_INVALID -> "invalid signature";
+            case ErrorCodes.TYPE_INVALID, ErrorCodes.TYPE_MISSING -> "not an access token (typ)";
+            default -> "invalid token (code " + code + ")";
+        };
     }
 }

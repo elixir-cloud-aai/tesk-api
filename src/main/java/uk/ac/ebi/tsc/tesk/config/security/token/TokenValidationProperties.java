@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Settings of the validation of access tokens ({@code tesk.api.auth.*}). The defaults are the
  * secure ones; issuers, their audiences and service clients have no defaults.
  */
+// registered, and documented in configuration.md, when authentication is switched to it
 @ConfigurationProperties(prefix = "tesk.api.auth")
 public class TokenValidationProperties {
 
@@ -55,7 +56,7 @@ public class TokenValidationProperties {
         /** The claim that names the client a token was issued to */
         private String clientClaim = "client_id";
 
-        /** The service clients whose own tokens (client credentials grant) are accepted (D-392) */
+        /** The service clients whose own tokens (client credentials grant) are accepted */
         private List<ServiceClient> serviceClients = new ArrayList<>();
 
         public String getUrl() {
@@ -101,8 +102,8 @@ public class TokenValidationProperties {
 
     /**
      * A service client: its token is accepted if both the client claim and {@code sub} are its ID,
-     * and {@code aud} is or contains its ID (D-392). An object, so that settings per client can be
-     * added later.
+     * and {@code aud} is or contains its ID. An object, so that settings per client can be added
+     * later.
      */
     public static class ServiceClient {
         /** The client's ID */
