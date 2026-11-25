@@ -98,6 +98,51 @@ tools). To see what the tests miss, open
 Cover new code with tests that check its behaviour, rather than excluding it;
 code that no test can reach is usually dead and can go.
 
+### Access matrix
+
+The integration tests in `src/integration-test/java/uk/ac/ebi/tsc/tesk/accessmatrix/`
+pin the target behaviour of the access control redesign: who may call which
+operation, with which answer. They are its acceptance tests, and they run
+against the current code as well, where some answers differ until the
+redesign's changes are in:
+
+- `src/integration-test/resources/access-matrix/matrix.txt` is the caller x
+  operation matrix of the design: one row per kind of caller (anonymous, users
+  with and without `EOC-Compute`, former members, service clients, invalid
+  tokens, exchanged tokens, failures of the decision service and of the user
+  info endpoint), one column per operation (service info, create, get in the
+  three views, list, cancel). `AccessMatrixIT` reads the table and runs one
+  test per row, caller variant (e.g. row 12's kinds of invalid tokens) and
+  operation; keep the table the same as the design's. Further tests cover the
+  variants the design names next to the table: the stamped owner and actor,
+  missing and foreign tasks alike, page tokens of other owners, service info
+  that needs a token (`AccessMatrixServiceInfoPrivateIT`), and the decision
+  service asked for all operations (`AccessMatrixAllOperationsIT`, also with
+  the list scopes, a widening policy and failing closed) or failing open
+  (`AccessMatrixFailOpenIT`).
+- `src/integration-test/resources/access-matrix/pending.csv` lists the cells
+  that the current code doesn't meet yet: configuration, case, operation, the
+  change (slice) of the redesign that makes the cell pass, and the status the
+  code answers now. The test of a pending cell checks that the code still
+  answers that status and still misses the target (a strict expected
+  failure), and then ends as skipped, naming the slice. Once a change meets a
+  cell's target, its test fails until the change removes the line; if a
+  change alters the answer of a cell that stays pending, its test fails until
+  the change updates the status. Cells whose target needs a decision first
+  have the slice `decide` and are skipped without checks.
+- The tests run TESK with the `auth` profile against a mock OpenID Connect
+  provider (`MockIdp`: discovery, keys, tokens signed as the callers need
+  them, and a user info endpoint that answers like LS Login's), a mock
+  decision service (`MockPdp`: a stand-in for the owner-only reference policy
+  of [tes-authz](https://github.com/elixir-cloud-aai/tes-authz), with failure
+  modes, recording the requests) and a mock Kubernetes API (`MockCluster`:
+  running tasks of given owners). `Harness` holds the settings of both the
+  current access control and the redesign (`tesk.api.auth.*`,
+  `tesk.api.authz.*`, without effect until the changes use them); each change
+  removes the settings it deletes. `Owners.of` is the owner ID that the mock
+  tasks carry: the subject now, `<iss>|<sub>` once tokens are validated
+  locally, switched there in one place.
+
 ## Formatting and linting
 
 The Java code is formatted with
