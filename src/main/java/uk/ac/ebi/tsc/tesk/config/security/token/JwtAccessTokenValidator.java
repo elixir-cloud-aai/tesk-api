@@ -44,7 +44,7 @@ import org.springframework.util.StringUtils;
  *       its tasks).
  * </ol>
  *
- * <p>Logs accepted service clients by ID, refusals by reason, never the token.
+ * <p>Logs refusals by reason at INFO and accepted service clients by ID at DEBUG, never the token.
  */
 public final class JwtAccessTokenValidator implements TokenValidator {
 
@@ -66,7 +66,7 @@ public final class JwtAccessTokenValidator implements TokenValidator {
     private static final String PREFIX = "tesk.api.auth.";
 
     /** Upper bound of the timeouts of the requests to the issuers, in seconds */
-    static final int MAX_TIMEOUT_SECONDS = 300;
+    static final int MAX_TIMEOUT_SECONDS = 60;
 
     static final String DELEGATED = "delegated token (act) not accepted";
     static final String WRONG_AUDIENCE = "wrong audience";
@@ -243,7 +243,8 @@ public final class JwtAccessTokenValidator implements TokenValidator {
         } catch (InvalidJwtException e) {
             throw refused(reasons(e));
         } catch (IOException e) {
-            logger.warn("Keys of issuer {} unavailable: {}", issuer.url(), e.getMessage());
+            // the failed fetch itself is logged at WARN, once per attempt
+            logger.info("Keys of issuer {} unavailable: {}", issuer.url(), e.getMessage());
             throw new IssuerUnavailableException("keys of the issuer unavailable");
         }
         return principal(issuer, claims);

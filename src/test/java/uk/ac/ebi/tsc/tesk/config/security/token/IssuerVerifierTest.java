@@ -19,12 +19,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jose4j.jwa.AlgorithmConstraints;
 import org.jose4j.jwk.JsonWebKeySet;
+import org.jose4j.jwk.RsaJsonWebKey;
 import org.jose4j.jwk.RsaJwkGenerator;
 import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.InvalidJwtException;
 import org.jose4j.jwt.consumer.JwtConsumer;
 import org.jose4j.jwt.consumer.JwtConsumerBuilder;
+import org.jose4j.keys.resolvers.VerificationKeyResolver;
+import org.jose4j.lang.UnresolvableKeyException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -58,14 +62,14 @@ public class IssuerVerifierTest {
         assertFalse(IssuerVerifier.isSecure("/relative"));
     }
 
-    /** While one request builds the verifier, the others are refused at once */
+    /** While one request builds the verifier, the others wait for it, and are refused after that */
     @Test
-    public void whileKeysAreFetched_otherRequestsAreRefused() throws Exception {
+    public void whileKeysAreFetched_otherRequestsAreRefused_afterTheWait() throws Exception {
         IssuerVerifier verifier =
                 new IssuerVerifier(
                         "http://localhost:" + idp.getPort() + "/",
                         null,
-                        1,
+                        1, // timeouts of 1 ms: the others wait 4 ms
                         100,
                         keys -> new JwtConsumerBuilder().build());
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -136,6 +140,80 @@ public class IssuerVerifierTest {
             holder.shutdownNow();
             waiter.shutdownNow();
         }
+    }
+
+    /** A failure to fetch the keys again later is told from an unknown key ID */
+    @Test
+    public void keysUnavailableLater_areReportedAsUnavailable() throws Exception {
+        VerificationKeyResolver failing =
+                IssuerVerifier.signallingUnavailableKeys((jws, nesting) -> {
+                    throw new UnresolvableKeyException("no keys", new IOException("issuer down"));
+                });
+        IssuerVerifier verifier =
+                new IssuerVerifier(
+                        "http://localhost:" + idp.getPort() + "/",
+                        "http://localhost:" + idp.getPort() + "/jwk",
+                        1000,
+                        100,
+                        keys ->
+                                new JwtConsumerBuilder()
+                                        .setVerificationKeyResolver(failing)
+                                        .build());
+        idp.givenThat(
+                get("/jwk")
+                        .willReturn(
+                                okJson(
+                                        new JsonWebKeySet(RsaJwkGenerator.generateJwk(2048))
+                                                .toJson())));
+
+        IOException e = assertThrows(IOException.class, () -> verifier.verify(signed()));
+        assertEquals("keys of the issuer unavailable", e.getMessage());
+    }
+
+    @Test
+    public void unknownKeyId_withKeysAtHand_isAnInvalidToken() throws Exception {
+        VerificationKeyResolver unknown =
+                IssuerVerifier.signallingUnavailableKeys((jws, nesting) -> {
+                    throw new UnresolvableKeyException("unknown kid");
+                });
+        IssuerVerifier verifier =
+                new IssuerVerifier(
+                        "http://localhost:" + idp.getPort() + "/",
+                        "http://localhost:" + idp.getPort() + "/jwk",
+                        1000,
+                        100,
+                        keys ->
+                                new JwtConsumerBuilder()
+                                        .setVerificationKeyResolver(unknown)
+                                        .build());
+        idp.givenThat(
+                get("/jwk")
+                        .willReturn(
+                                okJson(
+                                        new JsonWebKeySet(RsaJwkGenerator.generateJwk(2048))
+                                                .toJson())));
+
+        assertThrows(InvalidJwtException.class, () -> verifier.verify(signed()));
+    }
+
+    @Test
+    public void keysOfTheResolver_areReturned() throws Exception {
+        RsaJsonWebKey key = RsaJwkGenerator.generateJwk(2048);
+        VerificationKeyResolver resolver =
+                IssuerVerifier.signallingUnavailableKeys((jws, nesting) -> key.getPublicKey());
+
+        assertEquals(key.getPublicKey(), resolver.resolveKey(null, null));
+    }
+
+    private static String signed() throws Exception {
+        RsaJsonWebKey key = RsaJwkGenerator.generateJwk(2048);
+        JwtClaims claims = new JwtClaims();
+        claims.setSubject("user-1");
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setPayload(claims.toJson());
+        jws.setKey(key.getPrivateKey());
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
+        return jws.getCompactSerialization();
     }
 
     private static String unsigned() throws Exception {

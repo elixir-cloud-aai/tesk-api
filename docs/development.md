@@ -137,10 +137,11 @@ it, and its settings (`tesk.api.auth.*`) have no effect until then.
 
 - `TokenValidator` is the one interface for token validation: it takes the
   bearer token and returns the caller (`TokenPrincipal`), or throws an
-  `InvalidTokenException` whose message is the reason (never the token; for
-  `401`), or an `IssuerUnavailableException` if the token can't be checked
-  now, e.g. because the issuer's keys can't be fetched (for `503`, so that
-  clients retry instead of treating it as a bad credential).
+  `InvalidTokenException` whose message is the reason (never the token; its
+  caller is to answer `401`), or an `IssuerUnavailableException` if the token
+  can't be checked now because the issuer's keys can't be fetched, at first or
+  after the cached ones expired (its caller is to answer `503`, so that clients
+  retry instead of treating it as a bad credential).
   `TokenValidators.create` selects the implementation by
   `tesk.api.auth.token-validator`. Only `jwt` exists; another kind (e.g.
   introspection of opaque tokens, RFC 7662) is a new implementation and a new
@@ -151,7 +152,8 @@ it, and its settings (`tesk.api.auth.*`) have no effect until then.
   `ES256`; `none` and HMAC can't be configured) by a key of that issuer (from
   its OpenID Connect discovery, or a configured JWKS URI; `IssuerVerifier`
   caches them, fetches them again at most once per interval, and lets requests
-  that arrive during the first fetch wait for it), with `typ`
+  that arrive during the first fetch wait for it, at most 15 seconds), with
+  `typ`
   `at+jwt`, `exp`, `iat` and `sub` required, `nbf`, and a clock skew. Tokens
   with an `act` claim (delegation, RFC 8693) are refused for now.
 - The caller is identified by issuer and subject together
@@ -177,12 +179,12 @@ tesk.api.auth.algorithms=RS256,ES256
 tesk.api.auth.require-access-token-type=true
 tesk.api.auth.clock-skew-seconds=60
 tesk.api.auth.max-token-age-seconds=86400
-tesk.api.auth.timeout-seconds=10
+tesk.api.auth.timeout-seconds=10    # 1 to 60
 ```
 
 Invalid settings (e.g. no issuer, an issuer with neither audiences nor service
 clients, a plain `http` URL other than to the local host, a symmetric
-algorithm) make `JwtAccessTokenValidator` throw an `IllegalStateException`,
+algorithm, a timeout outside 1 to 60 seconds) make `JwtAccessTokenValidator` throw an `IllegalStateException`,
 so that TESK API will refuse to start with them.
 
 ## Building the image and the docs

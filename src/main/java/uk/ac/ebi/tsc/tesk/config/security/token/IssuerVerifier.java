@@ -17,6 +17,9 @@ import org.jose4j.jwt.consumer.JwtConsumer;
 import org.jose4j.keys.resolvers.HttpsJwksVerificationKeyResolver;
 import org.jose4j.keys.resolvers.VerificationKeyResolver;
 import org.jose4j.lang.JoseException;
+import org.jose4j.lang.UnresolvableKeyException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Verifies tokens of one issuer against its keys: from the configured JWKS URI or the {@code
@@ -26,6 +29,8 @@ import org.jose4j.lang.JoseException;
  * {@link TokenValidator}.
  */
 final class IssuerVerifier {
+
+    private static final Logger logger = LoggerFactory.getLogger(IssuerVerifier.class);
 
     /** Path of the OpenID Connect discovery document below the issuer */
     static final String DISCOVERY_PATH = "/.well-known/openid-configuration";
@@ -52,7 +57,10 @@ final class IssuerVerifier {
     private volatile JwtConsumer consumer;
 
     /** Until when (epoch milliseconds) a failed discovery isn't tried again (under buildLock) */
-    private long retryAt = 0;
+    private volatile long retryAt = 0;
+
+    /** Upper bound of the wait for the first build of the consumer, in milliseconds */
+    static final long MAX_WAIT_MS = 15_000;
 
     /** Held while the consumer is built */
     final ReentrantLock buildLock = new ReentrantLock();
@@ -102,19 +110,63 @@ final class IssuerVerifier {
     /**
      * @return the claims of the token, if all checks pass
      * @throws InvalidJwtException if a check fails
-     * @throws IOException if the issuer's keys are unavailable
+     * @throws IOException if the issuer's keys are unavailable (also if they can't be fetched again
+     *     later, once the cached ones have expired)
      */
     JwtClaims verify(String token) throws InvalidJwtException, IOException {
-        return consumer().processToClaims(token);
+        JwtConsumer built = consumer();
+        try {
+            return built.processToClaims(token);
+        } catch (InvalidJwtException e) {
+            if (hasCause(e, KeysUnavailableException.class)) {
+                throw new IOException("keys of the issuer unavailable", e);
+            }
+            throw e;
+        }
+    }
+
+    private static boolean hasCause(Throwable e, Class<? extends Throwable> type) {
+        for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A key that couldn't be resolved because the issuer's keys couldn't be fetched */
+    static final class KeysUnavailableException extends UnresolvableKeyException {
+        private static final long serialVersionUID = 1L;
+
+        KeysUnavailableException(UnresolvableKeyException e) {
+            super(e.getMessage(), e);
+        }
     }
 
     /**
-     * The consumer, built on first use. Requests that arrive while one builds it wait for it, at
-     * most as long as building it may take (discovery and keys, each with connect and read
-     * timeouts). If building it fails (e.g. no discovery), it isn't tried again for the refresh
-     * interval: tokens (which may be forged, as the issuer is read before the signature is checked)
-     * are refused at once until then, so that they can't make requests wait for the issuer one
-     * after another.
+     * Resolves keys with the resolver, and tells a failure to fetch the keys ({@link
+     * KeysUnavailableException}) from an unknown key ID with the keys at hand
+     */
+    static VerificationKeyResolver signallingUnavailableKeys(VerificationKeyResolver resolver) {
+        return (jws, nestingContext) -> {
+            try {
+                return resolver.resolveKey(jws, nestingContext);
+            } catch (UnresolvableKeyException e) {
+                if (e.getCause() instanceof IOException) {
+                    throw new KeysUnavailableException(e);
+                }
+                throw e;
+            }
+        };
+    }
+
+    /**
+     * The consumer, built on first use. Requests that arrive while the first attempt builds it wait
+     * for it (at most {@link #MAX_WAIT_MS}). If building it fails (e.g. no discovery), it isn't
+     * tried again for the refresh interval: tokens (which may be forged, as the issuer is read
+     * before the signature is checked) are refused at once until then, so that they can't make
+     * requests wait for the issuer one after another, and later attempts don't make other requests
+     * wait.
      */
     private JwtConsumer consumer() throws IOException {
         JwtConsumer built = this.consumer;
@@ -123,7 +175,8 @@ final class IssuerVerifier {
 
     private JwtConsumer build() throws IOException {
         try {
-            if (!this.buildLock.tryLock(4L * this.timeoutMs, TimeUnit.MILLISECONDS)) {
+            long waitMs = this.retryAt == 0 ? Math.min(4L * this.timeoutMs, MAX_WAIT_MS) : 0;
+            if (!this.buildLock.tryLock(waitMs, TimeUnit.MILLISECONDS)) {
                 throw new IOException("keys of the issuer are being fetched");
             }
         } catch (InterruptedException e) {
@@ -142,6 +195,8 @@ final class IssuerVerifier {
                 built = this.consumerFactory.apply(keyResolver());
             } catch (IOException | JoseException | RuntimeException e) {
                 this.retryAt = System.currentTimeMillis() + this.refreshIntervalMs;
+                // logged once per attempt, not per refused request
+                logger.warn("Fetching the keys of issuer {} failed: {}", this.issuer, e.toString());
                 throw new IOException("keys of the issuer unavailable", e);
             }
             this.consumer = built;
@@ -163,7 +218,7 @@ final class IssuerVerifier {
         if (jwks.getJsonWebKeys().isEmpty()) {
             throw new JoseException("The key set of the issuer has no keys");
         }
-        return new HttpsJwksVerificationKeyResolver(jwks);
+        return signallingUnavailableKeys(new HttpsJwksVerificationKeyResolver(jwks));
     }
 
     /**
