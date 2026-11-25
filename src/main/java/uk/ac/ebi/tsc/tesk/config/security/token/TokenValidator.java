@@ -14,8 +14,10 @@ public interface TokenValidator {
     /**
      * @param token the bearer token of the request
      * @return the caller, if the token is valid
-     * @throws InvalidTokenException if it isn't, with a reason that holds neither the token nor
-     *     values from it that weren't verified
+     * @throws InvalidTokenException if it isn't ({@code 401}), with a reason that holds neither the
+     *     token nor values from it that weren't verified
+     * @throws IssuerUnavailableException if it can't be checked now, e.g. the issuer's keys are
+     *     unavailable ({@code 503})
      */
     TokenPrincipal validate(String token);
 }

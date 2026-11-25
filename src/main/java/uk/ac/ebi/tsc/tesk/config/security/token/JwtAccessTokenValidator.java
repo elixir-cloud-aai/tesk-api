@@ -65,6 +65,9 @@ public final class JwtAccessTokenValidator implements TokenValidator {
 
     private static final String PREFIX = "tesk.api.auth.";
 
+    /** Upper bound of the timeouts of the requests to the issuers, in seconds */
+    static final int MAX_TIMEOUT_SECONDS = 300;
+
     static final String DELEGATED = "delegated token (act) not accepted";
     static final String WRONG_AUDIENCE = "wrong audience";
     static final String NO_SUBJECT = "no sub";
@@ -102,7 +105,10 @@ public final class JwtAccessTokenValidator implements TokenValidator {
         AlgorithmConstraints algorithms = algorithms(properties.getAlgorithms());
         check(properties.getClockSkewSeconds() >= 0, "clock-skew-seconds must not be negative");
         check(properties.getMaxTokenAgeSeconds() > 0, "max-token-age-seconds must be positive");
-        check(properties.getTimeoutSeconds() > 0, "timeout-seconds must be positive");
+        check(
+                properties.getTimeoutSeconds() > 0
+                        && properties.getTimeoutSeconds() <= MAX_TIMEOUT_SECONDS,
+                "timeout-seconds must be between 1 and " + MAX_TIMEOUT_SECONDS);
         List<TokenValidationProperties.Issuer> settings = properties.getIssuers();
         check(!settings.isEmpty(), "issuers must list at least one issuer");
         Map<String, Issuer> byUrl = new LinkedHashMap<>();
@@ -210,9 +216,9 @@ public final class JwtAccessTokenValidator implements TokenValidator {
                         .setRequireExpirationTime()
                         .setRequireIssuedAt()
                         .setRequireSubject()
-                        .setIssuedAtRestrictions(
-                                properties.getClockSkewSeconds(),
-                                properties.getMaxTokenAgeSeconds())
+                        // jose4j adds the clock skew to both bounds: iat at most the skew in the
+                        // future, and at most the maximum age (plus the skew) in the past
+                        .setIssuedAtRestrictions(0, properties.getMaxTokenAgeSeconds())
                         .setAllowedClockSkewInSeconds(properties.getClockSkewSeconds())
                         // the accepted audiences depend on the kind of caller
                         .setSkipDefaultAudienceValidation();
@@ -238,7 +244,7 @@ public final class JwtAccessTokenValidator implements TokenValidator {
             throw refused(reasons(e));
         } catch (IOException e) {
             logger.warn("Keys of issuer {} unavailable: {}", issuer.url(), e.getMessage());
-            throw refused("keys of the issuer unavailable");
+            throw new IssuerUnavailableException("keys of the issuer unavailable");
         }
         return principal(issuer, claims);
     }

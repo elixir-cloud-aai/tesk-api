@@ -176,6 +176,12 @@ public class JwtAccessTokenValidatorTest {
                 .getMessage();
     }
 
+    private String unavailable(String token) {
+        JwtAccessTokenValidator validator = validator();
+        return assertThrows(IssuerUnavailableException.class, () -> validator.validate(token))
+                .getMessage();
+    }
+
     private static String startupError(TokenValidationProperties settings) {
         return assertThrows(
                         IllegalStateException.class, () -> new JwtAccessTokenValidator(settings))
@@ -268,6 +274,29 @@ public class JwtAccessTokenValidatorTest {
                 accepted(sign(claims, otherKey, AlgorithmIdentifiers.RSA_USING_SHA256, "at+jwt"));
 
         assertEquals(second + "|" + USER, principal.owner());
+    }
+
+    /** Each issuer's tokens are checked against its own keys only */
+    @Test
+    public void tokenOfOneIssuer_signedWithTheKeyOfAnother_isRefused() throws Exception {
+        String second = base() + "/second";
+        properties.getIssuers().add(issuerSettings(second));
+        discovery("/second", second, "/second/jwk");
+        jwks("/second/jwk", otherKey);
+        JwtClaims claimsOfSecond = userClaims();
+        claimsOfSecond.setIssuer(second);
+        JwtAccessTokenValidator validator = validator();
+
+        assertThrows(InvalidTokenException.class, () -> validator.validate(sign(claimsOfSecond)));
+        assertThrows(
+                InvalidTokenException.class,
+                () ->
+                        validator.validate(
+                                sign(
+                                        userClaims(),
+                                        otherKey,
+                                        AlgorithmIdentifiers.RSA_USING_SHA256,
+                                        "at+jwt")));
     }
 
     @Test
@@ -503,6 +532,23 @@ public class JwtAccessTokenValidatorTest {
         assertThat(refused(sign(claims)), containsString("issued at"));
     }
 
+    /** The clock skew is the whole leeway for iat in the future */
+    @Test
+    public void issuedBeyondTheClockSkew_isRefused() throws Exception {
+        JwtClaims claims = userClaims();
+        claims.setIssuedAt(NumericDate.fromSeconds(NumericDate.now().getValue() + 90));
+
+        assertThat(refused(sign(claims)), containsString("issued at"));
+    }
+
+    @Test
+    public void issuedWithinTheClockSkew_isAccepted() throws Exception {
+        JwtClaims claims = userClaims();
+        claims.setIssuedAt(NumericDate.fromSeconds(NumericDate.now().getValue() + 30));
+
+        assertEquals(USER, accepted(sign(claims)).subject());
+    }
+
     @Test
     public void tooOld_isRefused() throws Exception {
         properties.setMaxTokenAgeSeconds(3600);
@@ -638,7 +684,7 @@ public class JwtAccessTokenValidatorTest {
                 get("/oidc" + IssuerVerifier.DISCOVERY_PATH)
                         .willReturn(aResponse().withStatus(503)));
 
-        assertEquals("keys of the issuer unavailable", refused(sign(userClaims())));
+        assertEquals("keys of the issuer unavailable", unavailable(sign(userClaims())));
     }
 
     @Test
@@ -646,7 +692,7 @@ public class JwtAccessTokenValidatorTest {
         idp.resetAll();
         discovery("/oidc", "https://evil.example.org/", "/oidc/jwk");
 
-        assertEquals("keys of the issuer unavailable", refused(sign(userClaims())));
+        assertEquals("keys of the issuer unavailable", unavailable(sign(userClaims())));
     }
 
     @Test
@@ -660,7 +706,7 @@ public class JwtAccessTokenValidatorTest {
                                                 + issuer()
                                                 + "\",\"jwks_uri\":\"http://keys.example.org/jwk\"}")));
 
-        assertEquals("keys of the issuer unavailable", refused(sign(userClaims())));
+        assertEquals("keys of the issuer unavailable", unavailable(sign(userClaims())));
     }
 
     @Test
@@ -670,7 +716,7 @@ public class JwtAccessTokenValidatorTest {
                 get("/oidc" + IssuerVerifier.DISCOVERY_PATH)
                         .willReturn(okJson("{\"issuer\":\"" + issuer() + "\"}")));
 
-        assertEquals("keys of the issuer unavailable", refused(sign(userClaims())));
+        assertEquals("keys of the issuer unavailable", unavailable(sign(userClaims())));
     }
 
     @Test
@@ -679,7 +725,7 @@ public class JwtAccessTokenValidatorTest {
         discovery("/oidc", issuer(), "/oidc/jwk");
         jwks("/oidc/jwk");
 
-        assertEquals("keys of the issuer unavailable", refused(sign(userClaims())));
+        assertEquals("keys of the issuer unavailable", unavailable(sign(userClaims())));
     }
 
     /** After a failed discovery, tokens are refused at once until the interval has passed */
@@ -692,8 +738,8 @@ public class JwtAccessTokenValidatorTest {
         JwtAccessTokenValidator validator = new JwtAccessTokenValidator(properties, 60_000);
         String token = sign(userClaims());
 
-        assertThrows(InvalidTokenException.class, () -> validator.validate(token));
-        assertThrows(InvalidTokenException.class, () -> validator.validate(token));
+        assertThrows(IssuerUnavailableException.class, () -> validator.validate(token));
+        assertThrows(IssuerUnavailableException.class, () -> validator.validate(token));
 
         idp.verify(1, getRequestedFor(urlEqualTo("/oidc" + IssuerVerifier.DISCOVERY_PATH)));
     }
@@ -706,7 +752,7 @@ public class JwtAccessTokenValidatorTest {
                         .willReturn(aResponse().withStatus(503)));
         JwtAccessTokenValidator validator = validator();
         String token = sign(userClaims());
-        assertThrows(InvalidTokenException.class, () -> validator.validate(token));
+        assertThrows(IssuerUnavailableException.class, () -> validator.validate(token));
         discovery("/oidc", issuer(), "/oidc/jwk");
         jwks("/oidc/jwk", key);
         Thread.sleep(150);
@@ -853,6 +899,13 @@ public class JwtAccessTokenValidatorTest {
         properties.setMaxTokenAgeSeconds(0);
 
         assertThat(startupError(properties), containsString("max-token-age-seconds"));
+    }
+
+    @Test
+    public void tooLongTimeout_failsAtStartup() {
+        properties.setTimeoutSeconds(JwtAccessTokenValidator.MAX_TIMEOUT_SECONDS + 1);
+
+        assertThat(startupError(properties), containsString("timeout-seconds"));
     }
 
     @Test

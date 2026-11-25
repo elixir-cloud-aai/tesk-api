@@ -17,11 +17,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import org.jose4j.jwa.AlgorithmConstraints;
 import org.jose4j.jwk.JsonWebKeySet;
 import org.jose4j.jwk.RsaJwkGenerator;
+import org.jose4j.jws.AlgorithmIdentifiers;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.JwtConsumer;
 import org.jose4j.jwt.consumer.JwtConsumerBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** The key handling of an issuer: URL checks and the throttling of concurrent fetches */
 public class IssuerVerifierTest {
@@ -59,7 +65,7 @@ public class IssuerVerifierTest {
                 new IssuerVerifier(
                         "http://localhost:" + idp.getPort() + "/",
                         null,
-                        1000,
+                        1,
                         100,
                         keys -> new JwtConsumerBuilder().build());
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -71,6 +77,83 @@ public class IssuerVerifierTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    /** Requests that wait while one request builds the verifier use the one it built */
+    @Test
+    public void waitingRequests_useTheVerifierBuiltMeanwhile() throws Exception {
+        JwtConsumer built =
+                new JwtConsumerBuilder()
+                        .setSkipAllValidators()
+                        .setDisableRequireSignature()
+                        .setSkipSignatureVerification()
+                        .build();
+        IssuerVerifier verifier =
+                new IssuerVerifier(
+                        "http://localhost:" + idp.getPort() + "/", null, 5000, 100, keys -> built);
+        ExecutorService holder = Executors.newSingleThreadExecutor();
+        ExecutorService waiter = Executors.newSingleThreadExecutor();
+        try {
+            holdLock(holder, verifier.buildLock);
+            Future<JwtClaims> claims = waiter.submit(() -> verifier.verify(unsigned()));
+            awaitQueued(verifier.buildLock);
+            ReflectionTestUtils.setField(verifier, "consumer", built);
+            holder.shutdownNow();
+
+            assertEquals("user-1", claims.get(5, TimeUnit.SECONDS).getSubject());
+            idp.verify(0, getRequestedFor(urlEqualTo(IssuerVerifier.DISCOVERY_PATH)));
+        } finally {
+            holder.shutdownNow();
+            waiter.shutdownNow();
+        }
+    }
+
+    @Test
+    public void interruptedWhileWaiting_isRefused() throws Exception {
+        IssuerVerifier verifier =
+                new IssuerVerifier(
+                        "http://localhost:" + idp.getPort() + "/",
+                        null,
+                        5000,
+                        100,
+                        keys -> new JwtConsumerBuilder().build());
+        ExecutorService holder = Executors.newSingleThreadExecutor();
+        ExecutorService waiter = Executors.newSingleThreadExecutor();
+        try {
+            holdLock(holder, verifier.buildLock);
+            Future<Boolean> interrupted =
+                    waiter.submit(() -> {
+                        IOException e =
+                                assertThrows(IOException.class, () -> verifier.verify("a.b.c"));
+                        assertTrue(e.getMessage().startsWith("interrupted"));
+                        return Thread.currentThread().isInterrupted();
+                    });
+            awaitQueued(verifier.buildLock);
+            waiter.shutdownNow();
+
+            assertTrue(interrupted.get(5, TimeUnit.SECONDS));
+        } finally {
+            holder.shutdownNow();
+            waiter.shutdownNow();
+        }
+    }
+
+    private static String unsigned() throws Exception {
+        JwtClaims claims = new JwtClaims();
+        claims.setSubject("user-1");
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setPayload(claims.toJson());
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.NONE);
+        jws.setAlgorithmConstraints(AlgorithmConstraints.NO_CONSTRAINTS);
+        return jws.getCompactSerialization();
+    }
+
+    /** Waits (up to 5 seconds) until a thread waits for the lock */
+    private static void awaitQueued(ReentrantLock lock) throws InterruptedException {
+        for (int i = 0; i < 500 && !lock.hasQueuedThreads(); i++) {
+            Thread.sleep(10);
+        }
+        assertTrue(lock.hasQueuedThreads());
     }
 
     /** While one request fetches the keys, the others use the keys at hand */

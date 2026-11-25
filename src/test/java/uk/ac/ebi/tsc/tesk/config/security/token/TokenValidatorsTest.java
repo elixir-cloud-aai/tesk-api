@@ -107,6 +107,10 @@ public class TokenValidatorsTest {
                         Map.of("sub", "user-1"));
 
         assertEquals("https://login.example.org/|user-1", principal.owner());
+        assertEquals(
+                "TokenPrincipal[issuer=https://login.example.org/, subject=user-1, kind=USER,"
+                        + " clientId=null]",
+                principal.toString());
         assertThrows(UnsupportedOperationException.class, () -> principal.claims().put("x", "y"));
     }
 

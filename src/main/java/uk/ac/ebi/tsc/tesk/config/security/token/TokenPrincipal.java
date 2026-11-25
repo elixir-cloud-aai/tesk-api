@@ -40,6 +40,20 @@ public record TokenPrincipal(
         claims = Collections.unmodifiableMap(new LinkedHashMap<>(claims));
     }
 
+    /** Without the claims, which may hold personal data (names, e-mail addresses) */
+    @Override
+    public String toString() {
+        return "TokenPrincipal[issuer="
+                + this.issuer
+                + ", subject="
+                + this.subject
+                + ", kind="
+                + this.kind
+                + ", clientId="
+                + this.clientId
+                + "]";
+    }
+
     /** The identity of the caller as owner of tasks: {@code <iss>|<sub>} */
     public String owner() {
         return this.issuer + OWNER_SEPARATOR + this.subject;

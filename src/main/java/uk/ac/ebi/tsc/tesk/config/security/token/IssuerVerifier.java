@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import org.jose4j.http.Get;
@@ -108,12 +109,12 @@ final class IssuerVerifier {
     }
 
     /**
-     * The consumer, built on first use. If building it fails (e.g. no discovery), it isn't tried
-     * again for the refresh interval: tokens (which may be forged, as the issuer is read before the
-     * signature is checked) are refused at once until then, so that they can't make requests wait
-     * for the issuer one after another. While one request builds it, the others are refused at once
-     * too. A request that found no consumer just before another one finished building it builds it
-     * once more (one more fetch of the keys, only right after startup).
+     * The consumer, built on first use. Requests that arrive while one builds it wait for it, at
+     * most as long as building it may take (discovery and keys, each with connect and read
+     * timeouts). If building it fails (e.g. no discovery), it isn't tried again for the refresh
+     * interval: tokens (which may be forged, as the issuer is read before the signature is checked)
+     * are refused at once until then, so that they can't make requests wait for the issuer one
+     * after another.
      */
     private JwtConsumer consumer() throws IOException {
         JwtConsumer built = this.consumer;
@@ -121,10 +122,18 @@ final class IssuerVerifier {
     }
 
     private JwtConsumer build() throws IOException {
-        if (!this.buildLock.tryLock()) {
-            throw new IOException("keys of the issuer are being fetched");
+        try {
+            if (!this.buildLock.tryLock(4L * this.timeoutMs, TimeUnit.MILLISECONDS)) {
+                throw new IOException("keys of the issuer are being fetched");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted while the keys of the issuer were fetched", e);
         }
         try {
+            if (this.consumer != null) {
+                return this.consumer; // built by the request that held the lock
+            }
             if (System.currentTimeMillis() < this.retryAt) {
                 throw new IOException("fetching the keys failed recently");
             }
