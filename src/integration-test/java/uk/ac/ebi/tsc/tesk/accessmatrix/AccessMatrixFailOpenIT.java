@@ -13,9 +13,9 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.Matrix.Operation;
 /**
  * Matrix variant of D-407: all four operations switched on, get, list and cancel failing open, and
  * the decision service down. Failing open falls back to TESK's owner-only decision, never to
- * allow-all, and create can't fail open (design section 4, as proposed in Q7, which is open: board
- * d67); so own tasks stay reachable, foreign ones don't, and create fails closed. Pending cells:
- * configuration {@code fail-open}.
+ * allow-all, and create can't fail open (as proposed by the design; the meaning of failing open is
+ * still to be decided, see docs/development.md, "Access matrix"); so own tasks stay reachable,
+ * foreign ones don't, and create fails closed. Pending cells: configuration {@code fail-open}.
  */
 @TestPropertySource(
         properties = {

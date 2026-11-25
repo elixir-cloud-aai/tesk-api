@@ -83,8 +83,14 @@ final class MockCluster {
                 get(urlPathMatching(JOBS + "/[^/]+"))
                         .atPriority(10)
                         .willReturn(aResponse().withStatus(404)));
-        kubernetes.givenThat(
-                get(urlPathEqualTo(JOBS)).atPriority(10).willReturn(okJson(jobList(List.of()))));
+        // the jobs of executors and filers: none
+        for (String selector : List.of("job-type=executor", "taskmaster-name=.*", "!job-type,.*")) {
+            kubernetes.givenThat(
+                    get(urlPathEqualTo(JOBS))
+                            .withQueryParam("labelSelector", matching(selector))
+                            .atPriority(4)
+                            .willReturn(okJson(jobList(List.of()))));
+        }
         kubernetes.givenThat(
                 get(urlPathEqualTo(PODS)).atPriority(10).willReturn(okJson(podList(List.of()))));
         kubernetes.givenThat(
@@ -119,31 +125,28 @@ final class MockCluster {
                     patch(urlPathEqualTo(PODS + "/" + pod.getMetadata().getName()))
                             .willReturn(okJson(GSON.toJson(pod))));
         });
-        // lists of taskmasters' jobs: of one owner by the hash label, of nobody for an unknown
-        // hash, and all without one
+        // lists of taskmasters' jobs: of one owner by the hash label (a term anywhere in the
+        // selector), of nobody for an unknown hash, and all for any other request, also without
+        // or with an unexpected selector, so that a selector that misses the owner shows up as
+        // a leak
         byOwner.forEach((owner, jobs) ->
                 kubernetes.givenThat(
                         get(urlPathEqualTo(JOBS))
                                 .withQueryParam(
                                         "labelSelector",
                                         matching(
-                                                "job-type=taskmaster(,.*)?,creator-user-hash="
+                                                "(.*,)?creator-user-hash="
                                                         + CreatorLabels.hash(owner)
                                                         + "(,.*)?"))
                                 .atPriority(1)
                                 .willReturn(okJson(jobList(jobs)))));
         kubernetes.givenThat(
                 get(urlPathEqualTo(JOBS))
-                        .withQueryParam(
-                                "labelSelector",
-                                matching("job-type=taskmaster(,.*)?,creator-user-hash=.*"))
+                        .withQueryParam("labelSelector", matching("(.*,)?creator-user-hash=.*"))
                         .atPriority(2)
                         .willReturn(okJson(jobList(List.of()))));
         kubernetes.givenThat(
-                get(urlPathEqualTo(JOBS))
-                        .withQueryParam("labelSelector", matching("job-type=taskmaster.*"))
-                        .atPriority(3)
-                        .willReturn(okJson(jobList(all))));
+                get(urlPathEqualTo(JOBS)).atPriority(10).willReturn(okJson(jobList(all))));
         // all pods of all jobs, for lists
         kubernetes.givenThat(
                 get(urlPathEqualTo(PODS))

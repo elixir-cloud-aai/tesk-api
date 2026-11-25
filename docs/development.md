@@ -143,6 +143,47 @@ redesign's changes are in:
   tasks carry: the subject now, `<iss>|<sub>` once tokens are validated
   locally, switched there in one place.
 
+The changes (slices) of the redesign that `pending.csv` names, in their
+order; each is a pull request of its own, stacked on the previous one, and
+none is merged before all are done:
+
+Slice | Change | Cells it makes pass
+--- | --- | ---
+T2 | Removes the group model: only owners get, list and cancel their tasks, foreign tasks are 404 like missing ones; create is denied for everyone until T4a | Rows 2, 4-7, 15 (get, list, cancel)
+T3b | Authenticates with the token validator (#222): local checks of issuer, signature, audience, expiry and type, owner `<iss>\|<sub>`, service info ignores the token | Rows 9-13, 17, 19 (all but create), the stamped owner
+T4a | Asks the decision service (AuthZEN, tes-authz) on create, with the entitlements from the user info endpoint; 503 if either fails | Create of rows 18 and 19
+T4b | Lets the decision service decide further operations (`tesk.api.authz.operations`), with list scopes and failure behaviour per operation | `all-operations`, `fail-open`
+T6 | Accepts exchanged tokens (RFC 8693) of trusted actors and records the actor | Row 16, the recorded actor
+
+Until T6, T3b refuses tokens with an `act` claim, so rows 14 and 15 fail from
+T3b to T6. What failing open means (`fail-open`: the owner-only decision, and
+create never fails open) is a proposal still to be decided.
+
+To run only these tests (the coverage check needs all tests, so skip it):
+
+```bash
+./mvnw verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dit.test='AccessMatrix*IT' -Djacoco.skip=true
+```
+
+The skipped tests are the pending cells; the reason of each names its slice
+and the target. A slice:
+
+1. removes the lines of the cells it makes pass from `pending.csv` (their
+   tests fail and name the line);
+2. updates `today` of the cells whose answer it changes but which stay
+   pending (their tests fail and name the new status), and adds the cells
+   it breaks on purpose (e.g. T2 denies create until T4a), with the slice
+   that fixes them;
+3. removes the settings it deletes from `Harness`, and T3b switches
+   `Owners.of` to `Owners.target`.
+
+The case of a line is the caller's ID in `Callers` (the row's number and, for
+rows with variants, a letter, e.g. `12a`), with `/none` or `/foreign` for
+rows whose task column has both (row 2), or the name of a variant test (e.g.
+`stamp-owner`); `today` is `-` for cells with the slice `decide`. A new row
+of the table needs callers in `Callers`, or the tests don't start.
+
 ## Formatting and linting
 
 The Java code is formatted with

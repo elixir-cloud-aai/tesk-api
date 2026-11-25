@@ -14,7 +14,8 @@ import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -76,16 +77,24 @@ class AccessMatrixIT extends MatrixHarness {
                 "owner " + owner + ", actor " + MockIdp.TRUSTED_ACTOR,
                 r -> {
                     assertStamped(owner);
-                    // the actor chain is recorded in an annotation of its own (name: slice T6)
+                    // the actor chain is recorded in an annotation of its own (its name: slice
+                    // T6), as JSON with the actor's sub (design section 10, R2)
                     Map<String, String> annotations = createdJobAnnotations();
                     assertTrue(
-                            annotations.entrySet().stream()
-                                    .anyMatch(e ->
-                                            !e.getKey().equals("creator-user-id")
-                                                    && e.getValue()
-                                                            .contains(MockIdp.TRUSTED_ACTOR)),
-                            "an annotation records the actor: " + annotations);
+                            annotations.values().stream().anyMatch(AccessMatrixIT::isActorChain),
+                            "an annotation records the actor chain: " + annotations);
                 });
+    }
+
+    /** Whether the value is JSON that holds the trusted actor as {@code sub} of a hop */
+    private static boolean isActorChain(String value) {
+        JsonElement json;
+        try {
+            json = JsonParser.parseString(value);
+        } catch (RuntimeException e) {
+            return false;
+        }
+        return json.toString().contains("\"sub\":\"" + MockIdp.TRUSTED_ACTOR + "\"");
     }
 
     private void assertStamped(String owner) {
@@ -161,8 +170,10 @@ class AccessMatrixIT extends MatrixHarness {
 
     /** The Kubernetes requests so far (method and URL), the task's name replaced by {@code ID} */
     private List<String> requests(String taskId) {
-        return kubernetes.getAllServeEvents().stream()
-                .sorted(Comparator.comparing(e -> e.getRequest().getLoggedDate()))
+        List<ServeEvent> events = new ArrayList<>(kubernetes.getAllServeEvents());
+        // the journal lists the newest first
+        Collections.reverse(events);
+        return events.stream()
                 .map(e -> e.getRequest().getMethod() + " " + e.getRequest().getUrl())
                 .map(request -> request.replace(taskId, "ID"))
                 .toList();

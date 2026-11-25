@@ -69,7 +69,29 @@ abstract class MatrixHarness extends Harness {
         if (cases.isEmpty()) {
             throw new IllegalStateException("No cases in " + Matrix.RESOURCE);
         }
+        checkCallers();
         return cases.stream();
+    }
+
+    /**
+     * Checks that the rows are numbered 1 to n, that every row has callers and every caller a row,
+     * so that a row added to the table can't go untested
+     */
+    static void checkCallers() {
+        List<Row> rows = Matrix.rows();
+        for (int i = 0; i < rows.size(); i++) {
+            if (rows.get(i).number() != i + 1) {
+                throw new IllegalStateException("Rows of " + Matrix.RESOURCE + " not 1 to n");
+            }
+            if (Callers.ofRow(i + 1).isEmpty()) {
+                throw new IllegalStateException("No callers (Callers) for row " + (i + 1));
+            }
+        }
+        for (Caller caller : Callers.all()) {
+            if (caller.row() < 1 || caller.row() > rows.size()) {
+                throw new IllegalStateException("Caller " + caller + " of no row");
+            }
+        }
     }
 
     /** The task variants of the matrix's task column */

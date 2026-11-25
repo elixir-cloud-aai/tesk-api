@@ -57,7 +57,8 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.MockIdp.Token;
         locations = {"classpath:application.properties"},
         properties = {
             "spring.profiles.active=auth",
-            // today: user info as authentication, groups of LS Login, service clients (#220)
+            // today: user info as authentication (removed by T3b), groups of LS Login (T2),
+            // service clients of #220 (T3b)
             "security.oauth2.resource.user-info-uri=" + MockIdp.USER_INFO_URI,
             "tesk.api.authorisation.group-prefix=" + Entitlements.PREFIX,
             "tesk.api.authorisation.group-suffix=" + Entitlements.SUFFIX,
@@ -69,7 +70,8 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.MockIdp.Token;
                     + "\": {\"audiences\": [\""
                     + MockIdp.LISTED_CLIENT
                     + "\"]}}",
-            // the redesign (design section 7), without effect until its slices
+            // the redesign, without effect until its slices: tesk.api.auth.* from T3b (issuers,
+            // audiences, service clients; trusted actors from T6), tesk.api.authz.* from T4a
             "tesk.api.auth.issuers[0].url=" + MockIdp.ISSUER,
             "tesk.api.auth.issuers[0].audiences=" + MockIdp.FRONT_END,
             "tesk.api.auth.issuers[0].service-clients[0].client-id=" + MockIdp.LISTED_CLIENT,

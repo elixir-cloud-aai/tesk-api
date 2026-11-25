@@ -221,10 +221,13 @@ final class MockIdp {
         }
     }
 
-    /** Signs the claims as the other, unknown issuer (with its own key) */
+    /**
+     * Signs the claims as if issued by the other, unknown issuer, but with the provider's own key,
+     * so that only the issuer is wrong
+     */
     static String signAsOtherIssuer(JwtClaims claims) {
         claims.setIssuer(OTHER_ISSUER);
-        return sign(claims, Signature.UNKNOWN_KID, "at+jwt");
+        return sign(claims, Signature.VALID, "at+jwt");
     }
 
     private static void sign(JsonWebSignature jws, RsaJsonWebKey key) {

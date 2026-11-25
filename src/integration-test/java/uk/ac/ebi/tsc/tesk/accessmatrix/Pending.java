@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -20,6 +21,10 @@ import java.util.regex.Pattern;
 final class Pending {
 
     static final String RESOURCE = "/access-matrix/pending.csv";
+
+    /** The configurations, as the test classes name them ({@code Harness#config}) */
+    static final Set<String> CONFIGS =
+            Set.of("default", "all-operations", "service-info-private", "fail-open");
 
     /** The slice of cells whose target isn't decided yet */
     static final String DECIDE = "decide";
@@ -74,7 +79,16 @@ final class Pending {
             if (fields.length != 5 || !SLICE.matcher(fields[3]).matches()) {
                 throw new IllegalStateException("Invalid line of " + RESOURCE + ": " + line);
             }
-            int today = DECIDE.equals(fields[3]) ? 0 : Integer.parseInt(fields[4]);
+            if (!CONFIGS.contains(fields[0])) {
+                throw new IllegalStateException(
+                        "Unknown configuration in " + RESOURCE + ": " + line);
+            }
+            int today;
+            try {
+                today = DECIDE.equals(fields[3]) ? 0 : Integer.parseInt(fields[4]);
+            } catch (NumberFormatException e) {
+                throw new IllegalStateException("Invalid status in " + RESOURCE + ": " + line, e);
+            }
             Entry previous =
                     result.put(key(fields[0], fields[1], fields[2]), new Entry(fields[3], today));
             if (previous != null) {

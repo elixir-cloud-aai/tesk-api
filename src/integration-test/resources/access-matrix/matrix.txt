@@ -1,5 +1,5 @@
 Caller x operation matrix of the access control redesign: the target behaviour, copied from
-section 2 of the design (tesk-auth design.md). AccessMatrixIT runs one test per row (and its
+section 2 of the redesign's design document. AccessMatrixIT runs one test per row (and its
 caller variants) and column; pending.csv lists the cells that the current code doesn't meet yet.
 Keep this table the same as the design's; see docs/development.md, "Access matrix".
 
