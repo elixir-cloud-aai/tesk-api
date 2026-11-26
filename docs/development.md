@@ -98,6 +98,100 @@ tools). To see what the tests miss, open
 Cover new code with tests that check its behaviour, rather than excluding it;
 code that no test can reach is usually dead and can go.
 
+### Access matrix
+
+The integration tests in `src/integration-test/java/uk/ac/ebi/tsc/tesk/accessmatrix/`
+pin the target behaviour of the access control redesign: who may call which
+operation, with which answer. They are its acceptance tests, and they run
+against the current code as well, where some answers differ until the
+redesign's changes are in:
+
+- `src/integration-test/resources/access-matrix/matrix.txt` is the caller x
+  operation matrix of the design: one row per kind of caller (anonymous, users
+  with and without `EOC-Compute`, former members, service clients, invalid
+  tokens, exchanged tokens, failures of the decision service and of the user
+  info endpoint), one column per operation (service info, create, get in the
+  three views, list, cancel). `AccessMatrixIT` reads the table and runs one
+  test per row, caller variant (e.g. row 12's kinds of invalid tokens) and
+  operation; keep the table the same as the design's. Further tests cover the
+  variants the design names next to the table: the stamped owner and actor,
+  missing and foreign tasks alike, page tokens of other owners, service info
+  that needs a token (`AccessMatrixServiceInfoPrivateIT`), and the decision
+  service asked for all operations (`AccessMatrixAllOperationsIT`, also with
+  the list scopes, a widening policy and failing closed) or failing open
+  (`AccessMatrixFailOpenIT`), each with the decision service down, timing
+  out and answering garbage.
+- `src/integration-test/resources/access-matrix/pending.csv` lists the cells
+  that the current code doesn't meet yet: configuration, case, operation, the
+  change (slice) of the redesign that makes the cell pass, and the status the
+  code answers now. The test of a pending cell checks that the code still
+  answers that status and still misses the target (a strict expected
+  failure), and then ends as skipped, naming the slice. Once a change meets a
+  cell's target, its test fails until the change removes the line; if a
+  change alters the answer of a cell that stays pending, its test fails until
+  the change updates the status.
+- The tests run TESK with the `auth` profile against a mock OpenID Connect
+  provider (`MockIdp`: discovery, keys, tokens signed as the callers need
+  them, and a user info endpoint that answers like LS Login's), a mock
+  decision service (`MockPdp`: a stand-in for the owner-only reference policy
+  of [tes-authz](https://github.com/elixir-cloud-aai/tes-authz), with failure
+  modes, recording the requests) and a mock Kubernetes API (`MockCluster`:
+  running tasks of given owners). `Harness` holds the settings of both the
+  current access control and the redesign (`tesk.api.auth.*`,
+  `tesk.api.authz.*`, without effect until the changes use them); each change
+  removes the settings it deletes. `Owners.of` is the owner ID that the mock
+  tasks carry: the subject now, `<iss>|<sub>` once tokens are validated
+  locally, switched there in one place.
+
+The changes (slices) of the redesign that `pending.csv` names, in their
+order; each is a pull request of its own, stacked on the previous one, and
+merged when it is ready:
+
+Slice | Change | Cells it makes pass
+--- | --- | ---
+T2 | Removes the group model: only owners get, list and cancel their tasks, foreign tasks are 404 like missing ones; create is denied for everyone until T4a | Rows 2, 4-7, 15 (get, list, cancel)
+T3b | Authenticates with the token validator (#222): local checks of issuer, signature, audience, expiry and type, owners by issuer and subject, service info ignores the token | Rows 9-13, 17, 19 (all but create), the stamped owner
+T4a | Asks the decision service (AuthZEN, tes-authz) on create, with the entitlements from the user info endpoint; 503 if either fails | Create of rows 18 and 19
+T4b | Lets the decision service decide further operations (`tesk.api.authz.operations`), with list scopes and failure behaviour per operation | `all-operations` (but create); the `fail-open` cells already pass with T2 and T4a
+T6 | Accepts exchanged tokens (RFC 8693) of trusted actors and records the actor | Row 16, the recorded actor
+
+Until T6, T3b refuses tokens with an `act` claim, so rows 14 and 15 fail from
+T3b to T6. Failing open (`fail-open`) falls back to the owner-only decision,
+never to allowing everything, and create never fails open.
+
+Row 9 (unlisted service client) uses a client token whose audience TESK
+accepts, so that only the missing listing makes the difference. A real LS
+Login client token carries the client's own ID as its audience, which TESK
+accepts for listed clients only, so an unlisted LS Login client gets 401 on
+every operation (as in row 10; pinned by
+`unlistedClient_withItsOwnAudience_isRefused`). With `serviceInfoPublic: false`, rows 16 and 17 get
+on service info what they get on every other operation (403 and 401).
+
+To run only these tests (the coverage check needs all tests, so skip it):
+
+```bash
+./mvnw verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dit.test='AccessMatrix*IT' -Djacoco.skip=true
+```
+
+The skipped tests are the pending cells; the reason of each names its slice
+and the target. A slice:
+
+1. removes the lines of the cells it makes pass from `pending.csv` (their
+   tests fail and name the line);
+2. updates `today` of the cells whose answer it changes but which stay
+   pending (their tests fail and name the new status), and adds the cells
+   it breaks on purpose (e.g. T2 denies create until T4a), with the slice
+   that fixes them;
+3. removes the settings it deletes from `Harness`, and T3b switches
+   `Owners.of` to `Owners.target`.
+
+The case of a line is the caller's ID in `Callers` (the row's number and, for
+rows with variants, a letter, e.g. `12a`), with `/none` or `/foreign` for
+rows whose task column has both (row 2), or the name of a variant test (e.g.
+`stamp-owner`). A new row of the table needs callers in `Callers`, or the
+tests don't start.
+
 ## Formatting and linting
 
 The Java code is formatted with
