@@ -221,6 +221,81 @@ run once:
 git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
+## Token validation
+
+The package `uk.ac.ebi.tsc.tesk.config.security.token` holds the token
+validation of the access control redesign. It is not used by the application
+yet: requests are still authenticated as described in [Access
+control](access-control.md), until a later change switches authentication to
+it, and its settings (`tesk.api.auth.*`) have no effect until then.
+
+- `TokenValidator` is the one interface for token validation: it takes the
+  bearer token and returns the caller (`TokenPrincipal`), or throws an
+  `InvalidTokenException` whose message is the reason (never the token; its
+  caller is to answer `401`), or an `IssuerUnavailableException` if the token
+  can't be checked now because the issuer's keys can't be fetched, at first or
+  after the cached ones expired (its caller is to answer `503`, so that clients
+  retry instead of treating it as a bad credential).
+  `TokenValidators.create` selects the implementation by
+  `tesk.api.auth.token-validator`. Only `jwt` exists; another kind (e.g.
+  introspection of opaque tokens, RFC 7662) is a new implementation and a new
+  value there, without changes to the callers.
+- `JwtAccessTokenValidator` accepts JWT access tokens (RFC 9068) only: a
+  single signed JWT whose `iss` is exactly one of the configured issuers,
+  signed with one of the configured asymmetric algorithms (default `RS256`,
+  `ES256`; `none` and HMAC can't be configured) by a key of that issuer (from
+  its OpenID Connect discovery, or a configured JWKS URI; `IssuerVerifier`
+  caches them, fetches them again at most once per interval, and lets requests
+  that arrive during the first fetch wait for it, at most 15 seconds), with
+  `typ`
+  `at+jwt`, `exp`, `iat` and `sub` required, `nbf`, and a clock skew. Tokens
+  with an `act` claim (delegation, RFC 8693) are refused for now.
+- The caller is identified by issuer and subject together
+  (`TokenPrincipal.owner()`: `<iss>|<sub>`). A token is a listed service
+  client's if both the client claim (default `client_id`) and `sub` are the
+  ID of a client in `service-clients`; it is then accepted if `aud` is or
+  contains that client's ID (unless the client has `allow-any-audience`,
+  below). Any other token is a user's: `aud` must be or
+  contain one of the issuer's `audiences` (the client IDs of the front ends),
+  and a `sub` that equals a listed client's ID is refused.
+- `allow-any-audience` (per service client, default `false`) accepts that
+  client's own tokens whatever their `aud`, or without one, like
+  `allowAnyAudience` of the current service-client settings. It is opt-in and
+  meant for testing, and for setting up a federation while the clients'
+  audiences at the identity provider are still being sorted out. Its risk:
+  every token that the issuer issues to that client is accepted, also tokens
+  it got for other services, so a token that leaks from another service, or
+  that another service replays, works at TESK API too. It applies to that
+  client's own tokens only (not to users' tokens obtained through it, and not
+  to other listed clients), and `JwtAccessTokenValidator` names each such
+  client in a warning at startup.
+
+The settings, as properties (environment variables in upper case, with
+underscores for dots and list indices and without the dashes, e.g.
+`TESK_API_AUTH_ISSUERS_0_URL` and
+`TESK_API_AUTH_ISSUERS_0_SERVICECLIENTS_0_CLIENTID`):
+
+```properties
+tesk.api.auth.token-validator=jwt
+tesk.api.auth.issuers[0].url=https://login.aai.lifescience-ri.eu/oidc/
+tesk.api.auth.issuers[0].audiences=<front-end client ID>,<another one>
+tesk.api.auth.issuers[0].service-clients[0].client-id=<service client ID>
+# optional, with their defaults
+tesk.api.auth.issuers[0].jwks-uri=
+tesk.api.auth.issuers[0].client-claim=client_id
+tesk.api.auth.issuers[0].service-clients[0].allow-any-audience=false
+tesk.api.auth.algorithms=RS256,ES256
+tesk.api.auth.require-access-token-type=true
+tesk.api.auth.clock-skew-seconds=60
+tesk.api.auth.max-token-age-seconds=86400
+tesk.api.auth.timeout-seconds=10    # 1 to 60
+```
+
+Invalid settings (e.g. no issuer, an issuer with neither audiences nor service
+clients, a plain `http` URL other than to the local host, a symmetric
+algorithm, a timeout outside 1 to 60 seconds) make `JwtAccessTokenValidator` throw an `IllegalStateException`,
+so that TESK API will refuse to start with them.
+
 ## Building the image and the docs
 
 To build the image (the `Dockerfile` builds the application from source, so
