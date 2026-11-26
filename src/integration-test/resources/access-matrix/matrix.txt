@@ -1,0 +1,42 @@
+Caller x operation matrix of the access control redesign: the target behaviour, copied from
+section 2 of the redesign's design document. AccessMatrixIT runs one test per row (and its
+caller variants) and column; pending.csv lists the cells that the current code doesn't meet yet.
+Keep this table the same as the design's; see docs/development.md, "Access matrix".
+
+Conventions: `own` = a task the caller owns; `foreign` = an existing task of another owner;
+`none` = no own task exists. GET columns are the three views MINIMAL/BASIC/FULL. Create success
+is 200 (TES). `200[]` = 200 with only the caller's tasks (here: none); `200o` = 200 with exactly
+the caller's tasks. SI = GET /service-info with `serviceInfoPublic: true` (default); the token,
+if any, is ignored on SI.
+
+#   Caller                                     task     SI   CREATE GET-M GET-B GET-F LIST  CANCEL
+--  -----------------------------------------  -------  ---  ------ ----- ----- ----- ----  ------
+1   anonymous (no token)                       any      200  401    401   401   401   401   401
+2   valid user, no EOC-Compute (e.g. only the  none/    200  403    404   404   404   200[] 404
+    base group ECP_CLN)                        foreign
+3   user with EOC-Compute                      own      200  200    200   200   200   200o  200
+4   former member (EOC-Compute revoked),       own      200  403    200   200   200   200o  200
+    owns tasks
+5   any authenticated caller (also members),   foreign  200  -      404   404   404   200o  404
+    other user's task                                                           (w/o it)
+6   holder of ECP_CLN:ADMIN or other ECP_CLN   foreign  200  403    404   404   404   200[] 404
+    subgroups only (no EOC-Compute)
+7   ADMIN + EOC-Compute                        foreign  200  200    404   404   404   200o  404
+8   listed service client (client_credentials, own      200  200    200   200   200   200o  200
+    sub == client_id, (iss, client_id) listed)
+9   unlisted service client (valid token)      none     200  403    404   404   404   200[] 404
+10  token for a wrong audience                 any      200  401    401   401   401   401   401
+11  wrong/unknown issuer                       any      200  401    401   401   401   401   401
+12  bad signature, alg none, unknown kid,      any      200  401    401   401   401   401   401
+    typ not at+jwt (e.g. ID token)
+13  expired token (beyond clock skew)          any      200  401    401   401   401   401   401
+14  token exchange: subject with EOC-Compute,  subj's   200  200    200   200   200   200o  200
+    trusted actor (owner = subject)
+15  token exchange: subject without            subj's   200  403    200   200   200   200o  200
+    EOC-Compute, trusted actor
+16  token exchange: untrusted actor            any      200  403    403   403   403   403   403
+17  user token whose sub equals a listed       any      200  401    401   401   401   401   401
+    client id at the same issuer
+18  member; PDP down / timeout / bad answer    own      200  503    200   200   200   200o  200
+19  member; entitlement lookup (userinfo)      own      200  503    200   200   200   200o  200
+    times out or 5xx (IdP 401/403 there: 401)
