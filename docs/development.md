@@ -160,7 +160,8 @@ it, and its settings (`tesk.api.auth.*`) have no effect until then.
   (`TokenPrincipal.owner()`: `<iss>|<sub>`). A token is a listed service
   client's if both the client claim (default `client_id`) and `sub` are the
   ID of a client in `service-clients`; it is then accepted if `aud` is or
-  contains that client's ID. Any other token is a user's: `aud` must be or
+  contains that client's ID (unless the client has `allow-any-audience`,
+  below). Any other token is a user's: `aud` must be or
   contain one of the issuer's `audiences` (the client IDs of the front ends),
   and a `sub` that equals a listed client's ID is refused.
 - `allow-any-audience` (per service client, default `false`) accepts that
@@ -175,8 +176,10 @@ it, and its settings (`tesk.api.auth.*`) have no effect until then.
   to other listed clients), and `JwtAccessTokenValidator` names each such
   client in a warning at startup.
 
-The settings, as properties (environment variables in upper snake case, e.g.
-`TESK_API_AUTH_ISSUERS_0_URL`):
+The settings, as properties (environment variables in upper case, with
+underscores for dots and list indices and without the dashes, e.g.
+`TESK_API_AUTH_ISSUERS_0_URL` and
+`TESK_API_AUTH_ISSUERS_0_SERVICECLIENTS_0_CLIENTID`):
 
 ```properties
 tesk.api.auth.token-validator=jwt

@@ -688,6 +688,13 @@ public class JwtAccessTokenValidatorTest {
     }
 
     @Test
+    public void serviceClientWithAnyAudience_isAccepted_withItsOwnIdAsAudience() throws Exception {
+        allowAnyAudience();
+
+        assertEquals(TokenPrincipal.Kind.SERVICE_CLIENT, accepted(sign(clientClaims())).kind());
+    }
+
+    @Test
     public void serviceClientWithAnyAudience_isAccepted_forAnotherAudience() throws Exception {
         allowAnyAudience();
         JwtClaims claims = clientClaims();
@@ -756,11 +763,18 @@ public class JwtAccessTokenValidatorTest {
         assertEquals("wrong audience", refused(sign(claims)));
     }
 
+    /** The warning names each client with the opt-in, with its issuer, and no other client */
     @Test
     public void allowAnyAudience_isNamedInAWarningAtStartup(CapturedOutput output) {
         allowAnyAudience();
+        TokenValidationProperties.ServiceClient other =
+                new TokenValidationProperties.ServiceClient();
+        other.setClientId("other-client");
+        properties.getIssuers().get(0).getServiceClients().add(other);
 
         validator();
+
+        assertThat(output.getOut(), not(containsString("service client other-client")));
 
         assertThat(
                 output.getOut(),
