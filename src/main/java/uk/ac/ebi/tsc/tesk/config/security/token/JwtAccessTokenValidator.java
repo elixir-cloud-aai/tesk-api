@@ -38,7 +38,8 @@ import org.springframework.util.StringUtils;
  *       supports actors);
  *   <li>a listed service client (client claim and {@code sub} both its ID) needs its own ID in
  *       {@code aud} (the issuer puts no TESK audience into client tokens; a token for any other
- *       audience was meant for another service); any other token is a user's and needs one of the
+ *       audience was meant for another service), unless the client has {@code allowAnyAudience}
+ *       (opt-in, named in a warning at startup); any other token is a user's and needs one of the
  *       issuer's audiences (the client IDs of the front ends through which users call TESK API) in
  *       {@code aud}; a user whose {@code sub} is a listed client's ID is refused (they would share
  *       its tasks).
@@ -78,7 +79,8 @@ public final class JwtAccessTokenValidator implements TokenValidator {
             IssuerVerifier verifier,
             Set<String> audiences,
             String clientClaim,
-            Set<String> serviceClients) {}
+            Set<String> serviceClients,
+            Set<String> anyAudienceClients) {}
 
     /** The accepted issuers by URL */
     private final Map<String, Issuer> issuers;
@@ -125,6 +127,16 @@ public final class JwtAccessTokenValidator implements TokenValidator {
                     "issuers lists " + issuer.url() + " twice");
         }
         this.issuers = Collections.unmodifiableMap(byUrl);
+        for (Issuer issuer : byUrl.values()) {
+            for (String client : issuer.anyAudienceClients()) {
+                logger.warn(
+                        "TESK API accepts tokens of service client {} of {} with any audience"
+                                + " (allow-any-audience), also tokens that it got for other"
+                                + " services; list it without allow-any-audience in production",
+                        client,
+                        issuer.url());
+            }
+        }
     }
 
     private static void check(boolean valid, String problem) {
@@ -173,11 +185,15 @@ public final class JwtAccessTokenValidator implements TokenValidator {
             audiences.add(value);
         }
         Set<String> clients = new LinkedHashSet<>();
+        Set<String> anyAudience = new LinkedHashSet<>();
         List<TokenValidationProperties.ServiceClient> listed = settings.getServiceClients();
         for (int j = 0; j < listed.size(); j++) {
             String id = trimmed(listed.get(j).getClientId());
             check(id != null, key + "service-clients[" + j + "].client-id must be set");
             check(clients.add(id), key + "service-clients lists " + id + " twice");
+            if (listed.get(j).isAllowAnyAudience()) {
+                anyAudience.add(id);
+            }
         }
         check(
                 !audiences.isEmpty() || !clients.isEmpty(),
@@ -194,7 +210,8 @@ public final class JwtAccessTokenValidator implements TokenValidator {
                 verifier,
                 Collections.unmodifiableSet(audiences),
                 clientClaim,
-                Collections.unmodifiableSet(clients));
+                Collections.unmodifiableSet(clients),
+                Collections.unmodifiableSet(anyAudience));
     }
 
     /** The value without surrounding white space, or null if blank */
@@ -285,8 +302,9 @@ public final class JwtAccessTokenValidator implements TokenValidator {
         }
         TokenPrincipal.Kind kind;
         if (subject.equals(clientId) && issuer.serviceClients().contains(subject)) {
-            // a listed client's own token is meant for TESK only with its own ID as audience
-            if (!audiences.contains(subject)) {
+            // a listed client's own token is meant for TESK only with its own ID as audience,
+            // unless the client may have any (opt-in)
+            if (!issuer.anyAudienceClients().contains(subject) && !audiences.contains(subject)) {
                 throw refused(WRONG_AUDIENCE);
             }
             kind = TokenPrincipal.Kind.SERVICE_CLIENT;

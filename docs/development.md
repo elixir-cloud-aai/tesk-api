@@ -163,6 +163,17 @@ it, and its settings (`tesk.api.auth.*`) have no effect until then.
   contains that client's ID. Any other token is a user's: `aud` must be or
   contain one of the issuer's `audiences` (the client IDs of the front ends),
   and a `sub` that equals a listed client's ID is refused.
+- `allow-any-audience` (per service client, default `false`) accepts that
+  client's own tokens whatever their `aud`, or without one, like
+  `allowAnyAudience` of the current service-client settings. It is opt-in and
+  meant for testing, and for setting up a federation while the clients'
+  audiences at the identity provider are still being sorted out. Its risk:
+  every token that the issuer issues to that client is accepted, also tokens
+  it got for other services, so a token that leaks from another service, or
+  that another service replays, works at TESK API too. It applies to that
+  client's own tokens only (not to users' tokens obtained through it, and not
+  to other listed clients), and `JwtAccessTokenValidator` names each such
+  client in a warning at startup.
 
 The settings, as properties (environment variables in upper snake case, e.g.
 `TESK_API_AUTH_ISSUERS_0_URL`):
@@ -175,6 +186,7 @@ tesk.api.auth.issuers[0].service-clients[0].client-id=<service client ID>
 # optional, with their defaults
 tesk.api.auth.issuers[0].jwks-uri=
 tesk.api.auth.issuers[0].client-claim=client_id
+tesk.api.auth.issuers[0].service-clients[0].allow-any-audience=false
 tesk.api.auth.algorithms=RS256,ES256
 tesk.api.auth.require-access-token-type=true
 tesk.api.auth.clock-skew-seconds=60

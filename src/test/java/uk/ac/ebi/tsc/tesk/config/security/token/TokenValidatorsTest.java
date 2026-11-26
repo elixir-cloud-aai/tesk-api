@@ -43,7 +43,11 @@ public class TokenValidatorsTest {
                                 Map.entry("tesk.api.auth.issuers[0].client-claim", "azp"),
                                 Map.entry(
                                         "tesk.api.auth.issuers[0].service-clients[0].client-id",
-                                        "protes")));
+                                        "protes"),
+                                Map.entry(
+                                        "tesk.api.auth.issuers[0].service-clients[0]"
+                                                + ".allow-any-audience",
+                                        "true")));
 
         assertEquals(TokenValidationProperties.Validator.JWT, properties.getTokenValidator());
         assertEquals(List.of("RS256", "PS256"), properties.getAlgorithms());
@@ -57,6 +61,7 @@ public class TokenValidatorsTest {
         assertEquals(List.of("portal", "cli"), issuer.getAudiences());
         assertEquals("azp", issuer.getClientClaim());
         assertEquals("protes", issuer.getServiceClients().get(0).getClientId());
+        assertTrue(issuer.getServiceClients().get(0).isAllowAnyAudience());
         assertInstanceOf(JwtAccessTokenValidator.class, TokenValidators.create(properties));
     }
 

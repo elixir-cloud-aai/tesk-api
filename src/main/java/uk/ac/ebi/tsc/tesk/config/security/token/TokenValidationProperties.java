@@ -102,12 +102,20 @@ public class TokenValidationProperties {
 
     /**
      * A service client: its token is accepted if both the client claim and {@code sub} are its ID,
-     * and {@code aud} is or contains its ID. An object, so that settings per client can be added
-     * later.
+     * and {@code aud} is or contains its ID (or, with {@code allowAnyAudience}, whatever its {@code
+     * aud}). An object, so that settings per client can be added later.
      */
     public static class ServiceClient {
         /** The client's ID */
         private String clientId;
+
+        /**
+         * Whether the client's own tokens are accepted whatever their {@code aud}, or without one
+         * (opt-in, for testing or while setting up a federation): then also tokens that the client
+         * got for other services are accepted, so a token that leaks from another service works at
+         * TESK API too
+         */
+        private boolean allowAnyAudience;
 
         public String getClientId() {
             return clientId;
@@ -115,6 +123,14 @@ public class TokenValidationProperties {
 
         public void setClientId(String clientId) {
             this.clientId = clientId;
+        }
+
+        public boolean isAllowAnyAudience() {
+            return allowAnyAudience;
+        }
+
+        public void setAllowAnyAudience(boolean allowAnyAudience) {
+            this.allowAnyAudience = allowAnyAudience;
         }
     }
 

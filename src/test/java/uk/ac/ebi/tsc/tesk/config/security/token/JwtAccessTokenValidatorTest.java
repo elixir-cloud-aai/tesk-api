@@ -10,6 +10,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -673,6 +674,109 @@ public class JwtAccessTokenValidatorTest {
         claims.setAudience("other-client");
 
         assertEquals("wrong audience", refused(sign(claims)));
+    }
+
+    // service clients that may have any audience (opt-in)
+
+    private void allowAnyAudience() {
+        properties.getIssuers().get(0).getServiceClients().get(0).setAllowAnyAudience(true);
+    }
+
+    @Test
+    public void allowAnyAudience_isOffByDefault() {
+        assertFalse(new TokenValidationProperties.ServiceClient().isAllowAnyAudience());
+    }
+
+    @Test
+    public void serviceClientWithAnyAudience_isAccepted_forAnotherAudience() throws Exception {
+        allowAnyAudience();
+        JwtClaims claims = clientClaims();
+        claims.setAudience("some-other-service");
+
+        TokenPrincipal principal = accepted(sign(claims));
+
+        assertEquals(TokenPrincipal.Kind.SERVICE_CLIENT, principal.kind());
+        assertEquals(issuer() + "|" + SERVICE_CLIENT, principal.owner());
+    }
+
+    @Test
+    public void serviceClientWithAnyAudience_isAccepted_withoutAudience() throws Exception {
+        allowAnyAudience();
+        JwtClaims claims = clientClaims();
+        claims.unsetClaim("aud");
+
+        assertEquals(TokenPrincipal.Kind.SERVICE_CLIENT, accepted(sign(claims)).kind());
+    }
+
+    @Test
+    public void serviceClientWithAnyAudience_withMalformedAudience_isRefused() throws Exception {
+        allowAnyAudience();
+        JwtClaims claims = clientClaims();
+        claims.setClaim("aud", 42);
+
+        assertEquals("wrong audience", refused(sign(claims)));
+    }
+
+    /**
+     * The opt-in is about the client's own tokens: users' tokens through it still need a front end
+     */
+    @Test
+    public void userTokenThroughClientWithAnyAudience_needsAFrontEndAudience() throws Exception {
+        allowAnyAudience();
+        JwtClaims claims = clientClaims();
+        claims.setSubject(USER);
+        claims.setAudience("some-other-service");
+
+        assertEquals("wrong audience", refused(sign(claims)));
+    }
+
+    @Test
+    public void userWithIdOfClientWithAnyAudience_isRefused() throws Exception {
+        allowAnyAudience();
+        JwtClaims claims = userClaims();
+        claims.setSubject(SERVICE_CLIENT);
+        claims.setAudience("some-other-service");
+
+        assertEquals("user with the ID of a service client", refused(sign(claims)));
+    }
+
+    /** Only the client with the opt-in may have any audience, not the other listed clients */
+    @Test
+    public void allowAnyAudience_appliesToItsClientOnly() throws Exception {
+        allowAnyAudience();
+        TokenValidationProperties.ServiceClient other =
+                new TokenValidationProperties.ServiceClient();
+        other.setClientId("other-client");
+        properties.getIssuers().get(0).getServiceClients().add(other);
+        JwtClaims claims = clientClaims();
+        claims.setSubject("other-client");
+        claims.setClaim("client_id", "other-client");
+        claims.setAudience("some-other-service");
+
+        assertEquals("wrong audience", refused(sign(claims)));
+    }
+
+    @Test
+    public void allowAnyAudience_isNamedInAWarningAtStartup(CapturedOutput output) {
+        allowAnyAudience();
+
+        validator();
+
+        assertThat(
+                output.getOut(),
+                containsString(
+                        "accepts tokens of service client "
+                                + SERVICE_CLIENT
+                                + " of "
+                                + issuer()
+                                + " with any audience"));
+    }
+
+    @Test
+    public void withoutAllowAnyAudience_noWarningAtStartup(CapturedOutput output) {
+        validator();
+
+        assertThat(output.getOut(), not(containsString("with any audience")));
     }
 
     // refused: keys unavailable
