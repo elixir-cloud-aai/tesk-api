@@ -2,9 +2,9 @@
 # (default, all-operations, service-info-private, fail-open), the case (the caller variant
 # of matrix.txt, /none or /foreign for row 2, or a variant test), the operation (column),
 # the slice of the redesign that makes the cell pass, and the status that the current code
-# answers. See Pending.java and
-# docs/development.md, "Access matrix". Each slice removes the lines of the cells it makes
-# pass, and updates the status of the cells whose answer it changes.
+# answers. See Pending.java and docs/development.md, "Access matrix". Each slice removes the
+# lines of the cells it makes pass, and updates the status of the cells whose answer it
+# changes.
 config,case,operation,slice,today
 default,2/none,LIST,T2,403
 default,2/foreign,GET-M,T2,403

@@ -1,6 +1,6 @@
 package uk.ac.ebi.tsc.tesk.accessmatrix;
 
-import java.util.Set;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -19,9 +19,9 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.Matrix.Operation;
 @TestPropertySource(properties = "tesk.api.service-info.public=false")
 class AccessMatrixServiceInfoPrivateIT extends Harness {
 
-    private static final Set<Integer> UNAUTHENTICATED = Set.of(1, 10, 11, 12, 13, 17);
-
-    private static final Set<Integer> FORBIDDEN = Set.of(16);
+    /** The rows whose service info isn't 200, with their status */
+    private static final Map<Integer, String> REFUSED =
+            Map.of(1, "401", 10, "401", 11, "401", 12, "401", 13, "401", 16, "403", 17, "401");
 
     /** The mock Kubernetes API (nested, so that it replaces the application's client) */
     @TestConfiguration
@@ -41,14 +41,7 @@ class AccessMatrixServiceInfoPrivateIT extends Harness {
     void serviceInfo(Caller caller) throws Exception {
         String token = prepare(caller);
         MvcResult result = perform(Operation.SI, token, null);
-        String expected;
-        if (UNAUTHENTICATED.contains(caller.row())) {
-            expected = "401";
-        } else if (FORBIDDEN.contains(caller.row())) {
-            expected = "403";
-        } else {
-            expected = "200";
-        }
+        String expected = REFUSED.getOrDefault(caller.row(), "200");
         check(caller.id(), "SI", result, expected, cell(expected, Operation.SI, null));
     }
 }

@@ -187,8 +187,8 @@ and the target. A slice:
 The case of a line is the caller's ID in `Callers` (the row's number and, for
 rows with variants, a letter, e.g. `12a`), with `/none` or `/foreign` for
 rows whose task column has both (row 2), or the name of a variant test (e.g.
-`stamp-owner`). A new row
-of the table needs callers in `Callers`, or the tests don't start.
+`stamp-owner`). A new row of the table needs callers in `Callers`, or the
+tests don't start.
 
 ## Formatting and linting
 
