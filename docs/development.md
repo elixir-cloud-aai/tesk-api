@@ -448,9 +448,7 @@ Spotless, Checkstyle (`checkstyle.xml`) and JaCoCo in `pom.xml` alike (see
 Validation](https://beanvalidation.org/) annotations beyond those derived from
 the specification (e.g. `@Digits` and `@DecimalMin` on the resources of
 `TesResources`); restore them by hand in the generated code, and reconcile
-any other manual changes, e.g. the internal field `userIdFromLegacyLabel` of
-`TesTaskLog` (not serialized), which the access check of a task needs, and
-the check `isUrlOrContentGiven` of `TesInput` (a generator that adds
+any other manual changes, e.g. the check `isUrlOrContentGiven` of `TesInput` (a generator that adds
 `@ScriptAssert(lang = "javascript")` instead brings back a check that fails
 on Java 15 and later, which have no JavaScript engine). Until
 the experimental private image credential workaround remains supported, also

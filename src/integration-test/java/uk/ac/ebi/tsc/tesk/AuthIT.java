@@ -86,6 +86,7 @@ public class AuthIT {
         }
     }
 
+    /** The user info of {@code sub}; groups only show that they are ignored */
     private void userInfo(String sub, String... groups) {
         StringBuilder json = new StringBuilder("{\"sub\" : \"" + sub + "\", ");
         json.append("\"eduperson_entitlement\" : [");

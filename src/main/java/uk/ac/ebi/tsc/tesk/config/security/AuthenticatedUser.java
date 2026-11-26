@@ -14,10 +14,11 @@ import org.springframework.security.oauth2.server.resource.InvalidBearerTokenExc
 
 /**
  * The result of validating an access token ({@link UserInfoTokenIntrospector}, {@link
- * ServiceClientTokenServices}): the {@link User} (a user or a service client), its authorities (the
- * group names) and the claims it was built from. {@link #toAuthentication} turns it into the
- * authentication of the request, whose principal is the {@link User}, as the authorisation rules
- * (e.g. of {@code TesService}) expect.
+ * ServiceClientTokenServices}): the {@link User} (a user or a service client), its authorities
+ * (none since the group model was removed, #225; kept for Spring Security's principal) and the
+ * claims it was built from. {@link #toAuthentication} turns it into the authentication of the
+ * request, whose principal is the {@link User}, as the authorisation rules (e.g. of {@code
+ * TesService}) expect.
  */
 public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
 

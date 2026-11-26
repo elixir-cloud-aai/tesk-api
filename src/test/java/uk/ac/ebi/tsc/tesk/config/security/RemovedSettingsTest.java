@@ -98,6 +98,38 @@ public class RemovedSettingsTest {
                                 Map.of("TESK_API_AUTHORISATION_SERVICECLIENTS_ENABLED", "true"))));
     }
 
+    /**
+     * The service clients' environment variables as documented, with {@code _} between the words,
+     * are kept too; words that merely start alike are not
+     */
+    @Test
+    public void serviceClientsEnvironmentVariables_areKept() {
+        assertDoesNotThrow(() ->
+                RemovedSettings.refuse(
+                        environmentVariables(
+                                Map.of(
+                                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED", "true",
+                                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_ISSUER",
+                                                "https://a",
+                                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS", "{}"))));
+        assertDoesNotThrow(() ->
+                RemovedSettings.refuse(
+                        properties(
+                                Map.of(
+                                        "tesk.api.authorisation.serviceClients.enabled",
+                                        "true",
+                                        "tesk.api.authorisation.service-clients[0]",
+                                        "x"))));
+        refused(
+                environmentVariables(Map.of("TESK_API_AUTHORISATION_SERVICE", "x")),
+                "tesk.api.authorisation.service");
+        refused(
+                environmentVariables(
+                        Map.of("TESK_API_AUTHORISATION_SERVICE_CLIENTSX_ENABLED", "x")),
+                "clientsx");
+        refused(properties(Map.of("tesk.api.authorisation.service-clientsx", "x")), "clientsx");
+    }
+
     /** Other settings, also with a similar prefix, are no concern */
     @Test
     public void otherSettings_areKept() {

@@ -96,7 +96,8 @@ class MockUtil {
 
     /**
      * Lets task-123 be a task created before the hash label, with only the old label {@code
-     * creator-user-id} and a group label (issue #119): nobody's task now
+     * creator-user-id} and a group label (issue #119): nobody's task now, the group label is
+     * ignored
      */
     static void mockLegacyTaskKubernetesResponses(
             WireMockExtension mockKubernetes, String legacyUserLabel) {

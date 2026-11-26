@@ -517,8 +517,8 @@ What's new:
 - **Authorisation without groups.** With the `auth` profile, TESK API can
   authorise users by a claim of the user info instead of group membership
   (`TESK_API_AUTHORISATION_CLAIM_ENABLED`, `TESK_API_AUTHORISATION_CLAIM_NAME`
-  and `TESK_API_AUTHORISATION_CLAIM_VALUES`; see [Authorisation without
-  groups](access-control.md#authorisation)). It is off by
+  and `TESK_API_AUTHORISATION_CLAIM_VALUES`; removed in 2.1.0 with the
+  group model, see [To 2.1.0](#to-210)). It is off by
   default, so nothing changes unless you turn it on; read its security
   implications first. The Helm chart of TESK sets them with `auth.claim`
   (`enabled`, `name` and `values`; from chart 0.3.0).
@@ -526,8 +526,8 @@ What's new:
   admin groups, it compares the group settings
   (`TESK_API_AUTHORISATION_GROUP_PREFIX`, `…_PARENT_GROUP`,
   `…_ENV_SUBGROUP`, `…_BASE_GROUP`, `…_DELIMITER`, `…_ADMIN_SUBGROUP` and
-  `…_GROUP_SUFFIX`) as plain text (see [Access
-  control](access-control.md#authorisation)). Before, they were used as
+  `…_GROUP_SUFFIX`) as plain text (these settings are removed in 2.1.0,
+  see [To 2.1.0](#to-210)). Before, they were used as
   regular expressions, so that characters such as the `.` in the default
   prefix and suffix matched any character. With plain group names, as in the
   defaults, nothing changes. If a setting relied on a pattern (e.g. `(A|B)`
