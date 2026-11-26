@@ -1,7 +1,6 @@
 package uk.ac.ebi.tsc.tesk.tes.model;
 
 import java.util.Objects;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
@@ -243,23 +242,5 @@ public class TesTaskLog   {
       return "null";
     }
     return o.toString().replace("\n", "\n    ");
-  }
-
-  /**
-   * Non-standard, internal only (neither serialized nor read from requests): whether USER_ID in
-   * the metadata is the value of the old label creator-user-id of a task created before the label
-   * creator-user-hash, instead of the full user ID. Added by hand; keep it when regenerating the
-   * model.
-   */
-  @JsonIgnore
-  private boolean userIdFromLegacyLabel = false;
-
-  @Schema(hidden = true)
-  public boolean isUserIdFromLegacyLabel() {
-    return userIdFromLegacyLabel;
-  }
-
-  public void setUserIdFromLegacyLabel(boolean userIdFromLegacyLabel) {
-    this.userIdFromLegacyLabel = userIdFromLegacyLabel;
   }
 }

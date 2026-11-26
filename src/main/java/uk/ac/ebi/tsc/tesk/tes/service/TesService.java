@@ -1,6 +1,5 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
-import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PreAuthorize;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
@@ -18,34 +17,33 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 public interface TesService {
     /**
      * Creates new TES task, by converting input and calling create method. In case of detecting
-     * duplicated task ID, retries with new generated ID (up to a limit of retries). Users
-     * authorised by the claim only (tesk.api.authorisation.claim) and service clients
-     * (tesk.api.authorisation.service-clients) create tasks without a group.
+     * duplicated task ID, retries with new generated ID (up to a limit of retries). The task is
+     * stamped with its creator, its only owner.
+     *
+     * <p>With authentication, creating tasks is denied to every caller (403) for now: the right to
+     * create tasks is to be decided by a decision service (AuthZEN, tes-authz), which TESK API
+     * doesn't ask yet. The group rules that decided it before are removed.
      */
-    @PreAuthorize(
-            "(hasRole(@authorisationProperties.baseGroupFull) AND"
-                    + "(#user.member OR #user.teskAdmin) AND"
-                    + "(#task.tags?.get('GROUP_NAME') == null OR #user.isGroupMember(#task.tags['GROUP_NAME'])))"
-                    + " OR (#user.authorisedWithoutGroup AND #task.tags?.get('GROUP_NAME') == null)")
+    @PreAuthorize("denyAll()")
     TesCreateTaskResponse createTask(TesTask task, User user);
 
     /**
      * Gets single task's details based on ID. Performs a series of kubernetes API calls and
-     * converts results with means of the converter. With owner-only visibility
-     * (tesk.api.authorisation.task-visibility=owner, the default; issue #218), only the task's
-     * creator may get it (see {@link User#mayGet}).
+     * converts results with means of the converter. Only the task's creator may get it ({@link
+     * User#isCreatorOf}); for any other caller, a task of another creator is not found, like a
+     * missing one (404).
      *
      * @param taskId - TES task ID (==taskmaster's job name)
      * @param view - one of {@link TaskView} values, decides on how much detail is put in results
      * @return - TES task details
      */
-    @PostAuthorize("#user.mayGet(returnObject.logs[0])")
     TesTask getTask(String taskId, TaskView view, User user);
 
     /**
      * Gets a full list of tasks. Performs Kubernetes API batch calls (all taskmasters, all
      * executors, all pods), combines them together into valid {@link Task} objects and converts to
-     * result with means of the converter.
+     * result with means of the converter. Only the caller's own tasks ({@link
+     * User#getLabelSelector}, {@link User#isCreatorOf}).
      *
      * @param filter - only tasks that match it (name prefix, state and tags; see {@link
      *     TaskFilter}); {@link TaskFilter#NONE} for all tasks
@@ -56,21 +54,17 @@ public interface TesService {
      *     resulting task
      * @return - the page of tasks, with the continue token of the next page, if there is one
      */
-    @PreAuthorize(
-            "#user.teskAdmin OR #user.manager OR #user.member OR #user.authorisedWithoutGroup")
     TesListTasksResponse listTasks(
             TaskFilter filter, Long pageSize, String pageToken, TaskView view, User user);
 
     /**
      * Cancels a task with a given id, by setting a label to taskmaster Job and Pod object. If not
      * task with a given Id - throws TaskNotFoundException If task completed, throws
-     * CancelNotRunningTask. The controller gets the task for the user first, so that users can only
-     * cancel the tasks they may get.
+     * CancelNotRunningTask. Only the task's creator may cancel it ({@link User#isCreatorOf}); for
+     * any other caller, a task of another creator is not found, like a missing one (404).
      *
      * @param taskId - TES task ID (==taskmaster's job name)
+     * @param user - the caller
      */
-    @PreAuthorize(
-            "hasRole(@authorisationProperties.baseGroupFull)"
-                    + " OR (principal instanceof T(uk.ac.ebi.tsc.tesk.config.security.User) AND principal.authorisedWithoutGroup)")
-    void cancelTask(String taskId);
+    void cancelTask(String taskId, User user);
 }

@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERHASH_KEY;
 
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
@@ -28,7 +27,6 @@ public class CreatorLabelsTest {
 
     @Test
     public void hash_distinguishesIdsThatTheOldEncodingMerged() {
-        assertEquals(CreatorLabels.legacyValue("a@b"), CreatorLabels.legacyValue("a_b"));
         assertNotEquals(CreatorLabels.hash("a@b"), CreatorLabels.hash("a_b"));
     }
 
@@ -55,8 +53,8 @@ public class CreatorLabelsTest {
         assertEquals(
                 "d159ef624ed86697b4f1f3ff086aacdd", metadata.getLabels().get(LABEL_USERHASH_KEY));
         assertEquals("user@example.org", metadata.getAnnotations().get(ANN_USERID_KEY));
-        assertFalse(metadata.getLabels().containsKey(LABEL_LEGACY_USERID_KEY));
-        assertFalse(CreatorLabels.isLegacy(metadata));
+        // not the old label of the same key
+        assertFalse(metadata.getLabels().containsKey(ANN_USERID_KEY));
         assertEquals("user@example.org", CreatorLabels.creatorId(metadata));
     }
 
@@ -76,30 +74,12 @@ public class CreatorLabelsTest {
         assertNull(CreatorLabels.creatorId(metadata));
     }
 
+    /** Objects of tasks created before the hash label (the old label only) have no creator */
     @Test
-    public void legacy_objectsWithOnlyTheOldLabel() {
-        V1ObjectMeta metadata = new V1ObjectMeta().putLabelsItem(LABEL_LEGACY_USERID_KEY, "a_b");
-        assertTrue(CreatorLabels.isLegacy(metadata));
-        assertNull(CreatorLabels.creatorId(metadata));
-        assertEquals("a_b", CreatorLabels.legacyCreator(metadata));
-        assertTrue(CreatorLabels.isLegacy(new V1ObjectMeta()));
-        assertNull(CreatorLabels.legacyCreator(new V1ObjectMeta()));
+    public void creatorId_nullForObjectsWithTheOldLabelOnly() {
+        assertNull(
+                CreatorLabels.creatorId(new V1ObjectMeta().putLabelsItem(ANN_USERID_KEY, "a_b")));
         assertNull(CreatorLabels.creatorId(new V1ObjectMeta()));
-        // without maps at all
-        V1ObjectMeta withoutMaps = new V1ObjectMeta().labels(null).annotations(null);
-        assertTrue(CreatorLabels.isLegacy(withoutMaps));
-        assertNull(CreatorLabels.legacyCreator(withoutMaps));
-        assertNull(CreatorLabels.creatorId(withoutMaps));
-    }
-
-    /** An annotation without the hash label is neither old nor valid: it names no creator */
-    @Test
-    public void isLegacy_falseWithTheAnnotation() {
-        V1ObjectMeta metadata =
-                new V1ObjectMeta()
-                        .putLabelsItem(LABEL_LEGACY_USERID_KEY, "a_b")
-                        .putAnnotationsItem(ANN_USERID_KEY, "a@b");
-        assertFalse(CreatorLabels.isLegacy(metadata));
-        assertNull(CreatorLabels.creatorId(metadata));
+        assertNull(CreatorLabels.creatorId(new V1ObjectMeta().labels(null).annotations(null)));
     }
 }

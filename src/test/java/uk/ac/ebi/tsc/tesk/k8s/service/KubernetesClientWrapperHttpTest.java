@@ -16,13 +16,13 @@ import io.kubernetes.client.openapi.models.V1JobSpec;
 import io.kubernetes.client.openapi.models.V1LabelSelector;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.util.ClientBuilder;
-import java.util.Collections;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.config.KubernetesClientConfig;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 
@@ -66,7 +66,11 @@ public class KubernetesClientWrapperHttpTest {
         wrapper.listAllTaskmasterJobsForUser("token-1", 10, User.builder("123").build());
         kubernetes.verify(
                 getRequestedFor(urlPathEqualTo(JOBS))
-                        .withQueryParam("labelSelector", equalTo("job-type=taskmaster"))
+                        .withQueryParam(
+                                "labelSelector",
+                                equalTo(
+                                        "job-type=taskmaster,creator-user-hash="
+                                                + CreatorLabels.hash("123")))
                         .withQueryParam("continue", equalTo("token-1"))
                         .withQueryParam("limit", equalTo("10")));
     }
@@ -235,9 +239,8 @@ public class KubernetesClientWrapperHttpTest {
                                 okJson(
                                         "{\"items\":[{\"metadata\":{\"name\":\"task-1\"}},"
                                                 + "{\"metadata\":{\"name\":\"task-2\",\"labels\":null}}]}")));
-        User member =
-                User.builder("123").teskMemberedGroups(Collections.singleton("group-1")).build();
-        assertThat(wrapper.listAllTaskmasterJobsForUser(null, null, member).getItems()).isEmpty();
+        User user = User.builder("123").build();
+        assertThat(wrapper.listAllTaskmasterJobsForUser(null, null, user).getItems()).isEmpty();
     }
 
     /** Every other call turns the errors of Kubernetes into KubernetesExceptions */

@@ -137,7 +137,7 @@ public class SingleTaskJobsIT {
     }
 
     private static V1Job taskmaster(V1JobStatus status) {
-        return job(TASK, "taskmaster").status(status);
+        return MockUtil.createdBy(job(TASK, "taskmaster").status(status), MockUtil.NOAUTH_USER);
     }
 
     private static V1Job executor() {

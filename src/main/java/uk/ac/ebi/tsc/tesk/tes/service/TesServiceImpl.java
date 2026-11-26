@@ -36,6 +36,7 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.data.*;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;
+import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.*;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 
@@ -190,15 +191,22 @@ public class TesServiceImpl implements TesService {
      */
     @Override
     public TesTask getTask(String taskId, TaskView view, User user) {
-        return this.getTask(this.readTask(taskId), view, false);
+        return this.getTask(this.readTask(taskId, user), view);
     }
 
     /**
-     * Reads all Kubernetes objects of a single task: the taskmaster's job and pods, the executors'
-     * jobs and pods, and the outputs filer's job.
+     * Reads all Kubernetes objects of a single task of the user: the taskmaster's job and pods, the
+     * executors' jobs and pods, and the outputs filer's job.
+     *
+     * @throws TaskNotFoundException if there is no such task, or another user created it: both
+     *     after the same single request (the taskmaster's job), so that the answer doesn't tell
+     *     whether another user's task exists
      */
-    private Task readTask(String taskId) {
+    private Task readTask(String taskId, User user) {
         V1Job taskMasterJob = this.kubernetesClientWrapper.readTaskmasterJob(taskId);
+        if (!user.isCreatorOf(taskMasterJob.getMetadata())) {
+            throw new TaskNotFoundException(taskId);
+        }
         V1JobList executorJobs =
                 this.kubernetesClientWrapper.listSingleTaskExecutorJobs(
                         taskMasterJob.getMetadata().getName());
@@ -230,10 +238,10 @@ public class TesServiceImpl implements TesService {
     }
 
     /** Common part of task's details retrieval for both single task and each of a list of tasks */
-    private TesTask getTask(Task taskObjects, TaskView view, boolean isList) {
+    private TesTask getTask(Task taskObjects, TaskView view) {
 
         if (view == TaskView.MINIMAL) {
-            return this.converter.fromK8sJobsToTesTaskMinimal(taskObjects, isList);
+            return this.converter.fromK8sJobsToTesTaskMinimal(taskObjects);
         }
 
         TesTask task =
@@ -328,7 +336,7 @@ public class TesServiceImpl implements TesService {
                                 !filter.hasState()
                                         || filter.matchesState(
                                                 this.converter.extractStateFromK8sJobs(task)))
-                        .map(task -> this.getTask(task, view, true))
+                        .map(task -> this.getTask(task, view))
                         .collect(Collectors.toList());
         return new TesListTasksResponse().tasks(tasks).nextPageToken(nextPageToken);
     }
@@ -379,12 +387,13 @@ public class TesServiceImpl implements TesService {
      * CancelNotRunningTask
      *
      * @param taskId - TES task ID (==taskmaster's job name)
+     * @param user - the caller; other users' tasks are not found
      */
     @Override
-    public void cancelTask(String taskId) {
+    public void cancelTask(String taskId, User user) {
         // the state of all the task's jobs, as for getTask: a task that ended (e.g. an executor
         // failed) isn't cancelled
-        Task task = this.readTask(taskId);
+        Task task = this.readTask(taskId, user);
         TesState state = this.converter.extractStateFromK8sJobs(task);
         if (COMPLETED_STATES.contains(state)) {
             throw new CancelNotRunningTask(taskId);

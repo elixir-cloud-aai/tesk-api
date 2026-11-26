@@ -99,36 +99,13 @@ public class Constants {
     public static final String LABEL_TASKSTATE_VALUE_CANC = "Cancelled";
 
     /**
-     * Key of the old label with the creating user's ID, with {@code @} replaced by {@code _}. New
-     * tasks don't get it; it is read for tasks created before {@link #LABEL_USERHASH_KEY} (see
-     * {@code tesk.api.authorisation.legacy-user-labels}). Same key as {@link #ANN_USERID_KEY},
-     * which is an annotation, not a label
-     */
-    public static final String LABEL_LEGACY_USERID_KEY = "creator-user-id";
-
-    /**
      * Key of the label with a hash of the creating user's full ID (see {@link
      * uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels}), by which the user's tasks are selected
      */
     public static final String LABEL_USERHASH_KEY = "creator-user-hash";
 
-    /**
-     * Key of the annotation with the creating user's full ID (same key as the old label {@link
-     * #LABEL_LEGACY_USERID_KEY})
-     */
+    /** Key of the annotation with the creating user's full ID */
     public static final String ANN_USERID_KEY = "creator-user-id";
-
-    /**
-     * Key of the label with the task's group (team) name, or a hash of it if the name isn't a valid
-     * label value (see {@link uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels})
-     */
-    public static final String LABEL_GROUPNAME_KEY = "creator-group-name";
-
-    /**
-     * Key of the annotation with the task's full group (team) name (same key as {@link
-     * #LABEL_GROUPNAME_KEY}, which is a label)
-     */
-    public static final String ANN_GROUPNAME_KEY = LABEL_GROUPNAME_KEY;
 
     /** Pattern to validate paths */
     public static final String ABSOLUTE_PATH_REGEXP = "^\\/.*";

@@ -52,8 +52,6 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
         properties = {
             "security.oauth2.resource.user-info-uri = http://localhost:8090",
             "spring.profiles.active=auth",
-            // the admins' rights of group visibility; owner-only: TaskVisibilityOwnerAuthIT
-            "tesk.api.authorisation.task-visibility=group",
             "tesk.api.authorisation.service-clients.enabled=true",
             "tesk.api.authorisation.service-clients.issuer=" + ServiceClientAuthIT.ISSUER,
             // audiences per client (issue #215)
@@ -181,54 +179,30 @@ public class ServiceClientAuthIT {
         mockUserInfo.verify(0, anyRequestedFor(anyUrl()));
     }
 
+    /**
+     * Creating tasks is denied to service clients too, until a decision service decides it (issue
+     * #225); nothing reaches Kubernetes (which fails on unmatched requests)
+     */
     @Test
-    public void serviceClient_createTask_withoutGroup() throws Exception {
-        mockKubernetes.givenThat(
-                WireMock.post("/apis/batch/v1/namespaces/default/jobs")
-                        .withRequestBody(
-                                matchingJsonPath(
-                                        "$.metadata.labels['creator-group-name']", absent()))
-                        .withRequestBody(
-                                matchingJsonPath(
-                                        "$.metadata.labels[?(@.creator-user-hash == '"
-                                                + CreatorLabels.hash(CLIENT)
-                                                + "')]"))
-                        .withRequestBody(
-                                matchingJsonPath(
-                                        "$.metadata.annotations[?(@.creator-user-id == '"
-                                                + CLIENT
-                                                + "')]"))
-                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
-        mockKubernetes.givenThat(
-                WireMock.post(WireMock.urlPathEqualTo("/api/v1/namespaces/default/configmaps"))
-                        .willReturn(okJson("{\"metadata\":{\"name\":\"task-fe99716a\"}}")));
-
-        createTask(serviceToken(), "fromTesToK8s_minimal/task.json").andExpect(status().isOk());
-        noUserInfoCalls();
-    }
-
-    /** No group rules apply to service clients: they can't create tasks for a group */
-    @Test
-    public void serviceClient_createTask_forGroup() throws Exception {
+    public void serviceClient_createTask_isDenied() throws Exception {
+        createTask(serviceToken(), "fromTesToK8s_minimal/task.json")
+                .andExpect(status().isForbidden());
         createTask(serviceToken(), "fromTesToK8s/task.json").andExpect(status().isForbidden());
         noUserInfoCalls();
     }
 
     @Test
     public void serviceClient_getList_ownTasksOnly() throws Exception {
-        V1Job othersTask = MockUtil.taskmaster(null, "other-gateway");
+        V1Job othersTask = MockUtil.taskmaster("other-gateway");
         othersTask.getMetadata().setName("task-456");
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
                                         + "%2Ccreator-user-hash%3D"
                                         + CreatorLabels.hash(CLIENT)
-                                        + "%2C%21creator-group-name"
                                         + "&limit=256")
                         .willReturn(
-                                okJson(
-                                        MockUtil.jobList(
-                                                MockUtil.taskmaster(null, CLIENT), othersTask))));
+                                okJson(MockUtil.jobList(MockUtil.taskmaster(CLIENT), othersTask))));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
         // the own task only, also if Kubernetes returned others
@@ -241,31 +215,24 @@ public class ServiceClientAuthIT {
 
     @Test
     public void serviceClient_getOwnTask() throws Exception {
-        MockUtil.mockUngroupedTaskKubernetesResponses(this.mockKubernetes, CLIENT);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, CLIENT);
 
         getTask(serviceToken()).andExpect(status().isOk());
         noUserInfoCalls();
     }
 
-    /** Another listed client's tasks are not the client's */
+    /** Another listed client's tasks are not the client's: not found, as missing ones */
     @Test
     public void serviceClient_getOthersTask() throws Exception {
-        MockUtil.mockUngroupedTaskKubernetesResponses(this.mockKubernetes, "other-gateway");
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, "other-gateway");
 
-        getTask(serviceToken()).andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void serviceClient_getGroupTask() throws Exception {
-        MockUtil.mockGroupTaskKubernetesResponses(this.mockKubernetes, "TEST", CLIENT);
-
-        getTask(serviceToken()).andExpect(status().isForbidden());
+        getTask(serviceToken()).andExpect(status().isNotFound());
     }
 
     /** Authorised to cancel the own task; it isn't running, hence 400 */
     @Test
     public void serviceClient_cancelOwnTask() throws Exception {
-        MockUtil.mockUngroupedTaskKubernetesResponses(this.mockKubernetes, CLIENT);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, CLIENT);
 
         cancelTask(serviceToken())
                 .andExpect(status().isBadRequest())
@@ -277,9 +244,9 @@ public class ServiceClientAuthIT {
 
     @Test
     public void serviceClient_cancelOthersTask() throws Exception {
-        MockUtil.mockUngroupedTaskKubernetesResponses(this.mockKubernetes, "other-gateway");
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, "other-gateway");
 
-        cancelTask(serviceToken()).andExpect(status().isForbidden());
+        cancelTask(serviceToken()).andExpect(status().isNotFound());
     }
 
     /** An unlisted client's token goes to the user info endpoint, which refuses it */
@@ -330,7 +297,6 @@ public class ServiceClientAuthIT {
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
                                         + "%2Ccreator-user-hash%3D"
                                         + CreatorLabels.hash("other-gateway")
-                                        + "%2C%21creator-group-name"
                                         + "&limit=256")
                         .willReturn(okJson(MockUtil.jobList())));
 
@@ -340,9 +306,12 @@ public class ServiceClientAuthIT {
         noUserInfoCalls();
     }
 
-    /** User tokens are validated at the user info endpoint, and group rules apply, as before */
+    /**
+     * User tokens are validated at the user info endpoint, as before, and list the user's own tasks
+     * only: groups give no rights (issue #225)
+     */
     @Test
-    public void userToken_getList_byGroups() throws Exception {
+    public void userToken_getList_ownTasksOnly() throws Exception {
         mockUserInfo.givenThat(
                 WireMock.get("/")
                         .withHeader("Authorization", equalTo("Bearer BAR"))
@@ -354,22 +323,25 @@ public class ServiceClientAuthIT {
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
+                                        + "%2Ccreator-user-hash%3D"
+                                        + CreatorLabels.hash("123")
                                         + "&limit=256")
                         .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
+        // task-123 and task-125, also if Kubernetes returned others
         listTasks("BAR")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(4));
+                .andExpect(jsonPath("$.tasks.length()").value(2));
         mockUserInfo.verify(1, getRequestedFor(urlEqualTo("/")));
     }
 
-    /** A user with no rights, by a user token, can't see the service client's tasks */
+    /** A user, by a user token, doesn't get the service client's tasks: not found */
     @Test
     public void userToken_getServiceClientsTask() throws Exception {
         mockUserInfo.givenThat(WireMock.get("/").willReturn(okJson("{\"sub\" : \"123\"}")));
-        MockUtil.mockUngroupedTaskKubernetesResponses(this.mockKubernetes, CLIENT);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, CLIENT);
 
-        getTask("BAR").andExpect(status().isForbidden());
+        getTask("BAR").andExpect(status().isNotFound());
     }
 }

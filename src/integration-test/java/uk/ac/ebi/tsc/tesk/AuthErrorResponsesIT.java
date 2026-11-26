@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -122,8 +123,15 @@ public class AuthErrorResponsesIT {
         mockUserInfo.givenThat(
                 WireMock.get("/")
                         .willReturn(okJson("{\"sub\":\"123\",\"eduperson_entitlement\":[]}")));
+        // creating a task is denied to every user (issue #225), without asking Kubernetes
         this.mvc
-                .perform(get(TASK_URL).header("Authorization", "Bearer " + TOKEN))
+                .perform(
+                        post(TASK_URL)
+                                .header("Authorization", "Bearer " + TOKEN)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"executors\":[{\"image\":\"alpine\","
+                                                + "\"command\":[\"true\"]}]}"))
                 .andExpect(status().isForbidden());
         mockUserInfo.verify(
                 1,

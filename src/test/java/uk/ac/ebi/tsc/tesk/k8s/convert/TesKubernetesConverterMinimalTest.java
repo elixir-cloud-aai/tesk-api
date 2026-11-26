@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
@@ -52,7 +53,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.util.StringUtils;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.ObjectMapper;
@@ -62,7 +62,6 @@ import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Job;
-import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.TaskBuilder;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutorLog;
@@ -127,11 +126,7 @@ public class TesKubernetesConverterMinimalTest {
             inputTask = this.objectMapper.readValue(reader, TesTask.class);
         }
         V1Job outputJob =
-                this.converter.fromTesTaskToK8sJob(
-                        inputTask,
-                        User.builder("test-user-id")
-                                .teskMemberedGroups(StringUtils.commaDelimitedListToSet("ABC"))
-                                .build());
+                this.converter.fromTesTaskToK8sJob(inputTask, User.builder("test-user-id").build());
         assertNull(outputJob.getMetadata().getAnnotations().get("tes-task-name"));
         // testing annotation with entire serialized task content..
         assertThat(outputJob.getMetadata().getAnnotations().get("json-input")).isNotEmpty();
@@ -154,7 +149,7 @@ public class TesKubernetesConverterMinimalTest {
         assertThat(
                 outputJob.getMetadata().getAnnotations().get("creator-user-id"),
                 is("test-user-id"));
-        assertThat(outputJob.getMetadata().getLabels().get("creator-group-name"), is("ABC"));
+        assertFalse(outputJob.getMetadata().getLabels().containsKey("creator-group-name"));
 
         Resource outputJobFile = new ClassPathResource("fromTesToK8s_minimal/job.json");
         V1Job expectedJob;
@@ -187,19 +182,11 @@ public class TesKubernetesConverterMinimalTest {
             inputTask = this.objectMapper.readValue(reader, TesTask.class);
         }
         V1Job outputJob =
-                this.converter.fromTesTaskToK8sJob(
-                        inputTask,
-                        User.builder("test-user-id")
-                                .teskMemberedGroups(StringUtils.commaDelimitedListToSet("ABC,CDE"))
-                                .build());
+                this.converter.fromTesTaskToK8sJob(inputTask, User.builder("test-user-id").build());
 
         V1ConfigMap outputConfigMap =
                 this.converter.fromTesTaskToK8sConfigMap(
-                        inputTask,
-                        User.builder("test-user-id")
-                                .teskMemberedGroups(StringUtils.commaDelimitedListToSet("ABC,CDE"))
-                                .build(),
-                        outputJob);
+                        inputTask, User.builder("test-user-id").build(), outputJob);
         Map<String, byte[]> binaryDataMap = outputConfigMap.getBinaryData();
         GZIPInputStream gis =
                 new GZIPInputStream(new ByteArrayInputStream(binaryDataMap.get("JSON_INPUT.gz")));
@@ -480,25 +467,7 @@ public class TesKubernetesConverterMinimalTest {
                 .forEach(executor -> executor.getJob().getStatus().succeeded(1));
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.COMPLETE);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
-        assertThat(outputTask, CoreMatchers.is(expectedTask));
-    }
-
-    @Test
-    public void fromK8sToTask_list() throws IOException {
-        TaskBuilder taskBuilder = this.prepareBaseTaskBuider(true, false);
-        taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(1);
-        // complete only when every executor completed
-        taskBuilder
-                .getTask()
-                .getExecutors()
-                .forEach(executor -> executor.getJob().getStatus().succeeded(1));
-        TesTask expectedTask = this.prepareBaseExpectedTask();
-        expectedTask.setState(TesState.COMPLETE);
-        expectedTask.setLogs(null);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), true);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -507,13 +476,12 @@ public class TesKubernetesConverterMinimalTest {
     public void fromK8sToTask_creatorFromAnnotation() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
         V1ObjectMeta metadata = taskBuilder.getTask().getTaskmaster().getJob().getMetadata();
-        metadata.getLabels().remove(Constants.LABEL_LEGACY_USERID_KEY);
+        metadata.getLabels().remove(Constants.ANN_USERID_KEY);
         CreatorLabels.put(metadata, "user@example.org");
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), false);
         assertThat(
                 outputTask.getLogs().get(0).getMetadata().get("USER_ID"), is("user@example.org"));
-        assertThat(outputTask.getLogs().get(0).isUserIdFromLegacyLabel(), is(false));
+        assertNull(outputTask.getLogs().get(0).getMetadata().get("GROUP_NAME"));
     }
 
     /** An annotation that doesn't match the hash label gives no creator (issue #119) */
@@ -523,20 +491,20 @@ public class TesKubernetesConverterMinimalTest {
         V1ObjectMeta metadata = taskBuilder.getTask().getTaskmaster().getJob().getMetadata();
         CreatorLabels.put(metadata, "user@example.org");
         metadata.putAnnotationsItem(Constants.ANN_USERID_KEY, "user_example.org");
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
-        assertNull(outputTask.getLogs().get(0).getMetadata().get("USER_ID"));
-        assertThat(outputTask.getLogs().get(0).isUserIdFromLegacyLabel(), is(false));
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), false);
+        assertNull(outputTask.getLogs().get(0).getMetadata());
     }
 
-    /** Tasks with only the old label show its value, marked as such (issue #119) */
+    /**
+     * Tasks with only the old label (and the old group label) have no creator and no group: nobody
+     * owns them (issue #225)
+     */
     @Test
-    public void fromK8sToTask_creatorFromLegacyLabel() throws IOException {
+    public void fromK8sToTask_noCreatorFromLegacyLabels() throws IOException {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
-        assertThat(outputTask.getLogs().get(0).getMetadata().get("USER_ID"), is("TEST_USER"));
-        assertThat(outputTask.getLogs().get(0).isUserIdFromLegacyLabel(), is(true));
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), false);
+        assertNull(outputTask.getLogs().get(0).getMetadata());
+        assertNull(this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask()).getLogs());
     }
 
     @Test
@@ -552,8 +520,7 @@ public class TesKubernetesConverterMinimalTest {
                 .putIfAbsent(LABEL_TASKSTATE_KEY, LABEL_TASKSTATE_VALUE_CANC);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.CANCELED);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -563,8 +530,7 @@ public class TesKubernetesConverterMinimalTest {
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().active(1);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.RUNNING);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -579,8 +545,7 @@ public class TesKubernetesConverterMinimalTest {
                 .setPhase(K8sConstants.PodPhase.PENDING.getCode());
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.QUEUED);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -597,8 +562,7 @@ public class TesKubernetesConverterMinimalTest {
                 .setPhase(K8sConstants.PodPhase.PENDING.getCode());
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.QUEUED);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -608,8 +572,7 @@ public class TesKubernetesConverterMinimalTest {
         TaskBuilder taskBuilder = this.prepareBaseTaskBuider(false, false);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.QUEUED);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -629,8 +592,7 @@ public class TesKubernetesConverterMinimalTest {
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().failed(1);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.SYSTEM_ERROR);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -640,8 +602,7 @@ public class TesKubernetesConverterMinimalTest {
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().succeeded(1);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.SYSTEM_ERROR);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -652,8 +613,7 @@ public class TesKubernetesConverterMinimalTest {
         taskBuilder.getTask().getLastExecutor().get().getJob().getStatus().active(1);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.SYSTEM_ERROR);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -669,8 +629,7 @@ public class TesKubernetesConverterMinimalTest {
         taskBuilder.getTask().getLastExecutor().get().getJob().getStatus().succeeded(1);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.SYSTEM_ERROR);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -681,8 +640,7 @@ public class TesKubernetesConverterMinimalTest {
         taskBuilder.getTask().getLastExecutor().get().getJob().getStatus().failed(1);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.EXECUTOR_ERROR);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
@@ -692,66 +650,33 @@ public class TesKubernetesConverterMinimalTest {
         taskBuilder.getTask().getTaskmaster().getJob().getStatus().active(1);
         TesTask expectedTask = this.prepareBaseExpectedTask();
         expectedTask.setState(TesState.INITIALIZING);
-        TesTask outputTask =
-                this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask(), false);
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskMinimal(taskBuilder.getTask());
         assertThat(outputTask, CoreMatchers.is(expectedTask));
     }
 
-    /** Without a group in the tags, the task belongs to a group of its creator */
-    @Test
-    public void groupOfTheUser_ifTheTagsHaveNone() {
-        given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-1");
-        TesTask task =
-                new TesTask()
-                        .putTagsItem("project", "p1")
-                        .addExecutorsItem(
-                                new TesExecutor()
-                                        .image("ubuntu")
-                                        .command(Collections.singletonList("true")));
-        User user = User.builder("user-1").teskMemberedGroups(Collections.singleton("ABC")).build();
-
-        V1Job job = this.converter.fromTesTaskToK8sJob(task, user);
-        V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, job);
-
-        assertEquals("ABC", job.getMetadata().getLabels().get(Constants.LABEL_GROUPNAME_KEY));
-        assertEquals("ABC", configMap.getMetadata().getLabels().get(Constants.LABEL_GROUPNAME_KEY));
-    }
-
     /**
-     * Groups whose names aren't valid label values, from the user or the tags, are labelled with
-     * valid values, and annotated with the full names (issue #216)
+     * New tasks get no group label or annotation, also with a {@code GROUP_NAME} tag, which is just
+     * a tag now (issue #225); their labels are valid label values, also for long creator IDs
      */
     @Test
-    public void groupNamesThatAreNoLabelValues() {
+    public void noGroupLabels() {
         given(this.jobNameGenerator.getTaskMasterName()).willReturn("task-1");
         StringBuilder longId = new StringBuilder("user|");
         for (int i = 0; i < 70; i++) {
             longId.append("x");
         }
-        for (String group : GroupLabelsTest.AWKWARD_NAMES) {
-            User user =
-                    User.builder(longId.toString())
-                            .teskMemberedGroups(Collections.singleton(group))
-                            .build();
-            TesTask untagged = task();
-            TesTask tagged = task().putTagsItem("GROUP_NAME", group);
-            for (TesTask task : new TesTask[] {untagged, tagged}) {
-                V1Job job = this.converter.fromTesTaskToK8sJob(task, user);
-                V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, job);
-                for (V1ObjectMeta metadata :
-                        new V1ObjectMeta[] {job.getMetadata(), configMap.getMetadata()}) {
-                    for (String value : metadata.getLabels().values()) {
-                        assertTrue(LABEL_VALUE.matcher(value).matches(), value);
-                    }
-                    assertEquals(
-                            GroupLabels.value(group),
-                            metadata.getLabels().get(Constants.LABEL_GROUPNAME_KEY));
-                    assertEquals(group, metadata.getAnnotations().get(Constants.ANN_GROUPNAME_KEY));
+        User user = User.builder(longId.toString()).build();
+        for (TesTask task : new TesTask[] {task(), task().putTagsItem("GROUP_NAME", "ABC")}) {
+            V1Job job = this.converter.fromTesTaskToK8sJob(task, user);
+            V1ConfigMap configMap = this.converter.fromTesTaskToK8sConfigMap(task, user, job);
+            for (V1ObjectMeta metadata :
+                    new V1ObjectMeta[] {job.getMetadata(), configMap.getMetadata()}) {
+                for (String value : metadata.getLabels().values()) {
+                    assertTrue(LABEL_VALUE.matcher(value).matches(), value);
                 }
-                // the task's group, as getting the task shows and authorises it
-                Task k8sTask = new Task(new Job(job.status(new V1JobStatus())));
-                TesTask read = this.converter.fromK8sJobsToTesTaskMinimal(k8sTask, false);
-                assertEquals(group, read.getLogs().get(0).getMetadata().get("GROUP_NAME"));
+                assertFalse(metadata.getLabels().containsKey("creator-group-name"));
+                assertFalse(metadata.getAnnotations().containsKey("creator-group-name"));
+                assertEquals(longId.toString(), CreatorLabels.creatorId(metadata));
             }
         }
     }

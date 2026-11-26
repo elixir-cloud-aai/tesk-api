@@ -245,7 +245,7 @@ public class KubernetesClientWrapper {
      *     results)
      * @param itemsPerPage - value submitted by user, limiting number of results
      * @param user - authenticated user
-     * @return all Taskmaster job objects, a User is allowed to see in V1JobList
+     * @return the taskmaster jobs that the user created (the page of them)
      */
     public V1JobList listAllTaskmasterJobsForUser(
             String pageToken, Integer itemsPerPage, User user) {
@@ -255,12 +255,8 @@ public class KubernetesClientWrapper {
                         .add(LABEL_JOBTYPE_KEY)
                         .add(LABEL_JOBTYPE_VALUE_TASKM)
                         .toString();
-        if (user.getLabelSelector() != null) {
-            // additional label selectors; limiting results to jobs belonging to chosen groups
-            // (where the user is member and/or manager)
-            // and optionally also to only those jobs, which were created bu the user
-            labelSelector += "," + user.getLabelSelector();
-        }
+        // only the user's jobs, by the hash label of the user's ID
+        labelSelector += "," + user.getLabelSelector();
         V1JobList result;
         try {
             result = this.listJobs(pageToken, labelSelector, itemsPerPage);
@@ -277,16 +273,12 @@ public class KubernetesClientWrapper {
                 result.getItems().stream()
                         .filter(job -> !isBeingDeleted(job))
                         .collect(Collectors.toList()));
-        if (user.isListFiltered()) {
-            // the selector only narrows the jobs down: keep those the user created, comparing
-            // the annotation with the full ID exactly (the hash label only selects, and the old
-            // label can't be selected for the user), and, unless only the own tasks are visible,
-            // those of the groups the user manages (see User#isListed)
-            result.setItems(
-                    result.getItems().stream()
-                            .filter(job -> user.isListed(job.getMetadata()))
-                            .collect(Collectors.toList()));
-        }
+        // the selector only narrows the jobs down (different IDs can have the same hash): keep
+        // those the user created, comparing the annotation with the full ID exactly
+        result.setItems(
+                result.getItems().stream()
+                        .filter(job -> user.isCreatorOf(job.getMetadata()))
+                        .collect(Collectors.toList()));
         return result;
     }
 

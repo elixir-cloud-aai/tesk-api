@@ -4,7 +4,6 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -15,7 +14,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
@@ -30,8 +29,7 @@ import org.springframework.web.client.RestTemplate;
  * security.oauth2.resource.user-info-uri}), on each request: a token is valid if the endpoint
  * answers it with a JSON object that has a {@code sub} and no {@code error}. Any failure (an error
  * status, an unreachable endpoint, an answer that isn't such an object) refuses the token. The user
- * ({@link ElixirPrincipalExtractor}) and its authorities, the group names ({@link
- * GroupNamesSecurityExtractor}), are taken from that answer.
+ * is the {@code sub} of that answer, without authorities.
  *
  * <p>Logs why a token was refused, never the token or the answer of the endpoint.
  */
@@ -52,22 +50,15 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
             new ParameterizedTypeReference<Map<String, Object>>() {};
 
     private final URI userInfoUri;
-    private final ElixirPrincipalExtractor principalExtractor;
-    private final GroupNamesSecurityExtractor authoritiesExtractor;
     private final RestOperations restOperations;
 
     /**
      * @param userInfoUri the user info endpoint
-     * @param principalExtractor builds the user from the user info
-     * @param authoritiesExtractor takes the authorities (group names) from the user info
      * @throws IllegalStateException if the user info endpoint isn't an absolute http(s) URL
      * @throws IllegalArgumentException if it isn't a URI
      */
-    public UserInfoTokenIntrospector(
-            String userInfoUri,
-            ElixirPrincipalExtractor principalExtractor,
-            GroupNamesSecurityExtractor authoritiesExtractor) {
-        this(userInfoUri, principalExtractor, authoritiesExtractor, restTemplate());
+    public UserInfoTokenIntrospector(String userInfoUri) {
+        this(userInfoUri, restTemplate());
     }
 
     /**
@@ -94,11 +85,7 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
     }
 
     /** As above, with the client of the user info endpoint (for tests) */
-    UserInfoTokenIntrospector(
-            String userInfoUri,
-            ElixirPrincipalExtractor principalExtractor,
-            GroupNamesSecurityExtractor authoritiesExtractor,
-            RestOperations restOperations) {
+    UserInfoTokenIntrospector(String userInfoUri, RestOperations restOperations) {
         if (!StringUtils.hasText(userInfoUri)) {
             throw new IllegalStateException(
                     "The auth profile needs security.oauth2.resource.user-info-uri"
@@ -112,8 +99,6 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
                     "security.oauth2.resource.user-info-uri (SECURITY_OAUTH2_RESOURCE_USER_INFO_URI)"
                             + " must be an absolute http(s) URL");
         }
-        this.principalExtractor = Objects.requireNonNull(principalExtractor);
-        this.authoritiesExtractor = Objects.requireNonNull(authoritiesExtractor);
         this.restOperations = Objects.requireNonNull(restOperations);
     }
 
@@ -129,9 +114,8 @@ public class UserInfoTokenIntrospector implements OpaqueTokenIntrospector {
             logger.warn("Refused token: the user info has no sub");
             throw new BadOpaqueTokenException(INVALID_TOKEN);
         }
-        User user = this.principalExtractor.extractPrincipal(userInfo);
-        List<GrantedAuthority> authorities = this.authoritiesExtractor.extractAuthorities(userInfo);
-        return new AuthenticatedUser(user, userInfo, authorities);
+        User user = User.builder(sub.toString()).build();
+        return new AuthenticatedUser(user, userInfo, AuthorityUtils.NO_AUTHORITIES);
     }
 
     /** The user info of the token's owner; any failure means that the token isn't valid */

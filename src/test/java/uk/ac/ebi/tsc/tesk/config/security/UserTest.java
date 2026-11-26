@@ -1,303 +1,111 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
+import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_USERHASH_KEY;
 
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
-import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
-import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 
-/** The account, group and equality rules of {@link User} */
+/**
+ * {@link User} without the group model (issue #225): a caller is its ID, and owns exactly the tasks
+ * stamped with that ID
+ */
 public class UserTest {
 
-    private static User.UserBuilder full() {
-        return full("user-1");
+    private static final String HASH_123 = "a665a45920422f9d417e4867efdc4fb8";
+
+    private static V1ObjectMeta createdBy(String userId) {
+        V1ObjectMeta metadata = new V1ObjectMeta();
+        CreatorLabels.put(metadata, userId);
+        return metadata;
     }
 
-    /** A user with all data */
-    private static User.UserBuilder full(String userId) {
-        return User.builder(userId)
-                .preferredUsername("preferred")
-                .name("Name")
-                .givenName("Given")
-                .familyName("Family")
-                .email("user@example.org")
-                .allGroups(Collections.singleton("elixir:GA4GH:GA4GH-CAP:EBI:TEST"))
-                .teskMemberedGroups(Collections.singleton("TEST"))
-                .teskManagedGroups(Collections.singleton("MANAGED"));
-    }
-
-    /** Users authenticate with tokens: no password, and the account is always usable */
     @Test
-    public void account_hasNoPasswordAndIsAlwaysUsable() {
-        User user = User.builder("user-1").build();
-        assertThat(user.getPassword()).isNull();
-        assertThat(user.isAccountNonExpired()).isTrue();
-        assertThat(user.isAccountNonLocked()).isTrue();
-        assertThat(user.isCredentialsNonExpired()).isTrue();
-        assertThat(user.isEnabled()).isTrue();
+    public void account_hasNoPasswordNoAuthoritiesAndIsAlwaysUsable() {
+        User user = User.builder("123").build();
+        assertNull(user.getPassword());
+        assertTrue(user.getAuthorities().isEmpty());
+        assertTrue(user.isAccountNonExpired());
+        assertTrue(user.isAccountNonLocked());
+        assertTrue(user.isCredentialsNonExpired());
+        assertTrue(user.isEnabled());
+        assertFalse(user.isServiceClient());
     }
 
-    /** A user without groups is neither member nor manager, and has no group for new tasks */
     @Test
-    public void withoutGroups() {
-        User user = User.builder("user-1").build();
-        assertThat(user.isMember()).isFalse();
-        assertThat(user.isManager()).isFalse();
-        assertThat(user.isGroupMember("TEST")).isFalse();
-        assertThat(user.isGroupManager("TEST")).isFalse();
-        assertThat(user.getAnyGroup()).isNull();
-        assertThat(user.getAuthorities()).isEmpty();
+    public void usernameAndName_areTheFullId() {
+        User user = User.builder("a@b|c").build();
+        assertEquals("a@b|c", user.getUsername());
+        assertEquals("a@b|c", user.getName());
     }
 
-    /** A member's group is the group of the tasks it creates without one */
+    /** Every caller lists by the hash label of its own ID, whatever kind of caller it is */
     @Test
-    public void member_anyGroupIsTheirGroup() {
-        User user =
-                User.builder("user-1").teskMemberedGroups(Collections.singleton("TEST")).build();
-        assertThat(user.isMember()).isTrue();
-        assertThat(user.isGroupMember("TEST")).isTrue();
-        assertThat(user.isGroupMember("OTHER")).isFalse();
-        assertThat(user.getAnyGroup()).isEqualTo("TEST");
+    public void labelSelector_isTheHashOfTheId() {
+        assertEquals(
+                "creator-user-hash=" + HASH_123, User.builder("123").build().getLabelSelector());
+        assertEquals(
+                "creator-user-hash=" + HASH_123,
+                User.builder("123").serviceClient(true).build().getLabelSelector());
     }
 
-    /** A manager of groups only, without membership, lists the tasks of the managed groups */
     @Test
-    public void managerOnly_labelSelectorNamesManagedGroups() {
-        User user =
-                User.builder("user-1").teskManagedGroups(Collections.singleton("MANAGED")).build();
-        assertThat(user.getLabelSelector()).isEqualTo("creator-group-name in (MANAGED)");
+    public void isCreatorOf_exactIdOnly() {
+        assertTrue(User.builder("a@b").build().isCreatorOf(createdBy("a@b")));
+        assertFalse(User.builder("a_b").build().isCreatorOf(createdBy("a@b")));
+        assertFalse(User.builder("a@b").build().isCreatorOf(createdBy("a_b")));
+        assertFalse(User.builder("a@b").build().isCreatorOf(createdBy("a@b ")));
     }
 
-    /** By default (as without authentication), group rules apply, not owner-only visibility */
     @Test
-    public void ownerOnly_offByDefault() {
-        assertThat(User.builder("user-1").build().isOwnerOnly()).isFalse();
+    public void isCreatorOf_annotationMustMatchHash() {
+        V1ObjectMeta metadata =
+                new V1ObjectMeta()
+                        .putLabelsItem(LABEL_USERHASH_KEY, CreatorLabels.hash("a@b"))
+                        .putAnnotationsItem(ANN_USERID_KEY, "a_b");
+        assertFalse(User.builder("a_b").build().isCreatorOf(metadata));
+        assertFalse(User.builder("a@b").build().isCreatorOf(metadata));
     }
 
     /**
-     * With owner-only visibility (issue #218), a super admin lists only the own tasks, of any group
-     * or none
+     * Objects without the hash label and the annotation (e.g. of tasks created before them, with
+     * the old label only) have no creator: nobody owns them
      */
     @Test
-    public void ownerOnly_adminLabelSelectorNamesTheCreator() {
-        User admin = User.builder("123").teskAdmin(true).ownerOnly(true).build();
-        assertThat(admin.getLabelSelector())
-                .isEqualTo("creator-user-hash=a665a45920422f9d417e4867efdc4fb8");
-        assertThat(admin.isListFiltered()).isTrue();
+    public void isCreatorOf_objectsWithoutCreatorAreNobodys() {
+        User user = User.builder("a_b").build();
+        assertFalse(user.isCreatorOf(null));
+        assertFalse(user.isCreatorOf(new V1ObjectMeta()));
+        assertFalse(user.isCreatorOf(new V1ObjectMeta().putLabelsItem("creator-user-id", "a_b")));
+        assertFalse(
+                user.isCreatorOf(
+                        new V1ObjectMeta()
+                                .putLabelsItem(LABEL_USERHASH_KEY, CreatorLabels.hash("a_b"))));
+        assertFalse(user.isCreatorOf(new V1ObjectMeta().putAnnotationsItem(ANN_USERID_KEY, "a_b")));
     }
 
-    /** With group visibility, a super admin lists all tasks: no selector and no filter */
     @Test
-    public void groupVisibility_adminListsAllTasks() {
-        User admin = User.builder("123").teskAdmin(true).build();
-        assertThat(admin.getLabelSelector()).isNull();
-        assertThat(admin.isListFiltered()).isFalse();
+    public void toString_namesIdAndKind() {
+        assertEquals(
+                "User{userId='c', serviceClient=true}",
+                User.builder("c").serviceClient(true).build().toString());
     }
 
-    /**
-     * With owner-only visibility and the old labels, the selector can't name the creator: no
-     * selector for a super admin, but the list is still filtered by the creator
-     */
     @Test
-    public void ownerOnly_adminWithLegacyLabels_filtersWithoutSelector() {
-        User admin =
-                User.builder("123").teskAdmin(true).ownerOnly(true).legacyUserLabels(true).build();
-        assertThat(admin.getLabelSelector()).isNull();
-        assertThat(admin.isListFiltered()).isTrue();
-    }
-
-    /** With owner-only visibility, a team admin lists only the own tasks of the teams */
-    @Test
-    public void ownerOnly_managerLabelSelectorNamesTheCreator() {
-        User manager =
-                User.builder("123")
-                        .teskManagedGroups(Collections.singleton("MANAGED"))
-                        .ownerOnly(true)
-                        .build();
-        assertThat(manager.getLabelSelector())
-                .isEqualTo(
-                        "creator-group-name in (MANAGED),"
-                                + "creator-user-hash=a665a45920422f9d417e4867efdc4fb8");
-    }
-
-    /**
-     * With owner-only visibility, the list keeps only the own tasks, also of managed teams; with
-     * group visibility, also the other tasks of managed teams
-     */
-    @Test
-    public void isListed_ownerOnlyKeepsOwnTasksOnly() {
-        V1ObjectMeta own = new V1ObjectMeta().name("task-1");
-        CreatorLabels.put(own, "123");
-        GroupLabels.put(own, "MANAGED");
-        V1ObjectMeta others = new V1ObjectMeta().name("task-2");
-        CreatorLabels.put(others, "124");
-        GroupLabels.put(others, "MANAGED");
-        User.UserBuilder manager =
-                User.builder("123").teskManagedGroups(Collections.singleton("MANAGED"));
-
-        User ownerOnly = manager.ownerOnly(true).build();
-        assertThat(ownerOnly.isListed(own)).isTrue();
-        assertThat(ownerOnly.isListed(others)).isFalse();
-
-        User group = manager.ownerOnly(false).build();
-        assertThat(group.isListed(own)).isTrue();
-        assertThat(group.isListed(others)).isTrue();
-    }
-
-    /** A task log of {@code creator} for {@code group} (or none), as getTask returns it */
-    private static TesTaskLog log(String creator, String group) {
-        TesTaskLog log = new TesTaskLog();
-        Map<String, String> metadata = new HashMap<>();
-        metadata.put("USER_ID", creator);
-        if (group != null) {
-            metadata.put("GROUP_NAME", group);
-        }
-        log.setMetadata(metadata);
-        return log;
-    }
-
-    /** With group visibility, the groups decide who gets a task, as before issue #218 */
-    @Test
-    public void mayGet_groupVisibility() {
-        User admin = User.builder("admin").teskAdmin(true).build();
-        User manager = User.builder("manager").teskManagedGroups(Set.of("TEST")).build();
-        User member = User.builder("member").teskMemberedGroups(Set.of("TEST")).build();
-        User claimUser = User.builder("claim").claimAuthorised(true).build();
-
-        assertThat(admin.mayGet(log("other", "TEST"))).isTrue();
-        assertThat(admin.mayGet(log("other", null))).isTrue();
-        assertThat(manager.mayGet(log("other", "TEST"))).isTrue();
-        assertThat(manager.mayGet(log("other", "ABC"))).isFalse();
-        assertThat(member.mayGet(log("member", "TEST"))).isTrue();
-        assertThat(member.mayGet(log("other", "TEST"))).isFalse();
-        assertThat(member.mayGet(log("member", "ABC"))).isFalse();
-        assertThat(member.mayGet(log("member", null))).isFalse();
-        assertThat(claimUser.mayGet(log("claim", null))).isTrue();
-        assertThat(claimUser.mayGet(log("claim", "TEST"))).isFalse();
-        assertThat(claimUser.mayGet(log("other", null))).isFalse();
-        assertThat(member.mayGet(null)).isFalse();
-    }
-
-    /**
-     * With owner-only visibility, nobody gets another user's task, admins and managers included;
-     * creators get their own tasks under the same rules as with group visibility
-     */
-    @Test
-    public void mayGet_ownerOnly() {
-        User admin = User.builder("admin").teskAdmin(true).ownerOnly(true).build();
-        User manager =
-                User.builder("manager").teskManagedGroups(Set.of("TEST")).ownerOnly(true).build();
-        User member =
-                User.builder("member").teskMemberedGroups(Set.of("TEST")).ownerOnly(true).build();
-        User claimUser = User.builder("claim").claimAuthorised(true).ownerOnly(true).build();
-
-        assertThat(admin.mayGet(log("other", "TEST"))).isFalse();
-        assertThat(admin.mayGet(log("other", null))).isFalse();
-        assertThat(admin.mayGet(log("admin", "TEST"))).isTrue();
-        assertThat(admin.mayGet(log("admin", null))).isTrue();
-        assertThat(manager.mayGet(log("other", "TEST"))).isFalse();
-        assertThat(manager.mayGet(log("manager", "TEST"))).isTrue();
-        assertThat(manager.mayGet(log("manager", "ABC"))).isFalse();
-        assertThat(member.mayGet(log("member", "TEST"))).isTrue();
-        assertThat(member.mayGet(log("other", "TEST"))).isFalse();
-        assertThat(member.mayGet(log("member", "ABC"))).isFalse();
-        assertThat(claimUser.mayGet(log("claim", null))).isTrue();
-        assertThat(claimUser.mayGet(log("other", null))).isFalse();
-        assertThat(admin.mayGet(null)).isFalse();
-    }
-
-    /**
-     * The same rules hold for tasks with only the old creator label, for service clients and for
-     * logs without metadata (403 for all but admins with group visibility)
-     */
-    @Test
-    public void mayGet_legacyLabelsServiceClientsAndNoMetadata() {
-        TesTaskLog legacy = log("a_b", "TEST");
-        legacy.setUserIdFromLegacyLabel(true);
-        User.UserBuilder member = User.builder("a@b").teskMemberedGroups(Set.of("TEST"));
-        assertThat(member.legacyUserLabels(true).build().mayGet(legacy)).isTrue();
-        assertThat(member.legacyUserLabels(true).ownerOnly(true).build().mayGet(legacy)).isTrue();
-        assertThat(member.legacyUserLabels(false).build().mayGet(legacy)).isFalse();
-
-        for (boolean ownerOnly : new boolean[] {false, true}) {
-            User client = User.builder("client").serviceClient(true).ownerOnly(ownerOnly).build();
-            assertThat(client.mayGet(log("client", null))).isTrue();
-            assertThat(client.mayGet(log("client", "TEST"))).isFalse();
-            assertThat(client.mayGet(log("other", null))).isFalse();
-            assertThat(
-                            User.builder("member")
-                                    .teskMemberedGroups(Set.of("TEST"))
-                                    .ownerOnly(ownerOnly)
-                                    .build()
-                                    .mayGet(new TesTaskLog()))
-                    .isFalse();
-        }
-        assertThat(User.builder("admin").teskAdmin(true).build().mayGet(new TesTaskLog())).isTrue();
-        assertThat(
-                        User.builder("admin")
-                                .teskAdmin(true)
-                                .ownerOnly(true)
-                                .build()
-                                .mayGet(new TesTaskLog()))
-                .isFalse();
-    }
-
-    /** The log of the user lists the user's data, but no credentials (there are none) */
-    @Test
-    public void toString_listsTheUser() {
-        assertThat(full().teskAdmin(true).build().toString())
-                .isEqualTo(
-                        "User{userId='user-1', preferredUsername='preferred', name='Name',"
-                                + " givenName='Given', familyName='Family',"
-                                + " email='user@example.org',"
-                                + " allGroups=(elixir:GA4GH:GA4GH-CAP:EBI:TEST),"
-                                + " memberedGroups=(TEST), managedGroups=(MANAGED), iasAdmin=true,"
-                                + " claimAuthorised=false, serviceClient=false,"
-                                + " legacyUserLabels=false, ownerOnly=false}");
-    }
-
-    /** Users with the same data are equal, and have the same hash code */
-    @Test
-    public void equals_sameData() {
-        User user = full().build();
-        assertThat(user).isEqualTo(user);
-        assertThat(user).isEqualTo(full().build());
-        assertThat(user.hashCode()).isEqualTo(full().build().hashCode());
-        assertThat(user).isNotEqualTo(null);
-        assertThat(user).isNotEqualTo("user-1");
-    }
-
-    /** Users that differ in any one property aren't equal */
-    @Test
-    public void equals_anyDifferentProperty() {
-        List<UnaryOperator<User.UserBuilder>> changes =
-                Arrays.asList(
-                        b -> b.teskAdmin(true),
-                        b -> b.claimAuthorised(true),
-                        b -> b.serviceClient(true),
-                        b -> b.legacyUserLabels(true),
-                        b -> b.ownerOnly(true),
-                        b -> full("user-2"),
-                        b -> b.preferredUsername("other"),
-                        b -> b.name("Other"),
-                        b -> b.givenName("Other"),
-                        b -> b.familyName("Other"),
-                        b -> b.email("other@example.org"),
-                        b -> b.allGroups(Collections.emptySet()),
-                        b -> b.teskMemberedGroups(Collections.emptySet()),
-                        b -> b.teskManagedGroups(Collections.emptySet()));
-        User user = full().build();
-        for (UnaryOperator<User.UserBuilder> change : changes) {
-            assertThat(change.apply(full()).build()).isNotEqualTo(user);
-        }
+    public void equals_sameIdAndKind() {
+        assertEquals(User.builder("a").build(), User.builder("a").build());
+        assertEquals(User.builder("a").build().hashCode(), User.builder("a").build().hashCode());
+        assertNotEquals(User.builder("a").build(), User.builder("b").build());
+        assertNotEquals(User.builder("a").build(), User.builder("a").serviceClient(true).build());
+        assertNotEquals(User.builder("a").build(), null);
+        assertNotEquals(User.builder("a").build(), "a");
+        User user = User.builder("a").build();
+        assertEquals(user, user);
     }
 }

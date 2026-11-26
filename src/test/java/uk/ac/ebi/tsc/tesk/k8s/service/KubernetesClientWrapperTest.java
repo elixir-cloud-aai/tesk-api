@@ -10,10 +10,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_GROUPNAME_KEY;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.ANN_USERID_KEY;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_GROUPNAME_KEY;
-import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_LEGACY_USERID_KEY;
 
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
@@ -37,11 +34,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.util.StringUtils;
 import uk.ac.ebi.tsc.tesk.config.security.User;
-import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
-import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
@@ -323,13 +317,10 @@ public class KubernetesClientWrapperTest {
     /** Taskmaster jobs that Kubernetes is deleting aren't listed (issue #117) */
     @Test
     public void listAllTaskmasterJobsForUser_skipsJobsBeingDeleted() throws ApiException {
-        V1Job kept = new V1Job().metadata(new V1ObjectMeta().name("kept"));
-        V1Job deleted =
-                new V1Job()
-                        .metadata(
-                                new V1ObjectMeta()
-                                        .name("deleted")
-                                        .deletionTimestamp(OffsetDateTime.now()));
+        V1Job kept = job("123");
+        kept.getMetadata().name("kept");
+        V1Job deleted = job("123");
+        deleted.getMetadata().name("deleted").deletionTimestamp(OffsetDateTime.now());
         given(listJobs.execute())
                 .willReturn(
                         new V1JobList()
@@ -357,122 +348,54 @@ public class KubernetesClientWrapperTest {
         assertThrows(KubernetesException.class, () -> wrapper.deleteJob("123"));
     }
 
+    /**
+     * Every caller lists only its own jobs: by the hash label of its ID, then exactly by the
+     * annotation (IDs with the same hash, or that the old label encoding merged, are told apart;
+     * issues #119 and #225)
+     */
     @Test
-    public void listAllTaskmasterJobsForUser_any() throws ApiException {
-
-        User user = User.builder("123").build();
+    public void listAllTaskmasterJobsForUser_ownJobsOnly() throws ApiException {
+        listJobsReturning(job("a@b"), job("a_b"), job("c@d"), job("a@b"));
         ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        given(listJobs.execute()).willReturn(this.resultList());
-        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, user);
+        V1JobList result =
+                wrapper.listAllTaskmasterJobsForUser(null, null, User.builder("a@b").build());
         verifyListJobs("test-namespace", argument);
-        assertThat(argument.getValue(), is("job-type=taskmaster"));
-        assertThat(result, is(this.resultList()));
+        assertThat(
+                argument.getValue(),
+                is("job-type=taskmaster,creator-user-hash=" + CreatorLabels.hash("a@b")));
+        assertThat(result.getItems(), is(Arrays.asList(job("a@b"), job("a@b"))));
+    }
+
+    /** Service clients list their own jobs the same way */
+    @Test
+    public void listAllTaskmasterJobsForUser_serviceClient() throws ApiException {
+        listJobsReturning(job("client"), job("other"));
+        User client = User.builder("client").serviceClient(true).build();
+        assertThat(
+                wrapper.listAllTaskmasterJobsForUser(null, null, client).getItems(),
+                is(Arrays.asList(job("client"))));
     }
 
     /**
-     * With owner-only visibility and the old labels, no selector names the creator of an admin's
-     * tasks, but the list keeps only the admin's own tasks, also those with only the old label
-     * (issues #218 and #119)
+     * Jobs without the hash label and the annotation (e.g. with only the old label, or no labels)
+     * belong to nobody, and jobs of a group are no longer listed to its members or managers
      */
     @Test
-    public void listAllTaskmasterJobsForUser_ownerOnlyAdminWithLegacyLabels() throws ApiException {
-        User admin =
-                User.builder("a@b").teskAdmin(true).ownerOnly(true).legacyUserLabels(true).build();
-        V1ObjectMeta own = new V1ObjectMeta().name("own");
-        CreatorLabels.put(own, "a@b");
-        GroupLabels.put(own, "TEST");
-        V1ObjectMeta ownLegacy =
-                new V1ObjectMeta()
-                        .name("own-legacy")
-                        .putLabelsItem(Constants.LABEL_LEGACY_USERID_KEY, "a_b");
-        V1ObjectMeta others = new V1ObjectMeta().name("others");
-        CreatorLabels.put(others, "c@d");
-        V1ObjectMeta othersLegacy =
-                new V1ObjectMeta()
-                        .name("others-legacy")
-                        .putLabelsItem(Constants.LABEL_LEGACY_USERID_KEY, "c_d");
-        given(listJobs.execute())
-                .willReturn(
-                        new V1JobList()
-                                .metadata(new V1ListMeta())
-                                .items(
-                                        Arrays.asList(
-                                                new V1Job().metadata(own),
-                                                new V1Job().metadata(ownLegacy),
-                                                new V1Job().metadata(others),
-                                                new V1Job().metadata(othersLegacy))));
-        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, admin);
-        verifyListJobs(namespace, argument);
-        assertThat(argument.getValue(), is("job-type=taskmaster"));
+    public void listAllTaskmasterJobsForUser_jobsWithoutCreatorAreNobodys() throws ApiException {
+        V1ObjectMeta annotatedOnly = new V1ObjectMeta().putAnnotationsItem(ANN_USERID_KEY, "a@b");
+        V1ObjectMeta oldLabelOnly = new V1ObjectMeta().putLabelsItem("creator-user-id", "a_b");
+        V1ObjectMeta othersInGroup = new V1ObjectMeta().putLabelsItem("creator-group-name", "TEST");
+        CreatorLabels.put(othersInGroup, "c@d");
+        listJobsReturning(
+                new V1Job().metadata(new V1ObjectMeta()),
+                new V1Job().metadata(annotatedOnly),
+                new V1Job().metadata(oldLabelOnly),
+                new V1Job().metadata(othersInGroup),
+                job("a@b"));
         assertThat(
-                result.getItems().stream().map(job -> job.getMetadata().getName()).toList(),
-                is(Arrays.asList("own", "own-legacy")));
-    }
-
-    @Test
-    public void listAllTaskmasterJobsForUser_admin() throws ApiException {
-
-        User user = User.builder("123").teskAdmin(true).build();
-        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        given(listJobs.execute()).willReturn(this.resultList());
-        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, user);
-        verifyListJobs(namespace, argument);
-        assertThat(argument.getValue(), is("job-type=taskmaster"));
-        assertThat(result, is(this.resultList()));
-    }
-
-    @Test
-    public void listAllTaskmasterJobsForUser_member() throws ApiException {
-
-        User user =
-                User.builder("123")
-                        .teskMemberedGroups(StringUtils.commaDelimitedListToSet("TEST"))
-                        .build();
-        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        given(listJobs.execute()).willReturn(this.resultList());
-        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, user);
-        verifyListJobs(namespace, argument);
-        assertThat(
-                argument.getValue(),
-                is(
-                        "job-type=taskmaster,creator-group-name in (TEST),"
-                                + "creator-user-hash=a665a45920422f9d417e4867efdc4fb8"));
-        // only the user's own jobs, also if Kubernetes returned others
-        assertThat(
-                result.getItems(),
-                is(Arrays.asList(job("TEST", "123"), job("XYZ", "123"), job("ABC", "123"))));
-    }
-
-    @Test
-    public void listAllTaskmasterJobsForUser_groupAdmin() throws ApiException {
-
-        User user =
-                User.builder("123")
-                        .teskManagedGroups(StringUtils.commaDelimitedListToSet("TEST,XYZ"))
-                        .build();
-        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        given(listJobs.execute()).willReturn(this.resultList());
-        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, user);
-        verifyListJobs(namespace, argument);
-        assertThat(argument.getValue(), is("job-type=taskmaster,creator-group-name in (TEST,XYZ)"));
-        assertThat(result, is(this.resultList()));
-    }
-
-    @Test
-    public void listAllTaskmasterJobsForUser_mixed() throws ApiException {
-
-        User user =
-                User.builder("123")
-                        .teskManagedGroups(StringUtils.commaDelimitedListToSet("TEST"))
-                        .teskMemberedGroups(StringUtils.commaDelimitedListToSet("XYZ"))
-                        .build();
-        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        given(listJobs.execute()).willReturn(this.resultList());
-        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, user);
-        verifyListJobs(namespace, argument);
-        assertThat(argument.getValue(), is("job-type=taskmaster,creator-group-name in (XYZ,TEST)"));
-        assertThat(result, is(filteredResultList()));
+                wrapper.listAllTaskmasterJobsForUser(null, null, User.builder("a@b").build())
+                        .getItems(),
+                is(Arrays.asList(job("a@b"))));
     }
 
     @Test
@@ -612,163 +535,17 @@ public class KubernetesClientWrapperTest {
         Mockito.verify(listJobs).execute();
     }
 
-    private static V1Job job(String group, String userId) {
-        V1ObjectMeta metadata = new V1ObjectMeta().putLabelsItem(LABEL_GROUPNAME_KEY, group);
-        CreatorLabels.put(metadata, userId);
-        return new V1Job().metadata(metadata);
-    }
-
-    /** A job of the group, labelled and annotated as TESK API does */
-    private static V1Job groupJob(String group, String userId) {
+    /** A job created by the user, labelled and annotated as TESK API does */
+    private static V1Job job(String userId) {
         V1ObjectMeta metadata = new V1ObjectMeta();
-        GroupLabels.put(metadata, group);
         CreatorLabels.put(metadata, userId);
         return new V1Job().metadata(metadata);
-    }
-
-    private static V1Job legacyJob(String group, String legacyUserLabel) {
-        return new V1Job()
-                .metadata(
-                        new V1ObjectMeta()
-                                .putLabelsItem(LABEL_GROUPNAME_KEY, group)
-                                .putLabelsItem(LABEL_LEGACY_USERID_KEY, legacyUserLabel));
-    }
-
-    private V1JobList resultList() {
-        V1JobList jobList = new V1JobList();
-        jobList.setItems(
-                Arrays.asList(
-                        job("TEST", "123"),
-                        job("TEST", "124"),
-                        job("XYZ", "123"),
-                        job("XYZ", "124"),
-                        job("ABC", "123")));
-        return jobList;
-    }
-
-    private V1JobList filteredResultList() {
-        V1JobList jobList = new V1JobList();
-        jobList.setItems(
-                Arrays.asList(
-                        job("TEST", "123"),
-                        job("TEST", "124"),
-                        job("XYZ", "123"),
-                        // this one wasn't filtered in Java, but K8s should not return this one
-                        job("ABC", "123")));
-        return jobList;
     }
 
     private V1JobList listJobsReturning(V1Job... jobs) throws ApiException {
         V1JobList jobList = new V1JobList().items(Arrays.asList(jobs));
         given(listJobs.execute()).willReturn(jobList);
         return jobList;
-    }
-
-    /**
-     * Groups whose names aren't valid label values are selected by their label values, and the jobs
-     * of managed groups are kept by the full names in the annotations (issue #216)
-     */
-    @Test
-    public void listAllTaskmasterJobsForUser_groupNamesThatAreNoLabelValues() throws ApiException {
-        String member = "BioHackCloud%20Admins";
-        String manager = "x) ,creator-user-hash in (y";
-        V1Job own = groupJob(member, "123");
-        V1Job othersInManaged = groupJob(manager, "124");
-        // the label of the managed group, with the annotation of another group: the group is the
-        // label, which names no group of the user
-        V1Job mismatched = job(GroupLabels.value(manager), "124");
-        mismatched.getMetadata().putAnnotationsItem(ANN_GROUPNAME_KEY, "OTHER");
-        listJobsReturning(own, groupJob(member, "124"), othersInManaged, mismatched);
-        User user =
-                User.builder("123")
-                        .teskMemberedGroups(Collections.singleton(member))
-                        .teskManagedGroups(Collections.singleton(manager))
-                        .build();
-        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, user);
-        verifyListJobs(namespace, argument);
-        assertThat(
-                argument.getValue(),
-                is(
-                        "job-type=taskmaster,creator-group-name in ("
-                                + GroupLabels.value(member)
-                                + ","
-                                + GroupLabels.value(manager)
-                                + ")"));
-        assertThat(result.getItems(), is(Arrays.asList(own, othersInManaged)));
-    }
-
-    /** IDs that the old label encoding merged are told apart (issue #119) */
-    @Test
-    public void listAllTaskmasterJobsForUser_exactCreatorOnly() throws ApiException {
-        listJobsReturning(job("TEST", "a@b"), job("TEST", "a_b"));
-        User user =
-                User.builder("a_b")
-                        .teskMemberedGroups(StringUtils.commaDelimitedListToSet("TEST"))
-                        .build();
-        V1JobList result = wrapper.listAllTaskmasterJobsForUser(null, null, user);
-        assertThat(result.getItems(), is(Arrays.asList(job("TEST", "a_b"))));
-    }
-
-    /** Jobs with only the old label belong to nobody, unless the setting is on (issue #119) */
-    @Test
-    public void listAllTaskmasterJobsForUser_legacyLabels() throws ApiException {
-        listJobsReturning(legacyJob("TEST", "a_b"), legacyJob("TEST", "c_d"), job("TEST", "a@b"));
-        User user =
-                User.builder("a@b")
-                        .teskMemberedGroups(StringUtils.commaDelimitedListToSet("TEST"))
-                        .build();
-        assertThat(
-                wrapper.listAllTaskmasterJobsForUser(null, null, user).getItems(),
-                is(Arrays.asList(job("TEST", "a@b"))));
-        User legacyUser =
-                User.builder("a@b")
-                        .teskMemberedGroups(StringUtils.commaDelimitedListToSet("TEST"))
-                        .legacyUserLabels(true)
-                        .build();
-        // a new list: the wrapper replaces the items of the one it gets
-        listJobsReturning(legacyJob("TEST", "a_b"), legacyJob("TEST", "c_d"), job("TEST", "a@b"));
-        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-        assertThat(
-                wrapper.listAllTaskmasterJobsForUser(null, null, legacyUser).getItems(),
-                is(Arrays.asList(legacyJob("TEST", "a_b"), job("TEST", "a@b"))));
-        Mockito.verify(batchApi, Mockito.times(2)).listNamespacedJob(namespace);
-        Mockito.verify(listJobs, Mockito.times(2)).labelSelector(argument.capture());
-        assertThat(argument.getValue(), is("job-type=taskmaster,creator-group-name in (TEST)"));
-    }
-
-    /** Managers see all jobs of their groups, whoever created them, as before */
-    @Test
-    public void listAllTaskmasterJobsForUser_managerSeesLegacyJobs() throws ApiException {
-        listJobsReturning(legacyJob("TEST", "c_d"), job("TEST", "e@f"));
-        User user =
-                User.builder("a@b")
-                        .teskManagedGroups(StringUtils.commaDelimitedListToSet("TEST"))
-                        .build();
-        assertThat(
-                wrapper.listAllTaskmasterJobsForUser(null, null, user).getItems(),
-                is(Arrays.asList(legacyJob("TEST", "c_d"), job("TEST", "e@f"))));
-    }
-
-    /**
-     * Jobs without labels belong to no group and no user, so the filter leaves them out, also with
-     * only the creator annotation and with the legacy-label setting on
-     */
-    @Test
-    public void listAllTaskmasterJobsForUser_jobWithoutLabels() throws ApiException {
-        V1ObjectMeta annotatedOnly = new V1ObjectMeta().putAnnotationsItem(ANN_USERID_KEY, "a@b");
-        listJobsReturning(
-                new V1Job().metadata(new V1ObjectMeta()),
-                new V1Job().metadata(annotatedOnly),
-                job("TEST", "a@b"));
-        User user =
-                User.builder("a@b")
-                        .teskMemberedGroups(StringUtils.commaDelimitedListToSet("TEST"))
-                        .legacyUserLabels(true)
-                        .build();
-        assertThat(
-                wrapper.listAllTaskmasterJobsForUser(null, null, user).getItems(),
-                is(Arrays.asList(job("TEST", "a@b"))));
     }
 
     /** Kubernetes answers an expired continue token with 410 Gone (issue #114) */
@@ -800,7 +577,7 @@ public class KubernetesClientWrapperTest {
     /** The page token and the page size are passed on to Kubernetes */
     @Test
     public void listAllTaskmasterJobsForUser_page() throws ApiException {
-        given(listJobs.execute()).willReturn(this.resultList());
+        listJobsReturning(job("123"));
         wrapper.listAllTaskmasterJobsForUser("token", 10, User.builder("123").build());
         Mockito.verify(listJobs)._continue("token");
         Mockito.verify(listJobs).limit(10);

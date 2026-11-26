@@ -1,11 +1,14 @@
 package uk.ac.ebi.tsc.tesk.tes.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.kubernetes.client.openapi.models.V1Job;
@@ -20,9 +23,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.convert.data.Task;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
+import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutorLog;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
@@ -34,7 +39,9 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
  */
 class TesServiceImplSystemLogsTest {
 
-    private static final User USER = User.builder("admin").build();
+    /** The creator of the task */
+    private static final User USER = User.builder("user@example.org").build();
+
     private static final String TASK_ID = "task-1";
 
     private KubernetesClientWrapper client;
@@ -60,6 +67,7 @@ class TesServiceImplSystemLogsTest {
                                         .selector(
                                                 new V1LabelSelector()
                                                         .putMatchLabelsItem("job-name", TASK_ID)));
+        CreatorLabels.put(this.taskmaster.getMetadata(), USER.getUsername());
         V1Pod taskmasterPod =
                 new V1Pod()
                         .metadata(
@@ -74,6 +82,33 @@ class TesServiceImplSystemLogsTest {
         when(this.client.readPodLog(anyString())).thenReturn("taskmaster log");
         when(this.converter.fromK8sJobsToTesTaskBasic(any(Task.class), anyBoolean()))
                 .thenAnswer(invocation -> new TesTask().id(TASK_ID).addLogsItem(new TesTaskLog()));
+    }
+
+    /**
+     * Only the creator gets a task: for anyone else (an ID that differs in any way, a service
+     * client, or a task without a creator), in every view, it is not found after reading the
+     * taskmaster's job only, as a missing task (issue #225)
+     */
+    @Test
+    void othersTaskIsNotFound() {
+        int reads = 0;
+        for (TaskView view : TaskView.values()) {
+            for (User other :
+                    new User[] {
+                        User.builder("someone@example.org").build(),
+                        User.builder("user_example.org").build(),
+                        User.builder("USER@example.org").build(),
+                    }) {
+                assertThatThrownBy(() -> this.service.getTask(TASK_ID, view, other))
+                        .isInstanceOf(TaskNotFoundException.class);
+                reads++;
+            }
+        }
+        this.taskmaster.getMetadata().setAnnotations(null);
+        assertThatThrownBy(() -> this.service.getTask(TASK_ID, TaskView.FULL, USER))
+                .isInstanceOf(TaskNotFoundException.class);
+        verify(this.client, times(reads + 1)).readTaskmasterJob(TASK_ID);
+        verifyNoMoreInteractions(this.client);
     }
 
     @Test

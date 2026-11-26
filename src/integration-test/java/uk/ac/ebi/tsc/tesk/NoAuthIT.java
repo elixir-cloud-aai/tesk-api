@@ -222,7 +222,7 @@ public class NoAuthIT {
     @Test
     public void getTask() throws Exception {
 
-        MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, MockUtil.NOAUTH_USER);
 
         this.mvc.perform(get(TASK_URL + "/{id}", "task-123")).andExpect(status().isOk());
         // logs[].outputs is required by TES: an empty array, as the mock has no outputs filer job
@@ -244,7 +244,7 @@ public class NoAuthIT {
      */
     @Test
     public void trailingSlash_isIgnored() throws Exception {
-        MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, MockUtil.NOAUTH_USER);
 
         this.mvc
                 .perform(get(TASK_URL + "/{id}/", "task-123"))
@@ -267,7 +267,7 @@ public class NoAuthIT {
     @Test
     public void cancelTask() throws Exception {
 
-        MockUtil.mockGetTaskKubernetesResponses(this.mockKubernetes);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, MockUtil.NOAUTH_USER);
 
         this.mvc
                 .perform(
@@ -284,10 +284,12 @@ public class NoAuthIT {
     public void getList() throws Exception {
 
         mockKubernetes.givenThat(
-                WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "&limit=256")
-                        .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
+                WireMock.get(urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs"))
+                        .withQueryParam(
+                                "labelSelector",
+                                equalTo(MockUtil.ownTaskmastersSelector(MockUtil.NOAUTH_USER)))
+                        .withQueryParam("limit", equalTo("256"))
+                        .willReturn(okJson(MockUtil.taskmastersOf(MockUtil.NOAUTH_USER))));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
         this.mvc
@@ -298,7 +300,9 @@ public class NoAuthIT {
         // of TES (issue #137)
         mockKubernetes.verify(
                 getRequestedFor(urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs"))
-                        .withQueryParam("labelSelector", equalTo("job-type=taskmaster"))
+                        .withQueryParam(
+                                "labelSelector",
+                                equalTo(MockUtil.ownTaskmastersSelector(MockUtil.NOAUTH_USER)))
                         .withQueryParam("limit", equalTo("256")));
         this.mvc
                 .perform(get(TASK_URL + "?view=BASIC").header("Authorization", "Bearer BAR"))
@@ -335,6 +339,10 @@ public class NoAuthIT {
 
     /** A running taskmaster job of a task with these tags, stored with the job. */
     private static V1Job taggedTaskmaster(String id, String tagsJson) {
+        return MockUtil.createdBy(taggedTaskmasterJob(id, tagsJson), MockUtil.NOAUTH_USER);
+    }
+
+    private static V1Job taggedTaskmasterJob(String id, String tagsJson) {
         return new V1Job()
                 .metadata(
                         new V1ObjectMeta()
@@ -352,9 +360,11 @@ public class NoAuthIT {
         V1Job cancelled = taggedTaskmaster("task-202", "{\"WORKFLOW_ID\":\"cwl-01234\"}");
         cancelled.getMetadata().putLabelsItem("task-status", "Cancelled");
         mockKubernetes.givenThat(
-                WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "&limit=256")
+                WireMock.get(urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs"))
+                        .withQueryParam(
+                                "labelSelector",
+                                equalTo(MockUtil.ownTaskmastersSelector(MockUtil.NOAUTH_USER)))
+                        .withQueryParam("limit", equalTo("256"))
                         .willReturn(
                                 okJson(
                                         MockUtil.jobList(

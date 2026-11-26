@@ -144,9 +144,6 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
 
     private final OpaqueTokenIntrospector userInfoIntrospector;
 
-    /** Whether clients see only their own tasks (tesk.api.authorisation.task-visibility=owner) */
-    private final boolean ownerOnly;
-
     private final String issuer;
     private final String jwksUri;
     private final String clientClaim;
@@ -194,7 +191,6 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             AuthorisationProperties properties,
             long jwksRefreshIntervalMs) {
         AuthorisationProperties.ServiceClients settings = properties.getServiceClients();
-        this.ownerOnly = properties.getTaskVisibility() == TaskVisibility.OWNER;
         if (!StringUtils.hasText(settings.getIssuer())
                 || !StringUtils.hasText(settings.getClientClaim())) {
             throw new IllegalStateException(
@@ -441,7 +437,7 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
             throw new BadOpaqueTokenException("Invalid access token of a service client");
         }
         logger.info("Accepted token of service client {}", clientId);
-        return principal(clientId, claims, this.ownerOnly);
+        return principal(clientId, claims);
     }
 
     /**
@@ -489,16 +485,9 @@ public class ServiceClientTokenServices implements OpaqueTokenIntrospector {
         }
     }
 
-    /** The client, as a principal of its own without groups, with the claims of its token */
-    private static OAuth2AuthenticatedPrincipal principal(
-            String clientId, JwtClaims claims, boolean ownerOnly) {
-        User user =
-                User.builder(clientId)
-                        .allGroups(Collections.emptySet())
-                        .serviceClient(true)
-                        .legacyUserLabels(false)
-                        .ownerOnly(ownerOnly)
-                        .build();
+    /** The client, as a principal of its own, with the claims of its token */
+    private static OAuth2AuthenticatedPrincipal principal(String clientId, JwtClaims claims) {
+        User user = User.builder(clientId).serviceClient(true).build();
         return new AuthenticatedUser(user, claims.getClaimsMap(), AuthorityUtils.NO_AUTHORITIES);
     }
 
