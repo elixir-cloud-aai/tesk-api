@@ -2,11 +2,14 @@ package uk.ac.ebi.tsc.tesk.config.security;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
@@ -140,5 +143,28 @@ public class RemovedSettingsTest {
                                         "tesk.api.authorisationx.base-group", "x",
                                         "tesk.api.auth.issuers[0].url", "https://a",
                                         "tesk.api.authz.decision-service.url", "https://b"))));
+    }
+
+    /**
+     * The documented environment variables, with {@code _} for the dash of {@code service-clients},
+     * are both kept and bound to the service-client settings (Spring's legacy mapping of dashes)
+     */
+    @Test
+    public void documentedServiceClientVariables_areKeptAndBound() {
+        StandardEnvironment environment =
+                environmentVariables(
+                        Map.of(
+                                "TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED", "true",
+                                "TESK_API_AUTHORISATION_SERVICE_CLIENTS_ISSUER", "https://i/",
+                                "TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_CLAIM", "azp"));
+        assertDoesNotThrow(() -> RemovedSettings.refuse(environment));
+
+        AuthorisationProperties bound =
+                Binder.get(environment)
+                        .bind("tesk.api.authorisation", Bindable.of(AuthorisationProperties.class))
+                        .get();
+        assertThat(bound.getServiceClients().isEnabled(), is(true));
+        assertThat(bound.getServiceClients().getIssuer(), is("https://i/"));
+        assertThat(bound.getServiceClients().getClientClaim(), is("azp"));
     }
 }
