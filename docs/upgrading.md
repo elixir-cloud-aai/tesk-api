@@ -43,24 +43,47 @@
     every listed client's tokens for the former shared audience: the
     audiences per client hold once the rollout has completed. Without
     service clients, nothing changes.
-- **Tasks visible to their owner only (behaviour change, security).** With
-  the `auth` profile, users get, list and cancel only their own tasks,
-  whatever their groups
-  ([#218](https://github.com/elixir-cloud-aai/tesk-api/issues/218)): super
-  admins no longer see all tasks of the installation, and team admins no
-  longer see the tasks of other members of their teams; requests for other
-  users' tasks give `403 Forbidden`, and lists leave them out. Groups still
-  decide who may create tasks. Handle stuck or abusive tasks through
-  Kubernetes (e.g. with `kubectl`). To keep the previous
-  behaviour, set `TESK_API_AUTHORISATION_TASK_VISIBILITY=group` (see [Task
-  visibility](access-control.md#task-visibility)); the Helm chart of TESK
-  can't set it yet. With `owner`, tasks created before 1.2.0, which have
-  only the old creator label, are visible to nobody unless
-  `TESK_API_AUTHORISATION_LEGACY_USER_LABELS` is on (with `group`, team
-  admins and super admins still see them). No effect with the `noauth`
-  profile. During a rolling update, pods of the old version still answer
-  with the old rules: owner-only visibility holds once the rollout has
-  completed.
+- **Group model removed (breaking, security).** TESK API has no groups,
+  teams, team admins or super admins any more, and no rights from a claim
+  of the user info
+  ([#225](https://github.com/elixir-cloud-aai/tesk-api/issues/225); see
+  [Authorisation](access-control.md#authorisation)). With the `auth`
+  profile:
+
+    * creating tasks is denied to every caller (`403 Forbidden`), users and
+      service clients alike, until a decision service (AuthZEN, e.g.
+      [tes-authz](https://github.com/elixir-cloud-aai/tes-authz)) decides it
+      in a later release. Don't upgrade an installation whose users must
+      create tasks before that;
+    * every caller gets, lists and cancels only the tasks that it created,
+      whatever its groups: requests for other users' tasks give `404 Not
+      Found`, as for missing tasks (before: `403 Forbidden`), and lists
+      leave them out. Handle stuck or abusive tasks through Kubernetes (e.g.
+      with `kubectl`);
+    * tasks created before 1.2.0, which have only the old creator label
+      `creator-user-id`, belong to nobody: there is no migration;
+    * the tag `GROUP_NAME` is a tag like any other, new tasks get no label or
+      annotation `creator-group-name`, and `logs[0].metadata` has no
+      `GROUP_NAME`.
+
+    All settings of the group model are removed:
+    `TESK_API_AUTHORISATION_GROUPS_CLAIM`, `…_GROUP_PREFIX`,
+    `…_GROUP_SUFFIX`, `…_DELIMITER`, `…_PARENT_GROUP`, `…_ENV_SUBGROUP`,
+    `…_BASE_GROUP`, `…_ADMIN_SUBGROUP`, `…_CLAIM_ENABLED`, `…_CLAIM_NAME`,
+    `…_CLAIM_VALUES`, `…_LEGACY_USER_LABELS` and `…_TASK_VISIBILITY`, and
+    any other setting under `tesk.api.authorisation` except
+    `tesk.api.authorisation.service-clients.*`. With one of them still set,
+    in any profile (also to an empty value: remove them), TESK API doesn't
+    start, and names the setting. With the Helm chart of TESK, use a chart
+    release that no longer renders them.
+
+    With the `noauth` profile, every caller is `anonymousUser`, the creator
+    of all tasks created without authentication, and gets, lists and
+    cancels only those: tasks created with the `auth` profile are no longer
+    visible with `noauth`. During a rolling update, pods of the old version
+    still answer with the group rules: the new rules hold once the rollout
+    has completed. For a downgrade, restore the removed settings; tasks
+    created meanwhile have no team.
 - **`/v2/api-docs` is gone.** The alias of the API description at its
   former path, deprecated in 2.0.0, is removed
   ([#188](https://github.com/elixir-cloud-aai/tesk-api/issues/188)):
@@ -96,21 +119,6 @@
   memory limit, or a `LimitRange`'s default, which could be below the
   request, so that the executor never started; see
   [tesk-core#160](https://github.com/elixir-cloud-aai/tesk-core/issues/160)).
-- **Team names in labels.** Members of teams whose names aren't valid
-  Kubernetes label values (e.g. `BioHackCloud%20Admins` from LS Login, names
-  with other characters than `[A-Za-z0-9._-]`, or longer than 63
-  characters) can create and list tasks; before, both failed with `500
-  Internal Server Error`
-  ([#216](https://github.com/elixir-cloud-aai/tesk-api/issues/216)). Tasks
-  get the team name in the annotation `creator-group-name`, and the label of
-  that name is a hash for such names (see [Task
-  creators](access-control.md#task-creators)). Other team names are labelled
-  as before, so existing tasks keep their teams. To select the tasks of
-  such a team with `kubectl`, use the hash (e.g. `kubectl get jobs -l
-  creator-group-name=sha256-$(printf %s 'BioHackCloud%20Admins' | sha256sum
-  | cut -c1-32)`), or read the annotation. After a downgrade to 2.0.0 or
-  earlier, tasks of teams with hashed labels are visible to super admins
-  only.
 - **Security contexts.** New settings give the taskmaster's and the
   executors' pods and containers security contexts, e.g. for namespaces
   that enforce the `restricted` Pod Security Standard
@@ -510,7 +518,7 @@ What's new:
   authorise users by a claim of the user info instead of group membership
   (`TESK_API_AUTHORISATION_CLAIM_ENABLED`, `TESK_API_AUTHORISATION_CLAIM_NAME`
   and `TESK_API_AUTHORISATION_CLAIM_VALUES`; see [Authorisation without
-  groups](access-control.md#authorisation-without-groups)). It is off by
+  groups](access-control.md#authorisation)). It is off by
   default, so nothing changes unless you turn it on; read its security
   implications first. The Helm chart of TESK sets them with `auth.claim`
   (`enabled`, `name` and `values`; from chart 0.3.0).
@@ -519,7 +527,7 @@ What's new:
   (`TESK_API_AUTHORISATION_GROUP_PREFIX`, `…_PARENT_GROUP`,
   `…_ENV_SUBGROUP`, `…_BASE_GROUP`, `…_DELIMITER`, `…_ADMIN_SUBGROUP` and
   `…_GROUP_SUFFIX`) as plain text (see [Access
-  control](access-control.md#configuration)). Before, they were used as
+  control](access-control.md#authorisation)). Before, they were used as
   regular expressions, so that characters such as the `.` in the default
   prefix and suffix matched any character. With plain group names, as in the
   defaults, nothing changes. If a setting relied on a pattern (e.g. `(A|B)`

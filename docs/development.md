@@ -150,8 +150,8 @@ merged when it is ready:
 Slice | Change | Cells it makes pass
 --- | --- | ---
 T2 | Removes the group model: only owners get, list and cancel their tasks, foreign tasks are 404 like missing ones; create is denied for everyone until T4a | Rows 2, 4-7, 15 (get, list, cancel)
-T3b | Authenticates with the token validator (#222): local checks of issuer, signature, audience, expiry and type, owners by issuer and subject, service info ignores the token | Rows 9-13, 17, 19 (all but create), the stamped owner
-T4a | Asks the decision service (AuthZEN, tes-authz) on create, with the entitlements from the user info endpoint; 503 if either fails | Create of rows 18 and 19
+T3b | Authenticates with the token validator (#222): local checks of issuer, signature, audience, expiry and type, owners by issuer and subject, service info ignores the token | Rows 9-13, 17, 19 (all but create)
+T4a | Asks the decision service (AuthZEN, tes-authz) on create, with the entitlements from the user info endpoint; 503 if either fails | Create of rows 3, 7, 8 and 14 (denied for everyone from T2), 18 and 19, the stamped owner
 T4b | Lets the decision service decide further operations (`tesk.api.authz.operations`), with list scopes and failure behaviour per operation | `all-operations` (but create); the `fail-open` cells already pass with T2 and T4a
 T6 | Accepts exchanged tokens (RFC 8693) of trusted actors and records the actor | Row 16, the recorded actor
 

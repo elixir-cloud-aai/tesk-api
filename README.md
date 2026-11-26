@@ -24,9 +24,9 @@ accepts TES tasks, runs each of them as Kubernetes jobs (a taskmaster, which
 runs the task's executors and the filers for its inputs and outputs), and
 reports their state and logs from those jobs and their pods; it needs no
 database. Access can be limited to users with tokens from an OpenID Connect
-provider and by group membership. It is a Spring Boot application, published
-as the image `elixircloud/tesk-api` and deployed with the Helm chart of
-[TESK][tesk].
+provider; each user gets, lists and cancels their own tasks only. It is a
+Spring Boot application, published as the image `elixircloud/tesk-api` and
+deployed with the Helm chart of [TESK][tesk].
 
 **Read the [documentation][docs]** (the "TESK API" section of the TESK
 documentation) for the API, the configuration, access control, deployment,
