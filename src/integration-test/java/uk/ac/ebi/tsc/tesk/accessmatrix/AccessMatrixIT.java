@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.jose4j.jwt.JwtClaims;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -255,12 +256,38 @@ class AccessMatrixIT extends MatrixHarness {
                     case LIST -> "200o";
                     default -> "200";
                 };
+        Target target = cell(expected, operation, OWN);
         check(
                 "userinfo-" + refusal,
                 operation.column,
                 result,
-                expected,
-                cell(expected, operation, OWN));
+                expected + (operation == Operation.CREATE ? "" : ", no user info request"),
+                r -> {
+                    target.check(r);
+                    // only create looks up the entitlements
+                    if (operation != Operation.CREATE) {
+                        idp.verify(0, getRequestedFor(urlPathEqualTo("/oidc/userinfo")));
+                    }
+                });
+    }
+
+    /**
+     * Row 9 note: a real LS Login client token of an unlisted client has the client's own ID as its
+     * audience, which TESK accepts for listed clients only, so it is refused on every operation
+     */
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(value = Operation.class, names = "SI", mode = EnumSource.Mode.EXCLUDE)
+    void unlistedClient_withItsOwnAudience_isRefused(Operation operation) throws Exception {
+        JwtClaims claims = MockIdp.clientClaims(MockIdp.UNLISTED_CLIENT);
+        claims.setAudience(MockIdp.UNLISTED_CLIENT);
+        String token = MockIdp.sign(claims, MockIdp.Signature.VALID, "at+jwt");
+        // LS Login's user info endpoint answers client tokens with 403
+        MockIdp.stubUserInfo(idp, MockIdp.answered(token, 403));
+        new MockCluster(kubernetes)
+                .task(FOREIGN, Owners.of(MockIdp.ISSUER, Callers.SOMEONE_ELSE), Callers.TEAM)
+                .stub();
+        MvcResult result = perform(operation, token, FOREIGN);
+        check("9-own-audience", operation.column, result, "401", cell("401", operation, FOREIGN));
     }
 
     /**
@@ -310,7 +337,7 @@ class AccessMatrixIT extends MatrixHarness {
     @ParameterizedTest(name = "{0}")
     @EnumSource(
             value = Operation.class,
-            names = {"GET_MINIMAL", "LIST", "CANCEL"})
+            names = {"GET_MINIMAL", "GET_BASIC", "GET_FULL", "LIST", "CANCEL"})
     void getListCancel_askNoDecisionService(Operation operation) throws Exception {
         Caller caller = Callers.byId("3");
         String token = prepare(caller);

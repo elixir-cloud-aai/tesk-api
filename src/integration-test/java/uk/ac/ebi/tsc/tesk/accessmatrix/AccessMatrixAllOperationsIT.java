@@ -4,9 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
@@ -68,16 +71,34 @@ class AccessMatrixAllOperationsIT extends MatrixHarness {
                 });
     }
 
-    /** The decision service down: every switched-on operation fails closed (503) */
-    @ParameterizedTest(name = "{0}")
-    @EnumSource(value = Operation.class, names = "SI", mode = EnumSource.Mode.EXCLUDE)
-    void decisionServiceDown_failsClosed(Operation operation) throws Exception {
+    /** The failure kinds of the decision service, by the case name in {@code pending.csv} */
+    static Stream<Arguments> failures() {
+        return Stream.of(
+                        Arguments.of("pdp-down", MockPdp.Mode.DOWN),
+                        Arguments.of("pdp-timeout", MockPdp.Mode.TIMEOUT),
+                        Arguments.of("pdp-bad-answer", MockPdp.Mode.BAD_ANSWER))
+                .flatMap(failure ->
+                        Stream.of(Operation.values())
+                                .filter(operation -> operation != Operation.SI)
+                                .map(operation ->
+                                        Arguments.of(
+                                                failure.get()[0], failure.get()[1], operation)));
+    }
+
+    /**
+     * The decision service down, timing out or answering garbage: every switched-on operation fails
+     * closed (503)
+     */
+    @ParameterizedTest(name = "{0} {2}")
+    @MethodSource("failures")
+    void decisionServiceFailure_failsClosed(String caseId, MockPdp.Mode mode, Operation operation)
+            throws Exception {
         Caller caller = Callers.byId("3");
         String token = prepare(caller);
-        PDP.mode(MockPdp.Mode.DOWN);
+        PDP.mode(mode);
         new MockCluster(kubernetes).task(OWN, caller.owner(), caller.team()).stub();
         MvcResult result = perform(operation, token, OWN);
-        check("pdp-down", operation.column, result, "503", cell("503", operation, OWN));
+        check(caseId, operation.column, result, "503", cell("503", operation, OWN));
     }
 
     /** List scope {@code all} from the policy: TESK lists all tasks (no owner selector) */

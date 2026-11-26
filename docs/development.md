@@ -119,7 +119,8 @@ redesign's changes are in:
   that needs a token (`AccessMatrixServiceInfoPrivateIT`), and the decision
   service asked for all operations (`AccessMatrixAllOperationsIT`, also with
   the list scopes, a widening policy and failing closed) or failing open
-  (`AccessMatrixFailOpenIT`).
+  (`AccessMatrixFailOpenIT`), each with the decision service down, timing
+  out and answering garbage.
 - `src/integration-test/resources/access-matrix/pending.csv` lists the cells
   that the current code doesn't meet yet: configuration, case, operation, the
   change (slice) of the redesign that makes the cell pass, and the status the
@@ -162,7 +163,8 @@ Row 9 (unlisted service client) uses a client token whose audience TESK
 accepts, so that only the missing listing makes the difference. A real LS
 Login client token carries the client's own ID as its audience, which TESK
 accepts for listed clients only, so an unlisted LS Login client gets 401 on
-every operation (row 10). With `serviceInfoPublic: false`, rows 16 and 17 get
+every operation (as in row 10; pinned by
+`unlistedClient_withItsOwnAudience_isRefused`). With `serviceInfoPublic: false`, rows 16 and 17 get
 on service info what they get on every other operation (403 and 401).
 
 To run only these tests (the coverage check needs all tests, so skip it):
