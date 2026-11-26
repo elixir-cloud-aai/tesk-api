@@ -80,9 +80,8 @@ public class TesKubernetesConverter {
         V1Job taskMasterJob = this.taskmasterTemplateSupplier.get();
         // put input task name as annotation
         taskMasterJob.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, task.getName());
-        // creating user and owning group
+        // creating user, the task's only owner
         CreatorLabels.put(taskMasterJob.getMetadata(), user.getUsername());
-        GroupLabels.put(taskMasterJob.getMetadata(), groupOf(task, user));
         // in order to retrieve task details, when querying for task details, whole tesTask
         // object is placed as taskMaster's annotation
         // Jackson for TES objects - because, we rely on auto-generated annotations for Json
@@ -115,9 +114,8 @@ public class TesKubernetesConverter {
         taskMasterConfigMap.getMetadata().setName(job.getMetadata().getName());
         // put input task name as annotation
         taskMasterConfigMap.getMetadata().putAnnotationsItem(ANN_TESTASK_NAME_KEY, task.getName());
-        // creating user and owning group
+        // creating user, the task's only owner
         CreatorLabels.put(taskMasterConfigMap.getMetadata(), user.getUsername());
-        GroupLabels.put(taskMasterConfigMap.getMetadata(), groupOf(task, user));
         List<V1Job> executorsAsJobs =
                 IntStream.range(0, task.getExecutors().size())
                         .mapToObj(i ->
@@ -552,56 +550,22 @@ public class TesKubernetesConverter {
     }
 
     /**
-     * The group (team) that a new task belongs to: the one in {@code tags['GROUP_NAME']}, otherwise
-     * any group of its creator; null for none
-     */
-    private static String groupOf(TesTask task, User user) {
-        if (task.getTags() != null && task.getTags().containsKey("GROUP_NAME")) {
-            return task.getTags().get("GROUP_NAME");
-        }
-        return user.isMember() ? user.getAnyGroup() : null;
-    }
-
-    /** Puts the task's group (team), if it has one, as {@code GROUP_NAME} into the log metadata */
-    private static void putGroup(TesTaskLog log, V1ObjectMeta metadata) {
-        String group = GroupLabels.groupName(metadata);
-        if (group != null) {
-            log.putMetadataItem("GROUP_NAME", group);
-        }
-    }
-
-    /**
      * Puts the creating user's ID into the log's metadata ({@code USER_ID}): the full ID of tasks
-     * with the hash label (if the annotation matches it), or the value of the old label of tasks
-     * created before, which the log marks as such (see {@link CreatorLabels})
+     * with the hash label, if the annotation matches it (see {@link CreatorLabels})
      */
     private static void putCreator(TesTaskLog log, V1ObjectMeta metadata) {
-        String creator;
-        if (CreatorLabels.isLegacy(metadata)) {
-            creator = CreatorLabels.legacyCreator(metadata);
-            log.setUserIdFromLegacyLabel(true);
-        } else {
-            creator = CreatorLabels.creatorId(metadata);
-        }
+        String creator = CreatorLabels.creatorId(metadata);
         if (creator != null) {
             log.putMetadataItem("USER_ID", creator);
         }
     }
 
     /** Extracts minimal view of TesTask from taskMaster's and executors' job and pod objects */
-    public TesTask fromK8sJobsToTesTaskMinimal(Task taskmasterWithExecutors, boolean isList) {
+    public TesTask fromK8sJobsToTesTaskMinimal(Task taskmasterWithExecutors) {
         TesTask task = new TesTask();
         V1ObjectMeta metadata = taskmasterWithExecutors.getTaskmaster().getJob().getMetadata();
         task.setId(metadata.getName());
         task.setState(this.extractStateFromK8sJobs(taskmasterWithExecutors));
-        // we need that info only for postAuthorization of a getTask; for list auth is handled at
-        // the query level
-        if (!isList) {
-            TesTaskLog log = new TesTaskLog();
-            task.addLogsItem(log);
-            putCreator(log, metadata);
-            putGroup(log, metadata);
-        }
         return task;
     }
 
@@ -648,7 +612,6 @@ public class TesKubernetesConverter {
         // the files that the outputs filer uploaded, as the taskmaster stored them (issue #160)
         log.setOutputs(this.extractOutputFileLogs(taskmasterWithExecutors));
         putCreator(log, taskMasterJobMetadata);
-        putGroup(log, taskMasterJobMetadata);
         log.setStartTime(
                 Optional.ofNullable(taskMasterJob.getStatus())
                         .map(V1JobStatus::getStartTime)

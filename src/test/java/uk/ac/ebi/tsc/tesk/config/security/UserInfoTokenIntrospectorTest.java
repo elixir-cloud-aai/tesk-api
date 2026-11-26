@@ -10,7 +10,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.unauthorized;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,7 +33,6 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -70,15 +68,7 @@ public class UserInfoTokenIntrospectorTest {
 
     /** An introspector that asks the user info endpoint on {@code port} of localhost */
     private static UserInfoTokenIntrospector introspector(int port) {
-        AuthorisationProperties properties = new AuthorisationProperties();
-        properties.setBaseGroupPrefix(PREFIX + "BASE:");
-        properties.setAdminSubgroup("ADMIN");
-        properties.setAdminGroupFull(PREFIX + "BASE:ADMIN");
-        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
-        return new UserInfoTokenIntrospector(
-                "http://localhost:" + port + "/userinfo",
-                new ElixirPrincipalExtractor(groups, properties),
-                groups);
+        return new UserInfoTokenIntrospector("http://localhost:" + port + "/userinfo");
     }
 
     private void answer(String json) {
@@ -101,7 +91,7 @@ public class UserInfoTokenIntrospectorTest {
     }
 
     @Test
-    public void validToken_givesTheUserAndGroups() {
+    public void validToken_givesTheUserWithoutAuthorities() {
         answer(
                 "{\"sub\":\"user@example.org\",\"name\":\"A User\",\"groups\":[\""
                         + PREFIX
@@ -114,30 +104,15 @@ public class UserInfoTokenIntrospectorTest {
         User user = ((AuthenticatedUser) principal).getUser();
         assertEquals("user@example.org", user.getUsername());
         assertEquals("user@example.org", principal.getName());
-        assertEquals("A User", user.getName());
-        assertTrue(user.isTeskAdmin());
-        assertTrue(user.isGroupMember("TEAM"));
-        assertThat(
-                principal.getAuthorities().stream()
-                        .map(GrantedAuthority::getAuthority)
-                        .collect(Collectors.toList()),
-                containsInAnyOrder(PREFIX + "BASE:TEAM", PREFIX + "BASE:ADMIN"));
+        assertEquals("user@example.org", user.getName());
+        assertFalse(user.isServiceClient());
+        // groups in the user info give no rights (issue #225)
+        assertTrue(principal.getAuthorities().isEmpty());
         assertEquals("A User", principal.getAttribute("name"));
         userInfo.verify(
                 getRequestedFor(urlEqualTo("/userinfo"))
                         .withHeader("Authorization", equalTo("Bearer " + TOKEN))
                         .withHeader("Accept", equalTo("application/json")));
-    }
-
-    /** Without the groups claim, the user has the authority of a user without groups */
-    @Test
-    public void noGroups_givesTheUserAuthority() {
-        answer("{\"sub\":\"123\"}");
-
-        OAuth2AuthenticatedPrincipal principal = introspector.introspect(TOKEN);
-
-        assertEquals(PREFIX + ":USER", principal.getAuthorities().iterator().next().getAuthority());
-        assertFalse(((AuthenticatedUser) principal).getUser().isMember());
     }
 
     @Test
@@ -211,13 +186,8 @@ public class UserInfoTokenIntrospectorTest {
 
     @Test
     public void withoutUserInfoUri_doesNotStart() {
-        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
-        ElixirPrincipalExtractor extractor =
-                new ElixirPrincipalExtractor(groups, new AuthorisationProperties());
         IllegalStateException e =
-                assertThrows(
-                        IllegalStateException.class,
-                        () -> new UserInfoTokenIntrospector(" ", extractor, groups));
+                assertThrows(IllegalStateException.class, () -> new UserInfoTokenIntrospector(" "));
         assertThat(e.getMessage(), containsString("security.oauth2.resource.user-info-uri"));
     }
 
@@ -246,12 +216,9 @@ public class UserInfoTokenIntrospectorTest {
                 get("/userinfo").willReturn(okJson("{\"sub\":\"123\"}").withFixedDelay(2_000)));
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setReadTimeout(200);
-        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
         introspector =
                 new UserInfoTokenIntrospector(
                         "http://localhost:" + userInfo.getPort() + "/userinfo",
-                        new ElixirPrincipalExtractor(groups, new AuthorisationProperties()),
-                        groups,
                         new RestTemplate(factory));
         refused();
     }
@@ -273,11 +240,7 @@ public class UserInfoTokenIntrospectorTest {
     /** Host names that URI doesn't parse as hosts (e.g. with _, as in Docker Compose) work */
     @Test
     public void userInfoUriWithUnderscore_starts() {
-        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
-        new UserInfoTokenIntrospector(
-                "http://my_idp:8080/userinfo",
-                new ElixirPrincipalExtractor(groups, new AuthorisationProperties()),
-                groups);
+        new UserInfoTokenIntrospector("http://my_idp:8080/userinfo");
     }
 
     @Test
@@ -292,9 +255,6 @@ public class UserInfoTokenIntrospectorTest {
 
     @Test
     public void userInfoUriNotAbsoluteHttp_doesNotStart() {
-        GroupNamesSecurityExtractor groups = new GroupNamesSecurityExtractor("groups", PREFIX);
-        ElixirPrincipalExtractor extractor =
-                new ElixirPrincipalExtractor(groups, new AuthorisationProperties());
         for (String uri :
                 new String[] {
                     "login.example.org/oidc/userinfo",
@@ -305,8 +265,7 @@ public class UserInfoTokenIntrospectorTest {
                 }) {
             IllegalStateException e =
                     assertThrows(
-                            IllegalStateException.class,
-                            () -> new UserInfoTokenIntrospector(uri, extractor, groups));
+                            IllegalStateException.class, () -> new UserInfoTokenIntrospector(uri));
             assertThat(e.getMessage(), containsString("absolute http(s) URL"));
         }
     }

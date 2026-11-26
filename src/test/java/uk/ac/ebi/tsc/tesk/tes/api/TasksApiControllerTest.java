@@ -9,7 +9,6 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -29,7 +28,6 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
-import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -345,24 +343,23 @@ public class TasksApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{}", true));
-        // the task is looked up for the user (authorisation) before it is cancelled
-        InOrder order = inOrder(this.tesService);
-        order.verify(this.tesService)
-                .getTask(eq("task-123"), eq(TaskView.MINIMAL), argThat(isAdmin()));
-        order.verify(this.tesService).cancelTask("task-123");
+        // the task is cancelled for the user, who must have created it
+        verify(this.tesService).cancelTask(eq("task-123"), argThat(isAdmin()));
+        verify(this.tesService, never()).getTask(anyString(), any(), any());
     }
 
+    /** Another user's task is not found, as a missing one (issue #225) */
     @Test
-    public void cancelTask_notFound_doesNotCancel() throws Exception {
-        given(this.tesService.getTask(eq("task-123"), eq(TaskView.MINIMAL), argThat(isAdmin())))
-                .willThrow(new TaskNotFoundException("task-123"));
+    public void cancelTask_notFound() throws Exception {
+        org.mockito.BDDMockito.willThrow(new TaskNotFoundException("task-123"))
+                .given(this.tesService)
+                .cancelTask(eq("task-123"), argThat(isAdmin()));
         this.mvc
                 .perform(
                         post(TASK_URL + "/{id}:cancel", "task-123")
                                 .header("Authorization", "Bearer BAR")
                                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
-        verify(this.tesService, never()).cancelTask(anyString());
     }
 
     /** Matches the user of the test's token (see {@link ResourceServerConfiguration}) */

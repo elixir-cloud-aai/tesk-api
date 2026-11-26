@@ -69,9 +69,9 @@ Task names, tags and states aren't Kubernetes labels, so Kubernetes can't
 select them: TESK API reads the tags from the task stored with the
 taskmaster's job and derives the state from all the task's jobs, so it
 filters each page after reading it. Pages can therefore be shorter
-than `page_size`, even empty, while `next_page_token` is still set; the same
-happens already to users who manage some of their groups and are only
-members of others, whose pages TESK API filters, too. The TES specification
+than `page_size`, even empty, while `next_page_token` is still set (TESK
+API also leaves out the jobs of other users that Kubernetes selects with
+the same label, see [Task creators](access-control.md#task-creators)). The TES specification
 doesn't forbid this: keep requesting pages until `next_page_token` is left
 out, not until a page is shorter than `page_size`.
 
@@ -364,6 +364,6 @@ Status code | Meaning
 200 | OK: successful request
 400 | Bad request: validation error, or cancellation of a task that doesn't run
 401 | Unauthorized: no access token in the request, or an invalid token (see [Token validation](access-control.md#token-validation) for the `WWW-Authenticate` header and the body)
-403 | Forbidden: the user may not do this (usually, not in the required group, or without the required claim)
-404 | Not found: no task with this ID
+403 | Forbidden: the caller may not do this (with the `auth` profile, creating a task, for now; see [Authorisation](access-control.md#authorisation))
+404 | Not found: no task with this ID, or a task of another user
 500 | Something else went wrong (possibly the configuration)

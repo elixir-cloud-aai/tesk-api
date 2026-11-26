@@ -22,7 +22,7 @@ public class AuthenticatedUserTest {
 
     private static final String TOKEN = "secret-token";
 
-    private final User user = User.builder("user@example.org").name("A User").build();
+    private final User user = User.builder("user@example.org").build();
     private final List<GrantedAuthority> authorities =
             AuthorityUtils.createAuthorityList("group:A", "group:B");
 

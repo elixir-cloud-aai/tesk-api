@@ -206,10 +206,6 @@ public class ServiceClientTokenServicesTest {
 
         assertEquals(CLIENT, user.getUsername());
         assertTrue(user.isServiceClient());
-        assertTrue(user.isAuthorisedWithoutGroup());
-        assertFalse(user.isClaimAuthorised());
-        assertFalse(user.isMember());
-        assertFalse(user.isTeskAdmin());
         assertTrue(user.getAuthorities().isEmpty());
         assertThat(output.getOut(), containsString("Accepted token of service client " + CLIENT));
         assertThat(output.getOut(), not(containsString(token)));
@@ -708,13 +704,11 @@ public class ServiceClientTokenServicesTest {
         assertThrows(IllegalStateException.class, this::services);
     }
 
-    /** Tasks of a service client are selected by its ID, without a group */
+    /** Tasks of a service client are selected by its ID */
     @Test
-    public void serviceClient_listsItsOwnTasksWithoutGroup() throws Exception {
+    public void serviceClient_listsItsOwnTasks() throws Exception {
         User user = accepted(sign(claims(CLIENT)));
-        assertEquals(
-                "creator-user-hash=" + CreatorLabels.hash(CLIENT) + ",!creator-group-name",
-                user.getLabelSelector());
+        assertEquals("creator-user-hash=" + CreatorLabels.hash(CLIENT), user.getLabelSelector());
     }
 
     /** A failed discovery isn't tried again within the interval: tokens are refused at once */
@@ -913,21 +907,6 @@ public class ServiceClientTokenServicesTest {
                                                 + issuer()
                                                 + "\",\"jwks_uri\":\"http://login.example.org/jwk\"}")));
         refused(sign(claims(CLIENT)));
-    }
-
-    /** Service clients never match tasks by the old creator label */
-    @Test
-    public void serviceClient_ignoresLegacyUserLabels() throws Exception {
-        properties.setLegacyUserLabels(true);
-        assertFalse(accepted(sign(claims(CLIENT))).isLegacyUserLabels());
-    }
-
-    /** Service clients follow the task visibility, as users (issue #218) */
-    @Test
-    public void serviceClient_followsTaskVisibility() throws Exception {
-        assertTrue(accepted(sign(claims(CLIENT))).isOwnerOnly());
-        properties.setTaskVisibility(TaskVisibility.GROUP);
-        assertFalse(accepted(sign(claims(CLIENT))).isOwnerOnly());
     }
 
     /** A JWT nested in another isn't a service client's token, whatever its claims */

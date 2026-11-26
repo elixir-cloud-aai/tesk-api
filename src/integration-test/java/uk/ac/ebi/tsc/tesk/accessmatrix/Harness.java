@@ -57,12 +57,8 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.MockIdp.Token;
         locations = {"classpath:application.properties"},
         properties = {
             "spring.profiles.active=auth",
-            // today: user info as authentication (removed by T3b), groups of LS Login (T2),
-            // service clients of #220 (T3b)
+            // today: user info as authentication (removed by T3b), service clients of #220 (T3b)
             "security.oauth2.resource.user-info-uri=" + MockIdp.USER_INFO_URI,
-            "tesk.api.authorisation.group-prefix=" + Entitlements.PREFIX,
-            "tesk.api.authorisation.group-suffix=" + Entitlements.SUFFIX,
-            "tesk.api.authorisation.base-group=" + Entitlements.BASE_GROUP,
             "tesk.api.authorisation.service-clients.enabled=true",
             "tesk.api.authorisation.service-clients.issuer=" + MockIdp.ISSUER,
             "tesk.api.authorisation.service-clients.clients={\""
@@ -199,9 +195,10 @@ abstract class Harness {
             missed = e;
         }
         int status = result.getResponse().getStatus();
+        String cell = String.join(",", config(), caseId, operation);
         if (pending.isEmpty()) {
             if (missed != null) {
-                throw missed;
+                throw new AssertionError(cell + ": " + missed.getMessage(), missed);
             }
             return;
         }
@@ -211,7 +208,7 @@ abstract class Harness {
                     "Meets its target ("
                             + expected
                             + ") now: remove the line "
-                            + String.join(",", config(), caseId, operation)
+                            + cell
                             + " (slice "
                             + entry.slice()
                             + ") from "
@@ -222,7 +219,9 @@ abstract class Harness {
                 status,
                 "Pending until "
                         + entry.slice()
-                        + ", but no longer answers today's status: update "
+                        + ", but no longer answers today's status: update the line "
+                        + cell
+                        + " of "
                         + Pending.RESOURCE
                         + " (target "
                         + expected

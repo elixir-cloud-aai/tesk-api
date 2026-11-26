@@ -41,7 +41,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.util.StringUtils;
 import tools.jackson.databind.ObjectMapper;
 import uk.ac.ebi.tsc.tesk.TestUtils;
 import uk.ac.ebi.tsc.tesk.config.GsonConfig;
@@ -218,11 +217,7 @@ public class TesKubernetesConverterTest {
             inputTask = this.objectMapper.readValue(reader, TesTask.class);
         }
         V1Job outputJob =
-                this.converter.fromTesTaskToK8sJob(
-                        inputTask,
-                        User.builder("test-user-id")
-                                .teskMemberedGroups(StringUtils.commaDelimitedListToSet("ABC,CDE"))
-                                .build());
+                this.converter.fromTesTaskToK8sJob(inputTask, User.builder("test-user-id").build());
         assertEquals(outputJob.getMetadata().getAnnotations().get("tes-task-name"), "taskFull");
         // testing annotation with entire serialized task content..
         assertThat(
@@ -249,7 +244,8 @@ public class TesKubernetesConverterTest {
         assertFalse(outputJob.getMetadata().getLabels().containsKey("creator-user-id"));
         assertEquals(
                 outputJob.getMetadata().getAnnotations().get("creator-user-id"), "test-user-id");
-        assertEquals(outputJob.getMetadata().getLabels().get("creator-group-name"), "ABC");
+        // no group label, also with the GROUP_NAME tag (issue #225)
+        assertFalse(outputJob.getMetadata().getLabels().containsKey("creator-group-name"));
         // test of placing generated task ID
         assertEquals(outputJob.getMetadata().getName(), "task-35605447");
         assertEquals(outputJob.getSpec().getTemplate().getMetadata().getName(), "task-35605447");
@@ -311,19 +307,11 @@ public class TesKubernetesConverterTest {
             inputTask = this.objectMapper.readValue(reader, TesTask.class);
         }
         V1Job outputJob =
-                this.converter.fromTesTaskToK8sJob(
-                        inputTask,
-                        User.builder("test-user-id")
-                                .teskMemberedGroups(StringUtils.commaDelimitedListToSet("ABC,CDE"))
-                                .build());
+                this.converter.fromTesTaskToK8sJob(inputTask, User.builder("test-user-id").build());
 
         V1ConfigMap outputConfigMap =
                 this.converter.fromTesTaskToK8sConfigMap(
-                        inputTask,
-                        User.builder("test-user-id")
-                                .teskMemberedGroups(StringUtils.commaDelimitedListToSet("ABC,CDE"))
-                                .build(),
-                        outputJob);
+                        inputTask, User.builder("test-user-id").build(), outputJob);
         Map<String, byte[]> binaryDataMap = outputConfigMap.getBinaryData();
         GZIPInputStream gis =
                 new GZIPInputStream(new ByteArrayInputStream(binaryDataMap.get("JSON_INPUT.gz")));

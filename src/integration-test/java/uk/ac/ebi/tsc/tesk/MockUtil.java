@@ -16,13 +16,47 @@ import io.kubernetes.client.openapi.models.V1ListMeta;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import java.util.Arrays;
 import org.springframework.http.HttpStatus;
-import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
-import uk.ac.ebi.tsc.tesk.k8s.convert.GroupLabels;
 
 class MockUtil {
 
     private static final Gson GSON = new JSON().getGson();
+
+    /**
+     * The caller without authentication (noauth): Spring Security's anonymous user, the creator of
+     * every task created without authentication, who gets, lists and cancels only those
+     */
+    static final String NOAUTH_USER = "anonymousUser";
+
+    /** The label selector of the taskmaster jobs of the user {@code userId} */
+    static String ownTaskmastersSelector(String userId) {
+        return "job-type=taskmaster,creator-user-hash=" + CreatorLabels.hash(userId);
+    }
+
+    /** Stamps the job as created by the user {@code userId}, as TESK API does */
+    static V1Job createdBy(V1Job job, String userId) {
+        CreatorLabels.put(job.getMetadata(), userId);
+        return job;
+    }
+
+    /**
+     * The taskmasters of list/taskmasters.json (of the users 123 and 124), all as created by the
+     * user {@code userId}
+     */
+    static String taskmastersOf(String userId) throws java.io.IOException {
+        String json =
+                java.nio.file.Files.readString(
+                        java.nio.file.Path.of(
+                                "src/integration-test/resources/__files/list/taskmasters.json"));
+        for (String creator : new String[] {"123", "124"}) {
+            json =
+                    json.replace(CreatorLabels.hash(creator), CreatorLabels.hash(userId))
+                            .replace(
+                                    "\"creator-user-id\": \"" + creator + "\"",
+                                    "\"creator-user-id\": \"" + userId + "\"");
+        }
+        return json;
+    }
 
     static void mockGetTaskKubernetesResponses(WireMockExtension mockKubernetes) {
         mockKubernetes.givenThat(
@@ -53,43 +87,34 @@ class MockUtil {
     }
 
     /**
-     * Lets task-123 be a task of the user {@code userId} without a group (replaces the taskmaster
-     * of {@link #mockGetTaskKubernetesResponses}, as WireMock prefers the stub added last)
+     * Lets task-123 be a task of the user {@code userId} (replaces the taskmaster of {@link
+     * #mockGetTaskKubernetesResponses}, as WireMock prefers the stub added last)
      */
-    static void mockUngroupedTaskKubernetesResponses(
-            WireMockExtension mockKubernetes, String userId) {
-        mockTaskKubernetesResponses(mockKubernetes, taskmaster(null, userId));
-    }
-
-    /** Lets task-123 be a task of the user {@code userId} for the group {@code group} */
-    static void mockGroupTaskKubernetesResponses(
-            WireMockExtension mockKubernetes, String group, String userId) {
-        mockTaskKubernetesResponses(mockKubernetes, taskmaster(group, userId));
+    static void mockOwnTaskKubernetesResponses(WireMockExtension mockKubernetes, String userId) {
+        mockTaskKubernetesResponses(mockKubernetes, taskmaster(userId));
     }
 
     /**
-     * Lets task-123 be a task for the group {@code group} created before the hash label, with only
-     * the old label {@code creator-user-id} (issue #119)
+     * Lets task-123 be a task created before the hash label, with only the old label {@code
+     * creator-user-id} and a group label (issue #119): nobody's task now, the group label is
+     * ignored
      */
     static void mockLegacyTaskKubernetesResponses(
-            WireMockExtension mockKubernetes, String group, String legacyUserLabel) {
+            WireMockExtension mockKubernetes, String legacyUserLabel) {
         V1ObjectMeta metadata =
                 new V1ObjectMeta()
                         .name("task-123")
                         .putLabelsItem("job-type", "taskmaster")
-                        .putLabelsItem(Constants.LABEL_LEGACY_USERID_KEY, legacyUserLabel);
-        if (group != null) {
-            metadata.putLabelsItem(Constants.LABEL_GROUPNAME_KEY, group);
-        }
+                        .putLabelsItem("creator-user-id", legacyUserLabel)
+                        .putLabelsItem("creator-group-name", "TEST");
         mockTaskKubernetesResponses(mockKubernetes, taskmaster(metadata));
     }
 
-    /** The taskmaster's job task-123, created by {@code userId} for {@code group} (or none) */
-    static V1Job taskmaster(String group, String userId) {
+    /** The taskmaster's job task-123, created by {@code userId} */
+    static V1Job taskmaster(String userId) {
         V1ObjectMeta metadata =
                 new V1ObjectMeta().name("task-123").putLabelsItem("job-type", "taskmaster");
         CreatorLabels.put(metadata, userId);
-        GroupLabels.put(metadata, group);
         return taskmaster(metadata);
     }
 

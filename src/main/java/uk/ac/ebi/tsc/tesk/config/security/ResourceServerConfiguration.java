@@ -16,7 +16,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.core.GrantedAuthorityDefaults;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
@@ -125,15 +124,7 @@ public class ResourceServerConfiguration {
      */
     @Bean
     public OpaqueTokenIntrospector tokenIntrospector(Environment environment) {
-        GroupNamesSecurityExtractor authoritiesExtractor =
-                new GroupNamesSecurityExtractor(
-                        authorisationProperties.getGroupsClaim(),
-                        authorisationProperties.getGroupPrefix());
-        OpaqueTokenIntrospector userInfoIntrospector =
-                new UserInfoTokenIntrospector(
-                        userInfoUri,
-                        new ElixirPrincipalExtractor(authoritiesExtractor, authorisationProperties),
-                        authoritiesExtractor);
+        OpaqueTokenIntrospector userInfoIntrospector = new UserInfoTokenIntrospector(userInfoUri);
         if (authorisationProperties.getServiceClients().isEnabled()) {
             ServiceClientTokenServices.refuseRemovedSettings(environment);
             return new ServiceClientTokenServices(userInfoIntrospector, authorisationProperties);
@@ -151,12 +142,6 @@ public class ResourceServerConfiguration {
                 HttpMessageConverters.forServer().registerDefaults();
         customizers.orderedStream().forEach(customizer -> customizer.customize(builder));
         return builder.build();
-    }
-
-    /** Magic, that changes default role prefix from ROLE_ to (...)elixir: */
-    @Bean
-    public GrantedAuthorityDefaults grantedAuthorityDefaults() {
-        return new GrantedAuthorityDefaults(this.authorisationProperties.getGroupPrefix());
     }
 
     /**

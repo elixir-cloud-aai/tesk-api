@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.JOB_NAME_FILER_SUF;
 import static uk.ac.ebi.tsc.tesk.k8s.constant.Constants.LABEL_JOBTYPE_KEY;
@@ -31,14 +32,20 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
+import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;
+import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 
 /** Cancelling a task derives its state from all its jobs, as getting it does. */
 class TesServiceImplCancelTest {
 
     private static final String TASK = "task-1234";
+
+    /** The creator of the task */
+    private static final User USER = User.builder("user@example.org").build();
 
     private KubernetesClientWrapper client;
     private TesServiceImpl service;
@@ -60,6 +67,7 @@ class TesServiceImplCancelTest {
                                                 LABEL_JOBTYPE_KEY, LABEL_JOBTYPE_VALUE_TASKM))
                         .spec(selector(TASK))
                         .status(new V1JobStatus().active(1));
+        CreatorLabels.put(this.taskmaster.getMetadata(), USER.getUsername());
         V1Pod taskmasterPod =
                 new V1Pod()
                         .metadata(
@@ -114,12 +122,34 @@ class TesServiceImplCancelTest {
     }
 
     /**
+     * Only the creator cancels a task: for anyone else (also a service client with the same ID, or
+     * a task without a creator), it is not found, after reading the taskmaster's job only, as for a
+     * missing task, and nothing is changed (issue #225)
+     */
+    @Test
+    void othersTaskIsNotFoundAndNotCancelled() {
+        for (User other :
+                new User[] {
+                    User.builder("someone@example.org").build(),
+                    User.builder("user_example.org").build(),
+                }) {
+            assertThatThrownBy(() -> this.service.cancelTask(TASK, other))
+                    .isInstanceOf(TaskNotFoundException.class);
+        }
+        this.taskmaster.getMetadata().getAnnotations().clear();
+        assertThatThrownBy(() -> this.service.cancelTask(TASK, USER))
+                .isInstanceOf(TaskNotFoundException.class);
+        verify(this.client, org.mockito.Mockito.times(3)).readTaskmasterJob(TASK);
+        verifyNoMoreInteractions(this.client);
+    }
+
+    /**
      * An executor failed, while the taskmaster still runs: the task has ended, and isn't cancelled.
      */
     @Test
     void failedExecutorIsNotCancelled() {
         this.executorWithCondition("FailureTarget");
-        assertThatThrownBy(() -> this.service.cancelTask(TASK))
+        assertThatThrownBy(() -> this.service.cancelTask(TASK, USER))
                 .isInstanceOf(CancelNotRunningTask.class);
         verify(this.client, never()).labelJobAsCancelled(anyString());
         verify(this.client, never()).cancelJobBeforeStart(anyString());
@@ -143,7 +173,7 @@ class TesServiceImplCancelTest {
                         .status(new V1JobStatus().active(1));
         when(this.client.listSingleTaskExecutorJobs(TASK))
                 .thenReturn(new V1JobList().addItemsItem(executor));
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client).labelJobAsCancelled(TASK);
         verify(this.client).labelPodAsCancelled(TASK + "-pod");
         verify(this.client, never()).labelPodAsCancelled(TASK + "-ex-00-pod");
@@ -157,7 +187,7 @@ class TesServiceImplCancelTest {
     @Test
     void pendingTaskIsCancelledBeforeStart() {
         this.taskmasterPods.getItems().get(0).getStatus().phase("Pending");
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client).labelPodAsCancelled(TASK + "-pod");
         verify(this.client).cancelJobBeforeStart(TASK);
         verify(this.client, never()).labelJobAsCancelled(anyString());
@@ -175,7 +205,7 @@ class TesServiceImplCancelTest {
                                 new io.kubernetes.client.openapi.ApiException(404, "gone")))
                 .when(this.client)
                 .labelPodAsCancelled(TASK + "-pod");
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(this.client);
         order.verify(this.client).cancelJobBeforeStart(TASK);
         order.verify(this.client).labelPodAsCancelled(TASK + "-pod");
@@ -188,7 +218,7 @@ class TesServiceImplCancelTest {
     @Test
     void podInOtherPhaseIsNotLabelled() {
         this.taskmasterPods.getItems().get(0).getStatus().phase("Unknown");
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client).cancelJobBeforeStart(TASK);
         verify(this.client, never()).labelPodAsCancelled(anyString());
     }
@@ -197,7 +227,7 @@ class TesServiceImplCancelTest {
     @Test
     void podWithoutStatusIsNotRunning() {
         this.taskmasterPods.getItems().get(0).setStatus(null);
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client).cancelJobBeforeStart(TASK);
         verify(this.client, never()).labelJobAsCancelled(anyString());
         verify(this.client, never()).labelPodAsCancelled(anyString());
@@ -212,7 +242,7 @@ class TesServiceImplCancelTest {
     void newTaskIsCancelledBeforeStart() {
         this.taskmaster.status(new V1JobStatus());
         this.taskmasterPods.setItems(Collections.emptyList());
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client).cancelJobBeforeStart(TASK);
         verify(this.client, never()).labelJobAsCancelled(anyString());
         verify(this.client, never()).labelPodAsCancelled(anyString());
@@ -260,7 +290,7 @@ class TesServiceImplCancelTest {
     @Test
     void cancelingTaskIsNotPatchedAgain() {
         this.cancelledRunningTaskmaster(true);
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         this.verifyNothingPatched();
     }
 
@@ -271,7 +301,7 @@ class TesServiceImplCancelTest {
     @Test
     void cancelingTaskLabelsUnlabelledTaskmasterPod() {
         this.cancelledRunningTaskmaster(false);
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client).labelPodAsCancelled(this.taskmasterPod().getMetadata().getName());
         verify(this.client, never()).labelJobAsCancelled(anyString());
         verify(this.client, never()).cancelJobBeforeStart(anyString());
@@ -289,7 +319,7 @@ class TesServiceImplCancelTest {
                                 new io.kubernetes.client.openapi.ApiException(404, "gone")))
                 .when(this.client)
                 .labelPodAsCancelled(TASK + "-pod");
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client).labelPodAsCancelled(TASK + "-pod");
         verify(this.client, never()).labelJobAsCancelled(anyString());
     }
@@ -306,7 +336,7 @@ class TesServiceImplCancelTest {
                                 new io.kubernetes.client.openapi.ApiException(403, "forbidden")))
                 .when(this.client)
                 .labelPodAsCancelled(TASK + "-pod");
-        assertThatThrownBy(() -> this.service.cancelTask(TASK))
+        assertThatThrownBy(() -> this.service.cancelTask(TASK, USER))
                 .isInstanceOf(uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException.class);
     }
 
@@ -324,7 +354,7 @@ class TesServiceImplCancelTest {
                                         .name(TASK + "-pod-2")
                                         .putLabelsItem("job-name", TASK))
                         .status(new V1PodStatus().phase("Pending")));
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client).labelPodAsCancelled(TASK + "-pod-2");
         verify(this.client, never()).labelPodAsCancelled(TASK + "-pod");
         verify(this.client, never()).labelJobAsCancelled(anyString());
@@ -341,7 +371,7 @@ class TesServiceImplCancelTest {
                                 new V1ObjectMeta()
                                         .name(TASK + "-pod-2")
                                         .putLabelsItem("job-name", TASK)));
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         this.verifyNothingPatched();
     }
 
@@ -357,7 +387,7 @@ class TesServiceImplCancelTest {
                         .spec(selector(TASK + JOB_NAME_FILER_SUF))
                         .status(new V1JobStatus().active(1));
         when(this.client.getSingleTaskOutputFilerJob(TASK)).thenReturn(Optional.of(filer));
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         verify(this.client, never()).listSingleJobPods(filer);
         verify(this.client).labelJobAsCancelled(TASK);
     }
@@ -366,7 +396,7 @@ class TesServiceImplCancelTest {
     @Test
     void canceledTaskIsNotCancelled() {
         this.cancelledEndedTaskmaster();
-        assertThatThrownBy(() -> this.service.cancelTask(TASK))
+        assertThatThrownBy(() -> this.service.cancelTask(TASK, USER))
                 .isInstanceOf(CancelNotRunningTask.class);
         this.verifyNothingPatched();
     }
@@ -396,7 +426,7 @@ class TesServiceImplCancelTest {
                         .status(new V1PodStatus().phase("Running"));
         when(this.client.listSingleJobPods(filer))
                 .thenReturn(new V1PodList().addItemsItem(filerPod));
-        this.service.cancelTask(TASK);
+        this.service.cancelTask(TASK, USER);
         this.verifyNothingPatched();
     }
 
@@ -423,7 +453,7 @@ class TesServiceImplCancelTest {
                         TASK.equals(invocation.<V1Job>getArgument(0).getMetadata().getName())
                                 ? this.taskmasterPods
                                 : new V1PodList().addItemsItem(evictedPod));
-        assertThatThrownBy(() -> this.service.cancelTask(TASK))
+        assertThatThrownBy(() -> this.service.cancelTask(TASK, USER))
                 .isInstanceOf(CancelNotRunningTask.class);
         this.verifyNothingPatched();
     }

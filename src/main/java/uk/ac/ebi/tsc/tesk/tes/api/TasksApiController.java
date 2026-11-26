@@ -58,10 +58,8 @@ public class TasksApiController implements TasksApi {
 
     public ResponseEntity<Object> cancelTask(
             @Parameter(required = true) @PathVariable("id") String id) {
-        // getTask - for authZ purposes (cancellation only possible for the same tasks, a user can
-        // actually see
-        this.tesService.getTask(id, TaskView.MINIMAL, getUser());
-        this.tesService.cancelTask(id);
+        // only the creator may cancel a task: other users' tasks are not found (404)
+        this.tesService.cancelTask(id, getUser());
         // the specification's CancelTaskResponse is an empty object
         return new ResponseEntity<>(Collections.emptyMap(), HttpStatus.OK);
     }
@@ -86,9 +84,6 @@ public class TasksApiController implements TasksApi {
 
         TaskView taskView = TaskView.fromString(view);
         TesTask task = this.tesService.getTask(id, taskView, this.getUser());
-        if (taskView == TaskView.MINIMAL) {
-            task.setLogs(null);
-        }
         return new ResponseEntity<>(task, HttpStatus.OK);
     }
 
@@ -156,8 +151,8 @@ public class TasksApiController implements TasksApi {
     }
 
     /**
-     * The {@link User} principal of the request, or, without one (noauth), a user without groups
-     * named after the authentication
+     * The {@link User} principal of the request, or, without one (noauth), a user named after the
+     * authentication
      */
     private User getUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

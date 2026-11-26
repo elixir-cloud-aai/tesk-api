@@ -121,14 +121,24 @@ public class ListTaskFilerJobsIT {
     private void mockTaskmasters() {
         mockKubernetes.givenThat(
                 WireMock.get(urlPathEqualTo(JOBS))
-                        .withQueryParam("labelSelector", equalTo("job-type=taskmaster"))
+                        .withQueryParam(
+                                "labelSelector",
+                                equalTo(MockUtil.ownTaskmastersSelector(MockUtil.NOAUTH_USER)))
                         .willReturn(
                                 okJson(
                                         MockUtil.jobList(
-                                                job("task-new", "taskmaster")
-                                                        .status(new V1JobStatus().active(1)),
-                                                job("task-old", "taskmaster")
-                                                        .status(new V1JobStatus().active(1))))));
+                                                MockUtil.createdBy(
+                                                        job("task-new", "taskmaster")
+                                                                .status(
+                                                                        new V1JobStatus()
+                                                                                .active(1)),
+                                                        MockUtil.NOAUTH_USER),
+                                                MockUtil.createdBy(
+                                                        job("task-old", "taskmaster")
+                                                                .status(
+                                                                        new V1JobStatus()
+                                                                                .active(1)),
+                                                        MockUtil.NOAUTH_USER)))));
         mockKubernetes.givenThat(
                 WireMock.get(urlPathEqualTo(JOBS))
                         .withQueryParam("labelSelector", equalTo("job-type=executor"))
