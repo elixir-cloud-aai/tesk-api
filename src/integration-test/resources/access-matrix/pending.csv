@@ -1,8 +1,8 @@
 # Cells of the access matrix that the current code doesn't meet yet: the configuration
 # (default, all-operations, service-info-private, fail-open), the case (the caller variant
 # of matrix.txt, /none or /foreign for row 2, or a variant test), the operation (column),
-# the slice of the redesign that makes the cell pass (decide: its target needs a decision
-# first) and the status that the current code answers. See Pending.java and
+# the slice of the redesign that makes the cell pass, and the status that the current code
+# answers. See Pending.java and
 # docs/development.md, "Access matrix". Each slice removes the lines of the cells it makes
 # pass, and updates the status of the cells whose answer it changes.
 config,case,operation,slice,today
@@ -180,8 +180,7 @@ all-operations,pdp-down,CANCEL,T4b,200
 all-operations,scope-all,LIST,T4b,200
 service-info-private,9,SI,T3b,401
 service-info-private,10,SI,T3b,200
-service-info-private,16,SI,decide,-
-service-info-private,17,SI,decide,-
+service-info-private,16,SI,T6,200
 service-info-private,19a,SI,T3b,401
 fail-open,owner,CREATE,T4a,200
 fail-open,foreign,GET-M,T2,403

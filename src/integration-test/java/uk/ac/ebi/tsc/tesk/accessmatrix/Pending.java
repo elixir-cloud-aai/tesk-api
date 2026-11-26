@@ -15,8 +15,7 @@ import java.util.regex.Pattern;
  * status that the current code answers. The tests of these cells check that the current code still
  * answers that status and does not meet the target yet (a strict expected failure); they then end
  * as aborted (skipped), naming the slice. A cell that meets its target fails its test until its
- * line is removed. The slice {@code decide} marks cells whose target needs a decision first: they
- * are skipped without checks.
+ * line is removed.
  */
 final class Pending {
 
@@ -26,12 +25,9 @@ final class Pending {
     static final Set<String> CONFIGS =
             Set.of("default", "all-operations", "service-info-private", "fail-open");
 
-    /** The slice of cells whose target isn't decided yet */
-    static final String DECIDE = "decide";
+    private static final Pattern SLICE = Pattern.compile("T[0-9][a-z]?");
 
-    private static final Pattern SLICE = Pattern.compile("T[0-9][a-z]?|decide");
-
-    /** A pending cell: the slice that makes it pass, and today's status (0 for {@code decide}) */
+    /** A pending cell: the slice that makes it pass, and today's status */
     record Entry(String slice, int today) {}
 
     private static Map<String, Entry> entries;
@@ -85,7 +81,7 @@ final class Pending {
             }
             int today;
             try {
-                today = DECIDE.equals(fields[3]) ? 0 : Integer.parseInt(fields[4]);
+                today = Integer.parseInt(fields[4]);
             } catch (NumberFormatException e) {
                 throw new IllegalStateException("Invalid status in " + RESOURCE + ": " + line, e);
             }

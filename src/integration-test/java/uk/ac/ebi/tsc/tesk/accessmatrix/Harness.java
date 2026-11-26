@@ -192,9 +192,6 @@ abstract class Harness {
     void check(String caseId, String operation, MvcResult result, String expected, Target target)
             throws Exception {
         Optional<Pending.Entry> pending = Pending.find(config(), caseId, operation);
-        if (pending.isPresent() && Pending.DECIDE.equals(pending.get().slice())) {
-            Assumptions.abort("needs a decision first; target as proposed: " + expected);
-        }
         AssertionError missed = null;
         try {
             target.check(result);

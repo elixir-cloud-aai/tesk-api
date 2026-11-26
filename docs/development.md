@@ -128,8 +128,7 @@ redesign's changes are in:
   failure), and then ends as skipped, naming the slice. Once a change meets a
   cell's target, its test fails until the change removes the line; if a
   change alters the answer of a cell that stays pending, its test fails until
-  the change updates the status. Cells whose target needs a decision first
-  have the slice `decide` and are skipped without checks.
+  the change updates the status.
 - The tests run TESK with the `auth` profile against a mock OpenID Connect
   provider (`MockIdp`: discovery, keys, tokens signed as the callers need
   them, and a user info endpoint that answers like LS Login's), a mock
@@ -145,7 +144,7 @@ redesign's changes are in:
 
 The changes (slices) of the redesign that `pending.csv` names, in their
 order; each is a pull request of its own, stacked on the previous one, and
-none is merged before all are done:
+merged when it is ready:
 
 Slice | Change | Cells it makes pass
 --- | --- | ---
@@ -156,8 +155,15 @@ T4b | Lets the decision service decide further operations (`tesk.api.authz.opera
 T6 | Accepts exchanged tokens (RFC 8693) of trusted actors and records the actor | Row 16, the recorded actor
 
 Until T6, T3b refuses tokens with an `act` claim, so rows 14 and 15 fail from
-T3b to T6. What failing open means (`fail-open`: the owner-only decision, and
-create never fails open) is a proposal still to be decided.
+T3b to T6. Failing open (`fail-open`) falls back to the owner-only decision,
+never to allowing everything, and create never fails open.
+
+Row 9 (unlisted service client) uses a client token whose audience TESK
+accepts, so that only the missing listing makes the difference. A real LS
+Login client token carries the client's own ID as its audience, which TESK
+accepts for listed clients only, so an unlisted LS Login client gets 401 on
+every operation (row 10). With `serviceInfoPublic: false`, rows 16 and 17 get
+on service info what they get on every other operation (403 and 401).
 
 To run only these tests (the coverage check needs all tests, so skip it):
 
@@ -181,7 +187,7 @@ and the target. A slice:
 The case of a line is the caller's ID in `Callers` (the row's number and, for
 rows with variants, a letter, e.g. `12a`), with `/none` or `/foreign` for
 rows whose task column has both (row 2), or the name of a variant test (e.g.
-`stamp-owner`); `today` is `-` for cells with the slice `decide`. A new row
+`stamp-owner`). A new row
 of the table needs callers in `Callers`, or the tests don't start.
 
 ## Formatting and linting
