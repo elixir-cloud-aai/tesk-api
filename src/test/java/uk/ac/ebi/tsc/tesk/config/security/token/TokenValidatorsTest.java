@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.jose4j.jwt.consumer.ErrorCodeValidator;
@@ -117,6 +120,37 @@ public class TokenValidatorsTest {
                         + " clientId=null]",
                 principal.toString());
         assertThrows(UnsupportedOperationException.class, () -> principal.claims().put("x", "y"));
+    }
+
+    /** Nested claims can't be changed either, also through the map the principal was made from */
+    @Test
+    @SuppressWarnings("unchecked")
+    public void nestedClaims_areCopiedAndCantBeChanged() {
+        Map<String, Object> act = new LinkedHashMap<>();
+        act.put("sub", "gateway");
+        List<Object> entitlements = new ArrayList<>(List.of("urn:a"));
+        entitlements.add(null);
+        Map<String, Object> claims = new LinkedHashMap<>();
+        claims.put("act", act);
+        claims.put("eduperson_entitlement", entitlements);
+        claims.put("nothing", null);
+        TokenPrincipal principal =
+                new TokenPrincipal(
+                        "https://login.example.org/",
+                        "user-1",
+                        TokenPrincipal.Kind.USER,
+                        null,
+                        claims);
+        act.put("sub", "changed");
+        entitlements.set(0, "urn:changed");
+
+        Map<String, Object> nested = (Map<String, Object>) principal.claims().get("act");
+        List<Object> values = (List<Object>) principal.claims().get("eduperson_entitlement");
+        assertEquals("gateway", nested.get("sub"));
+        assertEquals(Arrays.asList("urn:a", null), values);
+        assertTrue(principal.claims().containsKey("nothing"));
+        assertThrows(UnsupportedOperationException.class, () -> nested.put("sub", "x"));
+        assertThrows(UnsupportedOperationException.class, () -> values.add("urn:b"));
     }
 
     @Test

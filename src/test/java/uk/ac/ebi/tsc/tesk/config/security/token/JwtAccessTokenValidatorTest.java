@@ -916,6 +916,21 @@ public class JwtAccessTokenValidatorTest {
         assertThat(startupError(properties), containsString("issuers[0].url"));
     }
 
+    /** An issuer identifier has no query or fragment (RFC 8414, OpenID Connect Discovery) */
+    @Test
+    public void issuerWithQuery_failsAtStartup() {
+        properties.getIssuers().get(0).setUrl("https://login.example.org/oidc?tenant=x");
+
+        assertThat(startupError(properties), containsString("issuers[0].url"));
+    }
+
+    @Test
+    public void issuerWithFragment_failsAtStartup() {
+        properties.getIssuers().get(0).setUrl("https://login.example.org/oidc#x");
+
+        assertThat(startupError(properties), containsString("issuers[0].url"));
+    }
+
     @Test
     public void duplicateIssuer_failsAtStartup() {
         properties.getIssuers().add(issuerSettings(issuer()));

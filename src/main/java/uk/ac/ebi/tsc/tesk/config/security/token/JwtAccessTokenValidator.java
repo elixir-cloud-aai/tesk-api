@@ -172,6 +172,10 @@ public final class JwtAccessTokenValidator implements TokenValidator {
         check(
                 IssuerVerifier.isSecure(url),
                 key + "url must be an https URL (http only for localhost)");
+        // an issuer identifier has none (RFC 8414 section 2, OpenID Connect Discovery 1.0)
+        check(
+                !url.contains("?") && !url.contains("#"),
+                key + "url must not have a query or fragment");
         String jwksUri = trimmed(settings.getJwksUri());
         check(
                 jwksUri == null || IssuerVerifier.isSecure(jwksUri),

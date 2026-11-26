@@ -1,7 +1,9 @@
 package uk.ac.ebi.tsc.tesk.config.security.token;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -32,12 +34,33 @@ public record TokenPrincipal(
         SERVICE_CLIENT
     }
 
-    /** Checks that the fields are set, and copies the claims (which may hold JSON nulls) */
+    /**
+     * Checks that the fields are set, and copies the claims, nested objects and arrays too, into
+     * ones that can't be changed (they may hold JSON nulls)
+     */
     public TokenPrincipal {
         Objects.requireNonNull(issuer);
         Objects.requireNonNull(subject);
         Objects.requireNonNull(kind);
-        claims = Collections.unmodifiableMap(new LinkedHashMap<>(claims));
+        claims = copy(claims);
+    }
+
+    private static Map<String, Object> copy(Map<?, ?> map) {
+        Map<String, Object> copied = new LinkedHashMap<>();
+        map.forEach((key, value) -> copied.put(String.valueOf(key), copyValue(value)));
+        return Collections.unmodifiableMap(copied);
+    }
+
+    private static Object copyValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return copy(map);
+        }
+        if (value instanceof List<?> list) {
+            List<Object> copied = new ArrayList<>(list.size());
+            list.forEach(item -> copied.add(copyValue(item)));
+            return Collections.unmodifiableList(copied);
+        }
+        return value; // strings, numbers, booleans, null
     }
 
     /** Without the claims, which may hold personal data (names, e-mail addresses) */

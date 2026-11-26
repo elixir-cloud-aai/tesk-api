@@ -1,5 +1,6 @@
 package uk.ac.ebi.tsc.tesk.config.security.token;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -142,32 +143,41 @@ public class IssuerVerifierTest {
         }
     }
 
-    /** A failure to fetch the keys again later is told from an unknown key ID */
+    /**
+     * A failure to fetch the keys again later (here: for a new key ID, while the issuer is down) is
+     * told from an unknown key ID, with the verifier's own key resolver
+     */
     @Test
     public void keysUnavailableLater_areReportedAsUnavailable() throws Exception {
-        VerificationKeyResolver failing =
-                IssuerVerifier.signallingUnavailableKeys((jws, nesting) -> {
-                    throw new UnresolvableKeyException("no keys", new IOException("issuer down"));
-                });
+        RsaJsonWebKey current = RsaJwkGenerator.generateJwk(2048);
+        current.setKeyId("current");
+        RsaJsonWebKey rotated = RsaJwkGenerator.generateJwk(2048);
+        rotated.setKeyId("rotated");
         IssuerVerifier verifier =
                 new IssuerVerifier(
                         "http://localhost:" + idp.getPort() + "/",
                         "http://localhost:" + idp.getPort() + "/jwk",
                         1000,
-                        100,
-                        keys ->
-                                new JwtConsumerBuilder()
-                                        .setVerificationKeyResolver(failing)
-                                        .build());
-        idp.givenThat(
-                get("/jwk")
-                        .willReturn(
-                                okJson(
-                                        new JsonWebKeySet(RsaJwkGenerator.generateJwk(2048))
-                                                .toJson())));
+                        1,
+                        keys -> new JwtConsumerBuilder().setVerificationKeyResolver(keys).build());
+        idp.givenThat(get("/jwk").willReturn(okJson(new JsonWebKeySet(current).toJson())));
+        assertEquals("user-1", verifier.verify(signedWith(current)).getSubject());
+        idp.givenThat(get("/jwk").willReturn(aResponse().withStatus(503)));
+        Thread.sleep(5); // beyond the refresh interval of 1 ms
 
-        IOException e = assertThrows(IOException.class, () -> verifier.verify(signed()));
+        IOException e = assertThrows(IOException.class, () -> verifier.verify(signedWith(rotated)));
         assertEquals("keys of the issuer unavailable", e.getMessage());
+    }
+
+    private static String signedWith(RsaJsonWebKey key) throws Exception {
+        JwtClaims claims = new JwtClaims();
+        claims.setSubject("user-1");
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setPayload(claims.toJson());
+        jws.setKey(key.getPrivateKey());
+        jws.setKeyIdHeaderValue(key.getKeyId());
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
+        return jws.getCompactSerialization();
     }
 
     @Test
