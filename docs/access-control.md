@@ -162,9 +162,10 @@ The request (`POST`, JSON, with a new `X-Request-ID` each) describes:
 * the context: `tes.profile` `tes-authzen/3` and `tes.service_id`, the ID
   of the service info.
 
-The caller's access token is never sent to the decision service. Getting,
-listing and cancelling tasks don't ask it: they follow TESK API's own rules
-(see [Authorisation](#authorisation)).
+The caller's access token is never sent to the decision service. By
+default, getting, listing and cancelling tasks don't ask it: they follow
+TESK API's own rules (see [Authorisation](#authorisation)), unless you
+switch them on (see [Further operations](#further-operations)).
 
 Claims named in `TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS` (none by default)
 are looked up in this order, and the first one found is sent: a claim of
@@ -217,13 +218,87 @@ The policy of tes-authz then decides, e.g., that members of a group named in
 that releases the claim at the user info endpoint (for LS Login,
 `eduperson_entitlement`) when they get tokens for users.
 
+### Further operations
+
+By default, the decision service decides only who may create tasks. You
+can let it decide getting, listing and cancelling tasks, too, each on its
+own (`TESK_API_AUTHZ_OPERATIONS`). For a switched-on operation, the
+decision service decides alone, as in tes-authz's profile `tes-authzen/3`:
+its policy may allow more than TESK API's own rules (e.g. group sharing,
+or an admin view in your deployment), or less (e.g. access that ends with
+an entitlement). The reference policy of tes-authz is owner only, so
+switching all operations on with it gives the same answers as the
+default, except while the decision service is down.
+
+Operation | Request | Result
+--- | --- | ---
+Get a task | `GetTask` (with `view` `MINIMAL`, `BASIC` or `FULL`) on the resource type `tes_task`, id the task ID, with the properties `owner`, `state` and `tags` of the stored task; for a task that doesn't exist, or one without an exact owner (see [Task creators](#task-creators)), no properties | allowed: the task, whoever owns it; denied, or a task that doesn't exist: `404 Not Found`
+Cancel a task | `CancelTask` on the same resource | allowed: the task is cancelled, whoever owns it (a task that doesn't exist: `404`; TESK reads the task again after the decision, so a task that ended meanwhile isn't cancelled, and one that was deleted or replaced by another task with the same ID gives `404`); denied: `403 Forbidden` if the caller may get the task (asking `GetTask`, without a view, if getting is switched on; else if it is the task's creator), otherwise `404 Not Found`
+List tasks | `ListTasks` (with `view`) on the resource type `tes_task_set`, id `own`, once per page | by the list scope in the answer (below)
+
+The decision service is asked for tasks that don't exist too, so that the
+answers don't tell whether another user's task exists. The subject is the
+caller, as for create, but its claims come from the token only: the user
+info endpoint is asked on create only. Each request has a new
+`X-Request-ID` (a cancel that is denied may take two). Your policy must
+answer every request with a boolean `decision`, also for tasks without
+properties (in Rego, e.g. `default decision := false`): otherwise a
+missing task gives a failed decision (`503` when failing closed), while
+another user's task gives `404`, which tells callers which tasks exist.
+
+Answer to `ListTasks` | List scope | The list holds
+--- | --- | ---
+`{"decision": true}`, without a list scope, or with `"context": {"tes": {"list_scope": "own"}}` | `own` | the caller's own tasks
+`{"decision": true, "context": {"tes": {"list_scope": "all"}}}` | `all` | the tasks of all users (with an exact owner)
+`{"decision": true, "context": {"tes": {"list_scope": "none"}}}`, or any deny | `none` | nothing (`200` with an empty list, without a call to Kubernetes)
+An allow whose `context` or `context.tes` isn't an object, or whose `list_scope` is another value | – | a failed decision (below)
+
+TESK API never asks for the set `all`; only a decision service whose
+policy grants it answers the scope `all` (the reference policy never
+does). The `next_page_token` of a list of all tasks starts with `all.`: a
+page token of the other scope (e.g. after the scope changed between pages)
+gives `400 Bad Request`, and the client starts over.
+
+A decision fails if the decision service doesn't answer in time, can't be
+reached, answers with a status other than `200`, or with something that
+isn't JSON, without a boolean `decision` (e.g. `{}`), or with a malformed
+list scope. (On create, an answer without a boolean `decision` is a deny,
+as above.) What happens then is set per
+operation (`TESK_API_AUTHZ_FAILURE_<OPERATION>`):
+
+* `closed` (the default): `503 Service Unavailable`, as on create; nothing
+  is read or changed;
+* `open` (getting, listing and cancelling only): TESK API's own rule, as if
+  the operation weren't switched on: the creator gets and cancels own
+  tasks, other tasks are not found (`404`), and lists hold the caller's own
+  tasks. Never more than that. The fallback is logged.
+
+The second request of a denied cancel (`GetTask`, if getting is switched
+on) follows the failure setting of `get`, not that of `cancel`: with
+getting failing closed, a denied cancel gives `503` while that request
+fails.
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHZ_OPERATIONS` | The operations that the decision service decides: `create` and any of `get`, `list`, `cancel`, comma-separated (or one per `TESK_API_AUTHZ_OPERATIONS_<k>`; not as a JSON array), e.g. `create,get,list,cancel`. | `create`
+`TESK_API_AUTHZ_FAILURE_<OPERATION>` | What a failed decision of the operation (`CREATE`, `GET`, `LIST`, `CANCEL`) does: `closed` or `open`. | `closed`
+
+TESK API doesn't start, and says why, if `TESK_API_AUTHZ_OPERATIONS`
+doesn't include `create` (TESK API has no rule of its own for who may
+create tasks), names an unknown operation or one twice, if a failure
+setting names an unknown operation or has a value other than `closed` or
+`open`, or if `TESK_API_AUTHZ_FAILURE_CREATE` is `open`. A failure setting
+`open` for an operation that isn't switched on changes nothing; TESK API
+warns about it at startup.
+
 ## Authorisation
 
 Since 2.1.0, TESK API has no group model: no groups, teams, team admins or
 super admins, and no rights of its own from claims of the token or the user
 info ([#225](https://github.com/elixir-cloud-aai/tesk-api/issues/225)); such
 claims count only where the decision service uses them. With the `auth`
-profile:
+profile, and unless you let the decision service decide getting, listing or
+cancelling (see [Further operations](#further-operations)):
 
 Operation | Who may | Otherwise
 --- | --- | ---
@@ -244,7 +319,9 @@ environment), and access to data is granted to individual people, so nobody
 but a task's creator sees it through the API: admins can't read other users'
 tasks or cancel them. Operators handle stuck or abusive tasks through
 Kubernetes (e.g. with `kubectl`), not through the TES API. Clients that share
-tasks between users do so themselves.
+tasks between users do so themselves. Only a decision service whose policy
+allows more, for an operation that you switched on, can change this (see
+[Further operations](#further-operations)).
 
 The settings of the group model and of the former service clients (all
 settings under `tesk.api.authorisation`, i.e. environment variables

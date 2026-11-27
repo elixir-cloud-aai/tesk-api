@@ -58,7 +58,7 @@ class TesServiceImplCreateTest {
     void setUp() {
         this.client = mock(KubernetesClientWrapper.class);
         this.converter = mock(TesKubernetesConverter.class);
-        this.service = new TesServiceImpl(this.client, this.converter);
+        this.service = new TesServiceImpl(this.client, this.converter, TaskAccess.OWNER_ONLY);
         when(this.converter.fromTesTaskToK8sImagePullSecrets(any(TesTask.class), any(V1Job.class)))
                 .thenReturn(Collections.emptyList());
         when(this.converter.fromK8sJobToTesCreateTaskResponse(any(V1Job.class)))

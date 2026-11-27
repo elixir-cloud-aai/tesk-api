@@ -31,7 +31,8 @@ public interface TesService {
      * Gets single task's details based on ID. Performs a series of kubernetes API calls and
      * converts results with means of the converter. Only the task's creator may get it ({@link
      * User#isCreatorOf}); for any other caller, a task of another creator is not found, like a
-     * missing one (404).
+     * missing one (404). If getting is switched on ({@code tesk.api.authz.operations}), the
+     * decision service decides instead ({@link TaskAccess}), also for missing tasks.
      *
      * @param taskId - TES task ID (==taskmaster's job name)
      * @param view - one of {@link TaskView} values, decides on how much detail is put in results
@@ -43,7 +44,9 @@ public interface TesService {
      * Gets a full list of tasks. Performs Kubernetes API batch calls (all taskmasters, all
      * executors, all pods), combines them together into valid {@link Task} objects and converts to
      * result with means of the converter. Only the caller's own tasks ({@link
-     * User#getLabelSelector}, {@link User#isCreatorOf}).
+     * User#getLabelSelector}, {@link User#isCreatorOf}); if listing is switched on ({@code
+     * tesk.api.authz.operations}), the tasks of the decision service's list scope ({@link
+     * TaskAccess}): own, all (with an exact owner) or none.
      *
      * @param filter - only tasks that match it (name prefix, state and tags; see {@link
      *     TaskFilter}); {@link TaskFilter#NONE} for all tasks
@@ -61,7 +64,9 @@ public interface TesService {
      * Cancels a task with a given id, by setting a label to taskmaster Job and Pod object. If not
      * task with a given Id - throws TaskNotFoundException If task completed, throws
      * CancelNotRunningTask. Only the task's creator may cancel it ({@link User#isCreatorOf}); for
-     * any other caller, a task of another creator is not found, like a missing one (404).
+     * any other caller, a task of another creator is not found, like a missing one (404). If
+     * cancelling is switched on ({@code tesk.api.authz.operations}), the decision service decides
+     * instead ({@link TaskAccess}): 403 if it denies, but the caller may get the task.
      *
      * @param taskId - TES task ID (==taskmaster's job name)
      * @param user - the caller

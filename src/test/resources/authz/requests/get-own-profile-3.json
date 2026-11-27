@@ -1,0 +1,54 @@
+{
+  "case": "9",
+  "description": "profile tes-authzen/3, owner reads",
+  "expect": {
+    "reference_policy": {
+      "decision": true
+    }
+  },
+  "name": "get-own-profile-3",
+  "request": {
+    "action": {
+      "name": "GetTask",
+      "properties": {
+        "view": "MINIMAL"
+      }
+    },
+    "context": {
+      "tes": {
+        "profile": "tes-authzen/3",
+        "service_id": "tes-authz-test"
+      }
+    },
+    "resource": {
+      "id": "task-a1",
+      "properties": {
+        "owner": "alice-sub",
+        "state": "RUNNING",
+        "tags": {
+          "project": "demo"
+        }
+      },
+      "type": "tes_task"
+    },
+    "subject": {
+      "id": "alice-sub",
+      "properties": {
+        "claims": {
+          "eduperson_entitlement": [
+            "urn:geant:lifescience-ri.eu:group:example-vo:analysts#login.aai.lifescience-ri.eu",
+            "urn:geant:lifescience-ri.eu:group:other-vo:sub#login.aai.lifescience-ri.eu"
+          ]
+        },
+        "client_id": "tes-client",
+        "iss": "https://login.aai.lifescience-ri.eu/oidc/",
+        "scope": [
+          "openid",
+          "eduperson_entitlement"
+        ],
+        "sub": "alice-sub"
+      },
+      "type": "user"
+    }
+  }
+}

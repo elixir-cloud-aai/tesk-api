@@ -1,19 +1,34 @@
 package uk.ac.ebi.tsc.tesk.authz;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Settings of the decision service ({@code tesk.api.authz.*}), which decides who may create tasks
- * (OpenID AuthZEN 1.0 Access Evaluation, profile {@code tes-authzen/3} of tes-authz). Required with
- * authentication; checked at startup ({@link AuthzConfiguration}).
+ * Settings of the decision service ({@code tesk.api.authz.*}), which decides who may create tasks,
+ * and the further operations that the operator switches on (OpenID AuthZEN 1.0 Access Evaluation,
+ * profile {@code tes-authzen/3} of tes-authz). Required with authentication; checked at startup
+ * ({@link AuthzConfiguration}).
  */
 // registered with the auth profile (AuthzConfiguration), documented in configuration.md
 @ConfigurationProperties(prefix = "tesk.api.authz")
 public class AuthzProperties {
 
     private DecisionService decisionService = new DecisionService();
+
+    /**
+     * The operations that the decision service decides: {@code create} always, and any of {@code
+     * get}, {@code list}, {@code cancel} that the operator switches on
+     */
+    private List<String> operations = new ArrayList<>(List.of("create"));
+
+    /**
+     * What a failed decision does, per operation: {@code closed} (the default: 503) or {@code open}
+     * (the owner rule; not for create)
+     */
+    private Map<String, String> failure = new LinkedHashMap<>();
 
     /** The decision service */
     public static class DecisionService {
@@ -65,6 +80,22 @@ public class AuthzProperties {
         public void setCredentialFile(String credentialFile) {
             this.credentialFile = credentialFile;
         }
+    }
+
+    public List<String> getOperations() {
+        return operations;
+    }
+
+    public void setOperations(List<String> operations) {
+        this.operations = operations;
+    }
+
+    public Map<String, String> getFailure() {
+        return failure;
+    }
+
+    public void setFailure(Map<String, String> failure) {
+        this.failure = failure;
     }
 
     public DecisionService getDecisionService() {

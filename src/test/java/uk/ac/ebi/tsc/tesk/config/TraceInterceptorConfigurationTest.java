@@ -44,6 +44,7 @@ public class TraceInterceptorConfigurationTest {
                         "readTaskmasterJob",
                         "readPodLog",
                         "listAllTaskmasterJobsForUser",
+                        "listAllOwnedTaskmasterJobs",
                         "listSingleTaskExecutorJobs",
                         "listAllTaskExecutorJobs",
                         "listFilerJobsOfTasks",

@@ -398,6 +398,25 @@ public class KubernetesClientWrapperTest {
                 is(Arrays.asList(job("a@b"))));
     }
 
+    /**
+     * The list scope {@code all} of a decision service: the jobs of every owner, without an owner
+     * selector, but only those with an exact owner (others count as missing)
+     */
+    @Test
+    public void listAllOwnedTaskmasterJobs() throws ApiException {
+        V1ObjectMeta annotatedOnly = new V1ObjectMeta().putAnnotationsItem(ANN_USERID_KEY, "a@b");
+        listJobsReturning(
+                job("a@b"),
+                new V1Job().metadata(new V1ObjectMeta()),
+                new V1Job().metadata(annotatedOnly),
+                job("c@d"));
+        ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
+        V1JobList result = wrapper.listAllOwnedTaskmasterJobs(null, null);
+        verifyListJobs("test-namespace", argument);
+        assertThat(argument.getValue(), is("job-type=taskmaster"));
+        assertThat(result.getItems(), is(Arrays.asList(job("a@b"), job("c@d"))));
+    }
+
     @Test
     public void listSingleTaskExecutorJobs() throws ApiException {
         ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);

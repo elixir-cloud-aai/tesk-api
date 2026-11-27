@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.authz;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -12,20 +13,33 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.config.security.token.TokenPrincipal;
 import uk.ac.ebi.tsc.tesk.config.security.token.TokenValidationProperties;
+import uk.ac.ebi.tsc.tesk.tes.exception.AuthorisationUnavailableException;
+import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
+import uk.ac.ebi.tsc.tesk.tes.service.TaskAccess;
+import uk.ac.ebi.tsc.tesk.tes.service.TaskAccess.Operation;
 
 /** The startup checks of the decision service's settings ({@code tesk.api.authz.*}) */
 public class AuthzConfigurationTest {
@@ -173,5 +187,192 @@ public class AuthzConfigurationTest {
         Map<String, Object> context = (Map<String, Object>) request.getValue().get("context");
         assertThat((Map<String, Object>) context.get("tes"))
                 .containsEntry("service_id", "org.example.tes");
+    }
+
+    /** The environment variable forms of the docs bind to the settings */
+    @Test
+    public void operationsAndFailure_fromEnvironmentVariables() {
+        Map<String, Object> environment =
+                Map.of(
+                        "TESK_API_AUTHZ_OPERATIONS", "create,get,list,cancel",
+                        "TESK_API_AUTHZ_FAILURE_GET", "open",
+                        "TESK_API_AUTHZ_FAILURE_CANCEL", "closed");
+        AuthzProperties bound = bindEnvironment(environment);
+        assertThat(bound.getOperations()).containsExactly("create", "get", "list", "cancel");
+        assertThat(bound.getFailure())
+                .containsOnly(Map.entry("get", "open"), Map.entry("cancel", "closed"));
+        assertThat(
+                        bindEnvironment(
+                                        Map.of(
+                                                "TESK_API_AUTHZ_OPERATIONS_0", "create",
+                                                "TESK_API_AUTHZ_OPERATIONS_1", "get"))
+                                .getOperations())
+                .containsExactly("create", "get");
+    }
+
+    /** The settings as Spring binds them from these environment variables */
+    private static AuthzProperties bindEnvironment(Map<String, Object> environment) {
+        return new Binder(
+                        ConfigurationPropertySources.from(
+                                new SystemEnvironmentPropertySource(
+                                        StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                                        environment)))
+                .bind("tesk.api.authz", AuthzProperties.class)
+                .get();
+    }
+
+    @Test
+    public void operations_default() {
+        assertThat(this.properties.getOperations()).containsExactly("create");
+        assertThat(this.properties.getFailure()).isEmpty();
+        assertThat(AuthzConfiguration.operations(this.properties.getOperations()))
+                .containsExactly(Operation.CREATE);
+    }
+
+    @Test
+    public void operations_all() {
+        assertThat(AuthzConfiguration.operations(List.of(" cancel", "create", "get ", "list")))
+                .containsExactlyInAnyOrder(
+                        Operation.CREATE, Operation.GET, Operation.LIST, Operation.CANCEL);
+    }
+
+    @Test
+    public void operations_withoutCreate_failsAtStartup() {
+        assertThatThrownBy(() -> AuthzConfiguration.operations(List.of("get")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("tesk.api.authz.operations must include create");
+        assertThatThrownBy(() -> AuthzConfiguration.operations(List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("tesk.api.authz.operations must include create");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"delete", "", "GET", "create get"})
+    public void operations_unknown_failsAtStartup(String name) {
+        assertThatThrownBy(() -> AuthzConfiguration.operations(List.of("create", name)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("tesk.api.authz.operations has an unknown operation");
+    }
+
+    @Test
+    public void operations_null_failsAtStartup() {
+        assertThatThrownBy(() -> AuthzConfiguration.operations(Arrays.asList("create", null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("tesk.api.authz.operations has an unknown operation ''");
+    }
+
+    @Test
+    public void operations_repeated_failsAtStartup() {
+        assertThatThrownBy(() -> AuthzConfiguration.operations(List.of("create", "get", "get")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("tesk.api.authz.operations names 'get' more than once");
+    }
+
+    @Test
+    public void failure_openAndClosed() {
+        Map<String, String> failure = new LinkedHashMap<>();
+        failure.put("create", "closed");
+        failure.put("get", " open ");
+        failure.put("list", "closed");
+        failure.put("cancel", "open");
+        assertThat(AuthzConfiguration.failOpen(failure, EnumSet.allOf(Operation.class)))
+                .containsExactlyInAnyOrder(Operation.GET, Operation.CANCEL);
+    }
+
+    /** Open for an operation that isn't switched on changes nothing (a warning) */
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    public void failure_openForAnOperationNotSwitchedOn(CapturedOutput output) {
+        assertThat(
+                        AuthzConfiguration.failOpen(
+                                Map.of("list", "open"), EnumSet.of(Operation.CREATE)))
+                .containsExactly(Operation.LIST);
+        assertThat(output.getOut())
+                .contains(
+                        "tesk.api.authz.failure.list is open, but tesk.api.authz.operations"
+                                + " doesn't include list");
+    }
+
+    @Test
+    public void failure_createOpen_failsAtStartup() {
+        assertThatThrownBy(() ->
+                        AuthzConfiguration.failOpen(
+                                Map.of("create", "open"), EnumSet.allOf(Operation.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("tesk.api.authz.failure.create can't be open");
+    }
+
+    @Test
+    public void failure_unknownOperation_failsAtStartup() {
+        assertThatThrownBy(() ->
+                        AuthzConfiguration.failOpen(
+                                Map.of("delete", "open"), EnumSet.allOf(Operation.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("tesk.api.authz.failure.delete names an unknown operation");
+    }
+
+    @Test
+    public void failure_unknownValue_failsAtStartup() {
+        Map<String, String> failure = new LinkedHashMap<>();
+        failure.put("get", null);
+        assertThatThrownBy(
+                        () -> AuthzConfiguration.failOpen(failure, EnumSet.allOf(Operation.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("tesk.api.authz.failure.get must be closed or open");
+        assertThatThrownBy(() ->
+                        AuthzConfiguration.failOpen(
+                                Map.of("get", "allow"), EnumSet.allOf(Operation.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("tesk.api.authz.failure.get must be closed or open");
+    }
+
+    /** The bean of get, list and cancel: the switched-on operations, with the service info's ID */
+    @Test
+    @SuppressWarnings("unchecked")
+    public void taskAccess() throws Exception {
+        AuthzConfiguration configuration = new AuthzConfiguration();
+        ServiceInfoService serviceInfo = mock(ServiceInfoService.class);
+        TesServiceInfo info = new TesServiceInfo();
+        info.setId("org.example.tes");
+        when(serviceInfo.getServiceInfo()).thenReturn(info);
+        DecisionServiceClient decisionService = mock(DecisionServiceClient.class);
+        when(decisionService.answer(any(), anyString()))
+                .thenThrow(new DecisionServiceClient.Failure("down"));
+        this.properties.setOperations(new ArrayList<>(List.of("create", "get", "list")));
+        this.properties.setFailure(new LinkedHashMap<>(Map.of("list", "open")));
+
+        TaskAccess access = configuration.taskAccess(decisionService, this.properties, serviceInfo);
+
+        assertThat(access.decides(Operation.GET)).isTrue();
+        assertThat(access.decides(Operation.CANCEL)).isFalse();
+        TokenPrincipal alice =
+                new TokenPrincipal(
+                        "https://issuer.example/",
+                        "alice",
+                        TokenPrincipal.Kind.USER,
+                        null,
+                        Map.of());
+        User user = User.builder(alice.owner()).principal(alice).build();
+        assertThat(access.listScope(user, TaskView.MINIMAL)).isEqualTo(TaskAccess.ListScope.OWN);
+        assertThatThrownBy(() -> access.mayGet(user, "t", null, TaskView.MINIMAL))
+                .isInstanceOf(AuthorisationUnavailableException.class);
+        ArgumentCaptor<Map<String, Object>> request = ArgumentCaptor.forClass(Map.class);
+        verify(decisionService, org.mockito.Mockito.times(2))
+                .answer(request.capture(), anyString());
+        Map<String, Object> context = (Map<String, Object>) request.getValue().get("context");
+        assertThat((Map<String, Object>) context.get("tes"))
+                .containsEntry("service_id", "org.example.tes");
+    }
+
+    @Test
+    public void taskAccess_invalidSettings_failsAtStartup() {
+        this.properties.setOperations(List.of("get"));
+        assertThatThrownBy(() ->
+                        new AuthzConfiguration()
+                                .taskAccess(
+                                        mock(DecisionServiceClient.class),
+                                        this.properties,
+                                        mock(ServiceInfoService.class)))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

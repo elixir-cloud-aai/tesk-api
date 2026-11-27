@@ -86,13 +86,39 @@ public class DecisionServiceClient {
      * @throws Failure if the decision service gave no decision
      */
     public boolean evaluate(Map<String, Object> body, String requestId) throws Failure {
+        return isAllowed(answer(body, requestId));
+    }
+
+    /**
+     * The answer to an evaluation request, for callers that read more than the decision (e.g. the
+     * list scope in its context)
+     *
+     * @param body the AuthZEN evaluation request
+     * @param requestId the request ID, new for each evaluation
+     * @return the answer: JSON, but not necessarily an object
+     * @throws Failure if the decision service gave no answer
+     */
+    public JsonNode answer(Map<String, Object> body, String requestId) throws Failure {
         HttpRequest built;
         try {
             built = request(body, requestId);
         } catch (RuntimeException e) {
             throw new Failure("request not built: " + e.getClass().getSimpleName());
         }
-        return decision(built);
+        return send(built);
+    }
+
+    /**
+     * Whether an answer allows: only if its {@code decision} is {@code true}; a {@code decision}
+     * that is missing or not a boolean is a deny (logged)
+     */
+    public static boolean isAllowed(JsonNode answer) {
+        JsonNode decision = answer.get("decision");
+        if (decision == null || !decision.isBoolean()) {
+            logger.warn("Decision service answered without a boolean decision: a deny");
+            return false;
+        }
+        return decision.booleanValue();
     }
 
     private HttpRequest request(Map<String, Object> body, String requestId) throws Failure {
@@ -114,7 +140,7 @@ public class DecisionServiceClient {
         return request.build();
     }
 
-    private boolean decision(HttpRequest request) throws Failure {
+    private JsonNode send(HttpRequest request) throws Failure {
         HttpResponse<String> response;
         try {
             response = BoundedHttp.send(this.client, request, this.timeout);
@@ -134,11 +160,6 @@ public class DecisionServiceClient {
             // an empty body
             throw new Failure("body not JSON");
         }
-        JsonNode decision = answer.get("decision");
-        if (decision == null || !decision.isBoolean()) {
-            logger.warn("Decision service answered without a boolean decision: a deny");
-            return false;
-        }
-        return decision.booleanValue();
+        return answer;
     }
 }

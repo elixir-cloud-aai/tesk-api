@@ -53,7 +53,7 @@ class TesServiceImplSystemLogsTest {
     void setUp() {
         this.client = mock(KubernetesClientWrapper.class);
         this.converter = mock(TesKubernetesConverter.class);
-        this.service = new TesServiceImpl(this.client, this.converter);
+        this.service = new TesServiceImpl(this.client, this.converter, TaskAccess.OWNER_ONLY);
         this.taskmaster =
                 new V1Job()
                         .metadata(
