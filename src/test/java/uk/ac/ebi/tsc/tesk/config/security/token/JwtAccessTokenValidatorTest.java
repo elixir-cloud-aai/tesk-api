@@ -945,7 +945,7 @@ public class JwtAccessTokenValidatorTest {
     public void issuerWithFragment_failsAtStartup() {
         properties.getIssuers().get(0).setUrl("https://login.example.org/oidc#x");
 
-        assertThat(startupError(properties), containsString("issuers[0].url"));
+        assertThat(startupError(properties), containsString("query or fragment"));
     }
 
     @Test
