@@ -249,6 +249,25 @@ jobs:
             echo "::error::App did not name the missing decision service"
             exit 1
           fi
+          # Create can't fail open: the app refuses to start and names the
+          # setting
+          status=0
+          timeout 120 docker run --rm \
+            --env TESK_API_AUTH_ISSUERS_0_URL=https://issuer.example/ \
+            --env TESK_API_AUTH_ISSUERS_0_AUDIENCES_0=tesk \
+            --env TESK_API_AUTHZ_DECISIONSERVICE_URL=https://pdp.example/access/v1/evaluation \
+            --env TESK_API_AUTHZ_FAILURE_CREATE=open \
+            tesk-api:smoke > create-open.log 2>&1 || status=$?
+          if [[ "${status}" == 0 || "${status}" == 124 ]]; then
+            cat create-open.log
+            echo "::error::App started with create failing open"
+            exit 1
+          fi
+          if ! grep -q "tesk.api.authz.failure.create can't be open" create-open.log; then
+            cat create-open.log
+            echo "::error::App did not name the setting of create failing open"
+            exit 1
+          fi
           # Without authentication (explicit `noauth`), and with it (an
           # issuer and a decision service that are never asked: no request
           # below has a valid token)
@@ -283,6 +302,13 @@ jobs:
           stop
           start "${auth[@]}" --env TESK_API_SERVICE_INFO_PUBLIC=false
           check "${api}/service-info" 401
+          stop
+          # All operations switched on, with the environment variable forms
+          # of the docs (a comma-separated list, one variable per operation)
+          start "${auth[@]}" --env TESK_API_AUTHZ_OPERATIONS=create,get,list,cancel \
+            --env TESK_API_AUTHZ_FAILURE_GET=open
+          check "${api}/service-info" 200
+          check "${api}/tasks" 401
           stop
           # An arbitrary UID in group 0, as on OpenShift, with a read-only
           # root file system (the app writes only to `/tmp`)
