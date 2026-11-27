@@ -2,13 +2,9 @@ package uk.ac.ebi.tsc.tesk.config.security;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.StreamSupport;
 import org.springframework.boot.context.properties.source.ConfigurationPropertyName;
-import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
-import org.springframework.boot.context.properties.source.IterableConfigurationPropertySource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
@@ -114,27 +110,12 @@ public class RemovedSettings {
      * itself
      */
     static Optional<String> serviceClientSetting(ConfigurationPropertyName name) {
-        String normalised = name.toString().toLowerCase(Locale.ROOT).replace("-", "");
-        for (String prefix : SERVICE_CLIENTS) {
-            if (normalised.equals(prefix)) {
-                return Optional.of("");
-            }
-            if (normalised.startsWith(prefix + ".") || normalised.startsWith(prefix + "[")) {
-                return Optional.of(normalised.substring(prefix.length()).replace(".", ""));
-            }
-        }
-        return Optional.empty();
+        return PropertyNames.below(name, SERVICE_CLIENTS).map(rest -> rest.replace(".", ""));
     }
 
     /** The first removed setting that is set, if any */
     static Optional<ConfigurationPropertyName> firstRemoved(Environment environment) {
-        return StreamSupport.stream(
-                        ConfigurationPropertySources.get(environment).spliterator(), false)
-                .filter(IterableConfigurationPropertySource.class::isInstance)
-                .map(IterableConfigurationPropertySource.class::cast)
-                .flatMap(IterableConfigurationPropertySource::stream)
-                .filter(RemovedSettings::isRemoved)
-                .findFirst();
+        return PropertyNames.firstSet(environment, RemovedSettings::isRemoved);
     }
 
     /** Whether the name is a removed setting: the prefix or under it */

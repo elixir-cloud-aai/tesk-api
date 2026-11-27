@@ -4,15 +4,11 @@ import jakarta.servlet.DispatcherType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
-import java.util.stream.StreamSupport;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.source.ConfigurationPropertyName;
-import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
-import org.springframework.boot.context.properties.source.IterableConfigurationPropertySource;
 import org.springframework.boot.http.converter.autoconfigure.ServerHttpMessageConvertersCustomizer;
 import org.springframework.boot.webmvc.error.ErrorAttributes;
 import org.springframework.context.annotation.Bean;
@@ -190,13 +186,7 @@ public class ResourceServerConfiguration {
      */
     static void refuseMisplacedSettings(Environment environment) {
         Optional<ConfigurationPropertyName> misplaced =
-                StreamSupport.stream(
-                                ConfigurationPropertySources.get(environment).spliterator(), false)
-                        .filter(IterableConfigurationPropertySource.class::isInstance)
-                        .map(IterableConfigurationPropertySource.class::cast)
-                        .flatMap(IterableConfigurationPropertySource::stream)
-                        .filter(ResourceServerConfiguration::isMisplaced)
-                        .findFirst();
+                PropertyNames.firstSet(environment, ResourceServerConfiguration::isMisplaced);
         if (misplaced.isPresent()) {
             throw new IllegalStateException(
                     misplaced.get()
@@ -208,12 +198,7 @@ public class ResourceServerConfiguration {
 
     /** Whether the name is a setting of {@link #MISPLACED} */
     static boolean isMisplaced(ConfigurationPropertyName name) {
-        String normalised = name.toString().toLowerCase(Locale.ROOT).replace("-", "");
-        return MISPLACED.stream()
-                .anyMatch(misplaced ->
-                        normalised.equals(misplaced)
-                                || normalised.startsWith(misplaced + ".")
-                                || normalised.startsWith(misplaced + "["));
+        return PropertyNames.below(name, MISPLACED).isPresent();
     }
 
     /**
