@@ -55,5 +55,5 @@ keywords:
   - REST API
   - Spring Boot
 license: Apache-2.0
-version: "2.0.0"
-date-released: "2026-11-16"
+version: "2.1.0"
+date-released: "2026-11-24"

@@ -2,6 +2,17 @@
 
 ## To 2.1.0
 
+From 2.0.0, deployments with tokens of service clients must convert their
+settings (TESK API doesn't start with the old ones), deployments with the
+`auth` profile should check who sees which tasks now (users see only their
+own tasks by default), clients that still read the API description at
+`/v2/api-docs` must move to `/v3/api-docs`, and deployments should check
+the new default resources of the taskmaster and the executors, and the new
+default images of the taskmaster and the filer, against their namespaces'
+quotas and `LimitRange`s. The new security contexts are off by default.
+Read all of the items below before you upgrade; from 1.2.0, also those of
+[To 2.0.0](#to-200).
+
 - **Service clients: audiences per client (breaking).** With tokens of
   service clients on (`TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED`),
   each client is listed with its own audiences, and a client's token is
