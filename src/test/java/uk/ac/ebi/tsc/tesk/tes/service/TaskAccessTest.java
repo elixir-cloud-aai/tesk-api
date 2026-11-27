@@ -71,5 +71,6 @@ public class TaskAccessTest {
         assertThat(this.own.tags()).isEmpty();
         assertThat(this.own.isOwnedBy(this.alice)).isTrue();
         assertThat(this.foreign.isOwnedBy(this.alice)).isFalse();
+        assertThat(this.alice.isOwner(null)).isFalse();
     }
 }

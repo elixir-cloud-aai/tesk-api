@@ -19,10 +19,17 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.config.security.token.TokenPrincipal;
 import uk.ac.ebi.tsc.tesk.config.security.token.TokenValidationProperties;
@@ -182,6 +189,28 @@ public class AuthzConfigurationTest {
                 .containsEntry("service_id", "org.example.tes");
     }
 
+    /** The environment variable forms of the docs bind to the settings */
+    @Test
+    public void operationsAndFailure_fromEnvironmentVariables() {
+        Map<String, Object> environment =
+                Map.of(
+                        "TESK_API_AUTHZ_OPERATIONS", "create,get,list,cancel",
+                        "TESK_API_AUTHZ_FAILURE_GET", "open",
+                        "TESK_API_AUTHZ_FAILURE_CANCEL", "closed");
+        AuthzProperties bound =
+                new Binder(
+                                ConfigurationPropertySources.from(
+                                        new SystemEnvironmentPropertySource(
+                                                StandardEnvironment
+                                                        .SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                                                environment)))
+                        .bind("tesk.api.authz", AuthzProperties.class)
+                        .get();
+        assertThat(bound.getOperations()).containsExactly("create", "get", "list", "cancel");
+        assertThat(bound.getFailure())
+                .containsOnly(Map.entry("get", "open"), Map.entry("cancel", "closed"));
+    }
+
     @Test
     public void operations_default() {
         assertThat(this.properties.getOperations()).containsExactly("create");
@@ -242,11 +271,16 @@ public class AuthzConfigurationTest {
 
     /** Open for an operation that isn't switched on changes nothing (a warning) */
     @Test
-    public void failure_openForAnOperationNotSwitchedOn() {
+    @ExtendWith(OutputCaptureExtension.class)
+    public void failure_openForAnOperationNotSwitchedOn(CapturedOutput output) {
         assertThat(
                         AuthzConfiguration.failOpen(
                                 Map.of("list", "open"), EnumSet.of(Operation.CREATE)))
                 .containsExactly(Operation.LIST);
+        assertThat(output.getOut())
+                .contains(
+                        "tesk.api.authz.failure.list is open, but tesk.api.authz.operations"
+                                + " doesn't include list");
     }
 
     @Test

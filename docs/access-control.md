@@ -257,7 +257,9 @@ gives `400 Bad Request`, and the client starts over.
 
 A decision fails if the decision service doesn't answer in time, can't be
 reached, answers with a status other than `200`, or with something that
-isn't JSON, or with a malformed list scope. What happens then is set per
+isn't JSON, without a boolean `decision` (e.g. `{}`), or with a malformed
+list scope. (On create, an answer without a boolean `decision` is a deny,
+as above.) What happens then is set per
 operation (`TESK_API_AUTHZ_FAILURE_<OPERATION>`):
 
 * `closed` (the default): `503 Service Unavailable`, as on create; nothing
@@ -266,6 +268,11 @@ operation (`TESK_API_AUTHZ_FAILURE_<OPERATION>`):
   the operation weren't switched on: the creator gets and cancels own
   tasks, other tasks are not found (`404`), and lists hold the caller's own
   tasks. Never more than that. The fallback is logged.
+
+The second request of a denied cancel (`GetTask`, if getting is switched
+on) follows the failure setting of `get`, not that of `cancel`: with
+getting failing closed, a denied cancel gives `503` while that request
+fails.
 
 Environment variable | Meaning | Default
 --- | --- | ---

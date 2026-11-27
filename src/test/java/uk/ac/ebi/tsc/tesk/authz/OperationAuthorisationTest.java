@@ -347,7 +347,6 @@ public class OperationAuthorisationTest {
             strings = {
                 "{\"decision\": false}",
                 "{\"decision\": false, \"context\": {\"tes\": {\"list_scope\": \"all\"}}}",
-                "{\"decision\": \"true\", \"context\": {\"tes\": {\"list_scope\": \"all\"}}}",
                 "{\"decision\": true, \"context\": {\"tes\": {\"list_scope\": \"none\"}}}"
             })
     public void listScope_none(String answer) {
@@ -479,5 +478,42 @@ public class OperationAuthorisationTest {
 
         List<String> ids = new ArrayList<>(sentRequestIds(2));
         assertThat(ids.get(0)).isNotEqualTo(ids.get(1)).hasSize(36);
+    }
+
+    /**
+     * An answer without a boolean decision (e.g. OPA's {@code {}} for a policy that isn't loaded)
+     * is a failed decision, not a deny: 503 when failing closed
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "{}",
+                "[]",
+                "1",
+                "{\"decision\": null}",
+                "{\"decision\": \"true\", \"context\": {\"tes\": {\"list_scope\": \"all\"}}}"
+            })
+    public void noBooleanDecision_failsClosed(String answer) throws Exception {
+        answer(answer);
+        OperationAuthorisation authz = authz();
+
+        assertThatThrownBy(() -> authz.mayGet(this.user, "task-a1", this.own, TaskView.MINIMAL))
+                .isInstanceOf(AuthorisationUnavailableException.class);
+        assertThatThrownBy(() -> authz.mayCancel(this.user, "task-a1", this.own))
+                .isInstanceOf(AuthorisationUnavailableException.class);
+        assertThatThrownBy(() -> authz.listScope(this.user, TaskView.MINIMAL))
+                .isInstanceOf(AuthorisationUnavailableException.class);
+    }
+
+    /** ... and the owner rule when failing open */
+    @Test
+    public void noBooleanDecision_failsOpen() throws Exception {
+        answer("{}");
+        OperationAuthorisation authz = authz(ALL, ALL);
+
+        assertThat(authz.mayGet(this.user, "task-a1", this.own, TaskView.MINIMAL)).isTrue();
+        assertThat(authz.mayCancel(this.user, "task-b1", this.foreign))
+                .isEqualTo(CancelDecision.NOT_FOUND);
+        assertThat(authz.listScope(this.user, TaskView.MINIMAL)).isEqualTo(ListScope.OWN);
     }
 }

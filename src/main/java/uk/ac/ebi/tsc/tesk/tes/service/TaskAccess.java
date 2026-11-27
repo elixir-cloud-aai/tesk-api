@@ -79,9 +79,9 @@ public interface TaskAccess {
             tags = tags == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(tags));
         }
 
-        /** Whether the user owns the task */
+        /** Whether the user owns the task, by the same comparison as {@link User#isCreatorOf} */
         public boolean isOwnedBy(User user) {
-            return this.owner.equals(user.getName());
+            return user.isOwner(this.owner);
         }
     }
 

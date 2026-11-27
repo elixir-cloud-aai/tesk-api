@@ -219,6 +219,8 @@ public class TesServiceImpl implements TesService {
         if (!this.access.decides(TaskAccess.Operation.GET)) {
             return this.getTask(this.readTask(taskId, user), view);
         }
+        // the whole task is read before the decision, whoever owns it: the decision service gets
+        // its state, which only all its jobs and pods tell (as tes-authz's spec, section 3.3, says)
         Optional<Task> task = this.readOwnedTask(taskId);
         // asked for missing tasks too, so that the answer doesn't tell whether a task exists
         if (!this.access.mayGet(user, taskId, task.map(this::facts).orElse(null), view)

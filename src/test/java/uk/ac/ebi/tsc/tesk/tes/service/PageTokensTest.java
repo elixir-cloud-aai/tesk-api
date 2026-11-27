@@ -13,6 +13,7 @@ public class PageTokensTest {
     public void firstPage() {
         assertThat(PageTokens.continueToken(null, false)).isNull();
         assertThat(PageTokens.continueToken(null, true)).isNull();
+        assertThat(PageTokens.continueToken("", true)).isNull();
     }
 
     @Test

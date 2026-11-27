@@ -36,11 +36,11 @@ import uk.ac.ebi.tsc.tesk.tes.service.TaskAccess;
  *       #listScope(JsonNode)}).
  * </ul>
  *
- * <p>A failed decision (no answer in time, a connection error, a status other than 200, no JSON, a
- * malformed list scope) is {@code 503} if the operation fails {@code closed} (the default), or the
- * owner rule if it fails {@code open} ({@code tesk.api.authz.failure.<operation>}): never
- * allow-all. Claims come from the access token only: the user info endpoint is asked on create
- * only.
+ * <p>A failed decision (no answer in time, a connection error, a status other than 200, no JSON, no
+ * boolean {@code decision}, a malformed list scope) is {@code 503} if the operation fails {@code
+ * closed} (the default), or the owner rule if it fails {@code open} ({@code
+ * tesk.api.authz.failure.<operation>}): never allow-all. Claims come from the access token only:
+ * the user info endpoint is asked on create only.
  */
 public class OperationAuthorisation implements TaskAccess {
 
@@ -232,6 +232,12 @@ public class OperationAuthorisation implements TaskAccess {
             answer = this.decisionService.answer(body, requestId);
         } catch (DecisionServiceClient.Failure e) {
             return failed(operation, user, e.getMessage() + ", request " + requestId);
+        }
+        JsonNode decision = answer.get("decision");
+        if (decision == null || !decision.isBoolean()) {
+            // a failed decision (spec section 4.1), so that the operation's failure mode applies
+            return failed(
+                    operation, user, "no boolean decision in the answer, request " + requestId);
         }
         logger.debug(
                 "Decision service answered {} on {} {} (request {})",

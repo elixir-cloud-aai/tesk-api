@@ -74,7 +74,12 @@ public class User implements Serializable, UserDetails, Principal {
      * user's ID ({@link CreatorLabels#creatorId}); objects without them have no creator
      */
     public boolean isCreatorOf(V1ObjectMeta metadata) {
-        return metadata != null && userId.equals(CreatorLabels.creatorId(metadata));
+        return metadata != null && isOwner(CreatorLabels.creatorId(metadata));
+    }
+
+    /** Whether the owner ID (e.g. of a task) is the user's ID, exactly; null is nobody's */
+    public boolean isOwner(String ownerId) {
+        return userId.equals(ownerId);
     }
 
     /**

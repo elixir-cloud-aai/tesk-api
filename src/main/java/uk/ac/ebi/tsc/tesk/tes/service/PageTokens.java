@@ -20,13 +20,17 @@ final class PageTokens {
     /**
      * The continue token of Kubernetes for a page token
      *
-     * @param pageToken the client's page token, or null for the first page
+     * @param pageToken the client's page token, or null (or empty) for the first page
      * @param all whether the page lists all tasks (list scope {@code all})
      * @return the continue token, or null for the first page
      * @throws InvalidPageTokenException if the token was issued under the other scope
      */
     static String continueToken(String pageToken, boolean all) {
         if (pageToken == null) {
+            return null;
+        }
+        if (pageToken.isEmpty() && all) {
+            // an empty page_token parameter: the first page, as for the caller's own tasks
             return null;
         }
         if (pageToken.startsWith(ALL) != all) {

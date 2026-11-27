@@ -137,9 +137,9 @@ redesign's changes are in:
   of [tes-authz](https://github.com/elixir-cloud-aai/tes-authz), with failure
   modes, recording the requests) and a mock Kubernetes API (`MockCluster`:
   running tasks of given owners). `Harness` holds the settings of the
-  redesign (`tesk.api.auth.*` and `tesk.api.authz.*`; of the latter,
-  among them `operations` and `failure`, which the variants set). `Owners.of` is the owner ID that the mock tasks carry:
-  `<iss>|<sub>` (the subject alone before T3b).
+  redesign (`tesk.api.auth.*` and `tesk.api.authz.*`, whose `operations`
+  and `failure` the variants set). `Owners.of` is the owner ID that the
+  mock tasks carry: `<iss>|<sub>` (the subject alone before T3b).
 
 The changes (slices) of the redesign that `pending.csv` names, in their
 order; each is a pull request of its own, stacked on the previous one, and
