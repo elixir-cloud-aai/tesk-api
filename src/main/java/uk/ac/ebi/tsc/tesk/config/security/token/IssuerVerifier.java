@@ -24,9 +24,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Verifies tokens of one issuer against its keys: from the configured JWKS URI or the {@code
  * jwks_uri} of its OpenID Connect discovery document, cached, and fetched again for an unknown key
- * ID at most once per interval. The key handling of {@code ServiceClientTokenServices} (#153),
- * reused for all tokens; that class (and its copy of this code) goes when TESK API is switched to
- * {@link TokenValidator}.
+ * ID at most once per interval. The key handling of the former service clients' validation (#153),
+ * reused for all tokens.
  */
 final class IssuerVerifier {
 

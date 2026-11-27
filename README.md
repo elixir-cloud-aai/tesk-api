@@ -37,14 +37,16 @@ upgrades and development. Its sources are in [`docs/`](docs/).
 With [Docker](https://docs.docker.com/get-docker/) installed, and a
 Kubernetes cluster in your kubeconfig file (`KUBECONFIG`, or
 `~/.kube/config`; e.g., a local one with [kind](https://kind.sigs.k8s.io/)),
-start TESK API on your machine only (it runs without authentication by
-default, with the rights of your kubeconfig; with rootless Docker, use
+start TESK API on your machine only, without authentication (`noauth`;
+authentication is on by default), with the rights of your kubeconfig (with
+rootless Docker, use
 `--user 0:0` instead, see
 [Deployment](https://github.com/elixir-cloud-aai/tesk-api/blob/dev/docs/deployment.md#image)):
 
 ```bash
 docker run --rm --publish 127.0.0.1:8080:8080 --user "$(id -u):0" \
   --volume "${KUBECONFIG:-${HOME}/.kube/config}:/home/tesk/.kube/config:ro" \
+  --env SPRING_PROFILES_ACTIVE=noauth \
   elixircloud/tesk-api:latest
 ```
 

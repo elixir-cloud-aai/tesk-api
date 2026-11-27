@@ -28,10 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(
         locations = {"classpath:application.properties"},
-        properties = {
-            "security.oauth2.resource.user-info-uri = http://localhost:8090",
-            "spring.profiles.active=auth"
-        })
+        properties = {TestIssuer.ISSUER_URL, TestIssuer.AUDIENCES, "spring.profiles.active=auth"})
 public class ForwardedHeadersIT {
 
     private static final ObjectMapper JSON = JsonMapper.builder().build();

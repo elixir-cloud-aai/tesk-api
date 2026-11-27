@@ -36,7 +36,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(
         locations = {"classpath:application.properties"},
         properties = {
-            "security.oauth2.resource.user-info-uri = http://localhost:8090",
+            TestIssuer.ISSUER_URL,
+            TestIssuer.AUDIENCES,
             "spring.profiles.active=auth",
             "tesk.api.cors.allowed-origins=https://client.example.org,http://localhost:3000"
         })
@@ -48,9 +49,16 @@ public class CorsAuthIT {
     @Autowired private MockMvc mvc;
 
     @RegisterExtension
-    public WireMockExtension mockElixir =
+    public WireMockExtension mockIssuer =
             WireMockExtension.newInstance()
-                    .options(wireMockConfig().port(8090))
+                    .options(wireMockConfig().port(TestIssuer.PORT))
+                    .failOnUnmatchedRequests(true)
+                    .build();
+
+    @RegisterExtension
+    public WireMockExtension mockKubernetes =
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(9000))
                     .failOnUnmatchedRequests(true)
                     .build();
 
@@ -155,21 +163,32 @@ public class CorsAuthIT {
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 
+    /** Public service info ignores the token, so the issuer isn't asked */
     @Test
-    public void request_allowedOriginWithValidToken_isOkWithCorsHeaders() throws Exception {
-        mockElixir.givenThat(
-                WireMock.get("/")
-                        .willReturn(
-                                okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : []}")));
-
+    public void request_allowedOriginWithToken_isOkWithCorsHeaders() throws Exception {
         this.mvc
                 .perform(
                         get(SERVICE_INFO_URL)
                                 .header("Origin", ALLOWED_ORIGIN)
-                                .header("Authorization", "Bearer BAR"))
+                                .header("Authorization", "Bearer " + TestIssuer.userToken("123")))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", ALLOWED_ORIGIN));
-        mockElixir.verify(1, WireMock.getRequestedFor(WireMock.urlEqualTo("/")));
+        mockIssuer.verify(0, WireMock.anyRequestedFor(WireMock.anyUrl()));
+    }
+
+    @Test
+    public void request_allowedOriginWithValidToken_isOkWithCorsHeaders() throws Exception {
+        TestIssuer.stub(mockIssuer);
+        mockKubernetes.givenThat(
+                WireMock.get(WireMock.urlPathEqualTo("/apis/batch/v1/namespaces/default/jobs"))
+                        .willReturn(okJson(MockUtil.jobList())));
+        this.mvc
+                .perform(
+                        get(TASK_URL)
+                                .header("Origin", ALLOWED_ORIGIN)
+                                .header("Authorization", "Bearer " + TestIssuer.userToken("123")))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", ALLOWED_ORIGIN));
     }
 
     @Test

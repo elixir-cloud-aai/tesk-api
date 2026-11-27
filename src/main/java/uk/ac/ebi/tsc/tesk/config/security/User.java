@@ -12,8 +12,10 @@ import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
 /**
- * The caller of a request: a user or a service client, identified by its ID. There are no groups:
- * the caller gets, lists and cancels only the tasks it created ({@link #isCreatorOf}).
+ * The caller of a request: a user or a service client, identified by its owner ID: {@code
+ * <iss>|<sub>} of its token with authentication, Spring Security's anonymous user without (noauth).
+ * There are no groups: the caller gets, lists and cancels only the tasks it created ({@link
+ * #isCreatorOf}), with the same owner ID.
  *
  * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
@@ -21,12 +23,15 @@ public class User implements Serializable, UserDetails, Principal {
 
     private static final long serialVersionUID = 2L;
 
-    /** The ID: the OIDC {@code sub} of a user, the client ID of a service client */
+    /**
+     * The owner ID: {@code <iss>|<sub>} of the token (for a service client, its {@code sub} is its
+     * client ID), or {@code anonymousUser} without authentication
+     */
     private final String userId;
 
     /**
-     * Is this principal a service client, authenticated by an access token of an allow-listed
-     * client (tesk.api.authorisation.service-clients) instead of the user info
+     * Is this principal a service client, authenticated by its own access token as a listed client
+     * of its issuer (tesk.api.auth.issuers[i].service-clients)
      */
     private final boolean serviceClient;
 
@@ -77,7 +82,7 @@ public class User implements Serializable, UserDetails, Principal {
         return null;
     }
 
-    /** The user's ID (the OIDC {@code sub}), unchanged */
+    /** The owner ID, unchanged */
     @Override
     public String getUsername() {
         return userId;

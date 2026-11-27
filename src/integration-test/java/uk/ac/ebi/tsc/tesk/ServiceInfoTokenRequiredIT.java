@@ -1,14 +1,11 @@
 package uk.ac.ebi.tsc.tesk;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
-import static com.github.tomakehurst.wiremock.client.WireMock.unauthorized;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.SERVICE_INFO_URL;
 
-import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
@@ -25,14 +22,15 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Integration testing of GET /service-info with authentication on and the setting that requires a
- * token for it. OIDC userInfo endpoint is WireMocked
+ * token for it. The issuer's discovery and keys are WireMocked
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(
         locations = {"classpath:application.properties"},
         properties = {
-            "security.oauth2.resource.user-info-uri = http://localhost:8090",
+            TestIssuer.ISSUER_URL,
+            TestIssuer.AUDIENCES,
             "spring.profiles.active=auth",
             "tesk.api.service-info.public=false"
         })
@@ -41,9 +39,9 @@ public class ServiceInfoTokenRequiredIT {
     @Autowired private MockMvc mvc;
 
     @RegisterExtension
-    public WireMockExtension mockElixir =
+    public WireMockExtension mockIssuer =
             WireMockExtension.newInstance()
-                    .options(wireMockConfig().port(8090))
+                    .options(wireMockConfig().port(TestIssuer.PORT))
                     .failOnUnmatchedRequests(true)
                     .build();
 
@@ -64,20 +62,17 @@ public class ServiceInfoTokenRequiredIT {
 
     @Test
     public void withValidToken_isOk() throws Exception {
-        mockElixir.givenThat(
-                WireMock.get("/")
-                        .willReturn(
-                                okJson("{\"sub\" : \"123\",  \"eduperson_entitlement\" : []}")));
-
+        TestIssuer.stub(mockIssuer);
         this.mvc
-                .perform(get(SERVICE_INFO_URL).header("Authorization", "Bearer BAR"))
+                .perform(
+                        get(SERVICE_INFO_URL)
+                                .header("Authorization", "Bearer " + TestIssuer.userToken("123")))
                 .andExpect(status().isOk());
     }
 
+    /** With service info private, its token is validated like any other */
     @Test
     public void withInvalidToken_isUnauthorized() throws Exception {
-        mockElixir.givenThat(WireMock.get("/").willReturn(unauthorized()));
-
         this.mvc
                 .perform(get(SERVICE_INFO_URL).header("Authorization", "Bearer BAR"))
                 .andExpect(status().isUnauthorized());

@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Settings of the validation of access tokens ({@code tesk.api.auth.*}). The defaults are the
  * secure ones; issuers, their audiences and service clients have no defaults.
  */
-// registered, and documented in configuration.md, when authentication is switched to it
+// registered with the auth profile (ResourceServerConfiguration), documented in configuration.md
 @ConfigurationProperties(prefix = "tesk.api.auth")
 public class TokenValidationProperties {
 

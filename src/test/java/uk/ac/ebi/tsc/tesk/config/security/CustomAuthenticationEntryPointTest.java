@@ -1,6 +1,7 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -108,6 +109,29 @@ public class CustomAuthenticationEntryPointTest {
         assertEquals("invalid_token", body.get("error"));
         assertEquals("Invalid access token", body.get("message"));
         assertEquals("Invalid access token", body.get("error_description"));
+        assertEquals("/tasks", body.get("path"));
+    }
+
+    /**
+     * A token that can't be checked now (keys of the issuer unavailable) is 503, without a
+     * challenge, as the client did nothing wrong
+     */
+    @Test
+    public void tokenCheckUnavailable_isServiceUnavailable() throws Exception {
+        MockHttpServletResponse response =
+                commence(null, new TokenValidatorIntrospector.TokenCheckUnavailableException());
+        assertEquals(503, response.getStatus());
+        assertNull(response.getHeader("WWW-Authenticate"));
+        assertEquals("no-store", response.getHeader("Cache-Control"));
+        Map<String, Object> body = body(response);
+        assertEquals(503, body.get("status"));
+        assertEquals("temporarily_unavailable", body.get("error"));
+        assertEquals(
+                TokenValidatorIntrospector.TokenCheckUnavailableException.DESCRIPTION,
+                body.get("error_description"));
+        assertEquals(
+                TokenValidatorIntrospector.TokenCheckUnavailableException.DESCRIPTION,
+                body.get("message"));
         assertEquals("/tasks", body.get("path"));
     }
 
