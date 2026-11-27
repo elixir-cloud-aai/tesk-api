@@ -37,7 +37,6 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
 import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;
-import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
