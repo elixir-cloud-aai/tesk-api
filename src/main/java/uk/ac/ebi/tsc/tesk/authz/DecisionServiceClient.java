@@ -10,18 +10,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import uk.ac.ebi.tsc.tesk.config.security.token.BoundedHttp;
 
 /**
  * Asks an OpenID AuthZEN 1.0 Access Evaluation endpoint ({@code POST}, JSON) for one decision. One
- * attempt, no retries, bounded by the timeout as a whole. The answer is a decision only if the
- * status is 200 and the body is a JSON object whose {@code decision} is a boolean; anything else is
- * a failure ({@link Failure}). Sends the server-generated request ID as {@code X-Request-ID}, and,
- * if a credential file is set, its content as a bearer credential (read on each call, so that a
- * rotated file is picked up); never the caller's access token.
+ * attempt, no retries, bounded by the timeout as a whole. Only a JSON object whose {@code decision}
+ * is {@code true} allows; any other JSON (e.g. {@code decision} false, missing or not a boolean) is
+ * a deny. A failure ({@link Failure}) is no answer in time, a connection error, a status other than
+ * 200, or a body that isn't JSON (also with trailing content). Sends the server-generated request
+ * ID as {@code X-Request-ID}, and, if a credential file is set, its content as a bearer credential
+ * (read on each call, so that a rotated file is picked up); never the caller's access token.
  */
 public class DecisionServiceClient {
 
@@ -34,7 +38,10 @@ public class DecisionServiceClient {
         }
     }
 
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final Logger logger = LoggerFactory.getLogger(DecisionServiceClient.class);
+
+    private static final JsonMapper JSON =
+            JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
 
     private final URI url;
     private final Duration timeout;
@@ -123,9 +130,14 @@ public class DecisionServiceClient {
         } catch (JacksonException e) {
             throw new Failure("body not JSON");
         }
+        if (answer.isMissingNode()) {
+            // an empty body
+            throw new Failure("body not JSON");
+        }
         JsonNode decision = answer.get("decision");
-        if (!answer.isObject() || decision == null || !decision.isBoolean()) {
-            throw new Failure("no boolean decision");
+        if (decision == null || !decision.isBoolean()) {
+            logger.warn("Decision service answered without a boolean decision: a deny");
+            return false;
         }
         return decision.booleanValue();
     }

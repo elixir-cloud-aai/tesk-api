@@ -44,7 +44,7 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
  *   <li>allowed ({@code "decision": true}): the task is created;
  *   <li>denied (any other decision): {@code 403};
  *   <li>the decision service fails (timeout, connection error, a status other than 200, no JSON, no
- *       boolean decision), or the user info can't be looked up: {@code 503};
+ *       JSON), or the user info can't be looked up: {@code 503};
  *   <li>the user info endpoint refuses the token (401, 403) or answers for another subject: {@code
  *       401}.
  * </ul>

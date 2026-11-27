@@ -28,6 +28,10 @@ public final class SecureUrls {
         } catch (URISyntaxException e) {
             return false;
         }
+        if (uri.getRawFragment() != null) {
+            // HTTP requests have no fragment
+            return false;
+        }
         String scheme = uri.getScheme();
         String host = uri.getHost();
         if ("https".equalsIgnoreCase(scheme)) {

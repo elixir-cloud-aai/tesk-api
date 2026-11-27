@@ -35,10 +35,10 @@ public final class TaskProjection {
             put(values, "ram_gb", resources.getRamGb());
             put(values, "disk_gb", resources.getDiskGb());
             put(values, "preemptible", resources.getPreemptible());
-            put(values, "zones", resources.getZones());
+            put(values, "zones", withoutNulls(resources.getZones()));
             projection.put("resources", values);
         }
-        put(projection, "volumes", task.getVolumes());
+        put(projection, "volumes", withoutNulls(task.getVolumes()));
         List<Map<String, Object>> executors = new ArrayList<>();
         if (task.getExecutors() != null) {
             for (TesExecutor executor : task.getExecutors()) {
@@ -78,6 +78,11 @@ public final class TaskProjection {
         put(file, "path", path);
         put(file, "type", type == null ? null : type.getValue());
         return file;
+    }
+
+    /** The list without null elements, or null for none */
+    private static List<String> withoutNulls(List<String> values) {
+        return values == null ? null : values.stream().filter(v -> v != null).toList();
     }
 
     private static void put(Map<String, Object> map, String key, Object value) {

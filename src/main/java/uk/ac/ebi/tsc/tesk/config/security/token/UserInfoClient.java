@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jose4j.json.JsonUtil;
 import org.jose4j.lang.JoseException;
 import org.slf4j.Logger;
@@ -35,22 +36,22 @@ public class UserInfoClient {
     private static final class Endpoint {
         private final String issuer;
         private final boolean configured;
-        private volatile URI uri;
+        private final AtomicReference<URI> uri;
 
         Endpoint(String issuer, URI uri) {
             this.issuer = issuer;
             this.configured = uri != null;
-            this.uri = uri;
+            this.uri = new AtomicReference<>(uri);
         }
 
         /**
          * Forgets a discovered endpoint that failed, so that the next lookup discovers it again
-         * (e.g. after the issuer moved it); a configured one is kept. A lookup that fails while
-         * another one discovers again costs at most one more discovery.
+         * (e.g. after the issuer moved it), unless another lookup found a new one meanwhile; a
+         * configured one is kept
          */
-        void forgetDiscovered() {
+        void forgetDiscovered(URI failed) {
             if (!this.configured) {
-                this.uri = null;
+                this.uri.compareAndSet(failed, null);
             }
         }
     }
@@ -112,7 +113,7 @@ public class UserInfoClient {
         try {
             response = send(endpoint.issuer, request);
         } catch (IssuerUnavailableException e) {
-            endpoint.forgetDiscovered();
+            endpoint.forgetDiscovered(uri);
             throw e;
         }
         int status = response.statusCode();
@@ -124,7 +125,7 @@ public class UserInfoClient {
             throw new InvalidTokenException("refused by the user info endpoint");
         }
         if (status != 200) {
-            endpoint.forgetDiscovered();
+            endpoint.forgetDiscovered(uri);
             throw unavailable(endpoint.issuer, "status " + status);
         }
         Map<String, Object> claims = object(endpoint.issuer, response.body());
@@ -138,7 +139,7 @@ public class UserInfoClient {
 
     /** The endpoint's URI: configured, or from the discovery (kept once found) */
     private URI endpoint(Endpoint endpoint) {
-        URI uri = endpoint.uri;
+        URI uri = endpoint.uri.get();
         if (uri != null) {
             return uri;
         }
@@ -163,7 +164,7 @@ public class UserInfoClient {
                             + " userinfo_endpoint");
         }
         uri = URI.create((String) found);
-        endpoint.uri = uri;
+        endpoint.uri.set(uri);
         return uri;
     }
 

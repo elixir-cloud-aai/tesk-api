@@ -53,6 +53,7 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesOutputFileLog;
 import uk.ac.ebi.tsc.tesk.tes.model.TesResources;
 import uk.ac.ebi.tsc.tesk.tes.model.TesState;
 import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
+import uk.ac.ebi.tsc.tesk.tes.model.TesTaskLog;
 import uk.ac.ebi.tsc.tesk.trs.TrsToolClient;
 
 /**
@@ -712,6 +713,30 @@ public class TesKubernetesConverterTest {
                 Constants.ANN_JSON_INPUT_KEY, this.objectMapper.writeValueAsString(storedTask));
         TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
         assertNull(outputTask.getResources().getBackendParameters());
+        assertThat(outputTask, is(this.prepareBaseExpectedTask()));
+    }
+
+    /**
+     * Client-supplied id, state, creation_time and logs, stored with the task, are ignored: the
+     * server sets them (#229)
+     */
+    @Test
+    public void fromK8sToTask_ignoresClientSuppliedServerFields() throws IOException {
+        TaskBuilder taskBuilder = this.prepareBaseTaskBuider();
+        Map<String, String> annotations =
+                taskBuilder.getTask().getTaskmaster().getJob().getMetadata().getAnnotations();
+        TesTask storedTask =
+                this.objectMapper.readValue(
+                        annotations.get(Constants.ANN_JSON_INPUT_KEY), TesTask.class);
+        storedTask.setId("task-client");
+        storedTask.setState(TesState.COMPLETE);
+        storedTask.setCreationTime("2020-01-01T00:00:00Z");
+        TesTaskLog clientLog = new TesTaskLog();
+        clientLog.setStartTime("2020-01-01T00:00:00Z");
+        storedTask.setLogs(Arrays.asList(clientLog));
+        annotations.put(
+                Constants.ANN_JSON_INPUT_KEY, this.objectMapper.writeValueAsString(storedTask));
+        TesTask outputTask = this.converter.fromK8sJobsToTesTaskBasic(taskBuilder.getTask(), true);
         assertThat(outputTask, is(this.prepareBaseExpectedTask()));
     }
 

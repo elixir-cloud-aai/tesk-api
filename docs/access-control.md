@@ -137,8 +137,8 @@ passed [Token validation](#token-validation), and does what it answers:
 Answer | Result
 --- | ---
 `{"decision": true}` | The task is created.
-`{"decision": false}` | `403 Forbidden`, without a call to Kubernetes.
-No decision: no answer within the timeout, a status other than `200`, or a body without a boolean `decision` | `503 Service Unavailable`, with `Cache-Control: no-store`, without `WWW-Authenticate`, and with the error `temporarily_unavailable` (description `Authorisation unavailable; try again later`), as for tokens that can't be checked now; without a call to Kubernetes. Creating tasks never fails open; the cause is logged.
+Any other JSON: `decision` false, missing or not a boolean | `403 Forbidden`, without a call to Kubernetes.
+No decision: no answer within the timeout, a connection error, a status other than `200`, or a body that isn't JSON (also with content after the JSON value) or is larger than 1 MiB | `503 Service Unavailable`, with `Cache-Control: no-store`, without `WWW-Authenticate`, and with the error `temporarily_unavailable` (description `Authorisation unavailable; try again later`), as for tokens that can't be checked now; without a call to Kubernetes. Creating tasks never fails open; the cause is logged.
 
 The request (`POST`, JSON, with a new `X-Request-ID` each) describes:
 
@@ -185,7 +185,7 @@ be a JSON object with the token's `sub`. If it refuses the token (`401` or
 `WWW-Authenticate` and the error `invalid_token`, as for other invalid
 tokens; if it (or its discovery) doesn't answer, body included, within
 `TESK_API_AUTH_TIMEOUT_SECONDS`,
-answers with another status, or with something other than a JSON object
+answers with another status, or with something other than a JSON object of at most 1 MiB
 (e.g. a signed JWT), it is `503 Service Unavailable`.
 
 Environment variable | Meaning | Default

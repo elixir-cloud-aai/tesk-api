@@ -145,6 +145,7 @@ public class DecisionServiceClientTest {
                 .isInstanceOf(IOException.class);
     }
 
+    /** JSON without a boolean decision is a deny, not a failure (#229) */
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -152,14 +153,24 @@ public class DecisionServiceClientTest {
                 "{}",
                 "[true]",
                 "true",
-                "",
+                "null",
                 "{\"decision\": null}"
             })
-    public void evaluate_noBooleanDecision(String body) {
+    public void evaluate_noBooleanDecision_isDeny(String body) throws Exception {
+        answer(200, body);
+
+        assertThat(client(null, 2000).evaluate(BODY, "rid")).isFalse();
+    }
+
+    /** No JSON (empty, or with content after the JSON value): a failure, never a decision */
+    @ParameterizedTest
+    @ValueSource(strings = {"", "  ", "{\"decision\": true} garbage", "{\"decision\": true}{}"})
+    public void evaluate_notJsonAsAWhole(String body) {
         answer(200, body);
 
         assertThatThrownBy(() -> client(null, 2000).evaluate(BODY, "rid"))
-                .isInstanceOf(DecisionServiceClient.Failure.class);
+                .isInstanceOf(DecisionServiceClient.Failure.class)
+                .hasMessage("body not JSON");
     }
 
     @Test

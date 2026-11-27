@@ -161,6 +161,7 @@ public class CreateAuthorisationTest {
         decide(false);
 
         assertThat(authz(List.of()).mayCreate(new TesTask(), user(alice(Map.of())))).isFalse();
+        verify(this.decisionService).evaluate(any(), anyString());
     }
 
     /** Any failure of the decision service: 503, never a decision */

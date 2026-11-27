@@ -1,7 +1,10 @@
 package uk.ac.ebi.tsc.tesk.authz;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
@@ -10,13 +13,18 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.config.security.token.TokenPrincipal;
 import uk.ac.ebi.tsc.tesk.config.security.token.TokenValidationProperties;
 import uk.ac.ebi.tsc.tesk.tes.model.TesServiceInfo;
+import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
 import uk.ac.ebi.tsc.tesk.tes.service.ServiceInfoService;
 
 /** The startup checks of the decision service's settings ({@code tesk.api.authz.*}) */
@@ -130,20 +138,40 @@ public class AuthzConfigurationTest {
         assertThat(startupError()).contains("credential-file");
     }
 
-    /** The bean of the decision, with the service info's ID */
+    /** The bean of the decision sends the service info's ID as {@code context.tes.service_id} */
     @Test
-    public void createAuthorisation() {
+    @SuppressWarnings("unchecked")
+    public void createAuthorisation() throws Exception {
         AuthzConfiguration configuration = new AuthzConfiguration();
         ServiceInfoService serviceInfo = mock(ServiceInfoService.class);
         TesServiceInfo info = new TesServiceInfo();
         info.setId("org.example.tes");
         when(serviceInfo.getServiceInfo()).thenReturn(info);
+        DecisionServiceClient decisionService = mock(DecisionServiceClient.class);
+        when(decisionService.evaluate(any(), anyString())).thenReturn(true);
         CreateAuthorisation authz =
                 configuration.createAuthorisation(
-                        configuration.decisionServiceClient(this.properties),
+                        decisionService,
                         configuration.userInfoClient(new TokenValidationProperties()),
                         this.properties,
                         serviceInfo);
-        assertThat(authz).isNotNull();
+        TokenPrincipal alice =
+                new TokenPrincipal(
+                        "https://issuer.example/",
+                        "alice",
+                        TokenPrincipal.Kind.USER,
+                        "portal",
+                        Map.of());
+
+        assertThat(
+                        authz.mayCreate(
+                                new TesTask(),
+                                User.builder(alice.owner()).principal(alice).build()))
+                .isTrue();
+        ArgumentCaptor<Map<String, Object>> request = ArgumentCaptor.forClass(Map.class);
+        verify(decisionService).evaluate(request.capture(), anyString());
+        Map<String, Object> context = (Map<String, Object>) request.getValue().get("context");
+        assertThat((Map<String, Object>) context.get("tes"))
+                .containsEntry("service_id", "org.example.tes");
     }
 }

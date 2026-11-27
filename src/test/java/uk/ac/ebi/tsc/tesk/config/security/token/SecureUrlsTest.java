@@ -30,6 +30,8 @@ public class SecureUrlsTest {
                 "ftp://localhost/",
                 "localhost:8181",
                 "https://pdp example/",
+                "https://pdp.example.org/access/v1/evaluation#x",
+                "http://localhost/#",
                 ""
             })
     public void notSecure(String url) {
