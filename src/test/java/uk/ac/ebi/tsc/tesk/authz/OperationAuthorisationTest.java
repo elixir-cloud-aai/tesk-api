@@ -20,6 +20,7 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.JsonNode;
@@ -192,6 +193,18 @@ public class OperationAuthorisationTest {
                                         "RUNNING",
                                         "tags",
                                         Map.of())));
+    }
+
+    /** Every view is sent as it is, as the action's {@code view} */
+    @ParameterizedTest
+    @EnumSource(TaskView.class)
+    public void get_sendsTheView(TaskView view) throws Exception {
+        answer("{\"decision\": true}");
+
+        authz().mayGet(this.user, "task-a1", this.own, view);
+
+        assertThat(sent(1).get(0).get("action"))
+                .isEqualTo(Map.of("name", "GetTask", "properties", Map.of("view", view.name())));
     }
 
     @Test
