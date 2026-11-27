@@ -304,12 +304,12 @@ public class CreateAuthorisationTest {
 
     @Test
     public void scope() {
-        assertThat(CreateAuthorisation.scope("openid  profile"))
+        assertThat(EvaluationRequests.scope("openid  profile"))
                 .contains(List.of("openid", "profile"));
-        assertThat(CreateAuthorisation.scope(List.of("a", "b"))).contains(List.of("a", "b"));
-        assertThat(CreateAuthorisation.scope(List.of("a", 1))).isEmpty();
-        assertThat(CreateAuthorisation.scope(1)).isEmpty();
-        assertThat(CreateAuthorisation.scope(null)).isEmpty();
+        assertThat(EvaluationRequests.scope(List.of("a", "b"))).contains(List.of("a", "b"));
+        assertThat(EvaluationRequests.scope(List.of("a", 1))).isEmpty();
+        assertThat(EvaluationRequests.scope(1)).isEmpty();
+        assertThat(EvaluationRequests.scope(null)).isEmpty();
     }
 
     @Test
