@@ -92,8 +92,10 @@
     For a downgrade to 2.0.0, restore the former settings, and the profile
     `auth` if you used it; tasks created by 2.1.0 belong to nobody there.
     During a rolling update, pods of 2.0.0 still check tokens at the user
-    info endpoint and find tasks by the bare `sub`: the new rules hold once
-    the rollout has completed. With the Helm chart of TESK, use a chart
+    info endpoint and stamp new tasks with the bare `sub`: tasks that they
+    create during the rollout are unreachable afterwards, like older ones.
+    Update with the `Recreate` strategy, or when nobody creates tasks, to
+    avoid that; the new rules hold once the rollout has completed. With the Helm chart of TESK, use a chart
     release that renders the new settings.
 - **Group model removed (breaking, security).** TESK API has no groups,
   teams, team admins or super admins any more, and no rights from a claim

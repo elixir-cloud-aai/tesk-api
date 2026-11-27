@@ -233,7 +233,8 @@ public class TokenValidationIT {
                                                 user(),
                                                 "at+jwt",
                                                 AlgorithmIdentifiers.RSA_USING_SHA384,
-                                                OTHER_KEY.getPrivateKey(),
+                                                // the issuer's own key: only the algorithm is wrong
+                                                TestIssuer.privateKey(),
                                                 "test-key")),
                         // step 3: the issuer
                         new Refused(

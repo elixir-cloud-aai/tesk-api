@@ -41,7 +41,7 @@ with the authorisation code grant, and with the redirect URI
 provider must issue tokens to it without a client secret and without PKCE.
 
 ### Token validation
-Since 2.1.0, TESK API checks every token itself, without calling the provider (before, it sent user tokens to the provider's user info endpoint). It accepts JWT access tokens ([RFC 9068](https://datatracker.ietf.org/doc/html/rfc9068)) that pass all of these checks, in this order:
+Since 2.1.0, TESK API checks every token itself, without calling the provider (before, it sent user tokens to the provider's user info endpoint). It accepts signed JWT access tokens (as in [RFC 9068](https://datatracker.ietf.org/doc/html/rfc9068)) that pass all of these checks, in this order; it checks no other claims, so claims that RFC 9068 requires but that TESK API doesn't use (e.g. `client_id` in user tokens, or `jti`) may be missing:
 
 1. The request has a bearer token in the `Authorization` header.
 2. The token is a single signed JWT (compact form), signed with one of the allowed algorithms (`TESK_API_AUTH_ALGORITHMS`; by default `RS256` and `ES256`; only asymmetric ones can be allowed, never `none` or HMAC).

@@ -4,6 +4,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import java.security.PrivateKey;
 import org.jose4j.jwk.JsonWebKeySet;
 import org.jose4j.jwk.RsaJsonWebKey;
 import org.jose4j.jwk.RsaJwkGenerator;
@@ -105,6 +106,11 @@ public final class TestIssuer {
     /** A valid access token of the client */
     public static String clientToken(String clientId) {
         return sign(clientClaims(clientId));
+    }
+
+    /** The issuer's signing key (its key ID is {@code test-key}), for tokens signed otherwise */
+    public static PrivateKey privateKey() {
+        return KEY.getPrivateKey();
     }
 
     /** The claims as an access token ({@code typ at+jwt}), signed with the issuer's key */
