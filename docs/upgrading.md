@@ -53,7 +53,7 @@
         TESK_API_AUTH_ISSUERS_0_SERVICECLIENTS_0_CLIENTID=gateway
         ```
 
-        Service clients listed under no issuer
+        With the `auth` profile, service clients listed under no issuer
         (`TESK_API_AUTH_SERVICE_CLIENTS_*`) stop TESK API from starting too.
     * **Audiences of service clients:** a client's own token is accepted only
       with the client's own ID in its `aud` (before: any of the audiences
@@ -77,8 +77,9 @@
       custom-columns='NAME:.metadata.name,CREATOR:.metadata.annotations.creator-user-id'`,
       and delete those whose creator has no `|` (or none) by name, with
       their executors' jobs and ConfigMaps (see "Deleted tasks" under [To
-      1.2.0](#to-120)), once nobody needs them. With `noauth`, the owner
-      stays `anonymousUser`.
+      1.2.0](#to-120)), once nobody needs them, except those of
+      `anonymousUser`: with `noauth`, the owner stays `anonymousUser`, and
+      its tasks stay reachable with `noauth`.
     * **`503 Service Unavailable`** answers a token whose issuer's keys
       can't be fetched (before: `401 Unauthorized`), so that clients retry.
     * **Tokens are ignored on public endpoints:** service info (unless

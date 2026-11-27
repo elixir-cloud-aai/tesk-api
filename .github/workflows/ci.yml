@@ -220,11 +220,14 @@ jobs:
           fi
           # The default profile is `auth`, which needs at least one issuer:
           # without one, the app refuses to start and names the setting
-          if timeout 120 docker run --rm tesk-api:smoke > default.log 2>&1; then
+          status=0
+          timeout 120 docker run --rm tesk-api:smoke > default.log 2>&1 || status=$?
+          if [[ "${status}" == 0 || "${status}" == 124 ]]; then
+            cat default.log
             echo "::error::App started without issuers in the default profile"
             exit 1
           fi
-          if ! grep -q 'tesk.api.auth.issuers' default.log; then
+          if ! grep -q 'tesk.api.auth.issuers must list at least one issuer' default.log; then
             cat default.log
             echo "::error::App did not name the missing issuers"
             exit 1

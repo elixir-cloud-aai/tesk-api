@@ -232,7 +232,8 @@ class AccessMatrixIT extends MatrixHarness {
     /**
      * Row 19 note: a token that TESK validates itself, which the user info endpoint refuses (401 or
      * 403): create is 401, as the entitlements can't be looked up; the other operations don't look
-     * them up
+     * them up. The user info endpoint is only the source of entitlements for create (T4a):
+     * authentication never asks it
      */
     static Stream<Arguments> refusals() {
         return Stream.of(401, 403)

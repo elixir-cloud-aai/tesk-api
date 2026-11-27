@@ -51,9 +51,8 @@ Since 2.1.0, TESK API checks every token itself, without calling the provider (b
 6. It has `exp`, which isn't past, and `iat`, which isn't in the future nor longer ago than `TESK_API_AUTH_MAX_TOKEN_AGE_SECONDS` (a day by default), and its `nbf`, if it has one, isn't in the future, each with a leeway of `TESK_API_AUTH_CLOCK_SKEW_SECONDS`.
 7. Its audience fits: `aud` is or contains one of the issuer's `audiences`; for a listed service client's own token (step 9), `aud` is or contains the client's own ID instead (unless the client has `allow-any-audience`).
 8. It has a `sub` that isn't empty.
-9. It is classified: a token with an `act` claim (a delegated token, from a token exchange, [RFC 8693](https://datatracker.ietf.org/doc/html/rfc8693)) is refused for now. A token whose client claim (by default `client_id`) and `sub` are both the ID of one of the issuer's [service clients](#tokens-of-services) is that client's. Any other token is a user's; a user whose `sub` is the ID of a listed service client is refused.
-10. (Accepting delegated tokens is planned.)
-11. The caller is identified by issuer and subject together: its owner ID is `<iss>|<sub>` (see [Task creators](#task-creators)).
+9. It is classified: a token with an `act` claim (a delegated token, from a token exchange, [RFC 8693](https://datatracker.ietf.org/doc/html/rfc8693)) is refused for now (a later release will accept delegated tokens of trusted actors). A token whose client claim (by default `client_id`) and `sub` are both the ID of one of the issuer's [service clients](#tokens-of-services) is that client's. Any other token is a user's; a user whose `sub` is the ID of a listed service client is refused.
+10. The caller is identified by issuer and subject together: its owner ID is `<iss>|<sub>` (see [Task creators](#task-creators)).
 
 TESK API takes the token from the `Authorization` header only (`Bearer <token>`, as in [RFC 6750, section 2.1](https://datatracker.ietf.org/doc/html/rfc6750#section-2.1)), not from an `access_token` parameter in the URL or in a form. A header whose token is empty or has characters that bearer tokens can't have (anything but letters, digits and `-._~+/`, with `=` only at the end; e.g. spaces) is refused without any of the checks above.
 
@@ -109,7 +108,7 @@ TESK_API_AUTH_ISSUERS_0_AUDIENCES=<portal client ID>,<Swagger UI client ID>
 TESK_API_AUTH_ISSUERS_0_SERVICECLIENTS_0_CLIENTID=<gateway client ID>
 ```
 
-TESK API doesn't start, and says why, with invalid settings: with the `auth` profile and no issuer; an issuer with neither audiences nor service clients, or listed twice; an issuer or JWKS URI that isn't `https://` (plain `http://` only to the local host, e.g. for tests), or an issuer with a query or fragment; a blank audience; a blank or duplicate client ID; a symmetric algorithm or `none`; a negative leeway, a maximum age that isn't positive, or a timeout outside 1 to 60 seconds; an unknown `TESK_API_AUTH_TOKEN_VALIDATOR`; service clients listed under no issuer (`tesk.api.auth.service-clients`, i.e. `TESK_API_AUTH_SERVICE_CLIENTS_*` or `TESK_API_AUTH_SERVICECLIENTS_*`); or any setting under `tesk.api.authorisation` (`TESK_API_AUTHORISATION_*`, removed; see [Upgrading](upgrading.md#to-210)). The discovery documents and the keys are fetched at the first token of each issuer, not at startup.
+With the `auth` profile, TESK API doesn't start, and says why, with invalid settings: no issuer; an issuer with neither audiences nor service clients, or listed twice; an issuer or JWKS URI that isn't `https://` (plain `http://` only to the local host, e.g. for tests), or an issuer with a query or fragment; a blank audience; a blank or duplicate client ID; a symmetric algorithm or `none`; a negative leeway, a maximum age that isn't positive, or a timeout outside 1 to 60 seconds; an unknown `TESK_API_AUTH_TOKEN_VALIDATOR`; service clients listed under no issuer (`tesk.api.auth.service-clients`, i.e. `TESK_API_AUTH_SERVICE_CLIENTS_*` or `TESK_API_AUTH_SERVICECLIENTS_*`). In any profile, it doesn't start with a setting under `tesk.api.authorisation` (`TESK_API_AUTHORISATION_*`, removed; see [Upgrading](upgrading.md#to-210)). The discovery documents and the keys are fetched at the first token of each issuer, not at startup.
 
 For example, [LS Login](https://lifescience-ri.eu/ls-login/) (issuer
 `https://login.aai.lifescience-ri.eu/oidc/`) issues access tokens with the
@@ -138,7 +137,7 @@ Cancel a task | Its creator only. | `404 Not Found`, as for a task that doesn't 
 List tasks | Everyone; the list holds the caller's own tasks only. | (an empty list)
 
 This holds for every caller, users and [service clients](#tokens-of-services)
-alike, whatever groups or entitlements its token or the user info names. Another user's
+alike, whatever groups or entitlements its token names. Another user's
 task is not found (`404`), not forbidden: the answer, and the requests that
 TESK API makes to Kubernetes for it, are the same as for a task that doesn't
 exist, so that callers can't tell whether another user's task exists.

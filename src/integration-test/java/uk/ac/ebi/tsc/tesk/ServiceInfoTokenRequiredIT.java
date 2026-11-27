@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Integration testing of GET /service-info with authentication on and the setting that requires a
- * token for it. OIDC userInfo endpoint is WireMocked
+ * token for it. The issuer's discovery and keys are WireMocked
  */
 @SpringBootTest
 @AutoConfigureMockMvc
