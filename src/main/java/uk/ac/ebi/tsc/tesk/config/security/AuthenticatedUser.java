@@ -45,6 +45,7 @@ public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
         User user =
                 User.builder(principal.owner())
                         .serviceClient(principal.kind() == TokenPrincipal.Kind.SERVICE_CLIENT)
+                        .principal(principal)
                         .build();
         return new AuthenticatedUser(user, principal.claims(), AuthorityUtils.NO_AUTHORITIES);
     }

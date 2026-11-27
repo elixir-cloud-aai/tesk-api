@@ -27,7 +27,12 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @TestPropertySource(
         locations = {"classpath:application.properties"},
-        properties = {TestIssuer.ISSUER_URL, TestIssuer.AUDIENCES, "spring.profiles.active=auth"})
+        properties = {
+            TestIssuer.ISSUER_URL,
+            TestIssuer.AUDIENCES,
+            TestIssuer.DECISION_SERVICE,
+            "spring.profiles.active=auth"
+        })
 public class SwaggerUiAuthIT {
 
     @Autowired private MockMvc mvc;

@@ -33,9 +33,10 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 /**
  * Integration testing of service clients (D-392, #227): a listed client's own token (client
  * credentials grant, {@code aud} = its client ID) gets, lists and cancels the client's own tasks,
- * owned by {@code <iss>|<client ID>}, like a user's; creating tasks is denied until a decision
- * service decides it. A client listed with {@code allow-any-audience} is accepted whatever its
- * token's audience. The issuer (discovery, keys) and the Kubernetes API are WireMocked.
+ * owned by {@code <iss>|<client ID>}, like a user's; the decision service (mocked, here denying
+ * everything) decides who may create tasks. A client listed with {@code allow-any-audience} is
+ * accepted whatever its token's audience. The issuer (discovery, keys) and the Kubernetes API are
+ * WireMocked.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -45,6 +46,7 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
             "spring.profiles.active=auth",
             TestIssuer.ISSUER_URL,
             TestIssuer.AUDIENCES,
+            TestIssuer.DECISION_SERVICE,
             TestIssuer.SERVICE_CLIENT,
             "tesk.api.auth.issuers[0].service-clients[1].client-id="
                     + ServiceClientAuthIT.ANY_AUDIENCE_CLIENT,
@@ -76,6 +78,14 @@ public class ServiceClientAuthIT {
                     .failOnUnmatchedRequests(true)
                     .build();
 
+    /** The decision service, which denies every request */
+    @RegisterExtension
+    public WireMockExtension mockDecisionService =
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(TestIssuer.DECISION_SERVICE_PORT))
+                    .failOnUnmatchedRequests(true)
+                    .build();
+
     @TestConfiguration
     static class KubernetesClientMock {
         @Bean
@@ -88,6 +98,8 @@ public class ServiceClientAuthIT {
     @BeforeEach
     public void stubIssuer() {
         TestIssuer.stub(mockIssuer);
+        mockDecisionService.givenThat(
+                WireMock.post("/access/v1/evaluation").willReturn(okJson("{\"decision\": false}")));
     }
 
     private static String serviceToken() {
@@ -136,14 +148,24 @@ public class ServiceClientAuthIT {
     }
 
     /**
-     * Creating tasks is denied to service clients too, until a decision service decides it (issue
-     * #225); nothing reaches Kubernetes (which fails on unmatched requests)
+     * The decision service decides whether a service client may create tasks too: it gets the
+     * client as subject (owner ID, issuer, subject, client ID), and TESK API never asks the user
+     * info endpoint for a client's token; denied, nothing reaches Kubernetes (which fails on
+     * unmatched requests)
      */
     @Test
-    public void serviceClient_createTask_isDenied() throws Exception {
+    public void serviceClient_createTask_isDecidedByTheDecisionService() throws Exception {
         createTask(serviceToken(), "fromTesToK8s_minimal/task.json")
                 .andExpect(status().isForbidden());
         createTask(serviceToken(), "fromTesToK8s/task.json").andExpect(status().isForbidden());
+        mockDecisionService.verify(
+                2,
+                postRequestedFor(urlEqualTo("/access/v1/evaluation"))
+                        .withRequestBody(matchingJsonPath("$.subject.id", equalTo(owner(CLIENT))))
+                        .withRequestBody(
+                                matchingJsonPath("$.subject.properties.client_id", equalTo(CLIENT)))
+                        .withRequestBody(matchingJsonPath("$.action.name", equalTo("CreateTask"))));
+        mockIssuer.verify(0, getRequestedFor(urlPathMatching(".*userinfo.*")));
     }
 
     @Test

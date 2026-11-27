@@ -37,11 +37,12 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 /**
  * Integration testing of security without the group model (issue #225) with tokens validated by
  * TESK API itself (#227): users get, list and cancel only the tasks they created, identified by
- * {@code <iss>|<sub>} of their tokens, whatever groups they have; creating tasks is denied to
- * everyone until a decision service decides it. Tasks from before the redesign, owned by a bare
- * {@code sub}, are nobody's. The issuer (discovery, keys) and the Kubernetes API are WireMocked;
- * both fail on unmatched requests, so a request that should not reach Kubernetes fails the test if
- * it does. The full caller x operation matrix is in the access matrix suite (accessmatrix).
+ * {@code <iss>|<sub>} of their tokens, whatever groups they have; the decision service (mocked,
+ * here denying everything) decides who may create tasks. Tasks from before the redesign, owned by a
+ * bare {@code sub}, are nobody's. The issuer (discovery, keys) and the Kubernetes API are
+ * WireMocked; both fail on unmatched requests, so a request that should not reach Kubernetes fails
+ * the test if it does. The full caller x operation matrix is in the access matrix suite
+ * (accessmatrix).
  *
  * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
@@ -49,7 +50,12 @@ import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 @AutoConfigureMockMvc
 @TestPropertySource(
         locations = {"classpath:application.properties"},
-        properties = {"spring.profiles.active=auth", TestIssuer.ISSUER_URL, TestIssuer.AUDIENCES})
+        properties = {
+            "spring.profiles.active=auth",
+            TestIssuer.ISSUER_URL,
+            TestIssuer.AUDIENCES,
+            TestIssuer.DECISION_SERVICE
+        })
 public class AuthIT {
 
     @Autowired private MockMvc mvc;
@@ -73,6 +79,14 @@ public class AuthIT {
                     .failOnUnmatchedRequests(true)
                     .build();
 
+    /** The decision service, which denies every request */
+    @RegisterExtension
+    public WireMockExtension mockDecisionService =
+            WireMockExtension.newInstance()
+                    .options(wireMockConfig().port(TestIssuer.DECISION_SERVICE_PORT))
+                    .failOnUnmatchedRequests(true)
+                    .build();
+
     @TestConfiguration
     static class KubernetesClientMock {
         @Bean
@@ -88,6 +102,8 @@ public class AuthIT {
     @BeforeEach
     public void stubIssuer() {
         TestIssuer.stub(mockIssuer);
+        mockDecisionService.givenThat(
+                WireMock.post("/access/v1/evaluation").willReturn(okJson("{\"decision\": false}")));
     }
 
     /** The requests are sent with a token of {@code sub} */
@@ -156,12 +172,16 @@ public class AuthIT {
         }
     }
 
-    /** Creating tasks is denied to every user; nothing reaches Kubernetes */
+    /**
+     * The decision service denies creating tasks: 403, after one evaluation per request; nothing
+     * reaches Kubernetes
+     */
     @Test
-    public void createTask_isDeniedToEveryone() throws Exception {
+    public void createTask_deniedByTheDecisionService() throws Exception {
         as("123");
         createTask("fromTesToK8s_minimal/task.json").andExpect(status().isForbidden());
         createTask("fromTesToK8s/task.json").andExpect(status().isForbidden());
+        mockDecisionService.verify(2, postRequestedFor(urlEqualTo("/access/v1/evaluation")));
         mockKubernetes.verify(0, anyRequestedFor(anyUrl()));
     }
 

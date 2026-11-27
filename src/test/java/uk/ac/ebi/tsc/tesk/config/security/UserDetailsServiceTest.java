@@ -3,6 +3,7 @@ package uk.ac.ebi.tsc.tesk.config.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 
 /**
  * Both profiles replace Spring Boot's in-memory user store (with a generated password) by one
@@ -12,7 +13,10 @@ public class UserDetailsServiceTest {
 
     @Test
     public void noAuth_hasNoUsers() {
-        assertThat(new NoAuthConfiguration().userDetailsService().loadUserByUsername("user"))
+        assertThat(
+                        new NoAuthConfiguration(new MockEnvironment())
+                                .userDetailsService()
+                                .loadUserByUsername("user"))
                 .isNull();
     }
 

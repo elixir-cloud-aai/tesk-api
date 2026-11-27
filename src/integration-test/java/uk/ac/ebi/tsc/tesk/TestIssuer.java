@@ -24,6 +24,9 @@ public final class TestIssuer {
 
     static final int PORT = 8090;
 
+    /** The port of the decision service of {@link #DECISION_SERVICE} */
+    static final int DECISION_SERVICE_PORT = 8094;
+
     /** The issuer, exactly as in {@code iss} */
     public static final String ISSUER = "http://localhost:" + PORT + "/oidc/";
 
@@ -37,6 +40,15 @@ public final class TestIssuer {
     public static final String ISSUER_URL = "tesk.api.auth.issuers[0].url=" + ISSUER;
 
     public static final String AUDIENCES = "tesk.api.auth.issuers[0].audiences=" + FRONT_END;
+
+    /**
+     * A decision service, which TESK API requires with authentication; nothing listens there unless
+     * a test mocks it (AuthIT; the access matrix has its own)
+     */
+    public static final String DECISION_SERVICE =
+            "tesk.api.authz.decision-service.url=http://localhost:"
+                    + TestIssuer.DECISION_SERVICE_PORT
+                    + "/access/v1/evaluation";
 
     public static final String SERVICE_CLIENT =
             "tesk.api.auth.issuers[0].service-clients[0].client-id=" + CLIENT;

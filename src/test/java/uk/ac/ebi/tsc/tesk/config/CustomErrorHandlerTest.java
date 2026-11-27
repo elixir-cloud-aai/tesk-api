@@ -21,6 +21,7 @@ import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.ServletWebRequest;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
+import uk.ac.ebi.tsc.tesk.tes.exception.UserInfoRefusedException;
 
 /** Messages of {@link CustomErrorHandler} for request parameters of the wrong type (issue #114) */
 public class CustomErrorHandlerTest {
@@ -51,6 +52,34 @@ public class CustomErrorHandlerTest {
         assertEquals(400, body.get("status"));
         // Spring's message, as there is no parameter name to put in its place
         assertEquals(ex.getMessage(), body.get("message"));
+    }
+
+    /**
+     * A token that the user info endpoint refuses on create: 401 with {@code WWW-Authenticate} and
+     * the OAuth 2.0 error, as for other invalid tokens
+     */
+    @Test
+    public void userInfoRefusedHandler_answersAsForInvalidTokens() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/tasks");
+        DefaultErrorAttributes errorAttributes = new DefaultErrorAttributes();
+        CustomErrorHandler handler = new CustomErrorHandler(errorAttributes);
+        UserInfoRefusedException ex = new UserInfoRefusedException();
+        // as in the app, where DefaultErrorAttributes is the first exception resolver
+        errorAttributes.resolveException(request, new MockHttpServletResponse(), null, ex);
+
+        ResponseEntity<?> response = handler.userInfoRefusedHandler(request, ex);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals(
+                "Bearer realm=\"oauth\", error=\"invalid_token\","
+                        + " error_description=\"Invalid access token\"",
+                response.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
+        assertEquals("no-store", response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL));
+        Map<?, ?> body = (Map<?, ?>) response.getBody();
+        assertEquals(401, body.get("status"));
+        assertEquals("invalid_token", body.get("error"));
+        assertEquals("Invalid access token", body.get("error_description"));
+        assertEquals("Invalid access token", body.get("message"));
     }
 
     /** Exceptions get the status of their {@code @ResponseStatus}, the others 500 */

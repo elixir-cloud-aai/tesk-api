@@ -1,8 +1,6 @@
 package uk.ac.ebi.tsc.tesk.config.security.token;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
@@ -87,23 +85,10 @@ final class IssuerVerifier {
     /**
      * Whether keys from the URL can be trusted: https, or http to the local host only (e.g. for
      * tests), as anyone on the network path of plain http could give TESK API keys of their own
+     * ({@link SecureUrls#isSecure})
      */
     static boolean isSecure(String url) {
-        URI uri;
-        try {
-            uri = new URI(url);
-        } catch (URISyntaxException e) {
-            return false;
-        }
-        String scheme = uri.getScheme();
-        String host = uri.getHost();
-        if ("https".equalsIgnoreCase(scheme)) {
-            return host != null;
-        }
-        return "http".equalsIgnoreCase(scheme)
-                && ("localhost".equalsIgnoreCase(host)
-                        || "127.0.0.1".equals(host)
-                        || "[::1]".equals(host));
+        return SecureUrls.isSecure(url);
     }
 
     /**

@@ -22,7 +22,12 @@ import uk.ac.ebi.tsc.tesk.TestAuth;
  * String setter.
  */
 @SpringBootTest(
-        properties = {"tesk.api.swagger-ui.enabled=true", TestAuth.ISSUER_URL, TestAuth.AUDIENCES})
+        properties = {
+            "tesk.api.swagger-ui.enabled=true",
+            TestAuth.ISSUER_URL,
+            TestAuth.AUDIENCES,
+            TestAuth.DECISION_SERVICE
+        })
 @AutoConfigureMockMvc
 public class ApiDocsFileTypeTest {
 

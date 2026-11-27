@@ -27,6 +27,8 @@ import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import uk.ac.ebi.tsc.tesk.config.security.CustomAuthenticationEntryPoint;
+import uk.ac.ebi.tsc.tesk.tes.exception.UserInfoRefusedException;
 
 /**
  * Custom Error Handler:
@@ -46,6 +48,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @ControllerAdvice
 public class CustomErrorHandler extends ResponseEntityExceptionHandler {
 
+    /** The OAuth 2.0 error code of an invalid token (RFC 6750, section 3.1) */
+    static final String INVALID_TOKEN = "invalid_token";
+
     private final ErrorAttributes errorAttributes;
 
     public CustomErrorHandler(ErrorAttributes errorAttributes) {
@@ -58,6 +63,29 @@ public class CustomErrorHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<?> accessDeniedHandler(
             HttpServletRequest request, AccessDeniedException ex) {
         return this.handleExceptionInternal(request, HttpStatus.FORBIDDEN);
+    }
+
+    /**
+     * The user info endpoint refused the caller's token when a task was created: {@code 401}, as
+     * for other invalid tokens, with {@code WWW-Authenticate} ({@code invalid_token}) and the OAuth
+     * 2.0 error in the body
+     */
+    @ExceptionHandler(UserInfoRefusedException.class)
+    @ResponseBody
+    @SuppressWarnings("unchecked")
+    public ResponseEntity<?> userInfoRefusedHandler(
+            HttpServletRequest request, UserInfoRefusedException ex) {
+        ResponseEntity<?> response = this.handleExceptionInternal(request, HttpStatus.UNAUTHORIZED);
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        body.put("error", INVALID_TOKEN);
+        body.put("error_description", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .header(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        CustomAuthenticationEntryPoint.wwwAuthenticate(
+                                INVALID_TOKEN, ex.getMessage()))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(body);
     }
 
     /**

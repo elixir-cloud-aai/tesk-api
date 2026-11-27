@@ -16,5 +16,9 @@ public final class TestAuth {
     /** Its audiences: the client ID of a front end */
     public static final String AUDIENCES = "tesk.api.auth.issuers[0].audiences=tesk-portal";
 
+    /** A decision service, which TESK API requires with authentication; no test asks it */
+    public static final String DECISION_SERVICE =
+            "tesk.api.authz.decision-service.url=https://pdp.example/access/v1/evaluation";
+
     private TestAuth() {}
 }

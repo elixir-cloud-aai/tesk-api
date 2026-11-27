@@ -1,0 +1,8 @@
+Copied unchanged from elixir-cloud-aai/tes-authz, branch dev, commit
+3fcc24f (feat: service clients in the reference policy, #35):
+
+- hook-create.json: golden/hook/create.json
+- url-stripping.json: golden/poiesis/url-stripping.json
+
+The same golden values for every TES implementation of the profile
+tes-authzen/3; update them from tes-authz, never by hand.

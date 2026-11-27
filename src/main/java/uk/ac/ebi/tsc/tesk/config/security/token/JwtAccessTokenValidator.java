@@ -180,6 +180,10 @@ public final class JwtAccessTokenValidator implements TokenValidator {
         check(
                 jwksUri == null || IssuerVerifier.isSecure(jwksUri),
                 key + "jwks-uri must be an https URL (http only for localhost)");
+        String userinfoUri = trimmed(settings.getUserinfoUri());
+        check(
+                userinfoUri == null || IssuerVerifier.isSecure(userinfoUri),
+                key + "userinfo-uri must be an https URL (http only for localhost)");
         String clientClaim = trimmed(settings.getClientClaim());
         check(clientClaim != null, key + "client-claim must be set");
         Set<String> audiences = new LinkedHashSet<>();

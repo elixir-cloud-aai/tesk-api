@@ -232,11 +232,30 @@ jobs:
             echo "::error::App did not name the missing issuers"
             exit 1
           fi
+          # With an issuer, `auth` also needs a decision service: without
+          # one, the app refuses to start and names the setting
+          status=0
+          timeout 120 docker run --rm \
+            --env TESK_API_AUTH_ISSUERS_0_URL=https://issuer.example/ \
+            --env TESK_API_AUTH_ISSUERS_0_AUDIENCES_0=tesk \
+            tesk-api:smoke > no-pdp.log 2>&1 || status=$?
+          if [[ "${status}" == 0 || "${status}" == 124 ]]; then
+            cat no-pdp.log
+            echo "::error::App started without a decision service in the default profile"
+            exit 1
+          fi
+          if ! grep -q 'tesk.api.authz.decision-service.url must be set' no-pdp.log; then
+            cat no-pdp.log
+            echo "::error::App did not name the missing decision service"
+            exit 1
+          fi
           # Without authentication (explicit `noauth`), and with it (an
-          # issuer that is never asked: no request below has a valid token)
+          # issuer and a decision service that are never asked: no request
+          # below has a valid token)
           noauth=(--env SPRING_PROFILES_ACTIVE=noauth)
           auth=(--env TESK_API_AUTH_ISSUERS_0_URL=https://issuer.example/
-                --env TESK_API_AUTH_ISSUERS_0_AUDIENCES_0=tesk)
+                --env TESK_API_AUTH_ISSUERS_0_AUDIENCES_0=tesk
+                --env TESK_API_AUTHZ_DECISIONSERVICE_URL=https://pdp.example/access/v1/evaluation)
           start "${noauth[@]}"
           check "${api}/service-info" 200
           curl --silent --fail "${host}${api}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'

@@ -33,7 +33,10 @@ public class TokenValidationProperties {
     /** Age (by {@code iat}) beyond which tokens are refused, whatever their {@code exp} */
     private int maxTokenAgeSeconds = 86_400;
 
-    /** Connect and read timeouts of the requests to the issuers (discovery, keys), in seconds */
+    /**
+     * Connect and read timeouts of the requests to the issuers (discovery, keys, user info), in
+     * seconds
+     */
     private int timeoutSeconds = 10;
 
     /** The accepted issuers */
@@ -46,6 +49,13 @@ public class TokenValidationProperties {
 
         /** The URL of its keys; by default the {@code jwks_uri} of its discovery document */
         private String jwksUri;
+
+        /**
+         * The URL of its user info endpoint, where TESK API looks up claims that the access token
+         * lacks when a task is created ({@code tesk.api.authz.decision-service.claims}); by default
+         * the {@code userinfo_endpoint} of its discovery document
+         */
+        private String userinfoUri;
 
         /**
          * Accepted audiences of user tokens: the client IDs of the front ends through which users
@@ -73,6 +83,14 @@ public class TokenValidationProperties {
 
         public void setJwksUri(String jwksUri) {
             this.jwksUri = jwksUri;
+        }
+
+        public String getUserinfoUri() {
+            return userinfoUri;
+        }
+
+        public void setUserinfoUri(String userinfoUri) {
+            this.userinfoUri = userinfoUri;
         }
 
         public List<String> getAudiences() {
