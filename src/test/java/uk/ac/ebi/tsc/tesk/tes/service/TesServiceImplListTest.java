@@ -55,7 +55,7 @@ class TesServiceImplListTest {
         this.client = mock(KubernetesClientWrapper.class);
         TesKubernetesConverter converter =
                 new TesKubernetesConverter(null, null, new ObjectMapper(), null, null);
-        this.service = new TesServiceImpl(this.client, converter);
+        this.service = new TesServiceImpl(this.client, converter, TaskAccess.OWNER_ONLY);
         when(this.client.listAllTaskExecutorJobs()).thenReturn(new V1JobList());
         when(this.client.listFilerJobsOfTasks(any())).thenReturn(new V1JobList());
         when(this.client.listUnlabelledFilerJobs()).thenReturn(new V1JobList());

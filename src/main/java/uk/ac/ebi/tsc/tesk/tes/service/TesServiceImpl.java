@@ -25,10 +25,14 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.constant.K8sConstants.PodPhase;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.convert.IgnoredBackendParameters;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TaskStateResolver;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
@@ -55,10 +59,31 @@ public class TesServiceImpl implements TesService {
 
     private final TesKubernetesConverter converter;
 
+    private final TaskAccess access;
+
+    /**
+     * @param access who may get, list and cancel which tasks: with authentication, the decision
+     *     service for the operations switched on ({@code taskAccess}); without (noauth), there is
+     *     none, and the owner rule decides
+     */
+    @Autowired
     public TesServiceImpl(
-            KubernetesClientWrapper kubernetesClientWrapper, TesKubernetesConverter converter) {
+            KubernetesClientWrapper kubernetesClientWrapper,
+            TesKubernetesConverter converter,
+            ObjectProvider<TaskAccess> access) {
+        this(
+                kubernetesClientWrapper,
+                converter,
+                access.getIfAvailable(() -> TaskAccess.OWNER_ONLY));
+    }
+
+    TesServiceImpl(
+            KubernetesClientWrapper kubernetesClientWrapper,
+            TesKubernetesConverter converter,
+            TaskAccess access) {
         this.kubernetesClientWrapper = kubernetesClientWrapper;
         this.converter = converter;
+        this.access = access;
     }
 
     /**
@@ -191,7 +216,16 @@ public class TesServiceImpl implements TesService {
      */
     @Override
     public TesTask getTask(String taskId, TaskView view, User user) {
-        return this.getTask(this.readTask(taskId, user), view);
+        if (!this.access.decides(TaskAccess.Operation.GET)) {
+            return this.getTask(this.readTask(taskId, user), view);
+        }
+        Optional<Task> task = this.readOwnedTask(taskId);
+        // asked for missing tasks too, so that the answer doesn't tell whether a task exists
+        if (!this.access.mayGet(user, taskId, task.map(this::facts).orElse(null), view)
+                || task.isEmpty()) {
+            throw new TaskNotFoundException(taskId);
+        }
+        return this.getTask(task.get(), view);
     }
 
     /**
@@ -207,6 +241,40 @@ public class TesServiceImpl implements TesService {
         if (!user.isCreatorOf(taskMasterJob.getMetadata())) {
             throw new TaskNotFoundException(taskId);
         }
+        return this.readTask(taskMasterJob);
+    }
+
+    /**
+     * Reads all Kubernetes objects of a single task with an exact owner, whoever it is, for a
+     * decision service
+     *
+     * @return the task, or empty if there is no such task, or it has no exact owner (which counts
+     *     as missing)
+     */
+    private Optional<Task> readOwnedTask(String taskId) {
+        V1Job taskMasterJob;
+        try {
+            taskMasterJob = this.kubernetesClientWrapper.readTaskmasterJob(taskId);
+        } catch (TaskNotFoundException e) {
+            return Optional.empty();
+        }
+        if (CreatorLabels.creatorId(taskMasterJob.getMetadata()) == null) {
+            return Optional.empty();
+        }
+        return Optional.of(this.readTask(taskMasterJob));
+    }
+
+    /** The facts of a task that a decision service gets: its owner, state and tags */
+    private TaskAccess.TaskFacts facts(Task task) {
+        V1Job taskMasterJob = task.getTaskmaster().getJob();
+        return new TaskAccess.TaskFacts(
+                CreatorLabels.creatorId(taskMasterJob.getMetadata()),
+                this.converter.extractStateFromK8sJobs(task),
+                this.converter.extractTags(taskMasterJob));
+    }
+
+    /** Reads the other Kubernetes objects of the task of a taskmaster's job */
+    private Task readTask(V1Job taskMasterJob) {
         V1JobList executorJobs =
                 this.kubernetesClientWrapper.listSingleTaskExecutorJobs(
                         taskMasterJob.getMetadata().getName());
@@ -303,12 +371,25 @@ public class TesServiceImpl implements TesService {
     public TesListTasksResponse listTasks(
             TaskFilter filter, Long pageSize, String pageToken, TaskView view, User user) {
 
+        TaskAccess.ListScope scope =
+                this.access.decides(TaskAccess.Operation.LIST)
+                        ? this.access.listScope(user, view)
+                        : TaskAccess.ListScope.OWN;
+        if (scope == TaskAccess.ListScope.NONE) {
+            // nothing the caller may see: no Kubernetes request
+            return new TesListTasksResponse().tasks(new ArrayList<>());
+        }
+        boolean all = scope == TaskAccess.ListScope.ALL;
+        String continueToken = PageTokens.continueToken(pageToken, all);
+        Integer limit = Optional.ofNullable(pageSize).map(Long::intValue).orElse(null);
         V1JobList taskmasterJobs =
-                this.kubernetesClientWrapper.listAllTaskmasterJobsForUser(
-                        pageToken,
-                        Optional.ofNullable(pageSize).map(Long::intValue).orElse(null),
-                        user);
-        String nextPageToken = taskmasterJobs.getMetadata().getContinue();
+                all
+                        ? this.kubernetesClientWrapper.listAllOwnedTaskmasterJobs(
+                                continueToken, limit)
+                        : this.kubernetesClientWrapper.listAllTaskmasterJobsForUser(
+                                continueToken, limit, user);
+        String nextPageToken =
+                PageTokens.pageToken(taskmasterJobs.getMetadata().getContinue(), all);
         List<V1Job> matchingTaskmasterJobs =
                 taskmasterJobs.getItems().stream()
                         .filter(job -> filter.matchesName(taskName(job)))
@@ -393,7 +474,10 @@ public class TesServiceImpl implements TesService {
     public void cancelTask(String taskId, User user) {
         // the state of all the task's jobs, as for getTask: a task that ended (e.g. an executor
         // failed) isn't cancelled
-        Task task = this.readTask(taskId, user);
+        Task task =
+                this.access.decides(TaskAccess.Operation.CANCEL)
+                        ? this.readTaskToCancel(taskId, user)
+                        : this.readTask(taskId, user);
         TesState state = this.converter.extractStateFromK8sJobs(task);
         if (COMPLETED_STATES.contains(state)) {
             throw new CancelNotRunningTask(taskId);
@@ -428,6 +512,28 @@ public class TesServiceImpl implements TesService {
                 .forEach(pod ->
                         this.labelPodAsCancelledIfPossible(
                                 pod.getMetadata().getName(), "its job ends anyway"));
+    }
+
+    /**
+     * Reads the task to cancel, as the decision service decides: asked for missing tasks too, so
+     * that the answer doesn't tell whether a task exists
+     *
+     * @throws TaskNotFoundException if the task is missing, or the decision service denies and the
+     *     caller may not get the task either (404)
+     * @throws AccessDeniedException if the decision service denies, but the caller may get the task
+     *     (403)
+     */
+    private Task readTaskToCancel(String taskId, User user) {
+        Optional<Task> task = this.readOwnedTask(taskId);
+        TaskAccess.CancelDecision decision =
+                this.access.mayCancel(user, taskId, task.map(this::facts).orElse(null));
+        if (decision == TaskAccess.CancelDecision.FORBIDDEN) {
+            throw new AccessDeniedException("Not allowed to cancel task " + taskId);
+        }
+        if (decision == TaskAccess.CancelDecision.NOT_FOUND || task.isEmpty()) {
+            throw new TaskNotFoundException(taskId);
+        }
+        return task.get();
     }
 
     private static boolean isStartedAndNotLabelledCancelled(V1Pod pod) {

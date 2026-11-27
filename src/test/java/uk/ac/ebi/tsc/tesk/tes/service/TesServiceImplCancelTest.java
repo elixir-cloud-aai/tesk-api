@@ -57,7 +57,7 @@ class TesServiceImplCancelTest {
         this.client = mock(KubernetesClientWrapper.class);
         TesKubernetesConverter converter =
                 new TesKubernetesConverter(null, null, new ObjectMapper(), null, null);
-        this.service = new TesServiceImpl(this.client, converter);
+        this.service = new TesServiceImpl(this.client, converter, TaskAccess.OWNER_ONLY);
         this.taskmaster =
                 new V1Job()
                         .metadata(

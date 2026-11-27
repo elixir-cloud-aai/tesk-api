@@ -21,6 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.StringJoiner;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +30,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import uk.ac.ebi.tsc.tesk.config.security.User;
+import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.exception.KubernetesException;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
@@ -249,14 +251,47 @@ public class KubernetesClientWrapper {
      */
     public V1JobList listAllTaskmasterJobsForUser(
             String pageToken, Integer itemsPerPage, User user) {
+        // only the user's jobs, by the hash label of the user's ID; the selector only narrows the
+        // jobs down (different IDs can have the same hash): keep those the user created,
+        // comparing the annotation with the full ID exactly
+        return this.listTaskmasterJobs(
+                pageToken,
+                itemsPerPage,
+                "," + user.getLabelSelector(),
+                job -> user.isCreatorOf(job.getMetadata()));
+    }
+
+    /**
+     * Gets the taskmaster jobs of all users (the list scope {@code all} of a decision service):
+     * those with an exact owner ({@link CreatorLabels#creatorId}); jobs without one count as
+     * missing
+     *
+     * @param pageToken - pageToken supplied by user (from previous result; points to next page of
+     *     results)
+     * @param itemsPerPage - value submitted by user, limiting number of results
+     * @return the page of taskmaster jobs with an exact owner
+     */
+    public V1JobList listAllOwnedTaskmasterJobs(String pageToken, Integer itemsPerPage) {
+        return this.listTaskmasterJobs(
+                pageToken,
+                itemsPerPage,
+                "",
+                job -> CreatorLabels.creatorId(job.getMetadata()) != null);
+    }
+
+    /**
+     * Gets a page of taskmaster jobs, selected by the job type and the further selectors, and keeps
+     * those that Kubernetes isn't deleting and that pass the filter
+     */
+    private V1JobList listTaskmasterJobs(
+            String pageToken, Integer itemsPerPage, String moreSelectors, Predicate<V1Job> keep) {
         // Jobs of taskmaster type
         String labelSelector =
                 new StringJoiner("=")
-                        .add(LABEL_JOBTYPE_KEY)
-                        .add(LABEL_JOBTYPE_VALUE_TASKM)
-                        .toString();
-        // only the user's jobs, by the hash label of the user's ID
-        labelSelector += "," + user.getLabelSelector();
+                                .add(LABEL_JOBTYPE_KEY)
+                                .add(LABEL_JOBTYPE_VALUE_TASKM)
+                                .toString()
+                        + moreSelectors;
         V1JobList result;
         try {
             result = this.listJobs(pageToken, labelSelector, itemsPerPage);
@@ -273,12 +308,7 @@ public class KubernetesClientWrapper {
                 result.getItems().stream()
                         .filter(job -> !isBeingDeleted(job))
                         .collect(Collectors.toList()));
-        // the selector only narrows the jobs down (different IDs can have the same hash): keep
-        // those the user created, comparing the annotation with the full ID exactly
-        result.setItems(
-                result.getItems().stream()
-                        .filter(job -> user.isCreatorOf(job.getMetadata()))
-                        .collect(Collectors.toList()));
+        result.setItems(result.getItems().stream().filter(keep).collect(Collectors.toList()));
         return result;
     }
 

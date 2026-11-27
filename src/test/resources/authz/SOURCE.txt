@@ -3,6 +3,10 @@ Copied unchanged from elixir-cloud-aai/tes-authz, branch dev, commit
 
 - hook-create.json: golden/hook/create.json
 - url-stripping.json: golden/poiesis/url-stripping.json
+- requests/get-own-profile-3.json, requests/get-missing-profile-3.json,
+  requests/cancel-own-profile-3.json, requests/cancel-missing-profile-3.json,
+  requests/list-own-profile-3.json: the files of the same names in
+  golden/requests
 
 The same golden values for every TES implementation of the profile
 tes-authzen/3; update them from tes-authz, never by hand.
