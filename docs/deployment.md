@@ -123,5 +123,12 @@ that decides who may create tasks
 control](access-control.md). Run a decision service such as
 [tes-authz](https://github.com/elixir-cloud-aai/tes-authz) (image
 `elixircloud/tes-authz`) next to TESK API, with a policy of your own; the
-Helm chart of TESK doesn't deploy one yet. The `noauth` profile, without authentication,
+Helm chart of TESK doesn't deploy one yet. By default, the decision service
+decides only who may create tasks; to let it decide getting, listing and
+cancelling too, set `TESK_API_AUTHZ_OPERATIONS` and, per operation,
+`TESK_API_AUTHZ_FAILURE_<OPERATION>` (see [Further
+operations](access-control.md#further-operations)). A Helm chart renders
+these settings, like all `TESK_API_AUTHZ_*` settings, only with the `auth`
+profile: with `noauth`, TESK API doesn't start if any of them is set, even
+to an empty value. The `noauth` profile, without authentication,
 is only for installations that nobody else can reach, e.g. on your machine.

@@ -138,7 +138,7 @@ redesign's changes are in:
   modes, recording the requests) and a mock Kubernetes API (`MockCluster`:
   running tasks of given owners). `Harness` holds the settings of the
   redesign (`tesk.api.auth.*` and `tesk.api.authz.*`; of the latter,
-  `operations` and `failure` have no effect until T4b uses them). `Owners.of` is the owner ID that the mock tasks carry:
+  among them `operations` and `failure`, which the variants set). `Owners.of` is the owner ID that the mock tasks carry:
   `<iss>|<sub>` (the subject alone before T3b).
 
 The changes (slices) of the redesign that `pending.csv` names, in their
@@ -150,7 +150,7 @@ Slice | Change | Cells it makes pass
 T2 | Removes the group model: only owners get, list and cancel their tasks, foreign tasks are 404 like missing ones; create is denied for everyone until T4a | Rows 2, 4-7, 15 (get, list, cancel)
 T3b (done) | Authenticates with the token validator (#222): local checks of issuer, signature, audience, expiry and type, owners by issuer and subject, service info ignores the token | Rows 9-13, 17, 19 (all but create)
 T4a (done) | Asks the decision service (AuthZEN, tes-authz) on create, with the entitlements from the user info endpoint; 503 if either fails | Create of rows 3, 7, 8, 18 and 19, the stamped owner, the user info answers (row 14 waits for T6)
-T4b | Lets the decision service decide further operations (`tesk.api.authz.operations`), with list scopes and failure behaviour per operation | `all-operations` (but create); the `fail-open` cells already pass with T2 and T4a
+T4b (done) | Lets the decision service decide further operations (`tesk.api.authz.operations`), with list scopes and failure behaviour per operation (`tesk.api.authz.failure.<operation>`) | `all-operations` (but create); the `fail-open` cells passed already with T2 and T4a, as their answers are the owner-only ones
 T6 | Accepts exchanged tokens (RFC 8693) of trusted actors and records the actor | Row 16, the recorded actor
 
 Until T6, tokens with an `act` claim are refused (`401`), so all cells of

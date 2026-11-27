@@ -116,7 +116,13 @@
       whatever its groups: requests for other users' tasks give `404 Not
       Found`, as for missing tasks (before: `403 Forbidden`), and lists
       leave them out. Handle stuck or abusive tasks through Kubernetes (e.g.
-      with `kubectl`);
+      with `kubectl`). If you need more (e.g. an admin view), you can let
+      the decision service decide getting, listing and cancelling, each on
+      its own (`TESK_API_AUTHZ_OPERATIONS`, failing closed or open with
+      `TESK_API_AUTHZ_FAILURE_<OPERATION>`), with a policy of your own; see
+      [Further operations](access-control.md#further-operations). The
+      default (`create` only) keeps the rule above, and a decision service
+      that is down then blocks creating tasks only;
     * tasks created before 1.2.0, which have only the old creator label
       `creator-user-id`, belong to nobody: there is no migration (nor for
       later tasks, see above);
