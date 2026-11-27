@@ -104,6 +104,9 @@ public class DecisionServiceClientTest {
         assertThatThrownBy(() -> DecisionServiceClient.readCredential(file))
                 .isInstanceOf(IOException.class);
         // not ASCII: the header would carry other bytes than the secret, or not be built
+        Files.write(file, "a b".getBytes(StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> DecisionServiceClient.readCredential(file))
+                .isInstanceOf(IOException.class);
         Files.write(file, "caf\u00e9".getBytes(StandardCharsets.UTF_8));
         assertThatThrownBy(() -> DecisionServiceClient.readCredential(file))
                 .isInstanceOf(IOException.class);
@@ -181,9 +184,9 @@ public class DecisionServiceClientTest {
     public void evaluate_timeout() {
         pdp.stubFor(
                 post(urlEqualTo("/access/v1/evaluation"))
-                        .willReturn(okJson("{\"decision\": true}").withFixedDelay(1000)));
+                        .willReturn(okJson("{\"decision\": true}").withFixedDelay(2000)));
 
-        assertThatThrownBy(() -> client(null, 100).evaluate(BODY, "rid"))
+        assertThatThrownBy(() -> client(null, 500).evaluate(BODY, "rid"))
                 .isInstanceOf(DecisionServiceClient.Failure.class)
                 .hasMessage("timeout");
     }

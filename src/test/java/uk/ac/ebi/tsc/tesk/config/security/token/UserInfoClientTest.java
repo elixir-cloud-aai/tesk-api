@@ -137,6 +137,21 @@ public class UserInfoClientTest {
         idp.verify(3, getRequestedFor(urlEqualTo("/oidc/.well-known/openid-configuration")));
     }
 
+    /** A refused token says nothing about the endpoint: it is kept */
+    @Test
+    public void refusal_keepsTheDiscoveredEndpoint() {
+        discovered();
+        userInfo(401, "");
+        UserInfoClient client = new UserInfoClient(this.properties);
+
+        assertThatThrownBy(() -> client.claims(alice(), TOKEN))
+                .isInstanceOf(InvalidTokenException.class);
+        assertThatThrownBy(() -> client.claims(alice(), TOKEN))
+                .isInstanceOf(InvalidTokenException.class);
+
+        idp.verify(1, getRequestedFor(urlEqualTo("/oidc/.well-known/openid-configuration")));
+    }
+
     /** A configured endpoint that fails is kept: there is nothing to discover */
     @Test
     public void failingConfiguredEndpoint_isKept() {

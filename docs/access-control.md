@@ -91,7 +91,7 @@ Environment variable | Meaning | Default
 `TESK_API_AUTH_CLOCK_SKEW_SECONDS` | Leeway for `exp`, `nbf` and `iat` (in the future), in seconds. | `60`
 `TESK_API_AUTH_MAX_TOKEN_AGE_SECONDS` | Maximum age of a token (since `iat`), in seconds. | `86400`
 `TESK_API_AUTH_ISSUERS_<i>_USERINFOURI` | User info endpoint of the issuer, if it shouldn't come from the discovery document; used only to look up claims for the [decision service](#decision-service). `https://` only (plain `http://` only to the local host). | from discovery
-`TESK_API_AUTH_TIMEOUT_SECONDS` | Connect and read timeouts of the requests to the issuers (discovery document, keys, user info), in seconds, from 1 to 60. | `10`
+`TESK_API_AUTH_TIMEOUT_SECONDS` | Timeouts of the requests to the issuers, in seconds, from 1 to 60: connect and read timeouts for the discovery document and keys, and the time of each request for user info (discovery and lookup) as a whole. | `10`
 
 For example, as properties (e.g. in `application.properties`):
 
@@ -155,10 +155,10 @@ The request (`POST`, JSON, with a new `X-Request-ID` each) describes:
   executor, and `url`, `path` and `type` of each input and output, with
   user info, query and fragment removed from URLs. Commands, environments,
   input contents and backend parameters are never sent, as they may hold
-  secrets. A URL that can't be passed on this way (e.g. with an ambiguous
-  host, or with a tab or line break) would look like inline content to the
-  decision service, so the create is refused with `400 Bad Request`, naming
-  the field (e.g. `inputs[1].url`), before the decision service is asked;
+  secrets. A URL that can't be stripped safely (e.g. with an ambiguous
+  host, a tab or line break, or a path without a scheme that has `?` or
+  `@`) is left out, as in tes-authz's reference cases: such an input looks
+  like one with inline content to the decision service;
 * the context: `tes.profile` `tes-authzen/3` and `tes.service_id`, the ID
   of the service info.
 
@@ -183,7 +183,8 @@ and `403`); it must be
 be a JSON object with the token's `sub`. If it refuses the token (`401` or
 `403`) or names another `sub`, the answer is `401 Unauthorized`, with
 `WWW-Authenticate` and the error `invalid_token`, as for other invalid
-tokens; if it doesn't answer within `TESK_API_AUTH_TIMEOUT_SECONDS`,
+tokens; if it (or its discovery) doesn't answer, body included, within
+`TESK_API_AUTH_TIMEOUT_SECONDS`,
 answers with another status, or with something other than a JSON object
 (e.g. a signed JWT), it is `503 Service Unavailable`.
 
@@ -192,13 +193,13 @@ Environment variable | Meaning | Default
 `TESK_API_AUTHZ_DECISIONSERVICE_URL` | URL of the Access Evaluation endpoint, e.g. `https://tes-authz.example.org/access/v1/evaluation`. Required with the `auth` profile; `https://` only (plain `http://` only to the local host, e.g. a sidecar). | none
 `TESK_API_AUTHZ_DECISIONSERVICE_TIMEOUT` | Timeout of a request to the decision service as a whole, in seconds, from 1 to 60. | `2`
 `TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS` | Claims of the caller that the decision service gets, comma-separated (or one per `TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS_<k>`; not as a JSON array). | none
-`TESK_API_AUTHZ_DECISIONSERVICE_CREDENTIALFILE` | File with a bearer credential for the decision service, sent as `Authorization: Bearer <credential>` (one line of printable ASCII; read for every request, so it can be rotated in place, e.g. as a mounted Kubernetes secret). | none (no `Authorization` header)
+`TESK_API_AUTHZ_DECISIONSERVICE_CREDENTIALFILE` | File with a bearer credential for the decision service, sent as `Authorization: Bearer <credential>` (one line of printable ASCII without spaces; read for every request, so it can be rotated in place, e.g. as a mounted Kubernetes secret). | none (no `Authorization` header)
 
 With the `auth` profile, TESK API doesn't start, and says why, without
 `TESK_API_AUTHZ_DECISIONSERVICE_URL`, with a URL that isn't `https://`
 (except to the local host), a timeout outside 1 to 60 seconds, a blank
 claim name, or a credential file that can't be read, is empty or isn't one
-line of printable ASCII. With the `noauth` profile, it doesn't start if any setting
+line of printable ASCII without spaces. With the `noauth` profile, it doesn't start if any setting
 under `tesk.api.authz` (`TESK_API_AUTHZ_*`) is set: the decision service
 needs authentication.
 

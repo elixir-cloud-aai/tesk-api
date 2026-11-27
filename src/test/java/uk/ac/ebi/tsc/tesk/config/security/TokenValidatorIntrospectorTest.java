@@ -57,7 +57,7 @@ public class TokenValidatorIntrospectorTest {
                 });
         BadOpaqueTokenException e =
                 assertThrows(BadOpaqueTokenException.class, () -> introspector.introspect("t"));
-        assertEquals(TokenValidatorIntrospector.INVALID_TOKEN, e.getMessage());
+        assertEquals(TokenValidatorIntrospector.INVALID_TOKEN_DESCRIPTION, e.getMessage());
     }
 
     /**

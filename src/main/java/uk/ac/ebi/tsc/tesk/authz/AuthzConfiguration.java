@@ -109,7 +109,7 @@ public class AuthzConfiguration {
                 throw new IllegalStateException(
                         PREFIX
                                 + "credential-file can't be read, is empty or isn't one line of"
-                                + " printable ASCII");
+                                + " printable ASCII without spaces");
             }
         }
         return url;

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import uk.ac.ebi.tsc.tesk.tes.exception.UncheckableUrlException;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
 import uk.ac.ebi.tsc.tesk.tes.model.TesFileType;
 import uk.ac.ebi.tsc.tesk.tes.model.TesInput;
@@ -24,12 +23,7 @@ public final class TaskProjection {
 
     private TaskProjection() {}
 
-    /**
-     * The projection of the task
-     *
-     * @throws UncheckableUrlException if an input or output has a URL that the stripping leaves
-     *     out, which the decision service couldn't tell from inline content
-     */
+    /** The projection of the task */
     public static Map<String, Object> of(TesTask task) {
         Map<String, Object> projection = new LinkedHashMap<>();
         put(projection, "name", task.getName());
@@ -59,30 +53,18 @@ public final class TaskProjection {
         projection.put("executors", executors);
         if (task.getInputs() != null) {
             List<Map<String, Object>> inputs = new ArrayList<>();
-            for (int i = 0; i < task.getInputs().size(); i++) {
-                TesInput input = task.getInputs().get(i);
+            for (TesInput input : task.getInputs()) {
                 if (input != null) {
-                    inputs.add(
-                            file(
-                                    "inputs[" + i + "].url",
-                                    input.getUrl(),
-                                    input.getPath(),
-                                    input.getType()));
+                    inputs.add(file(input.getUrl(), input.getPath(), input.getType()));
                 }
             }
             projection.put("inputs", inputs);
         }
         if (task.getOutputs() != null) {
             List<Map<String, Object>> outputs = new ArrayList<>();
-            for (int i = 0; i < task.getOutputs().size(); i++) {
-                TesOutput output = task.getOutputs().get(i);
+            for (TesOutput output : task.getOutputs()) {
                 if (output != null) {
-                    outputs.add(
-                            file(
-                                    "outputs[" + i + "].url",
-                                    output.getUrl(),
-                                    output.getPath(),
-                                    output.getType()));
+                    outputs.add(file(output.getUrl(), output.getPath(), output.getType()));
                 }
             }
             projection.put("outputs", outputs);
@@ -90,14 +72,9 @@ public final class TaskProjection {
         return projection;
     }
 
-    private static Map<String, Object> file(
-            String field, String url, String path, TesFileType type) {
+    private static Map<String, Object> file(String url, String path, TesFileType type) {
         Map<String, Object> file = new LinkedHashMap<>();
-        String stripped = UrlStripper.strip(url);
-        if (url != null && stripped == null) {
-            throw new UncheckableUrlException(field);
-        }
-        put(file, "url", stripped);
+        put(file, "url", UrlStripper.strip(url));
         put(file, "path", path);
         put(file, "type", type == null ? null : type.getValue());
         return file;

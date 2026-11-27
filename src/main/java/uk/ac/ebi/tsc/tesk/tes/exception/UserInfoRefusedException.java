@@ -12,7 +12,7 @@ public class UserInfoRefusedException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     /** The description of the error, as for other invalid tokens */
-    public static final String MESSAGE = TokenValidatorIntrospector.INVALID_TOKEN;
+    public static final String MESSAGE = TokenValidatorIntrospector.INVALID_TOKEN_DESCRIPTION;
 
     public UserInfoRefusedException() {
         super(MESSAGE);

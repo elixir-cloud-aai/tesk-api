@@ -35,7 +35,7 @@ public class TokenValidationProperties {
 
     /**
      * Timeouts of the requests to the issuers, in seconds: connect and read timeouts for the
-     * discovery and keys, and the time of a user info lookup as a whole
+     * discovery and keys, and the time of each user info request (discovery, lookup) as a whole
      */
     private int timeoutSeconds = 10;
 

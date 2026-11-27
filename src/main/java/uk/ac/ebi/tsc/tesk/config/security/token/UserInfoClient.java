@@ -23,8 +23,9 @@ import org.springframework.util.StringUtils;
  *
  * <p>The endpoint is {@code tesk.api.auth.issuers[i].userinfo-uri}, else the {@code
  * userinfo_endpoint} of the issuer's discovery document (fetched once it is needed, and kept until
- * a lookup there gets no answer, or a status other than 200, 401 and 403). One attempt per lookup,
- * bounded by {@code tesk.api.auth.timeout-seconds} as a whole. Never logs the token or the claims.
+ * a lookup there gets no answer, or a status other than 200, 401 and 403). One attempt per lookup;
+ * each request (the discovery, if needed, and the lookup) is bounded by {@code
+ * tesk.api.auth.timeout-seconds} as a whole. Never logs the token or the claims.
  */
 public class UserInfoClient {
 

@@ -57,14 +57,15 @@ public class DecisionServiceClient {
      * Reads the credential file: its content without surrounding white space
      *
      * @throws IOException if it can't be read, is empty, or has characters other than printable
-     *     ASCII (e.g. several lines), which a bearer credential can't have (RFC 6750)
+     *     ASCII without white space (e.g. several lines), which a bearer credential can't have (RFC
+     *     6750)
      */
     static String readCredential(Path file) throws IOException {
         String credential = new String(Files.readAllBytes(file), StandardCharsets.UTF_8).trim();
         if (credential.isEmpty()) {
             throw new IOException("empty");
         }
-        if (credential.chars().anyMatch(c -> c < 0x20 || c > 0x7e)) {
+        if (credential.chars().anyMatch(c -> c <= 0x20 || c > 0x7e)) {
             throw new IOException("not printable ASCII");
         }
         return credential;

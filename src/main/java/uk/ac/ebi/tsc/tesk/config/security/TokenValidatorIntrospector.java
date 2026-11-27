@@ -20,7 +20,7 @@ import uk.ac.ebi.tsc.tesk.config.security.token.TokenValidator;
 public final class TokenValidatorIntrospector implements OpaqueTokenIntrospector {
 
     /** Description of the error for all tokens that the validator refuses */
-    public static final String INVALID_TOKEN = "Invalid access token";
+    public static final String INVALID_TOKEN_DESCRIPTION = "Invalid access token";
 
     private final TokenValidator validator;
 
@@ -33,7 +33,7 @@ public final class TokenValidatorIntrospector implements OpaqueTokenIntrospector
         try {
             return AuthenticatedUser.of(this.validator.validate(token));
         } catch (InvalidTokenException e) {
-            throw new BadOpaqueTokenException(INVALID_TOKEN);
+            throw new BadOpaqueTokenException(INVALID_TOKEN_DESCRIPTION);
         } catch (IssuerUnavailableException e) {
             throw new TokenCheckUnavailableException();
         }

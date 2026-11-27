@@ -84,7 +84,8 @@ public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
             String accessToken, OAuth2AuthenticatedPrincipal principal) {
         if (!(principal instanceof AuthenticatedUser)) {
             // not expected: the introspector returns an AuthenticatedUser
-            throw new InvalidBearerTokenException(TokenValidatorIntrospector.INVALID_TOKEN);
+            throw new InvalidBearerTokenException(
+                    TokenValidatorIntrospector.INVALID_TOKEN_DESCRIPTION);
         }
         AuthenticatedUser authenticated = (AuthenticatedUser) principal;
         return new UsernamePasswordAuthenticationToken(

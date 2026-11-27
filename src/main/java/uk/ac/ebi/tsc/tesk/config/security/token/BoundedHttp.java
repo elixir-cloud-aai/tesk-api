@@ -24,6 +24,9 @@ public final class BoundedHttp {
 
         private static final long serialVersionUID = 1L;
 
+        /**
+         * @param reason why
+         */
         Failure(String reason) {
             super(reason, null, false, false);
         }
@@ -42,6 +45,10 @@ public final class BoundedHttp {
      * Sends the request and reads the body as UTF-8, within the timeout; a call that takes longer
      * is cancelled
      *
+     * @param client the client
+     * @param request the request
+     * @param timeout the time the call may take as a whole
+     * @return the response, with the body
      * @throws Failure if there is no answer in time, the call fails or the thread is interrupted
      *     (whose interrupt status is kept)
      */
