@@ -104,11 +104,14 @@
   [Authorisation](access-control.md#authorisation)). With the `auth`
   profile:
 
-    * creating tasks is denied to every caller (`403 Forbidden`), users and
-      service clients alike, until a decision service (AuthZEN, e.g.
-      [tes-authz](https://github.com/elixir-cloud-aai/tes-authz)) decides it
-      in a later release. Don't upgrade an installation whose users must
-      create tasks before that;
+    * a decision service (AuthZEN, e.g.
+      [tes-authz](https://github.com/elixir-cloud-aai/tes-authz)) decides who
+      may create tasks, users and service clients alike: TESK API doesn't
+      start without `TESK_API_AUTHZ_DECISIONSERVICE_URL`. Deploy one with a
+      policy that allows those who created tasks before (e.g. members of
+      your groups, by `eduperson_entitlement` in
+      `TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS`) before you upgrade; see
+      [Decision service](access-control.md#decision-service);
     * every caller gets, lists and cancels only the tasks that it created,
       whatever its groups: requests for other users' tasks give `404 Not
       Found`, as for missing tasks (before: `403 Forbidden`), and lists

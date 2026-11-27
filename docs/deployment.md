@@ -117,6 +117,11 @@ TESK_API_SWAGGER_UI_ENABLED=true` (see [API](api.md#swagger-ui)).
 
 By default (`auth` profile, since 2.1.0), TESK API needs a valid access
 token of a configured issuer for every operation on tasks, and doesn't start
-without an issuer (`TESK_API_AUTH_ISSUERS_0_URL`); see [Access
-control](access-control.md). The `noauth` profile, without authentication,
+without an issuer (`TESK_API_AUTH_ISSUERS_0_URL`) and a decision service
+that decides who may create tasks
+(`TESK_API_AUTHZ_DECISIONSERVICE_URL`); see [Access
+control](access-control.md). Run a decision service such as
+[tes-authz](https://github.com/elixir-cloud-aai/tes-authz) (image
+`elixircloud/tes-authz`) next to TESK API, with a policy of your own; the
+Helm chart of TESK doesn't deploy one yet. The `noauth` profile, without authentication,
 is only for installations that nobody else can reach, e.g. on your machine.
