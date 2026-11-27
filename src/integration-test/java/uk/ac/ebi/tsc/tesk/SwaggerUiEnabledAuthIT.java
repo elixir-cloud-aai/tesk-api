@@ -25,7 +25,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(
         locations = {"classpath:application.properties"},
         properties = {
-            "security.oauth2.resource.user-info-uri = http://localhost:8090",
+            TestIssuer.ISSUER_URL,
+            TestIssuer.AUDIENCES,
             "spring.profiles.active=auth",
             "tesk.api.swagger-ui.enabled=true"
         })

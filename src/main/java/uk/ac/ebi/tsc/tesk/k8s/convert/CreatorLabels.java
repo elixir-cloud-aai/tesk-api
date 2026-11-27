@@ -11,9 +11,9 @@ import java.util.Map;
 /**
  * The creating user of a task's Kubernetes objects: a label with a hash of the user's ID, by which
  * Kubernetes selects the user's tasks, and an annotation with the full ID, which is compared
- * exactly. User IDs (the OIDC {@code sub}) can be any string, while label values are limited to 63
- * characters from {@code [A-Za-z0-9._-]}; annotations take any string. Objects without both (e.g.
- * of tasks created before the hash label) have no creator.
+ * exactly. Owner IDs ({@code <iss>|<sub>} of the token) can be any string, while label values are
+ * limited to 63 characters from {@code [A-Za-z0-9._-]}; annotations take any string. Objects
+ * without both (e.g. of tasks created before the hash label) have no creator.
  */
 public final class CreatorLabels {
 

@@ -33,7 +33,10 @@ import org.springframework.web.util.WebUtils;
  * the OAuth 2.0 error code ({@code error}) and description ({@code error_description}), and a
  * {@code WWW-Authenticate} header with both (RFC 6750, section 3). These are the answers of the
  * resource server of the former Spring Security OAuth: {@code unauthorized} without a token, {@code
- * invalid_token} for a token that isn't valid.
+ * invalid_token} for a token that isn't valid. A token that can't be checked now (e.g. the keys of
+ * its issuer can't be fetched, {@link TokenValidatorIntrospector.TokenCheckUnavailableException})
+ * gets {@code 503 Service Unavailable} with the error {@code temporarily_unavailable}, in the same
+ * format, without {@code WWW-Authenticate}: the client did nothing wrong and may retry.
  *
  * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
@@ -50,6 +53,9 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
 
     /** Name of the OAuth 2.0 error code (RFC 6750, section 3) */
     static final String ERROR = "error";
+
+    /** The error code if the token can't be checked now */
+    static final String TEMPORARILY_UNAVAILABLE = "temporarily_unavailable";
 
     /** Name of the OAuth 2.0 error description (RFC 6750, section 3) */
     static final String DESCRIPTION = "error_description";
@@ -70,6 +76,21 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
             HttpServletResponse response,
             AuthenticationException authException)
             throws IOException {
+        if (authException instanceof TokenValidatorIntrospector.TokenCheckUnavailableException) {
+            HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+            Map<String, Object> body =
+                    errorBody(
+                            request,
+                            authException,
+                            status,
+                            TEMPORARILY_UNAVAILABLE,
+                            authException.getMessage());
+            response.setStatus(status.value());
+            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+            write(body, request, response);
+            response.flushBuffer();
+            return;
+        }
         String error = UNAUTHORIZED;
         String description = authException.getMessage();
         if (authException instanceof OAuth2AuthenticationException) {
@@ -82,15 +103,8 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         if (!StringUtils.hasText(description)) {
             description = HttpStatus.UNAUTHORIZED.getReasonPhrase();
         }
-        WebUtils.exposeErrorRequestAttributes(request, authException, null);
-        request.setAttribute(WebUtils.ERROR_STATUS_CODE_ATTRIBUTE, HttpStatus.UNAUTHORIZED.value());
         Map<String, Object> body =
-                this.errorAttributes.getErrorAttributes(
-                        new ServletWebRequest(request),
-                        ErrorAttributeOptions.defaults()
-                                .including(ErrorAttributeOptions.Include.MESSAGE));
-        body.put(ERROR, error);
-        body.put(DESCRIPTION, description);
+                errorBody(request, authException, HttpStatus.UNAUTHORIZED, error, description);
 
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
@@ -98,6 +112,28 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, wwwAuthenticate(error, description));
         write(body, request, response);
         response.flushBuffer();
+    }
+
+    /**
+     * Spring Boot's error attributes for the status, with the message, plus the OAuth 2.0 error
+     * code and description
+     */
+    private Map<String, Object> errorBody(
+            HttpServletRequest request,
+            AuthenticationException authException,
+            HttpStatus status,
+            String error,
+            String description) {
+        WebUtils.exposeErrorRequestAttributes(request, authException, null);
+        request.setAttribute(WebUtils.ERROR_STATUS_CODE_ATTRIBUTE, status.value());
+        Map<String, Object> body =
+                this.errorAttributes.getErrorAttributes(
+                        new ServletWebRequest(request),
+                        ErrorAttributeOptions.defaults()
+                                .including(ErrorAttributeOptions.Include.MESSAGE));
+        body.put(ERROR, error);
+        body.put(DESCRIPTION, description);
+        return body;
     }
 
     /** The {@code WWW-Authenticate} header, with quotes and backslashes in the values escaped */

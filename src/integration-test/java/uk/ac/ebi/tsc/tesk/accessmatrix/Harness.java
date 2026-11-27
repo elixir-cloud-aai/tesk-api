@@ -44,12 +44,9 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.MockIdp.Token;
  * MockCluster}); requests per operation, and the check of a cell against its target or its pending
  * entry ({@link Pending}).
  *
- * <p>The settings hold both today's (group model, user info as authentication, service clients of
- * #220, which the slices of the redesign remove) and the redesign's (design section 7: {@code
- * tesk.api.auth.*}, {@code tesk.api.authz.*}, which have no effect until the slices use them), so
- * that the same suite runs before, during and after the redesign. Each slice removes the settings
- * it deletes. Today's group settings are those of the deployments with LS Login and the base group
- * {@code elixir:ECP_CLN}.
+ * <p>The settings are the redesign's (design section 7: {@code tesk.api.auth.*}, used since slice
+ * T3b; {@code tesk.api.authz.*} and the trusted actors, which have no effect until the slices T4a
+ * and T6 use them), so that the same suite runs during and after the redesign.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -57,17 +54,8 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.MockIdp.Token;
         locations = {"classpath:application.properties"},
         properties = {
             "spring.profiles.active=auth",
-            // today: user info as authentication (removed by T3b), service clients of #220 (T3b)
-            "security.oauth2.resource.user-info-uri=" + MockIdp.USER_INFO_URI,
-            "tesk.api.authorisation.service-clients.enabled=true",
-            "tesk.api.authorisation.service-clients.issuer=" + MockIdp.ISSUER,
-            "tesk.api.authorisation.service-clients.clients={\""
-                    + MockIdp.LISTED_CLIENT
-                    + "\": {\"audiences\": [\""
-                    + MockIdp.LISTED_CLIENT
-                    + "\"]}}",
-            // the redesign, without effect until its slices: tesk.api.auth.* from T3b (issuers,
-            // audiences, service clients; trusted actors from T6), tesk.api.authz.* from T4a
+            // tesk.api.auth.* since T3b (issuers, audiences, service clients; trusted actors from
+            // T6), tesk.api.authz.* from T4a
             "tesk.api.auth.issuers[0].url=" + MockIdp.ISSUER,
             "tesk.api.auth.issuers[0].audiences=" + MockIdp.FRONT_END,
             "tesk.api.auth.issuers[0].service-clients[0].client-id=" + MockIdp.LISTED_CLIENT,

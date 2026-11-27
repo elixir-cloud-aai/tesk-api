@@ -1,5 +1,7 @@
 package uk.ac.ebi.tsc.tesk.config.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -9,13 +11,28 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Switches off spring security for all requests making all requests anonymous
+ * Switches off spring security for all requests making all requests anonymous. Only by explicit
+ * choice (profile {@code noauth}; the default is {@code auth}), and named in a warning at startup:
+ * every caller is then the anonymous user, who owns, gets, lists and cancels all tasks created
+ * without authentication.
  *
  * @author Ania Niewielska &lt;aniewielska@ebi.ac.uk&gt;
  */
 @Configuration
 @Profile("noauth")
 public class NoAuthConfiguration {
+
+    private static final Logger logger = LoggerFactory.getLogger(NoAuthConfiguration.class);
+
+    /** The warning at startup */
+    static final String WARNING =
+            "Authentication is off (profile noauth): every caller is anonymous and may create,"
+                    + " get, list and cancel all tasks created without authentication; use the"
+                    + " profile auth (the default) for any installation that others can reach";
+
+    public NoAuthConfiguration() {
+        logger.warn(WARNING);
+    }
 
     /**
      * Lets all requests in as anonymous, without Spring Security's other defaults (CSRF protection,

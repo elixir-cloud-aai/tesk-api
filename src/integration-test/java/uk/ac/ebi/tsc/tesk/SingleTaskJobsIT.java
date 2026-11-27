@@ -44,10 +44,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @TestPropertySource(
         locations = {"classpath:application.properties"},
-        properties = {
-            "security.oauth2.resource.user-info-uri = http://localhost:8090",
-            "spring.profiles.active=noauth"
-        })
+        properties = {"spring.profiles.active=noauth"})
 public class SingleTaskJobsIT {
 
     private static final Gson GSON = new JSON().getGson();

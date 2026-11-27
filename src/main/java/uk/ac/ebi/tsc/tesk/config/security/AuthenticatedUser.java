@@ -9,16 +9,18 @@ import java.util.Objects;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
+import uk.ac.ebi.tsc.tesk.config.security.token.TokenPrincipal;
 
 /**
- * The result of validating an access token ({@link UserInfoTokenIntrospector}, {@link
- * ServiceClientTokenServices}): the {@link User} (a user or a service client), its authorities
+ * The result of validating an access token ({@link TokenValidatorIntrospector}): the {@link User}
+ * (a user or a service client, identified by its owner ID {@code <iss>|<sub>}), its authorities
  * (none since the group model was removed, #225; kept for Spring Security's principal) and the
- * claims it was built from. {@link #toAuthentication} turns it into the authentication of the
- * request, whose principal is the {@link User}, as the authorisation rules (e.g. of {@code
- * TesService}) expect.
+ * claims of the token. {@link #toAuthentication} turns it into the authentication of the request,
+ * whose principal is the {@link User}, as the authorisation rules (e.g. of {@code TesService})
+ * expect.
  */
 public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
 
@@ -35,12 +37,24 @@ public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
         this.authorities = Collections.unmodifiableList(new ArrayList<>(authorities));
     }
 
+    /**
+     * The caller of a valid token: its owner ID is {@code <iss>|<sub>} ({@link
+     * TokenPrincipal#owner()}), its attributes are the token's claims
+     */
+    static AuthenticatedUser of(TokenPrincipal principal) {
+        User user =
+                User.builder(principal.owner())
+                        .serviceClient(principal.kind() == TokenPrincipal.Kind.SERVICE_CLIENT)
+                        .build();
+        return new AuthenticatedUser(user, principal.claims(), AuthorityUtils.NO_AUTHORITIES);
+    }
+
     /** The user or service client */
     public User getUser() {
         return this.user;
     }
 
-    /** The claims (of the user info, or of a service client's token) */
+    /** The claims of the token */
     @Override
     public Map<String, Object> getAttributes() {
         return this.attributes;
@@ -51,7 +65,7 @@ public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
         return this.authorities;
     }
 
-    /** The ID of the user (the {@code sub} of the user info) or of the service client */
+    /** The owner ID of the user or service client ({@code <iss>|<sub>}) */
     @Override
     public String getName() {
         return this.user.getUsername();
@@ -68,8 +82,8 @@ public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
     static Authentication toAuthentication(
             String accessToken, OAuth2AuthenticatedPrincipal principal) {
         if (!(principal instanceof AuthenticatedUser)) {
-            // not expected: both introspectors return an AuthenticatedUser
-            throw new InvalidBearerTokenException(UserInfoTokenIntrospector.INVALID_TOKEN);
+            // not expected: the introspector returns an AuthenticatedUser
+            throw new InvalidBearerTokenException(TokenValidatorIntrospector.INVALID_TOKEN);
         }
         AuthenticatedUser authenticated = (AuthenticatedUser) principal;
         return new UsernamePasswordAuthenticationToken(

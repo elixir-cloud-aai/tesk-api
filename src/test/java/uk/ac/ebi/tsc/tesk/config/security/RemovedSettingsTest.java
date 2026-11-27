@@ -2,19 +2,18 @@ package uk.ac.ebi.tsc.tesk.config.security;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.context.properties.bind.Bindable;
-import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 
-/** The settings of the removed group model refuse startup (issue #225) */
+/**
+ * The settings of the removed group model (issue #225) and service clients (#227) refuse startup
+ */
 public class RemovedSettingsTest {
 
     private static StandardEnvironment properties(Map<String, Object> properties) {
@@ -82,47 +81,81 @@ public class RemovedSettingsTest {
                 "tesk.api.authorisation.claim.values[0]");
     }
 
-    /** The service clients are kept, until the token validator replaces them */
-    @Test
-    public void serviceClients_areKept() {
-        assertDoesNotThrow(() ->
-                RemovedSettings.refuse(
-                        properties(
-                                Map.of(
-                                        "tesk.api.authorisation.service-clients.enabled",
-                                        "true",
-                                        "tesk.api.authorisation.service-clients.clients",
-                                        "{}",
-                                        "tesk.api.authorisation.service-clients",
-                                        ""))));
-        assertDoesNotThrow(() ->
-                RemovedSettings.refuse(
-                        environmentVariables(
-                                Map.of("TESK_API_AUTHORISATION_SERVICECLIENTS_ENABLED", "true"))));
+    /** The service clients' settings, and what replaces each */
+    private static final Map<String, String> SERVICE_CLIENT_SETTINGS =
+            Map.of(
+                    "enabled", "tesk.api.auth.issuers[i].service-clients[j].client-id",
+                    "issuer", "tesk.api.auth.issuers[i].url",
+                    "jwks-uri", "tesk.api.auth.issuers[i].jwks-uri",
+                    "client-claim", "tesk.api.auth.issuers[i].client-claim",
+                    "clients", "tesk.api.auth.issuers[i].service-clients[j].client-id",
+                    "require-access-token-type", "tesk.api.auth.require-access-token-type",
+                    "require-client-subject", "sub must be the client ID",
+                    "clock-skew-seconds", "tesk.api.auth.clock-skew-seconds");
+
+    private static void refusedServiceClient(
+            StandardEnvironment environment, String name, String replacement) {
+        IllegalStateException e =
+                assertThrows(
+                        IllegalStateException.class, () -> RemovedSettings.refuse(environment));
+        assertThat(e.getMessage(), containsString(name));
+        assertThat(e.getMessage(), containsString("removed with the service clients"));
+        assertThat(e.getMessage(), containsString(replacement));
     }
 
     /**
-     * The service clients' environment variables as documented, with {@code _} between the words,
-     * are kept too; words that merely start alike are not
+     * The service clients of #153 and #220 are removed too (#227), each setting naming what
+     * replaces it, as property
      */
     @Test
-    public void serviceClientsEnvironmentVariables_areKept() {
-        assertDoesNotThrow(() ->
-                RemovedSettings.refuse(
-                        environmentVariables(
-                                Map.of(
-                                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED", "true",
-                                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_ISSUER",
-                                                "https://a",
-                                        "TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS", "{}"))));
-        assertDoesNotThrow(() ->
-                RemovedSettings.refuse(
-                        properties(
-                                Map.of(
-                                        "tesk.api.authorisation.serviceClients.enabled",
-                                        "true",
-                                        "tesk.api.authorisation.service-clients[0]",
-                                        "x"))));
+    public void serviceClients_areRefusedWithTheirReplacement() {
+        SERVICE_CLIENT_SETTINGS.forEach((setting, replacement) -> {
+            String name = "tesk.api.authorisation.service-clients." + setting;
+            refusedServiceClient(properties(Map.of(name, "x")), name, replacement);
+        });
+        refusedServiceClient(
+                properties(Map.of("tesk.api.authorisation.serviceClients.jwksUri", "x")),
+                "tesk.api.authorisation.serviceclients.jwksuri",
+                "tesk.api.auth.issuers[i].jwks-uri");
+    }
+
+    /** ... and as environment variable, with or without {@code _} between the words */
+    @Test
+    public void serviceClientsEnvironmentVariables_areRefusedWithTheirReplacement() {
+        SERVICE_CLIENT_SETTINGS.forEach((setting, replacement) -> {
+            String variable = setting.toUpperCase(java.util.Locale.ROOT).replace("-", "_");
+            refusedServiceClient(
+                    environmentVariables(
+                            Map.of("TESK_API_AUTHORISATION_SERVICE_CLIENTS_" + variable, "x")),
+                    "tesk.api.authorisation.service.clients.",
+                    replacement);
+            refusedServiceClient(
+                    environmentVariables(
+                            Map.of("TESK_API_AUTHORISATION_SERVICECLIENTS_" + variable, "x")),
+                    "tesk.api.authorisation.serviceclients.",
+                    replacement);
+        });
+    }
+
+    /** The prefix itself, lists and unknown keys under it name the new service clients */
+    @Test
+    public void otherServiceClientsSettings_nameTheNewServiceClients() {
+        for (String name :
+                new String[] {
+                    "tesk.api.authorisation.service-clients",
+                    "tesk.api.authorisation.service-clients[0]",
+                    "tesk.api.authorisation.service-clients.audiences"
+                }) {
+            refusedServiceClient(
+                    properties(Map.of(name, "x")),
+                    name,
+                    RemovedSettings.ANY_SERVICE_CLIENT_SETTING);
+        }
+    }
+
+    /** Words that merely start alike belong to the group model's settings */
+    @Test
+    public void similarNames_areGroupModelSettings() {
         refused(
                 environmentVariables(Map.of("TESK_API_AUTHORISATION_SERVICE", "x")),
                 "tesk.api.authorisation.service");
@@ -143,28 +176,5 @@ public class RemovedSettingsTest {
                                         "tesk.api.authorisationx.base-group", "x",
                                         "tesk.api.auth.issuers[0].url", "https://a",
                                         "tesk.api.authz.decision-service.url", "https://b"))));
-    }
-
-    /**
-     * The documented environment variables, with {@code _} for the dash of {@code service-clients},
-     * are both kept and bound to the service-client settings (Spring's legacy mapping of dashes)
-     */
-    @Test
-    public void documentedServiceClientVariables_areKeptAndBound() {
-        StandardEnvironment environment =
-                environmentVariables(
-                        Map.of(
-                                "TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED", "true",
-                                "TESK_API_AUTHORISATION_SERVICE_CLIENTS_ISSUER", "https://i/",
-                                "TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_CLAIM", "azp"));
-        assertDoesNotThrow(() -> RemovedSettings.refuse(environment));
-
-        AuthorisationProperties bound =
-                Binder.get(environment)
-                        .bind("tesk.api.authorisation", Bindable.of(AuthorisationProperties.class))
-                        .get();
-        assertThat(bound.getServiceClients().isEnabled(), is(true));
-        assertThat(bound.getServiceClients().getIssuer(), is("https://i/"));
-        assertThat(bound.getServiceClients().getClientClaim(), is("azp"));
     }
 }

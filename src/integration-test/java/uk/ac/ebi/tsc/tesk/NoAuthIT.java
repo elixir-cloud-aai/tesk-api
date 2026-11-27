@@ -51,10 +51,7 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @TestPropertySource(
         locations = {"classpath:application.properties"},
-        properties = {
-            "security.oauth2.resource.user-info-uri = http://localhost:8090",
-            "spring.profiles.active=noauth"
-        })
+        properties = {"spring.profiles.active=noauth"})
 public class NoAuthIT {
 
     @Autowired private MockMvc mvc;

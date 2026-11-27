@@ -14,15 +14,7 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.util.Config;
-import org.jose4j.jwk.JsonWebKeySet;
-import org.jose4j.jwk.RsaJsonWebKey;
-import org.jose4j.jwk.RsaJwkGenerator;
-import org.jose4j.jws.AlgorithmIdentifiers;
-import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
-import org.jose4j.jwt.NumericDate;
-import org.jose4j.lang.JoseException;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -39,45 +31,38 @@ import org.springframework.test.web.servlet.ResultActions;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
 /**
- * Integration testing of tokens of allow-listed service clients (issue #153): with {@code
- * tesk.api.authorisation.service-clients.enabled}, a JWT access token of a listed client creates,
- * lists, gets and cancels the client's own tasks without a call to the user info endpoint; other
- * tokens are validated at the user info endpoint as before. The identity provider (discovery, keys
- * and user info), and the Kubernetes API are WireMocked.
+ * Integration testing of service clients (D-392, #227): a listed client's own token (client
+ * credentials grant, {@code aud} = its client ID) gets, lists and cancels the client's own tasks,
+ * owned by {@code <iss>|<client ID>}, like a user's; creating tasks is denied until a decision
+ * service decides it. A client listed with {@code allow-any-audience} is accepted whatever its
+ * token's audience. The issuer (discovery, keys) and the Kubernetes API are WireMocked.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(
         locations = {"classpath:application.properties"},
         properties = {
-            "security.oauth2.resource.user-info-uri = http://localhost:8090",
             "spring.profiles.active=auth",
-            "tesk.api.authorisation.service-clients.enabled=true",
-            "tesk.api.authorisation.service-clients.issuer=" + ServiceClientAuthIT.ISSUER,
-            // audiences per client (issue #215)
-            "tesk.api.authorisation.service-clients.clients={\"gateway\": {\"audiences\":"
-                    + " [\"tesk\"]}, \"other-gateway\": {\"audiences\": [\"tesk-other\"]}}"
+            TestIssuer.ISSUER_URL,
+            TestIssuer.AUDIENCES,
+            TestIssuer.SERVICE_CLIENT,
+            "tesk.api.auth.issuers[0].service-clients[1].client-id="
+                    + ServiceClientAuthIT.ANY_AUDIENCE_CLIENT,
+            "tesk.api.auth.issuers[0].service-clients[1].allow-any-audience=true"
         })
 public class ServiceClientAuthIT {
 
-    static final String ISSUER = "http://localhost:8091/oidc/";
-    private static final String CLIENT = "gateway";
+    /** A client whose tokens are accepted whatever their audience (opt-in) */
+    static final String ANY_AUDIENCE_CLIENT = "other-gateway";
 
-    private static RsaJsonWebKey key;
+    private static final String CLIENT = TestIssuer.CLIENT;
 
     @Autowired private MockMvc mvc;
 
     @RegisterExtension
-    public WireMockExtension mockUserInfo =
-            WireMockExtension.newInstance()
-                    .options(wireMockConfig().port(8090))
-                    .failOnUnmatchedRequests(true)
-                    .build();
-
-    @RegisterExtension
     public WireMockExtension mockIssuer =
             WireMockExtension.newInstance()
-                    .options(wireMockConfig().port(8091))
+                    .options(wireMockConfig().port(TestIssuer.PORT))
                     .failOnUnmatchedRequests(true)
                     .build();
 
@@ -96,57 +81,21 @@ public class ServiceClientAuthIT {
         @Bean
         @Primary
         public ApiClient kubernetesApiClient() {
-
             return Config.fromUrl("http://localhost:9000", false);
         }
     }
 
-    @BeforeAll
-    public static void generateKey() throws JoseException {
-        key = RsaJwkGenerator.generateJwk(2048);
-        key.setKeyId("key-1");
-    }
-
     @BeforeEach
-    public void mockIssuer() {
-        mockIssuer.givenThat(
-                WireMock.get("/oidc/.well-known/openid-configuration")
-                        .willReturn(
-                                okJson(
-                                        "{\"issuer\":\""
-                                                + ISSUER
-                                                + "\",\"jwks_uri\":\"http://localhost:8091/oidc/jwk\"}")));
-        mockIssuer.givenThat(
-                WireMock.get("/oidc/jwk").willReturn(okJson(new JsonWebKeySet(key).toJson())));
-        // the user info endpoint refuses all tokens unless a test says otherwise
-        mockUserInfo.givenThat(WireMock.get("/").willReturn(aResponse().withStatus(401)));
+    public void stubIssuer() {
+        TestIssuer.stub(mockIssuer);
     }
 
-    /** A token of the client credentials grant of {@code client}, valid unless changed */
-    private static JwtClaims claims(String client) {
-        JwtClaims claims = new JwtClaims();
-        claims.setIssuer(ISSUER);
-        claims.setClaim("client_id", client);
-        claims.setSubject(client);
-        claims.setAudience("tesk");
-        claims.setIssuedAtToNow();
-        claims.setExpirationTimeMinutesInTheFuture(60);
-        claims.setGeneratedJwtId();
-        return claims;
+    private static String serviceToken() {
+        return TestIssuer.clientToken(CLIENT);
     }
 
-    private static String sign(JwtClaims claims) throws JoseException {
-        JsonWebSignature jws = new JsonWebSignature();
-        jws.setPayload(claims.toJson());
-        jws.setKey(key.getPrivateKey());
-        jws.setKeyIdHeaderValue(key.getKeyId());
-        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
-        jws.setHeader("typ", "at+jwt");
-        return jws.getCompactSerialization();
-    }
-
-    private static String serviceToken() throws JoseException {
-        return sign(claims(CLIENT));
+    private static String owner(String clientId) {
+        return TestIssuer.owner(clientId);
     }
 
     private ResultActions createTask(String token, String path) throws Exception {
@@ -175,8 +124,15 @@ public class ServiceClientAuthIT {
                         .header("Authorization", "Bearer " + token));
     }
 
-    private void noUserInfoCalls() {
-        mockUserInfo.verify(0, anyRequestedFor(anyUrl()));
+    /** Kubernetes lists no tasks for the hash label of the owner */
+    private void mockEmptyList(String owner) {
+        mockKubernetes.givenThat(
+                WireMock.get(
+                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
+                                        + "%2Ccreator-user-hash%3D"
+                                        + CreatorLabels.hash(owner)
+                                        + "&limit=256")
+                        .willReturn(okJson(MockUtil.jobList())));
     }
 
     /**
@@ -188,21 +144,27 @@ public class ServiceClientAuthIT {
         createTask(serviceToken(), "fromTesToK8s_minimal/task.json")
                 .andExpect(status().isForbidden());
         createTask(serviceToken(), "fromTesToK8s/task.json").andExpect(status().isForbidden());
-        noUserInfoCalls();
     }
 
     @Test
     public void serviceClient_getList_ownTasksOnly() throws Exception {
-        V1Job othersTask = MockUtil.taskmaster("other-gateway");
+        V1Job othersTask = MockUtil.taskmaster(owner(ANY_AUDIENCE_CLIENT));
         othersTask.getMetadata().setName("task-456");
+        // a task of the client's bare ID, from before the redesign: nobody's
+        V1Job bareIdTask = MockUtil.taskmaster(CLIENT);
+        bareIdTask.getMetadata().setName("task-789");
         mockKubernetes.givenThat(
                 WireMock.get(
                                 "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
                                         + "%2Ccreator-user-hash%3D"
-                                        + CreatorLabels.hash(CLIENT)
+                                        + CreatorLabels.hash(owner(CLIENT))
                                         + "&limit=256")
                         .willReturn(
-                                okJson(MockUtil.jobList(MockUtil.taskmaster(CLIENT), othersTask))));
+                                okJson(
+                                        MockUtil.jobList(
+                                                MockUtil.taskmaster(owner(CLIENT)),
+                                                othersTask,
+                                                bareIdTask))));
         MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
 
         // the own task only, also if Kubernetes returned others
@@ -210,21 +172,19 @@ public class ServiceClientAuthIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tasks.length()").value(1))
                 .andExpect(jsonPath("$.tasks[0].id").value("task-123"));
-        noUserInfoCalls();
     }
 
     @Test
     public void serviceClient_getOwnTask() throws Exception {
-        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, CLIENT);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, owner(CLIENT));
 
         getTask(serviceToken()).andExpect(status().isOk());
-        noUserInfoCalls();
     }
 
     /** Another listed client's tasks are not the client's: not found, as missing ones */
     @Test
     public void serviceClient_getOthersTask() throws Exception {
-        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, "other-gateway");
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, owner(ANY_AUDIENCE_CLIENT));
 
         getTask(serviceToken()).andExpect(status().isNotFound());
     }
@@ -232,116 +192,53 @@ public class ServiceClientAuthIT {
     /** Authorised to cancel the own task; it isn't running, hence 400 */
     @Test
     public void serviceClient_cancelOwnTask() throws Exception {
-        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, CLIENT);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, owner(CLIENT));
 
         cancelTask(serviceToken())
                 .andExpect(status().isBadRequest())
                 .andExpect(
                         jsonPath("$.message")
                                 .value("Job with ID=task-123 has no pods in RUNNING status."));
-        noUserInfoCalls();
     }
 
     @Test
     public void serviceClient_cancelOthersTask() throws Exception {
-        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, "other-gateway");
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, owner(ANY_AUDIENCE_CLIENT));
 
         cancelTask(serviceToken()).andExpect(status().isNotFound());
     }
 
-    /** An unlisted client's token goes to the user info endpoint, which refuses it */
+    /** A client with allow-any-audience is accepted with any audience, also without one */
     @Test
-    public void unlistedClient_isUnauthorized() throws Exception {
-        listTasks(sign(claims("unlisted"))).andExpect(status().isUnauthorized());
-        mockUserInfo.verify(1, getRequestedFor(urlEqualTo("/")));
+    public void anyAudienceClient_isAccepted() throws Exception {
+        mockEmptyList(owner(ANY_AUDIENCE_CLIENT));
+        for (String audience : new String[] {"other-service", null}) {
+            JwtClaims claims = TestIssuer.clientClaims(ANY_AUDIENCE_CLIENT);
+            if (audience == null) {
+                claims.unsetClaim("aud");
+            } else {
+                claims.setAudience(audience);
+            }
+            listTasks(TestIssuer.sign(claims))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.tasks.length()").value(0));
+        }
     }
 
-    /** An invalid token of a listed client is refused without asking the user info endpoint */
+    /** ... but only its own tokens: a user's token for another audience is still refused */
     @Test
-    public void expiredServiceToken_isUnauthorized() throws Exception {
-        JwtClaims claims = claims(CLIENT);
-        claims.setIssuedAt(NumericDate.fromSeconds(1_000_000_000L));
-        claims.setExpirationTime(NumericDate.fromSeconds(1_000_003_600L));
-
-        listTasks(sign(claims)).andExpect(status().isUnauthorized());
-        noUserInfoCalls();
-    }
-
-    @Test
-    public void serviceTokenForOtherAudience_isUnauthorized() throws Exception {
-        JwtClaims claims = claims(CLIENT);
+    public void anyAudienceClient_userTokens_needTheAudience() throws Exception {
+        JwtClaims claims = TestIssuer.userClaims("user-1");
+        claims.setClaim("client_id", ANY_AUDIENCE_CLIENT);
         claims.setAudience("other-service");
-
-        createTask(sign(claims), "fromTesToK8s_minimal/task.json")
-                .andExpect(status().isUnauthorized());
-        noUserInfoCalls();
+        listTasks(TestIssuer.sign(claims)).andExpect(status().isUnauthorized());
     }
 
-    /** A client's token for another listed client's audience is refused (issue #215) */
-    @Test
-    public void serviceTokenForOtherClientsAudience_isUnauthorized() throws Exception {
-        JwtClaims claims = claims(CLIENT);
-        claims.setAudience("tesk-other");
-
-        listTasks(sign(claims)).andExpect(status().isUnauthorized());
-        noUserInfoCalls();
-    }
-
-    /** Each client is accepted at its own audience */
-    @Test
-    public void otherClient_ownAudience_isAccepted() throws Exception {
-        JwtClaims claims = claims("other-gateway");
-        claims.setAudience("tesk-other");
-        mockKubernetes.givenThat(
-                WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-user-hash%3D"
-                                        + CreatorLabels.hash("other-gateway")
-                                        + "&limit=256")
-                        .willReturn(okJson(MockUtil.jobList())));
-
-        listTasks(sign(claims))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(0));
-        noUserInfoCalls();
-    }
-
-    /**
-     * User tokens are validated at the user info endpoint, as before, and list the user's own tasks
-     * only: groups give no rights (issue #225)
-     */
-    @Test
-    public void userToken_getList_ownTasksOnly() throws Exception {
-        mockUserInfo.givenThat(
-                WireMock.get("/")
-                        .withHeader("Authorization", equalTo("Bearer BAR"))
-                        .willReturn(
-                                okJson(
-                                        "{\"sub\" : \"123\", \"eduperson_entitlement\" : ["
-                                                + "\"urn:geant:elixir-europe.org:group:elixir:"
-                                                + "GA4GH:GA4GH-CAP:EBI:ADMIN#perun.elixir-czech.cz\"]}")));
-        mockKubernetes.givenThat(
-                WireMock.get(
-                                "/apis/batch/v1/namespaces/default/jobs?labelSelector=job-type%3Dtaskmaster"
-                                        + "%2Ccreator-user-hash%3D"
-                                        + CreatorLabels.hash("123")
-                                        + "&limit=256")
-                        .willReturn(aResponse().withBodyFile("list/taskmasters.json")));
-        MockUtil.mockListTaskKubernetesResponses(this.mockKubernetes);
-
-        // task-123 and task-125, also if Kubernetes returned others
-        listTasks("BAR")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tasks.length()").value(2));
-        mockUserInfo.verify(1, getRequestedFor(urlEqualTo("/")));
-    }
-
-    /** A user, by a user token, doesn't get the service client's tasks: not found */
+    /** A user doesn't get the service client's tasks: not found */
     @Test
     public void userToken_getServiceClientsTask() throws Exception {
-        mockUserInfo.givenThat(WireMock.get("/").willReturn(okJson("{\"sub\" : \"123\"}")));
-        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, CLIENT);
+        MockUtil.mockOwnTaskKubernetesResponses(this.mockKubernetes, owner(CLIENT));
 
-        getTask("BAR").andExpect(status().isNotFound());
+        getTask(TestIssuer.userToken("123")).andExpect(status().isNotFound());
     }
 }

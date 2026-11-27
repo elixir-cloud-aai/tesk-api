@@ -60,8 +60,8 @@ import uk.ac.ebi.tsc.tesk.tes.service.TaskFilter;
 import uk.ac.ebi.tsc.tesk.tes.service.TesService;
 
 @WebMvcTest(TasksApiController.class)
-// the auth profile, as the security configuration below stands for it (and the noauth one, which
-// application.properties sets, has a security configuration of its own)
+// the auth profile, as the security configuration below stands for it (the noauth profile has a
+// security configuration of its own)
 @ActiveProfiles("auth")
 public class TasksApiControllerTest {
 

@@ -14,13 +14,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import uk.ac.ebi.tsc.tesk.TestAuth;
 
 /**
  * The API description documents the type of inputs and outputs as optional, with its two values, in
  * requests and responses (TES 1.1, issue #146), although the models read it from JSON through a
  * String setter.
  */
-@SpringBootTest(properties = {"tesk.api.swagger-ui.enabled=true"})
+@SpringBootTest(
+        properties = {"tesk.api.swagger-ui.enabled=true", TestAuth.ISSUER_URL, TestAuth.AUDIENCES})
 @AutoConfigureMockMvc
 public class ApiDocsFileTypeTest {
 

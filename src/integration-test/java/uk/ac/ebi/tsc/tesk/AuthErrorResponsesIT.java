@@ -13,10 +13,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.ac.ebi.tsc.tesk.UrlConstants.TASK_URL;
 
-import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.util.Config;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,17 +32,14 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * Integration testing of the answers to requests without a valid access token (auth profile): the
- * status, the headers ({@code WWW-Authenticate}) and the JSON body. The user info endpoint is
- * WireMocked.
+ * status, the headers ({@code WWW-Authenticate}) and the JSON body, which never echo the token or
+ * name why it was refused. The issuer (discovery, keys) is WireMocked.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(
         locations = {"classpath:application.properties"},
-        properties = {
-            "security.oauth2.resource.user-info-uri = http://localhost:8090",
-            "spring.profiles.active=auth"
-        })
+        properties = {"spring.profiles.active=auth", TestIssuer.ISSUER_URL, TestIssuer.AUDIENCES})
 public class AuthErrorResponsesIT {
 
     private static final String TOKEN = "TOKEN-THAT-MUST-NOT-BE-ECHOED";
@@ -55,9 +52,9 @@ public class AuthErrorResponsesIT {
     @Autowired private MockMvc mvc;
 
     @RegisterExtension
-    public WireMockExtension mockUserInfo =
+    public WireMockExtension mockIssuer =
             WireMockExtension.newInstance()
-                    .options(wireMockConfig().port(8090))
+                    .options(wireMockConfig().port(TestIssuer.PORT))
                     .failOnUnmatchedRequests(true)
                     .build();
 
@@ -70,9 +67,14 @@ public class AuthErrorResponsesIT {
         }
     }
 
+    @BeforeEach
+    public void stubIssuer() {
+        TestIssuer.stub(mockIssuer);
+    }
+
     /** The answer to a request without a usable token: as before the resource server moved */
-    private static void expectUnauthorized(ResultActions result, String error, String description)
-            throws Exception {
+    private static void expectUnauthorized(
+            ResultActions result, String error, String description, String token) throws Exception {
         result.andExpect(status().isUnauthorized())
                 .andExpect(
                         header().string(
@@ -85,8 +87,8 @@ public class AuthErrorResponsesIT {
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(header().string("Pragma", "no-cache"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(header().string("WWW-Authenticate", not(containsString(TOKEN))))
-                .andExpect(content().string(not(containsString(TOKEN))));
+                .andExpect(header().string("WWW-Authenticate", not(containsString(token))))
+                .andExpect(content().string(not(containsString(token))));
     }
 
     private static void expectBody(ResultActions result, String error, String description)
@@ -102,110 +104,80 @@ public class AuthErrorResponsesIT {
     @Test
     public void withoutToken_isUnauthorized() throws Exception {
         ResultActions result = this.mvc.perform(get(TASK_URL));
-        expectUnauthorized(result, "unauthorized", NO_TOKEN_MESSAGE);
+        expectUnauthorized(result, "unauthorized", NO_TOKEN_MESSAGE, TOKEN);
         expectBody(result, "unauthorized", NO_TOKEN_MESSAGE);
-        expectUnauthorized(this.mvc.perform(head(TASK_URL)), "unauthorized", NO_TOKEN_MESSAGE);
-        mockUserInfo.verify(0, anyRequestedFor(anyUrl()));
+        expectUnauthorized(
+                this.mvc.perform(head(TASK_URL)), "unauthorized", NO_TOKEN_MESSAGE, TOKEN);
+        mockIssuer.verify(0, anyRequestedFor(anyUrl()));
     }
 
     @Test
     public void otherScheme_isUnauthorized() throws Exception {
         ResultActions result =
                 this.mvc.perform(get(TASK_URL).header("Authorization", "Basic Zm9vOmJhcg=="));
-        expectUnauthorized(result, "unauthorized", NO_TOKEN_MESSAGE);
+        expectUnauthorized(result, "unauthorized", NO_TOKEN_MESSAGE, TOKEN);
         expectBody(result, "unauthorized", NO_TOKEN_MESSAGE);
-        mockUserInfo.verify(0, anyRequestedFor(anyUrl()));
+        mockIssuer.verify(0, anyRequestedFor(anyUrl()));
     }
 
-    /** The user info endpoint gets the token as a bearer token, and is asked for JSON */
+    /**
+     * A valid token passes authentication without any request to the issuer but for its keys (no
+     * user info); creating a task is denied to every caller (issue #225), without asking Kubernetes
+     */
     @Test
-    public void validToken_isSentToUserInfo() throws Exception {
-        mockUserInfo.givenThat(
-                WireMock.get("/")
-                        .willReturn(okJson("{\"sub\":\"123\",\"eduperson_entitlement\":[]}")));
-        // creating a task is denied to every user (issue #225), without asking Kubernetes
+    public void validToken_isCheckedLocally() throws Exception {
         this.mvc
                 .perform(
                         post(TASK_URL)
-                                .header("Authorization", "Bearer " + TOKEN)
+                                .header("Authorization", "Bearer " + TestIssuer.userToken("123"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         "{\"executors\":[{\"image\":\"alpine\","
                                                 + "\"command\":[\"true\"]}]}"))
                 .andExpect(status().isForbidden());
-        mockUserInfo.verify(
-                1,
-                getRequestedFor(urlEqualTo("/"))
-                        .withHeader("Authorization", equalTo("Bearer " + TOKEN))
-                        .withHeader("Accept", containing("application/json")));
+        mockIssuer.verify(0, getRequestedFor(urlPathMatching(".*userinfo.*")));
     }
 
-    private void expectInvalidToken() throws Exception {
+    /** Not a JWT */
+    @Test
+    public void opaqueToken_isUnauthorized() throws Exception {
         ResultActions result =
                 this.mvc.perform(get(TASK_URL).header("Authorization", "Bearer " + TOKEN));
-        expectUnauthorized(result, "invalid_token", INVALID_TOKEN_MESSAGE);
+        expectUnauthorized(result, "invalid_token", INVALID_TOKEN_MESSAGE, TOKEN);
         expectBody(result, "invalid_token", INVALID_TOKEN_MESSAGE);
     }
 
+    /** A JWT that a check refuses: the answer names no reason, and doesn't echo the token */
     @Test
-    public void tokenRefusedByUserInfo_isUnauthorized() throws Exception {
-        mockUserInfo.givenThat(WireMock.get("/").willReturn(unauthorized()));
-        expectInvalidToken();
+    public void refusedJwt_isUnauthorized() throws Exception {
+        org.jose4j.jwt.JwtClaims claims = TestIssuer.userClaims("123");
+        claims.setAudience("other-service");
+        String token = TestIssuer.sign(claims);
+        ResultActions result =
+                this.mvc.perform(get(TASK_URL).header("Authorization", "Bearer " + token));
+        expectUnauthorized(result, "invalid_token", INVALID_TOKEN_MESSAGE, token);
+        expectBody(result, "invalid_token", INVALID_TOKEN_MESSAGE);
+        result.andExpect(content().string(not(containsString("audience"))));
     }
 
-    @Test
-    public void userInfoFails_isUnauthorized() throws Exception {
-        mockUserInfo.givenThat(WireMock.get("/").willReturn(serverError()));
-        expectInvalidToken();
-    }
-
-    @Test
-    public void userInfoWithError_isUnauthorized() throws Exception {
-        mockUserInfo.givenThat(
-                WireMock.get("/").willReturn(okJson("{\"error\":\"invalid_token\"}")));
-        expectInvalidToken();
-    }
-
-    @Test
-    public void userInfoWithoutSub_isUnauthorized() throws Exception {
-        mockUserInfo.givenThat(WireMock.get("/").willReturn(okJson("{\"name\":\"x\"}")));
-        expectInvalidToken();
-    }
-
-    @Test
-    public void userInfoNotJson_isUnauthorized() throws Exception {
-        mockUserInfo.givenThat(
-                WireMock.get("/")
-                        .willReturn(
-                                aResponse()
-                                        .withHeader("Content-Type", "application/json")
-                                        .withBody("[\"sub\"]")));
-        expectInvalidToken();
-    }
-
-    /** Malformed bearer tokens are refused without asking the user info endpoint */
+    /** Malformed bearer tokens are refused without asking the issuer */
     @Test
     public void malformedToken_isUnauthorized() throws Exception {
-        mockUserInfo.givenThat(
-                WireMock.get("/")
-                        .willReturn(okJson("{\"sub\":\"123\",\"eduperson_entitlement\":[]}")));
         for (String value : new String[] {"Bearer ", "Bearer a b", "Bearer a\"b"}) {
             this.mvc
                     .perform(get(TASK_URL).header("Authorization", value))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.error").value("invalid_token"));
         }
-        mockUserInfo.verify(0, anyRequestedFor(anyUrl()));
+        mockIssuer.verify(0, anyRequestedFor(anyUrl()));
     }
 
     /** Tokens are only taken from the Authorization header, not from the URL */
     @Test
     public void tokenInQuery_isIgnored() throws Exception {
-        mockUserInfo.givenThat(
-                WireMock.get("/")
-                        .willReturn(okJson("{\"sub\":\"123\",\"eduperson_entitlement\":[]}")));
-        ResultActions result = this.mvc.perform(get(TASK_URL).param("access_token", TOKEN));
-        expectUnauthorized(result, "unauthorized", NO_TOKEN_MESSAGE);
-        mockUserInfo.verify(0, anyRequestedFor(anyUrl()));
+        ResultActions result =
+                this.mvc.perform(get(TASK_URL).param("access_token", TestIssuer.userToken("123")));
+        expectUnauthorized(result, "unauthorized", NO_TOKEN_MESSAGE, TOKEN);
+        mockIssuer.verify(0, anyRequestedFor(anyUrl()));
     }
 }

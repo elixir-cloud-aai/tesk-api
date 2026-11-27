@@ -19,8 +19,7 @@ public class UserDetailsServiceTest {
     @Test
     public void auth_hasNoUsers() {
         ResourceServerConfiguration configuration =
-                new ResourceServerConfiguration(
-                        null, null, new AuthorisationProperties(), "/ga4gh/tes/v1", true, "");
+                new ResourceServerConfiguration(null, null, "/ga4gh/tes/v1", true);
         assertThat(configuration.userDetailsService().loadUserByUsername("user")).isNull();
     }
 }

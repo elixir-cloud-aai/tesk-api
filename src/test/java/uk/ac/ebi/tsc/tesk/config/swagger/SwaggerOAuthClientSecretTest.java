@@ -17,6 +17,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import uk.ac.ebi.tsc.tesk.TestAuth;
 
 /**
  * The Swagger UI is a public client: its configuration and the API description never contain the
@@ -27,7 +28,9 @@ import org.springframework.test.web.servlet.MockMvc;
             "tesk.api.swagger-ui.enabled=true",
             "tesk.api.swagger-oauth.implicit=false",
             "tesk.api.swagger-oauth.client-id=swagger-client-id",
-            "tesk.api.swagger-oauth.client-secret=" + SwaggerOAuthClientSecretTest.SECRET
+            "tesk.api.swagger-oauth.client-secret=" + SwaggerOAuthClientSecretTest.SECRET,
+            TestAuth.ISSUER_URL,
+            TestAuth.AUDIENCES
         })
 @ExtendWith(OutputCaptureExtension.class)
 @ActiveProfiles("auth")
