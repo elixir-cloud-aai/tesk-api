@@ -149,6 +149,42 @@ A quota on `limits.memory` also needs memory limits: executors get one only
 from `resources.ram_gb`, so give the namespace a `LimitRange` with a default
 memory limit for executors of tasks without it.
 
+### Limit ranges
+
+A `LimitRange` of the namespace gives containers without a limit (or
+request) for a resource its default limit (`default`) and default request
+(`defaultRequest`), and refuses pods whose containers are outside its
+`min` and `max`. Kubernetes checks this when the job creates the pod, not
+when the job is created: a refused pod leaves the job without pods
+(`FailedCreate` events on the job, e.g. `must be less than or equal to
+memory limit of 1Gi`).
+
+The containers get their limits as follows, so that a namespace's default
+limit never applies to a resource that has a request of its own:
+
+Container | CPU | Memory
+--- | --- | ---
+Taskmaster | From `TESK_API_TASKMASTER_RESOURCES` (request 100m, limit 500m) | From `TESK_API_TASKMASTER_RESOURCES` (request 128Mi, limit 256Mi)
+Executors | `resources.cpu_cores` as request and limit, else `TESK_API_TASKMASTER_EXECUTOR_DEFAULT_CPU` (1) | `resources.ram_gb` as request and limit, else none (the `LimitRange`'s defaults apply)
+Filers | From the taskmaster's `FILER_RESOURCES` (request 100m, limit 1) | From the taskmaster's `FILER_RESOURCES` (request 128Mi, limit 512Mi)
+
+The values in parentheses are the defaults; the filers have them since
+taskmaster 0.13.0 (before: none, and the `LimitRange`'s defaults applied).
+
+Before 2.1.0, executors of tasks with both `cpu_cores` and `ram_gb` got a
+memory request but no memory limit. In a namespace whose default memory
+limit is below the task's `ram_gb` (e.g. 1Gi on CSC Rahti, and a task
+asking for 2 GB), their pods were refused, and the task stayed `RUNNING`
+(see [Upgrading](upgrading.md#to-210)). Taskmaster 0.13.0 also fills in an
+executor's missing limits from its requests, per resource, so that it
+fixes this for older TESK API versions too.
+
+Tasks still fail where they ask for more than the `LimitRange` allows:
+`ram_gb` or `cpu_cores` above its `max`, or `cpu_cores` below its `min`
+(TESK API raises `ram_gb` to the highest memory `min` of the namespace's
+`LimitRange`s, if it may list them; see [Deployment](deployment.md)). Set
+the taskmaster's and the filers' resources within the `LimitRange` too.
+
 ## Tool images from a tool registry
 
 An executor's `image` can name a tool version in a GA4GH Tool Registry

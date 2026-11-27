@@ -182,7 +182,9 @@
   taskmaster set the limits to the requests; with `cpu_cores`, there was no
   memory limit, or a `LimitRange`'s default, which could be below the
   request, so that the executor never started; see
-  [tesk-core#160](https://github.com/elixir-cloud-aai/tesk-core/issues/160)).
+  [tesk-core#160](https://github.com/elixir-cloud-aai/tesk-core/issues/160),
+  [#234](https://github.com/elixir-cloud-aai/tesk-api/issues/234) and
+  [Limit ranges](configuration.md#limit-ranges)).
 - **Security contexts.** New settings give the taskmaster's and the
   executors' pods and containers security contexts, e.g. for namespaces
   that enforce the `restricted` Pod Security Standard
