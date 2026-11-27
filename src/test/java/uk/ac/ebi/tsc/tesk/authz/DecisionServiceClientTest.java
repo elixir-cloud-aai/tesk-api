@@ -90,10 +90,10 @@ public class DecisionServiceClientTest {
     public void evaluate_credentialFileGone() {
         assertThatThrownBy(() -> client(dir.resolve("missing"), 2000).evaluate(BODY, "rid"))
                 .isInstanceOf(DecisionServiceClient.Failure.class)
-                .hasMessage("credential file empty, unreadable or with control characters");
+                .hasMessage("credential file empty, unreadable or not printable ASCII");
     }
 
-    /** A credential of several lines can't be a header value: refused, not a 500 */
+    /** A credential of several lines, or not ASCII, can't be a bearer header: refused, not a 500 */
     @Test
     public void readCredential_controlCharacters() throws IOException {
         Path file = dir.resolve("lines");
@@ -103,9 +103,13 @@ public class DecisionServiceClientTest {
         Files.write(file, "a\u007fb".getBytes(StandardCharsets.UTF_8));
         assertThatThrownBy(() -> DecisionServiceClient.readCredential(file))
                 .isInstanceOf(IOException.class);
+        // not ASCII: the header would carry other bytes than the secret, or not be built
+        Files.write(file, "caf\u00e9".getBytes(StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> DecisionServiceClient.readCredential(file))
+                .isInstanceOf(IOException.class);
         assertThatThrownBy(() -> client(file, 2000).evaluate(BODY, "rid"))
                 .isInstanceOf(DecisionServiceClient.Failure.class)
-                .hasMessage("credential file empty, unreadable or with control characters");
+                .hasMessage("credential file empty, unreadable or not printable ASCII");
     }
 
     /** A value whose getter fails, so that it can't be written as JSON */
@@ -177,10 +181,11 @@ public class DecisionServiceClientTest {
     public void evaluate_timeout() {
         pdp.stubFor(
                 post(urlEqualTo("/access/v1/evaluation"))
-                        .willReturn(okJson("{\"decision\": true}").withFixedDelay(1500)));
+                        .willReturn(okJson("{\"decision\": true}").withFixedDelay(1000)));
 
-        assertThatThrownBy(() -> client(null, 200).evaluate(BODY, "rid"))
-                .isInstanceOf(DecisionServiceClient.Failure.class);
+        assertThatThrownBy(() -> client(null, 100).evaluate(BODY, "rid"))
+                .isInstanceOf(DecisionServiceClient.Failure.class)
+                .hasMessage("timeout");
     }
 
     @Test

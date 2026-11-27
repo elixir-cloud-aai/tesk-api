@@ -7,14 +7,16 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  * 503 - the right to create a task can't be decided now: the decision service
  * (tesk.api.authz.decision-service) timed out, couldn't be reached, or didn't answer with a boolean
  * decision, or the caller's claims couldn't be looked up at the user info endpoint of its issuer.
- * The request is denied; the message is generic, the cause is logged.
+ * The request is denied; the message is generic, the cause is logged. Answered like tokens that
+ * can't be checked now, with the OAuth 2.0 error {@code temporarily_unavailable} ({@code
+ * CustomErrorHandler}).
  */
 @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
 public class AuthorisationUnavailableException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
-    static final String MESSAGE = "Authorisation unavailable; try again later";
+    public static final String MESSAGE = "Authorisation unavailable; try again later";
 
     public AuthorisationUnavailableException() {
         super(MESSAGE);

@@ -10,13 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import uk.ac.ebi.tsc.tesk.config.security.token.BoundedHttp;
 
 /**
  * Asks an OpenID AuthZEN 1.0 Access Evaluation endpoint ({@code POST}, JSON) for one decision. One
@@ -53,22 +50,22 @@ public class DecisionServiceClient {
         this.url = url;
         this.timeout = timeout;
         this.credentialFile = credentialFile;
-        this.client = HttpClient.newBuilder().connectTimeout(timeout).build();
+        this.client = BoundedHttp.client(timeout);
     }
 
     /**
      * Reads the credential file: its content without surrounding white space
      *
-     * @throws IOException if it can't be read, is empty, or has control characters (e.g. several
-     *     lines), which can't be sent in a header
+     * @throws IOException if it can't be read, is empty, or has characters other than printable
+     *     ASCII (e.g. several lines), which a bearer credential can't have (RFC 6750)
      */
     static String readCredential(Path file) throws IOException {
         String credential = new String(Files.readAllBytes(file), StandardCharsets.UTF_8).trim();
         if (credential.isEmpty()) {
             throw new IOException("empty");
         }
-        if (credential.chars().anyMatch(c -> c < 0x20 || c == 0x7f)) {
-            throw new IOException("control characters");
+        if (credential.chars().anyMatch(c -> c < 0x20 || c > 0x7e)) {
+            throw new IOException("not printable ASCII");
         }
         return credential;
     }
@@ -93,7 +90,6 @@ public class DecisionServiceClient {
     private HttpRequest request(Map<String, Object> body, String requestId) throws Failure {
         HttpRequest.Builder request =
                 HttpRequest.newBuilder(this.url)
-                        .timeout(this.timeout)
                         .header("Content-Type", "application/json")
                         .header("Accept", "application/json")
                         .header("X-Request-ID", requestId)
@@ -104,27 +100,18 @@ public class DecisionServiceClient {
             try {
                 request.header("Authorization", "Bearer " + readCredential(this.credentialFile));
             } catch (IOException e) {
-                throw new Failure("credential file empty, unreadable or with control characters");
+                throw new Failure("credential file empty, unreadable or not printable ASCII");
             }
         }
         return request.build();
     }
 
     private boolean decision(HttpRequest request) throws Failure {
-        CompletableFuture<HttpResponse<String>> call =
-                this.client.sendAsync(
-                        request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         HttpResponse<String> response;
         try {
-            response = call.get(this.timeout.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
-            call.cancel(true);
-            throw new Failure("timeout");
-        } catch (ExecutionException e) {
-            throw new Failure(e.getCause().getClass().getSimpleName());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new Failure("interrupted");
+            response = BoundedHttp.send(this.client, request, this.timeout);
+        } catch (BoundedHttp.Failure e) {
+            throw new Failure(e.getMessage());
         }
         if (response.statusCode() != 200) {
             throw new Failure("status " + response.statusCode());

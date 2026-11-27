@@ -4,15 +4,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.jose4j.json.JsonUtil;
 import org.jose4j.lang.JoseException;
 import org.slf4j.Logger;
@@ -27,22 +22,35 @@ import org.springframework.util.StringUtils;
  * create.
  *
  * <p>The endpoint is {@code tesk.api.auth.issuers[i].userinfo-uri}, else the {@code
- * userinfo_endpoint} of the issuer's discovery document (fetched once it is needed, and kept once
- * it was found). One attempt per lookup, bounded by {@code tesk.api.auth.timeout-seconds} as a
- * whole. Never logs the token or the claims.
+ * userinfo_endpoint} of the issuer's discovery document (fetched once it is needed, and kept until
+ * a lookup there gets no answer, or a status other than 200, 401 and 403). One attempt per lookup,
+ * bounded by {@code tesk.api.auth.timeout-seconds} as a whole. Never logs the token or the claims.
  */
 public class UserInfoClient {
 
     private static final Logger logger = LoggerFactory.getLogger(UserInfoClient.class);
 
-    /** An issuer's endpoint: configured, or discovered (then kept) */
+    /** An issuer's endpoint: configured, or discovered (then kept while it answers) */
     private static final class Endpoint {
         private final String issuer;
+        private final boolean configured;
         private volatile URI uri;
 
         Endpoint(String issuer, URI uri) {
             this.issuer = issuer;
+            this.configured = uri != null;
             this.uri = uri;
+        }
+
+        /**
+         * Forgets a discovered endpoint that failed, so that the next lookup discovers it again
+         * (e.g. after the issuer moved it); a configured one is kept. A lookup that fails while
+         * another one discovers again costs at most one more discovery.
+         */
+        void forgetDiscovered() {
+            if (!this.configured) {
+                this.uri = null;
+            }
         }
     }
 
@@ -71,7 +79,7 @@ public class UserInfoClient {
         }
         this.endpoints = Collections.unmodifiableMap(byIssuer);
         this.timeout = Duration.ofSeconds(properties.getTimeoutSeconds());
-        this.client = HttpClient.newBuilder().connectTimeout(this.timeout).build();
+        this.client = BoundedHttp.client(this.timeout);
     }
 
     /**
@@ -95,12 +103,17 @@ public class UserInfoClient {
         URI uri = endpoint(endpoint);
         HttpRequest request =
                 HttpRequest.newBuilder(uri)
-                        .timeout(this.timeout)
                         .header("Accept", "application/json")
                         .header("Authorization", "Bearer " + token)
                         .GET()
                         .build();
-        HttpResponse<String> response = send(endpoint.issuer, request);
+        HttpResponse<String> response;
+        try {
+            response = send(endpoint.issuer, request);
+        } catch (IssuerUnavailableException e) {
+            endpoint.forgetDiscovered();
+            throw e;
+        }
         int status = response.statusCode();
         if (status == 401 || status == 403) {
             logger.info(
@@ -110,6 +123,7 @@ public class UserInfoClient {
             throw new InvalidTokenException("refused by the user info endpoint");
         }
         if (status != 200) {
+            endpoint.forgetDiscovered();
             throw unavailable(endpoint.issuer, "status " + status);
         }
         Map<String, Object> claims = object(endpoint.issuer, response.body());
@@ -130,7 +144,6 @@ public class UserInfoClient {
         String discovery = endpoint.issuer.replaceAll("/+$", "") + IssuerVerifier.DISCOVERY_PATH;
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(discovery))
-                        .timeout(this.timeout)
                         .header("Accept", "application/json")
                         .GET()
                         .build();
@@ -155,19 +168,10 @@ public class UserInfoClient {
 
     /** Sends the request, bounded by the timeout as a whole */
     private HttpResponse<String> send(String issuer, HttpRequest request) {
-        CompletableFuture<HttpResponse<String>> call =
-                this.client.sendAsync(
-                        request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         try {
-            return call.get(this.timeout.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
-            call.cancel(true);
-            throw unavailable(issuer, "timeout");
-        } catch (ExecutionException e) {
-            throw unavailable(issuer, e.getCause().getClass().getSimpleName());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw unavailable(issuer, "interrupted");
+            return BoundedHttp.send(this.client, request, this.timeout);
+        } catch (BoundedHttp.Failure e) {
+            throw unavailable(issuer, e.getMessage());
         }
     }
 

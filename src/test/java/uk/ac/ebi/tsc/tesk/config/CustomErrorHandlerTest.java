@@ -20,6 +20,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.ServletWebRequest;
+import uk.ac.ebi.tsc.tesk.tes.exception.AuthorisationUnavailableException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.exception.UserInfoRefusedException;
 
@@ -75,11 +76,37 @@ public class CustomErrorHandlerTest {
                         + " error_description=\"Invalid access token\"",
                 response.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
         assertEquals("no-store", response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL));
+        assertEquals("no-cache", response.getHeaders().getFirst(HttpHeaders.PRAGMA));
         Map<?, ?> body = (Map<?, ?>) response.getBody();
         assertEquals(401, body.get("status"));
         assertEquals("invalid_token", body.get("error"));
         assertEquals("Invalid access token", body.get("error_description"));
         assertEquals("Invalid access token", body.get("message"));
+    }
+
+    /**
+     * No decision about creating a task: 503 with the OAuth 2.0 error {@code
+     * temporarily_unavailable}, as for tokens that can't be checked now, and no {@code
+     * WWW-Authenticate}
+     */
+    @Test
+    public void authorisationUnavailableHandler_answersAsForUncheckableTokens() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/tasks");
+        DefaultErrorAttributes errorAttributes = new DefaultErrorAttributes();
+        CustomErrorHandler handler = new CustomErrorHandler(errorAttributes);
+        AuthorisationUnavailableException ex = new AuthorisationUnavailableException();
+        errorAttributes.resolveException(request, new MockHttpServletResponse(), null, ex);
+
+        ResponseEntity<?> response = handler.authorisationUnavailableHandler(request, ex);
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertNull(response.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
+        assertEquals("no-store", response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL));
+        Map<?, ?> body = (Map<?, ?>) response.getBody();
+        assertEquals(503, body.get("status"));
+        assertEquals("temporarily_unavailable", body.get("error"));
+        assertEquals(AuthorisationUnavailableException.MESSAGE, body.get("error_description"));
+        assertEquals(AuthorisationUnavailableException.MESSAGE, body.get("message"));
     }
 
     /** Exceptions get the status of their {@code @ResponseStatus}, the others 500 */

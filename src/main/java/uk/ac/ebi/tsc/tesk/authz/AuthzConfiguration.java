@@ -52,11 +52,17 @@ public class AuthzConfiguration {
                 StringUtils.hasText(file) ? Path.of(file.strip()) : null);
     }
 
+    /**
+     * The client of the issuers' user info endpoints, after the token validator, which checks their
+     * settings
+     */
     @Bean
+    @DependsOn("tokenValidator")
     public UserInfoClient userInfoClient(TokenValidationProperties properties) {
         return new UserInfoClient(properties);
     }
 
+    /** The decision whether the caller may create a task, for {@code @PreAuthorize} */
     @Bean
     public CreateAuthorisation createAuthorisation(
             DecisionServiceClient decisionServiceClient,
@@ -102,8 +108,8 @@ public class AuthzConfiguration {
             } catch (IOException | RuntimeException e) {
                 throw new IllegalStateException(
                         PREFIX
-                                + "credential-file can't be read, is empty or has more than"
-                                + " one line");
+                                + "credential-file can't be read, is empty or isn't one line of"
+                                + " printable ASCII");
             }
         }
         return url;

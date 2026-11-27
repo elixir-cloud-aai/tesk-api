@@ -83,15 +83,6 @@ final class IssuerVerifier {
     }
 
     /**
-     * Whether keys from the URL can be trusted: https, or http to the local host only (e.g. for
-     * tests), as anyone on the network path of plain http could give TESK API keys of their own
-     * ({@link SecureUrls#isSecure})
-     */
-    static boolean isSecure(String url) {
-        return SecureUrls.isSecure(url);
-    }
-
-    /**
      * @return the claims of the token, if all checks pass
      * @throws InvalidJwtException if a check fails
      * @throws IOException if the issuer's keys are unavailable (also if they can't be fetched again
@@ -262,7 +253,7 @@ final class IssuerVerifier {
         Object jwks = document.get("jwks_uri");
         if (!this.issuer.equals(document.get("issuer"))
                 || !(jwks instanceof String)
-                || !isSecure((String) jwks)) {
+                || !SecureUrls.isSecure((String) jwks)) {
             throw new JoseException(
                     "Discovery document of another issuer, or without an https jwks_uri");
         }

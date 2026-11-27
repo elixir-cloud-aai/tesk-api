@@ -20,7 +20,7 @@ import uk.ac.ebi.tsc.tesk.config.security.token.TokenValidator;
 public final class TokenValidatorIntrospector implements OpaqueTokenIntrospector {
 
     /** Description of the error for all tokens that the validator refuses */
-    static final String INVALID_TOKEN = "Invalid access token";
+    public static final String INVALID_TOKEN = "Invalid access token";
 
     private final TokenValidator validator;
 

@@ -122,8 +122,7 @@ final class MockPdp implements ResponseDefinitionTransformerV2 {
         JsonObject decision = new JsonObject();
         switch (action) {
             case "CreateTask" ->
-                    decision.addProperty(
-                            "decision", namesSubjectAsOwner(request) && mayCreate(request));
+                    decision.addProperty("decision", isOwner(request) && mayCreate(request));
             case "GetTask", "CancelTask" ->
                     decision.addProperty("decision", this.mode == Mode.WIDEN || isOwner(request));
             case "ListTasks" -> {
@@ -145,12 +144,10 @@ final class MockPdp implements ResponseDefinitionTransformerV2 {
         return decision;
     }
 
-    /** tes-authzen/3: CreateTask names the caller as the new task's owner */
-    private static boolean namesSubjectAsOwner(JsonObject request) {
-        Optional<String> owner = string(request, "resource", "properties", "owner");
-        return owner.isPresent() && owner.equals(string(request, "subject", "id"));
-    }
-
+    /**
+     * Whether the resource's owner is the subject: for CreateTask (tes-authzen/3), the caller is
+     * named as the new task's owner
+     */
     private static boolean isOwner(JsonObject request) {
         Optional<String> owner = string(request, "resource", "properties", "owner");
         return owner.isPresent() && owner.equals(string(request, "subject", "id"));

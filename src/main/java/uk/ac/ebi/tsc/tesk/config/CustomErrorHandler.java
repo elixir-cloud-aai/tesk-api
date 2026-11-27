@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,6 +29,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import uk.ac.ebi.tsc.tesk.config.security.CustomAuthenticationEntryPoint;
+import uk.ac.ebi.tsc.tesk.tes.exception.AuthorisationUnavailableException;
 import uk.ac.ebi.tsc.tesk.tes.exception.UserInfoRefusedException;
 
 /**
@@ -48,9 +50,6 @@ import uk.ac.ebi.tsc.tesk.tes.exception.UserInfoRefusedException;
 @ControllerAdvice
 public class CustomErrorHandler extends ResponseEntityExceptionHandler {
 
-    /** The OAuth 2.0 error code of an invalid token (RFC 6750, section 3.1) */
-    static final String INVALID_TOKEN = "invalid_token";
-
     private final ErrorAttributes errorAttributes;
 
     public CustomErrorHandler(ErrorAttributes errorAttributes) {
@@ -67,25 +66,56 @@ public class CustomErrorHandler extends ResponseEntityExceptionHandler {
 
     /**
      * The user info endpoint refused the caller's token when a task was created: {@code 401}, as
-     * for other invalid tokens, with {@code WWW-Authenticate} ({@code invalid_token}) and the OAuth
-     * 2.0 error in the body
+     * for other invalid tokens ({@link CustomAuthenticationEntryPoint}), with {@code
+     * WWW-Authenticate} ({@code invalid_token}) and the OAuth 2.0 error in the body
      */
     @ExceptionHandler(UserInfoRefusedException.class)
     @ResponseBody
-    @SuppressWarnings("unchecked")
     public ResponseEntity<?> userInfoRefusedHandler(
             HttpServletRequest request, UserInfoRefusedException ex) {
-        ResponseEntity<?> response = this.handleExceptionInternal(request, HttpStatus.UNAUTHORIZED);
-        Map<String, Object> body = (Map<String, Object>) response.getBody();
-        body.put("error", INVALID_TOKEN);
-        body.put("error_description", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .header(
                         HttpHeaders.WWW_AUTHENTICATE,
                         CustomAuthenticationEntryPoint.wwwAuthenticate(
-                                INVALID_TOKEN, ex.getMessage()))
+                                OAuth2ErrorCodes.INVALID_TOKEN, ex.getMessage()))
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(body);
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .body(
+                        this.oauthErrorBody(
+                                request,
+                                HttpStatus.UNAUTHORIZED,
+                                OAuth2ErrorCodes.INVALID_TOKEN,
+                                ex.getMessage()));
+    }
+
+    /**
+     * The right to create a task can't be decided now: {@code 503}, as for tokens that can't be
+     * checked now ({@link CustomAuthenticationEntryPoint}), with {@code Cache-Control: no-store}
+     * and the OAuth 2.0 error {@code temporarily_unavailable} in the body
+     */
+    @ExceptionHandler(AuthorisationUnavailableException.class)
+    @ResponseBody
+    public ResponseEntity<?> authorisationUnavailableHandler(
+            HttpServletRequest request, AuthorisationUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(
+                        this.oauthErrorBody(
+                                request,
+                                HttpStatus.SERVICE_UNAVAILABLE,
+                                OAuth2ErrorCodes.TEMPORARILY_UNAVAILABLE,
+                                ex.getMessage()));
+    }
+
+    /** The error attributes for the status, plus the OAuth 2.0 error code and description */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> oauthErrorBody(
+            HttpServletRequest request, HttpStatus status, String error, String description) {
+        Map<String, Object> body =
+                (Map<String, Object>) this.handleExceptionInternal(request, status).getBody();
+        body.put("error", error);
+        body.put("error_description", description);
+        return body;
     }
 
     /**

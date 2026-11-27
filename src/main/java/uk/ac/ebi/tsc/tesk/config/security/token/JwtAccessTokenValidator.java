@@ -169,20 +169,18 @@ public final class JwtAccessTokenValidator implements TokenValidator {
         String url = trimmed(settings.getUrl());
         check(url != null, key + "url must be set");
         // also refuses the separator of the owner (TokenPrincipal), which URLs can't hold
-        check(
-                IssuerVerifier.isSecure(url),
-                key + "url must be an https URL (http only for localhost)");
+        check(SecureUrls.isSecure(url), key + "url must be an https URL (http only for localhost)");
         // an issuer identifier has none (RFC 8414 section 2, OpenID Connect Discovery 1.0)
         check(
                 !url.contains("?") && !url.contains("#"),
                 key + "url must not have a query or fragment");
         String jwksUri = trimmed(settings.getJwksUri());
         check(
-                jwksUri == null || IssuerVerifier.isSecure(jwksUri),
+                jwksUri == null || SecureUrls.isSecure(jwksUri),
                 key + "jwks-uri must be an https URL (http only for localhost)");
         String userinfoUri = trimmed(settings.getUserinfoUri());
         check(
-                userinfoUri == null || IssuerVerifier.isSecure(userinfoUri),
+                userinfoUri == null || SecureUrls.isSecure(userinfoUri),
                 key + "userinfo-uri must be an https URL (http only for localhost)");
         String clientClaim = trimmed(settings.getClientClaim());
         check(clientClaim != null, key + "client-claim must be set");

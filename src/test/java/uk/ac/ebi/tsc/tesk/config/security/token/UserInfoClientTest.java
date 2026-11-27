@@ -116,6 +116,43 @@ public class UserInfoClientTest {
                 .hasMessage("refused by the user info endpoint");
     }
 
+    /** A discovered endpoint that fails is discovered again at the next lookup */
+    @Test
+    public void failingDiscoveredEndpoint_isDiscoveredAgain() {
+        discovered();
+        userInfo(500, "");
+        UserInfoClient client = new UserInfoClient(this.properties);
+
+        assertThatThrownBy(() -> client.claims(alice(), TOKEN))
+                .isInstanceOf(IssuerUnavailableException.class);
+        idp.stubFor(
+                get(urlEqualTo("/oidc/userinfo"))
+                        .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+        assertThatThrownBy(() -> client.claims(alice(), TOKEN))
+                .isInstanceOf(IssuerUnavailableException.class);
+        userInfo(200, "{\"sub\": \"alice\"}");
+        assertThat(client.claims(alice(), TOKEN)).containsEntry("sub", "alice");
+        client.claims(alice(), TOKEN);
+
+        idp.verify(3, getRequestedFor(urlEqualTo("/oidc/.well-known/openid-configuration")));
+    }
+
+    /** A configured endpoint that fails is kept: there is nothing to discover */
+    @Test
+    public void failingConfiguredEndpoint_isKept() {
+        this.properties.getIssuers().get(0).setUserinfoUri(idp.baseUrl() + "/oidc/userinfo");
+        userInfo(500, "");
+        UserInfoClient client = new UserInfoClient(this.properties);
+
+        assertThatThrownBy(() -> client.claims(alice(), TOKEN))
+                .isInstanceOf(IssuerUnavailableException.class);
+        assertThatThrownBy(() -> client.claims(alice(), TOKEN))
+                .isInstanceOf(IssuerUnavailableException.class);
+
+        idp.verify(0, getRequestedFor(urlEqualTo("/oidc/.well-known/openid-configuration")));
+        idp.verify(2, getRequestedFor(urlEqualTo("/oidc/userinfo")));
+    }
+
     @Test
     public void anotherSubject_isRefused() {
         discovered();
@@ -162,17 +199,17 @@ public class UserInfoClientTest {
                 .hasMessage("user info unavailable: status " + status);
     }
 
-    /** No answer within the timeout (of the request or of the lookup, whichever ends first) */
+    /** No answer within the timeout */
     @Test
     public void timeout_isUnavailable() {
         discovered();
         idp.stubFor(
                 get(urlEqualTo("/oidc/userinfo"))
-                        .willReturn(okJson("{\"sub\": \"alice\"}").withFixedDelay(2500)));
+                        .willReturn(okJson("{\"sub\": \"alice\"}").withFixedDelay(1500)));
 
         assertThatThrownBy(this::lookUp)
                 .isInstanceOf(IssuerUnavailableException.class)
-                .hasMessageMatching("user info unavailable: (timeout|HttpTimeoutException)");
+                .hasMessage("user info unavailable: timeout");
     }
 
     /** An answer whose body doesn't end within the timeout (of the lookup as a whole) */
@@ -183,7 +220,7 @@ public class UserInfoClientTest {
                 get(urlEqualTo("/oidc/userinfo"))
                         .willReturn(
                                 okJson("{\"sub\": \"alice\", \"padding\": \"xxxxxxxxxx\"}")
-                                        .withChunkedDribbleDelay(10, 2500)));
+                                        .withChunkedDribbleDelay(10, 1500)));
 
         assertThatThrownBy(this::lookUp)
                 .isInstanceOf(IssuerUnavailableException.class)

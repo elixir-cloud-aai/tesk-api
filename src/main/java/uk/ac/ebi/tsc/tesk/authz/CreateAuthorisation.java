@@ -53,6 +53,10 @@ public class CreateAuthorisation {
 
     private static final Logger logger = LoggerFactory.getLogger(CreateAuthorisation.class);
 
+    /** Reads the bearer token of a request, as Spring Security does for authentication */
+    private static final DefaultBearerTokenResolver BEARER_TOKENS =
+            new DefaultBearerTokenResolver();
+
     /** The profile of the requests (the tes-authz spec) */
     static final String PROFILE = "tes-authzen/3";
 
@@ -225,6 +229,6 @@ public class CreateAuthorisation {
             return null;
         }
         HttpServletRequest request = servlet.getRequest();
-        return new DefaultBearerTokenResolver().resolve(request);
+        return BEARER_TOKENS.resolve(request);
     }
 }

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import uk.ac.ebi.tsc.tesk.tes.exception.UncheckableUrlException;
 import uk.ac.ebi.tsc.tesk.tes.model.TesExecutor;
 import uk.ac.ebi.tsc.tesk.tes.model.TesFileType;
 import uk.ac.ebi.tsc.tesk.tes.model.TesInput;
@@ -17,13 +18,18 @@ import uk.ac.ebi.tsc.tesk.tes.model.TesTask;
  * {@code preemptible}, {@code zones}), {@code volumes}, {@code executors[].image}, {@code
  * inputs[].{url,path,type}} and {@code outputs[].{url,path,type}}, with URLs stripped ({@link
  * UrlStripper}). Never commands, environments, input contents or backend parameters, which may hold
- * secrets. Fields without a value are left out.
+ * secrets. Fields without a value, and list elements that are null, are left out.
  */
 public final class TaskProjection {
 
     private TaskProjection() {}
 
-    /** The projection of the task */
+    /**
+     * The projection of the task
+     *
+     * @throws UncheckableUrlException if an input or output has a URL that the stripping leaves
+     *     out, which the decision service couldn't tell from inline content
+     */
     public static Map<String, Object> of(TesTask task) {
         Map<String, Object> projection = new LinkedHashMap<>();
         put(projection, "name", task.getName());
@@ -42,6 +48,9 @@ public final class TaskProjection {
         List<Map<String, Object>> executors = new ArrayList<>();
         if (task.getExecutors() != null) {
             for (TesExecutor executor : task.getExecutors()) {
+                if (executor == null) {
+                    continue;
+                }
                 Map<String, Object> image = new LinkedHashMap<>();
                 put(image, "image", executor.getImage());
                 executors.add(image);
@@ -50,24 +59,45 @@ public final class TaskProjection {
         projection.put("executors", executors);
         if (task.getInputs() != null) {
             List<Map<String, Object>> inputs = new ArrayList<>();
-            for (TesInput input : task.getInputs()) {
-                inputs.add(file(input.getUrl(), input.getPath(), input.getType()));
+            for (int i = 0; i < task.getInputs().size(); i++) {
+                TesInput input = task.getInputs().get(i);
+                if (input != null) {
+                    inputs.add(
+                            file(
+                                    "inputs[" + i + "].url",
+                                    input.getUrl(),
+                                    input.getPath(),
+                                    input.getType()));
+                }
             }
             projection.put("inputs", inputs);
         }
         if (task.getOutputs() != null) {
             List<Map<String, Object>> outputs = new ArrayList<>();
-            for (TesOutput output : task.getOutputs()) {
-                outputs.add(file(output.getUrl(), output.getPath(), output.getType()));
+            for (int i = 0; i < task.getOutputs().size(); i++) {
+                TesOutput output = task.getOutputs().get(i);
+                if (output != null) {
+                    outputs.add(
+                            file(
+                                    "outputs[" + i + "].url",
+                                    output.getUrl(),
+                                    output.getPath(),
+                                    output.getType()));
+                }
             }
             projection.put("outputs", outputs);
         }
         return projection;
     }
 
-    private static Map<String, Object> file(String url, String path, TesFileType type) {
+    private static Map<String, Object> file(
+            String field, String url, String path, TesFileType type) {
         Map<String, Object> file = new LinkedHashMap<>();
-        put(file, "url", UrlStripper.strip(url));
+        String stripped = UrlStripper.strip(url);
+        if (url != null && stripped == null) {
+            throw new UncheckableUrlException(field);
+        }
+        put(file, "url", stripped);
         put(file, "path", path);
         put(file, "type", type == null ? null : type.getValue());
         return file;
