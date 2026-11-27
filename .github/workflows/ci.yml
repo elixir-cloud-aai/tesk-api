@@ -218,7 +218,23 @@ jobs:
             echo "::error::Image user is '${user}', expected '1000:0'"
             exit 1
           fi
-          start
+          # The default profile is `auth`, which needs at least one issuer:
+          # without one, the app refuses to start and names the setting
+          if timeout 120 docker run --rm tesk-api:smoke > default.log 2>&1; then
+            echo "::error::App started without issuers in the default profile"
+            exit 1
+          fi
+          if ! grep -q 'tesk.api.auth.issuers' default.log; then
+            cat default.log
+            echo "::error::App did not name the missing issuers"
+            exit 1
+          fi
+          # Without authentication (explicit `noauth`), and with it (an
+          # issuer that is never asked: no request below has a valid token)
+          noauth=(--env SPRING_PROFILES_ACTIVE=noauth)
+          auth=(--env TESK_API_AUTH_ISSUERS_0_URL=https://issuer.example/
+                --env TESK_API_AUTH_ISSUERS_0_AUDIENCES_0=tesk)
+          start "${noauth[@]}"
           check "${api}/service-info" 200
           curl --silent --fail "${host}${api}/service-info" | jq -e '.type.artifact | ascii_downcase == "tes"'
           # The Swagger UI is off by default; the API description is not.
@@ -229,18 +245,26 @@ jobs:
           check /v3/api-docs 200
           check /v2/api-docs 404
           stop
-          start --env SPRING_PROFILES_ACTIVE=auth
+          start "${auth[@]}"
           check "${api}/service-info" 200
           check "${api}/tasks" 401
           check /v3/api-docs 200
           check /v2/api-docs 401
+          # Public service info ignores tokens, also invalid ones
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --header 'Authorization: Bearer not-a-token' "${host}${api}/service-info")"
+          if [[ "${status}" != 200 ]]; then
+            docker logs smoke
+            echo "::error::GET service-info with an invalid token: status ${status}, expected 200"
+            exit 1
+          fi
           stop
-          start --env SPRING_PROFILES_ACTIVE=auth --env TESK_API_SERVICE_INFO_PUBLIC=false
+          start "${auth[@]}" --env TESK_API_SERVICE_INFO_PUBLIC=false
           check "${api}/service-info" 401
           stop
           # An arbitrary UID in group 0, as on OpenShift, with a read-only
           # root file system (the app writes only to `/tmp`)
-          start --user 1000750000:0 --read-only --tmpfs /tmp
+          start "${noauth[@]}" --user 1000750000:0 --read-only --tmpfs /tmp
           check "${api}/service-info" 200
           stop
           # ... which finds its home directory (`~/.kube/config`), writable for
@@ -250,7 +274,7 @@ jobs:
             echo "::error::Home directory not set up for an arbitrary UID"
             exit 1
           }
-          start --env TESK_API_SWAGGER_UI_ENABLED=true
+          start "${noauth[@]}" --env TESK_API_SWAGGER_UI_ENABLED=true
           check /swagger-ui/index.html 200
           check /v3/api-docs/swagger-config 200
           stop
