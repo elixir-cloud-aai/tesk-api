@@ -6,9 +6,6 @@
 # lines of the cells it makes pass, and updates the status of the cells whose answer it
 # changes.
 config,case,operation,slice,today
-default,3,CREATE,T4a,403
-default,7,CREATE,T4a,403
-default,8,CREATE,T4a,403
 default,14,CREATE,T6,401
 default,14,GET-M,T6,401
 default,14,GET-B,T6,401
@@ -27,19 +24,7 @@ default,16,GET-B,T6,401
 default,16,GET-F,T6,401
 default,16,LIST,T6,401
 default,16,CANCEL,T6,401
-default,18a,CREATE,T4a,403
-default,18b,CREATE,T4a,403
-default,18c,CREATE,T4a,403
-default,19a,CREATE,T4a,403
-default,userinfo-401,CREATE,T4a,403
-default,userinfo-403,CREATE,T4a,403
-default,19b,CREATE,T4a,403
-default,asks-pdp,CREATE,T4a,403
-default,stamp-owner,CREATE,T4a,403
 default,stamp-actor,CREATE,T6,401
-all-operations,3,CREATE,T4a,403
-all-operations,7,CREATE,T4a,403
-all-operations,8,CREATE,T4a,403
 all-operations,14,CREATE,T6,401
 all-operations,14,GET-M,T6,401
 all-operations,14,GET-B,T6,401
@@ -58,30 +43,24 @@ all-operations,16,GET-B,T6,401
 all-operations,16,GET-F,T6,401
 all-operations,16,LIST,T6,401
 all-operations,16,CANCEL,T6,401
-all-operations,19a,CREATE,T4a,403
-all-operations,19b,CREATE,T4a,403
 all-operations,scope-none,LIST,T4b,200
 all-operations,widen,GET-M,T4b,404
 all-operations,widen,CANCEL,T4b,404
-all-operations,asks-pdp,CREATE,T4a,403
 all-operations,asks-pdp,GET-M,T4b,200
 all-operations,asks-pdp,GET-B,T4b,200
 all-operations,asks-pdp,GET-F,T4b,200
 all-operations,asks-pdp,LIST,T4b,200
 all-operations,asks-pdp,CANCEL,T4b,200
-all-operations,pdp-down,CREATE,T4a,403
 all-operations,pdp-down,GET-M,T4b,200
 all-operations,pdp-down,GET-B,T4b,200
 all-operations,pdp-down,GET-F,T4b,200
 all-operations,pdp-down,LIST,T4b,200
 all-operations,pdp-down,CANCEL,T4b,200
-all-operations,pdp-timeout,CREATE,T4a,403
 all-operations,pdp-timeout,GET-M,T4b,200
 all-operations,pdp-timeout,GET-B,T4b,200
 all-operations,pdp-timeout,GET-F,T4b,200
 all-operations,pdp-timeout,LIST,T4b,200
 all-operations,pdp-timeout,CANCEL,T4b,200
-all-operations,pdp-bad-answer,CREATE,T4a,403
 all-operations,pdp-bad-answer,GET-M,T4b,200
 all-operations,pdp-bad-answer,GET-B,T4b,200
 all-operations,pdp-bad-answer,GET-F,T4b,200
@@ -91,6 +70,3 @@ all-operations,scope-all,LIST,T4b,200
 service-info-private,14,SI,T6,401
 service-info-private,15,SI,T6,401
 service-info-private,16,SI,T6,401
-fail-open,owner,CREATE,T4a,403
-fail-open,owner-timeout,CREATE,T4a,403
-fail-open,owner-bad-answer,CREATE,T4a,403

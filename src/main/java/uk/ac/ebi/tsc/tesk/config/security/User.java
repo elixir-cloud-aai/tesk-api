@@ -5,9 +5,11 @@ import java.io.Serializable;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.UserDetails;
+import uk.ac.ebi.tsc.tesk.config.security.token.TokenPrincipal;
 import uk.ac.ebi.tsc.tesk.k8s.constant.Constants;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 
@@ -35,9 +37,17 @@ public class User implements Serializable, UserDetails, Principal {
      */
     private final boolean serviceClient;
 
-    User(String userId, boolean serviceClient) {
+    /**
+     * The validated token's caller (issuer, subject, client and claims), for the decision service
+     * on create; null without authentication. Not serialised, and not part of {@link #equals} or
+     * {@link #toString} (the claims may hold personal data).
+     */
+    private final transient TokenPrincipal principal;
+
+    User(String userId, boolean serviceClient, TokenPrincipal principal) {
         this.userId = Objects.requireNonNull(userId);
         this.serviceClient = serviceClient;
+        this.principal = principal;
     }
 
     public static User.UserBuilder builder(String userId) {
@@ -52,6 +62,11 @@ public class User implements Serializable, UserDetails, Principal {
 
     public boolean isServiceClient() {
         return serviceClient;
+    }
+
+    /** The validated token's caller, if the request was authenticated with a token */
+    public Optional<TokenPrincipal> getPrincipal() {
+        return Optional.ofNullable(principal);
     }
 
     /**
@@ -133,6 +148,7 @@ public class User implements Serializable, UserDetails, Principal {
     public static class UserBuilder {
         private final String userId;
         private boolean serviceClient = false;
+        private TokenPrincipal principal;
 
         UserBuilder(String userId) {
             this.userId = userId;
@@ -143,8 +159,13 @@ public class User implements Serializable, UserDetails, Principal {
             return this;
         }
 
+        public UserBuilder principal(TokenPrincipal principal) {
+            this.principal = principal;
+            return this;
+        }
+
         public User build() {
-            return new User(userId, serviceClient);
+            return new User(userId, serviceClient, principal);
         }
     }
 }

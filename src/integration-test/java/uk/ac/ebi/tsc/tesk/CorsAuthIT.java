@@ -38,6 +38,7 @@ import org.springframework.test.web.servlet.MockMvc;
         properties = {
             TestIssuer.ISSUER_URL,
             TestIssuer.AUDIENCES,
+            TestIssuer.DECISION_SERVICE,
             "spring.profiles.active=auth",
             "tesk.api.cors.allowed-origins=https://client.example.org,http://localhost:3000"
         })

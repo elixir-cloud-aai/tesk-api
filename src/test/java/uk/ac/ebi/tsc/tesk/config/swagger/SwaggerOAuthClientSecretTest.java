@@ -30,7 +30,8 @@ import uk.ac.ebi.tsc.tesk.TestAuth;
             "tesk.api.swagger-oauth.client-id=swagger-client-id",
             "tesk.api.swagger-oauth.client-secret=" + SwaggerOAuthClientSecretTest.SECRET,
             TestAuth.ISSUER_URL,
-            TestAuth.AUDIENCES
+            TestAuth.AUDIENCES,
+            TestAuth.DECISION_SERVICE
         })
 @ExtendWith(OutputCaptureExtension.class)
 @ActiveProfiles("auth")

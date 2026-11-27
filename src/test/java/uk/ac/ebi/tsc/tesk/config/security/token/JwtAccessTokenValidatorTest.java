@@ -908,6 +908,23 @@ public class JwtAccessTokenValidatorTest {
         assertThat(startupError(properties), containsString("issuers[0].jwks-uri"));
     }
 
+    @Test
+    public void plainHttpUserinfoUri_failsAtStartup() {
+        properties.getIssuers().get(0).setUserinfoUri("http://login.example.org/userinfo");
+
+        assertThat(startupError(properties), containsString("issuers[0].userinfo-uri"));
+    }
+
+    /** An https user info endpoint, or one on the local host, is accepted */
+    @Test
+    public void userinfoUri_https_orLocalHost() {
+        properties.getIssuers().get(0).setUserinfoUri("https://login.example.org/userinfo");
+        new JwtAccessTokenValidator(properties);
+        properties.getIssuers().get(0).setUserinfoUri("http://localhost:8080/userinfo");
+        new JwtAccessTokenValidator(properties);
+        assertThat(properties.getIssuers().get(0).getUserinfoUri(), containsString("localhost"));
+    }
+
     /** URLs can't hold the separator of issuer and subject in the owner */
     @Test
     public void issuerWithSeparator_failsAtStartup() {
@@ -928,7 +945,7 @@ public class JwtAccessTokenValidatorTest {
     public void issuerWithFragment_failsAtStartup() {
         properties.getIssuers().get(0).setUrl("https://login.example.org/oidc#x");
 
-        assertThat(startupError(properties), containsString("issuers[0].url"));
+        assertThat(startupError(properties), containsString("query or fragment"));
     }
 
     @Test

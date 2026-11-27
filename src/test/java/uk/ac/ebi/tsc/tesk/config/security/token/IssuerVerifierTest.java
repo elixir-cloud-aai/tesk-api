@@ -7,7 +7,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,34 +33,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/** The key handling of an issuer: URL checks and the throttling of concurrent fetches */
+/** The key handling of an issuer: the throttling of concurrent fetches */
 public class IssuerVerifierTest {
 
     @RegisterExtension
     public WireMockExtension idp =
             WireMockExtension.newInstance().options(wireMockConfig().dynamicPort()).build();
-
-    @Test
-    public void httpsUrls_areSecure() {
-        assertTrue(IssuerVerifier.isSecure("https://login.example.org/oidc/"));
-    }
-
-    @Test
-    public void httpToTheLocalHost_isSecure() {
-        assertTrue(IssuerVerifier.isSecure("http://localhost:8080/"));
-        assertTrue(IssuerVerifier.isSecure("http://LOCALHOST/"));
-        assertTrue(IssuerVerifier.isSecure("http://127.0.0.1:8080/"));
-        assertTrue(IssuerVerifier.isSecure("http://[::1]:8080/"));
-    }
-
-    @Test
-    public void otherUrls_areNotSecure() {
-        assertFalse(IssuerVerifier.isSecure("http://login.example.org/"));
-        assertFalse(IssuerVerifier.isSecure("ftp://localhost/"));
-        assertFalse(IssuerVerifier.isSecure("https:///no-host"));
-        assertFalse(IssuerVerifier.isSecure("https://bad host/"));
-        assertFalse(IssuerVerifier.isSecure("/relative"));
-    }
 
     /** While one request builds the verifier, the others wait for it, and are refused after that */
     @Test

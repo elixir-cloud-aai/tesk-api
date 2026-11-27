@@ -10,7 +10,7 @@ import uk.ac.ebi.tsc.tesk.config.security.token.JwtAccessTokenValidator;
 import uk.ac.ebi.tsc.tesk.config.security.token.TokenValidator;
 
 /** With the default settings plus an issuer, TESK API starts with authentication (#227) */
-@SpringBootTest(properties = {TestAuth.ISSUER_URL, TestAuth.AUDIENCES})
+@SpringBootTest(properties = {TestAuth.ISSUER_URL, TestAuth.AUDIENCES, TestAuth.DECISION_SERVICE})
 public class TeskApplicationTests {
 
     @Autowired private Environment environment;

@@ -61,6 +61,7 @@ import org.springframework.test.web.servlet.ResultActions;
             "spring.profiles.active=auth",
             TestIssuer.ISSUER_URL,
             TestIssuer.AUDIENCES,
+            TestIssuer.DECISION_SERVICE,
             TestIssuer.SERVICE_CLIENT,
             // an issuer whose keys can't be fetched: nothing listens there
             "tesk.api.auth.issuers[1].url=" + TokenValidationIT.DOWN_ISSUER,

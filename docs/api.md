@@ -362,9 +362,9 @@ with these status codes:
 Status code | Meaning
 --- | ---
 200 | OK: successful request
-400 | Bad request: validation error, or cancellation of a task that doesn't run
-401 | Unauthorized: with the `auth` profile, no access token in the request, or an invalid one: one that fails a check of [Token validation](access-control.md#token-validation), e.g. of an unknown issuer, with a wrong audience, expired, or delegated (see [Token validation](access-control.md#token-validation) for the `WWW-Authenticate` header and the body)
-403 | Forbidden: the caller may not do this (with the `auth` profile, creating a task, for now; see [Authorisation](access-control.md#authorisation))
+400 | Bad request: validation error, cancellation of a task that doesn't run
+401 | Unauthorized: with the `auth` profile, no access token in the request, or an invalid one: one that fails a check of [Token validation](access-control.md#token-validation), e.g. of an unknown issuer, with a wrong audience, expired, or delegated (see [Token validation](access-control.md#token-validation) for the `WWW-Authenticate` header and the body); on create also a token that the user info endpoint refuses (see [Decision service](access-control.md#decision-service))
+403 | Forbidden: the caller may not do this (with the `auth` profile, the decision service denies creating the task; see [Decision service](access-control.md#decision-service))
 404 | Not found: no task with this ID, or a task of another caller (with the `auth` profile also one created before 2.1.0, see [Task creators](access-control.md#task-creators))
 500 | Something else went wrong (possibly the configuration)
-503 | Service unavailable: with the `auth` profile, the access token can't be checked now, because the keys of its issuer can't be fetched (see [Token validation](access-control.md#token-validation)); try again later. Since 2.1.0
+503 | Service unavailable: with the `auth` profile, the access token can't be checked now, because the keys of its issuer can't be fetched (see [Token validation](access-control.md#token-validation)), or, on create, the decision service or the user info endpoint gives no answer that TESK API can use (see [Decision service](access-control.md#decision-service)); try again later. Since 2.1.0

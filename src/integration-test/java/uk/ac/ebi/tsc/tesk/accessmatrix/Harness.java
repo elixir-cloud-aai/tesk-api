@@ -45,8 +45,9 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.MockIdp.Token;
  * entry ({@link Pending}).
  *
  * <p>The settings are the redesign's (design section 7: {@code tesk.api.auth.*}, used since slice
- * T3b; {@code tesk.api.authz.*} and the trusted actors, which have no effect until the slices T4a
- * and T6 use them), so that the same suite runs during and after the redesign.
+ * T3b; {@code tesk.api.authz.*} since T4a, with the entitlements as the claim that the decision
+ * service gets, as for LS Login; the trusted actors, which have no effect until slice T6 uses
+ * them), so that the same suite runs during and after the redesign.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -55,14 +56,15 @@ import uk.ac.ebi.tsc.tesk.accessmatrix.MockIdp.Token;
         properties = {
             "spring.profiles.active=auth",
             // tesk.api.auth.* since T3b (issuers, audiences, service clients; trusted actors from
-            // T6), tesk.api.authz.* from T4a
+            // T6), tesk.api.authz.* since T4a
             "tesk.api.auth.issuers[0].url=" + MockIdp.ISSUER,
             "tesk.api.auth.issuers[0].audiences=" + MockIdp.FRONT_END,
             "tesk.api.auth.issuers[0].service-clients[0].client-id=" + MockIdp.LISTED_CLIENT,
             "tesk.api.auth.issuers[0].trusted-actors=" + MockIdp.TRUSTED_ACTOR,
             "tesk.api.auth.timeout-seconds=1",
             "tesk.api.authz.decision-service.url=" + MockPdp.URL,
-            "tesk.api.authz.decision-service.timeout=1"
+            "tesk.api.authz.decision-service.timeout=1",
+            "tesk.api.authz.decision-service.claims=eduperson_entitlement"
         })
 abstract class Harness {
 

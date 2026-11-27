@@ -20,11 +20,11 @@ public interface TesService {
      * duplicated task ID, retries with new generated ID (up to a limit of retries). The task is
      * stamped with its creator, its only owner.
      *
-     * <p>With authentication, creating tasks is denied to every caller (403) for now: the right to
-     * create tasks is to be decided by a decision service (AuthZEN, tes-authz), which TESK API
-     * doesn't ask yet. The group rules that decided it before are removed.
+     * <p>With authentication, the decision service (AuthZEN, e.g. tes-authz) decides whether the
+     * caller may create the task, before anything is created ({@code CreateAuthorisation}): 403 if
+     * it denies, 503 if it can't decide now. Without authentication (noauth), every caller may.
      */
-    @PreAuthorize("denyAll()")
+    @PreAuthorize("@createAuthorisation.mayCreate(#task, #user)")
     TesCreateTaskResponse createTask(TesTask task, User user);
 
     /**

@@ -137,7 +137,7 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
     }
 
     /** The {@code WWW-Authenticate} header, with quotes and backslashes in the values escaped */
-    static String wwwAuthenticate(String error, String description) {
+    public static String wwwAuthenticate(String error, String description) {
         return String.format(
                 "Bearer realm=\"%s\", %s=\"%s\", %s=\"%s\"",
                 REALM, ERROR, quote(error), DESCRIPTION, quote(description));

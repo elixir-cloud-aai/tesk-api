@@ -45,6 +45,7 @@ public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
         User user =
                 User.builder(principal.owner())
                         .serviceClient(principal.kind() == TokenPrincipal.Kind.SERVICE_CLIENT)
+                        .principal(principal)
                         .build();
         return new AuthenticatedUser(user, principal.claims(), AuthorityUtils.NO_AUTHORITIES);
     }
@@ -83,7 +84,8 @@ public final class AuthenticatedUser implements OAuth2AuthenticatedPrincipal {
             String accessToken, OAuth2AuthenticatedPrincipal principal) {
         if (!(principal instanceof AuthenticatedUser)) {
             // not expected: the introspector returns an AuthenticatedUser
-            throw new InvalidBearerTokenException(TokenValidatorIntrospector.INVALID_TOKEN);
+            throw new InvalidBearerTokenException(
+                    TokenValidatorIntrospector.INVALID_TOKEN_DESCRIPTION);
         }
         AuthenticatedUser authenticated = (AuthenticatedUser) principal;
         return new UsernamePasswordAuthenticationToken(

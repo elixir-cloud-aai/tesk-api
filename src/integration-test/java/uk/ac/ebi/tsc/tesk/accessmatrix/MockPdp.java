@@ -19,13 +19,13 @@ import java.util.Optional;
  * policy of tes-authz, in Java, for TESK's integration tests, with failure modes. It records the
  * requests, so that tests can check what TESK asked.
  *
- * <p>The reference policy (owner-only, D-388, D-407, D-409 Q3 b): {@code CreateTask} is allowed if
- * the subject's entitlements hold {@code elixir:ECP_CLN:EOC-Compute} exactly, or if the subject is
- * a listed service client ({@code sub} = {@code client_id}, listed for the issuer); {@code GetTask}
- * and {@code CancelTask} if the task's owner is the subject; {@code ListTasks} answers the scope
- * {@code own}. The request fields it reads are those of the tes-authz contract that won't change
- * (subject, action, resource owner); T4a aligns the rest (e.g. where the list scope is answered)
- * with the contract of tes-authz slice Z1.
+ * <p>The reference policy (owner-only, D-388, D-407, D-409 Q3 b), as in the OPA policy of tes-authz
+ * (profile {@code tes-authzen/3}): {@code CreateTask} is allowed if the request names the subject
+ * as the new task's owner ({@code resource.properties.owner}), and the subject's entitlements hold
+ * {@code elixir:ECP_CLN:EOC-Compute} exactly, or the subject is a listed service client ({@code
+ * sub} = {@code client_id}, listed for the issuer); {@code GetTask} and {@code CancelTask} if the
+ * task's owner is the subject; {@code ListTasks} answers the list scope {@code own} ({@code
+ * context.tes.list_scope}).
  */
 final class MockPdp implements ResponseDefinitionTransformerV2 {
 
@@ -121,19 +121,22 @@ final class MockPdp implements ResponseDefinitionTransformerV2 {
         String action = string(request, "action", "name").orElse("");
         JsonObject decision = new JsonObject();
         switch (action) {
-            case "CreateTask" -> decision.addProperty("decision", mayCreate(request));
+            case "CreateTask" ->
+                    decision.addProperty("decision", isOwner(request) && mayCreate(request));
             case "GetTask", "CancelTask" ->
                     decision.addProperty("decision", this.mode == Mode.WIDEN || isOwner(request));
             case "ListTasks" -> {
                 decision.addProperty("decision", true);
-                JsonObject context = new JsonObject();
-                context.addProperty(
-                        "scope",
+                JsonObject tes = new JsonObject();
+                tes.addProperty(
+                        "list_scope",
                         switch (this.mode) {
                             case LIST_ALL -> "all";
                             case LIST_NONE -> "none";
                             default -> "own";
                         });
+                JsonObject context = new JsonObject();
+                context.add("tes", tes);
                 decision.add("context", context);
             }
             default -> decision.addProperty("decision", false);
@@ -141,6 +144,10 @@ final class MockPdp implements ResponseDefinitionTransformerV2 {
         return decision;
     }
 
+    /**
+     * Whether the resource's owner is the subject: for CreateTask (tes-authzen/3), the caller is
+     * named as the new task's owner
+     */
     private static boolean isOwner(JsonObject request) {
         Optional<String> owner = string(request, "resource", "properties", "owner");
         return owner.isPresent() && owner.equals(string(request, "subject", "id"));

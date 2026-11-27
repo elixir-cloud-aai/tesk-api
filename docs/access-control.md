@@ -90,7 +90,8 @@ Environment variable | Meaning | Default
 `TESK_API_AUTH_REQUIRE_ACCESS_TOKEN_TYPE` | `true`: the header `typ` must be `at+jwt`. Set it to `false` only for providers that don't set it. | `true`
 `TESK_API_AUTH_CLOCK_SKEW_SECONDS` | Leeway for `exp`, `nbf` and `iat` (in the future), in seconds. | `60`
 `TESK_API_AUTH_MAX_TOKEN_AGE_SECONDS` | Maximum age of a token (since `iat`), in seconds. | `86400`
-`TESK_API_AUTH_TIMEOUT_SECONDS` | Connect and read timeouts of the requests to the issuers (discovery document, keys), in seconds, from 1 to 60. | `10`
+`TESK_API_AUTH_ISSUERS_<i>_USERINFOURI` | User info endpoint of the issuer, if it shouldn't come from the discovery document; used only to look up claims for the [decision service](#decision-service). `https://` only (plain `http://` only to the local host). | from discovery
+`TESK_API_AUTH_TIMEOUT_SECONDS` | Timeouts of the requests to the issuers, in seconds, from 1 to 60: connect and read timeouts for the discovery document and keys, and the time of each request for user info (discovery and lookup) as a whole. | `10`
 
 For example, as properties (e.g. in `application.properties`):
 
@@ -108,7 +109,7 @@ TESK_API_AUTH_ISSUERS_0_AUDIENCES=<portal client ID>,<Swagger UI client ID>
 TESK_API_AUTH_ISSUERS_0_SERVICECLIENTS_0_CLIENTID=<gateway client ID>
 ```
 
-With the `auth` profile, TESK API doesn't start, and says why, with invalid settings: no issuer; an issuer with neither audiences nor service clients, or listed twice; an issuer or JWKS URI that isn't `https://` (plain `http://` only to the local host, e.g. for tests), or an issuer with a query or fragment; a blank audience; a blank or duplicate client ID; a symmetric algorithm or `none`; a negative leeway, a maximum age that isn't positive, or a timeout outside 1 to 60 seconds; an unknown `TESK_API_AUTH_TOKEN_VALIDATOR`; service clients listed under no issuer (`tesk.api.auth.service-clients`, i.e. `TESK_API_AUTH_SERVICE_CLIENTS_*` or `TESK_API_AUTH_SERVICECLIENTS_*`). In any profile, it doesn't start with a setting under `tesk.api.authorisation` (`TESK_API_AUTHORISATION_*`, removed; see [Upgrading](upgrading.md#to-210)). The discovery documents and the keys are fetched at the first token of each issuer, not at startup.
+With the `auth` profile, TESK API doesn't start, and says why, with invalid settings: no issuer; an issuer with neither audiences nor service clients, or listed twice; an issuer, JWKS URI or user info URI that isn't `https://` (plain `http://` only to the local host, e.g. for tests), or an issuer with a query or fragment; a blank audience; a blank or duplicate client ID; a symmetric algorithm or `none`; a negative leeway, a maximum age that isn't positive, or a timeout outside 1 to 60 seconds; an unknown `TESK_API_AUTH_TOKEN_VALIDATOR`; service clients listed under no issuer (`tesk.api.auth.service-clients`, i.e. `TESK_API_AUTH_SERVICE_CLIENTS_*` or `TESK_API_AUTH_SERVICECLIENTS_*`). In any profile, it doesn't start with a setting under `tesk.api.authorisation` (`TESK_API_AUTHORISATION_*`, removed; see [Upgrading](upgrading.md#to-210)). The discovery documents and the keys are fetched at the first token of each issuer, not at startup.
 
 For example, [LS Login](https://lifescience-ri.eu/ls-login/) (issuer
 `https://login.aai.lifescience-ri.eu/oidc/`) issues access tokens with the
@@ -118,26 +119,122 @@ with the claims `iss`, `client_id`, `sub`, `exp`, `iat`, `jti`, `scope` and
 front ends as audiences, and your service clients.
 
 TESK API reads no claims of a token but those named under [Token
-validation](#token-validation). The user info endpoint of the provider is no
-longer used, and `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`
-is ignored.
+validation](#token-validation), and those that it passes on to the
+[decision service](#decision-service). It no longer validates tokens at the
+user info endpoint of the provider, and `SECURITY_OAUTH2_RESOURCE_USER_INFO_URI`
+is ignored; it asks the user info endpoint only for claims for the decision
+service, when creating a task.
+
+### Decision service
+
+With the `auth` profile, a decision service decides who may create tasks:
+an [OpenID AuthZEN 1.0](https://openid.net/specs/authorization-api-1_0.html)
+Access Evaluation endpoint, e.g. [tes-authz](https://github.com/elixir-cloud-aai/tes-authz),
+which implements the profile `tes-authzen/3` that TESK API speaks. TESK API
+asks it once for every task that a caller creates, after the token has
+passed [Token validation](#token-validation), and does what it answers:
+
+Answer | Result
+--- | ---
+`{"decision": true}` | The task is created.
+Any other JSON: `decision` false, missing or not a boolean | `403 Forbidden`, without a call to Kubernetes.
+No decision: no answer within the timeout, a connection error, a status other than `200`, or a body that isn't JSON (also with content after the JSON value) or is larger than 1 MiB | `503 Service Unavailable`, with `Cache-Control: no-store`, without `WWW-Authenticate`, and with the error `temporarily_unavailable` (description `Authorisation unavailable; try again later`), as for tokens that can't be checked now; without a call to Kubernetes. Creating tasks never fails open; the cause is logged.
+
+The request (`POST`, JSON, with a new `X-Request-ID` each) describes:
+
+* the subject: type `user`, id the caller's owner ID (`<iss>|<sub>`, see
+  [Task creators](#task-creators)), with the properties `iss`, `sub`,
+  `client_id` and `scope` (as a list) of the token, if present, and
+  `claims`: the claims listed in `TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS`
+  (see below) that the caller has;
+* the action `CreateTask`;
+* the resource: type `tes_task_set`, id `own`, with the property `owner`
+  (the owner ID that the task gets) and `task`, a fixed projection of the
+  submitted task: `name`, `tags`, `resources` (`cpu_cores`, `ram_gb`,
+  `disk_gb`, `preemptible`, `zones`), `volumes`, the `image` of each
+  executor, and `url`, `path` and `type` of each input and output, with
+  user info, query and fragment removed from URLs. Commands, environments,
+  input contents and backend parameters are never sent, as they may hold
+  secrets. A URL that can't be stripped safely (e.g. with an ambiguous
+  host, a tab or line break, or a path without a scheme that has `?` or
+  `@`) is left out, as in tes-authz's reference cases: such an input looks
+  like one with inline content to the decision service;
+* the context: `tes.profile` `tes-authzen/3` and `tes.service_id`, the ID
+  of the service info.
+
+The caller's access token is never sent to the decision service. Getting,
+listing and cancelling tasks don't ask it: they follow TESK API's own rules
+(see [Authorisation](#authorisation)).
+
+Claims named in `TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS` (none by default)
+are looked up in this order, and the first one found is sent: a claim of
+that exact name in the token, then at the user info endpoint of the
+token's issuer, then, for names with dots (e.g. `a.b`), the nested claim
+`b` of the object `a` in the token, then at the user info endpoint. TESK
+API calls the user info endpoint (with the caller's token, at most once
+per create, and never for other operations) only if a listed claim isn't
+in the token by its exact name, and never for tokens of clients (listed
+service clients, and tokens whose `sub` is their client ID), which have no
+user info. The endpoint is `TESK_API_AUTH_ISSUERS_<i>_USERINFOURI`, or the
+`userinfo_endpoint` of the issuer's discovery document (discovered again
+after a lookup there gets no answer, or a status other than `200`, `401`
+and `403`); it must be
+`https://` (plain `http://` only to the local host), and its answer must
+be a JSON object with the token's `sub`. If it refuses the token (`401` or
+`403`) or names another `sub`, the answer is `401 Unauthorized`, with
+`WWW-Authenticate` and the error `invalid_token`, as for other invalid
+tokens; if it (or its discovery) doesn't answer, body included, within
+`TESK_API_AUTH_TIMEOUT_SECONDS`,
+answers with another status, or with something other than a JSON object of at most 1 MiB
+(e.g. a signed JWT), it is `503 Service Unavailable`.
+
+Environment variable | Meaning | Default
+--- | --- | ---
+`TESK_API_AUTHZ_DECISIONSERVICE_URL` | URL of the Access Evaluation endpoint, e.g. `https://tes-authz.example.org/access/v1/evaluation`. Required with the `auth` profile; `https://` only (plain `http://` only to the local host, e.g. a sidecar). | none
+`TESK_API_AUTHZ_DECISIONSERVICE_TIMEOUT` | Timeout of a request to the decision service as a whole, in seconds, from 1 to 60. | `2`
+`TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS` | Claims of the caller that the decision service gets, comma-separated (or one per `TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS_<k>`; not as a JSON array). | none
+`TESK_API_AUTHZ_DECISIONSERVICE_CREDENTIALFILE` | File with a bearer credential for the decision service, sent as `Authorization: Bearer <credential>` (one line of printable ASCII without spaces; read for every request, so it can be rotated in place, e.g. as a mounted Kubernetes secret). | none (no `Authorization` header)
+
+With the `auth` profile, TESK API doesn't start, and says why, without
+`TESK_API_AUTHZ_DECISIONSERVICE_URL`, with a URL that isn't `https://`
+(except to the local host), a timeout outside 1 to 60 seconds, a blank
+claim name, or a credential file that can't be read, is empty or isn't one
+line of printable ASCII without spaces. With the `noauth` profile, it doesn't start if any setting
+under `tesk.api.authz` (`TESK_API_AUTHZ_*`) is set: the decision service
+needs authentication.
+
+For example, for [LS Login](https://lifescience-ri.eu/ls-login/), whose
+tokens carry no entitlements but whose user info does, with tes-authz next
+to TESK API:
+
+```bash
+TESK_API_AUTHZ_DECISIONSERVICE_URL=https://tes-authz.example.org/access/v1/evaluation
+TESK_API_AUTHZ_DECISIONSERVICE_CLAIMS=eduperson_entitlement
+```
+
+The policy of tes-authz then decides, e.g., that members of a group named in
+`eduperson_entitlement` may create tasks. Your front ends need the scope
+that releases the claim at the user info endpoint (for LS Login,
+`eduperson_entitlement`) when they get tokens for users.
 
 ## Authorisation
 
 Since 2.1.0, TESK API has no group model: no groups, teams, team admins or
-super admins, and no rights from claims of the token or the user info
-([#225](https://github.com/elixir-cloud-aai/tesk-api/issues/225)). With the
-`auth` profile:
+super admins, and no rights of its own from claims of the token or the user
+info ([#225](https://github.com/elixir-cloud-aai/tesk-api/issues/225)); such
+claims count only where the decision service uses them. With the `auth`
+profile:
 
 Operation | Who may | Otherwise
 --- | --- | ---
-Create a task | Nobody, for now: the right to create tasks is to be decided by a decision service (AuthZEN, e.g. [tes-authz](https://github.com/elixir-cloud-aai/tes-authz)), which TESK API doesn't ask yet. | `403 Forbidden`, without a call to Kubernetes
+Create a task | Whoever the [decision service](#decision-service) (AuthZEN, e.g. [tes-authz](https://github.com/elixir-cloud-aai/tes-authz)) allows. | `403 Forbidden` if it denies, `503 Service Unavailable` if it gives no decision; both without a call to Kubernetes
 Get a task | Its creator only (see [Task creators](#task-creators)), in every view. | `404 Not Found`, as for a task that doesn't exist
 Cancel a task | Its creator only. | `404 Not Found`, as for a task that doesn't exist; nothing is changed
 List tasks | Everyone; the list holds the caller's own tasks only. | (an empty list)
 
 This holds for every caller, users and [service clients](#tokens-of-services)
-alike, whatever groups or entitlements its token names. Another user's
+alike; for getting, listing and cancelling, whatever groups or entitlements
+its token names. Another user's
 task is not found (`404`), not forbidden: the answer, and the requests that
 TESK API makes to Kubernetes for it, are the same as for a task that doesn't
 exist, so that callers can't tell whether another user's task exists.
@@ -234,7 +331,9 @@ isn't listed is a user like any other if its token has one of the issuer's
 A listed client is a principal of its own: its owner ID is `<iss>|<client
 ID>`. The rules of [Authorisation](#authorisation) apply to it as to users:
 it may list, get and cancel the tasks that it created, and no others, also
-none of other listed clients; creating tasks is denied for now. Its tasks
+none of other listed clients; whether it may create tasks is up to the
+[decision service](#decision-service), which gets its client ID (its
+token is never sent to the user info endpoint). Its tasks
 record it as their creator as for users (see [Task
 creators](#task-creators)).
 
@@ -245,9 +344,10 @@ its users may see and cancel which task.
 ### Trust implications
 
 * Everyone who holds a listed client's credentials (e.g. its client secret)
-  can get tokens and use TESK API as that client: once creating tasks is
-  allowed, run any container image with any command on your cluster, within
-  the resources that tasks may request; and see and cancel all tasks of that
+  can get tokens and use TESK API as that client: if the decision service
+  lets it create tasks, run any container image with any command on your
+  cluster, within the resources that tasks may request and the limits of
+  the decision service's policy; and see and cancel all tasks of that
   client. Keep the credentials as safe as an administrator's, list only
   clients of services that you trust, and remove a client from the list (and
   rotate its credentials) if they may have been disclosed.

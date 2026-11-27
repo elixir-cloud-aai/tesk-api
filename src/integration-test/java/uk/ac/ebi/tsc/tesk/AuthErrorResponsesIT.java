@@ -39,7 +39,12 @@ import org.springframework.test.web.servlet.ResultActions;
 @AutoConfigureMockMvc
 @TestPropertySource(
         locations = {"classpath:application.properties"},
-        properties = {"spring.profiles.active=auth", TestIssuer.ISSUER_URL, TestIssuer.AUDIENCES})
+        properties = {
+            "spring.profiles.active=auth",
+            TestIssuer.ISSUER_URL,
+            TestIssuer.AUDIENCES,
+            TestIssuer.DECISION_SERVICE
+        })
 public class AuthErrorResponsesIT {
 
     private static final String TOKEN = "TOKEN-THAT-MUST-NOT-BE-ECHOED";
@@ -122,7 +127,7 @@ public class AuthErrorResponsesIT {
 
     /**
      * A valid token passes authentication without any request to the issuer but for its keys (no
-     * user info); creating a task is denied to every caller (issue #225), without asking Kubernetes
+     * user info); creating a task then needs the decision service, which doesn't answer here: 503
      */
     @Test
     public void validToken_isCheckedLocally() throws Exception {
@@ -134,7 +139,7 @@ public class AuthErrorResponsesIT {
                                 .content(
                                         "{\"executors\":[{\"image\":\"alpine\","
                                                 + "\"command\":[\"true\"]}]}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isServiceUnavailable());
         mockIssuer.verify(0, getRequestedFor(urlPathMatching(".*userinfo.*")));
     }
 
