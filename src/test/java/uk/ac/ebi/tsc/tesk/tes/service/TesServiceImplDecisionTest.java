@@ -36,6 +36,8 @@ import uk.ac.ebi.tsc.tesk.config.security.User;
 import uk.ac.ebi.tsc.tesk.k8s.convert.CreatorLabels;
 import uk.ac.ebi.tsc.tesk.k8s.convert.TesKubernetesConverter;
 import uk.ac.ebi.tsc.tesk.k8s.service.KubernetesClientWrapper;
+import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;
+import uk.ac.ebi.tsc.tesk.tes.exception.CancelNotRunningTask;
 import uk.ac.ebi.tsc.tesk.tes.exception.InvalidPageTokenException;
 import uk.ac.ebi.tsc.tesk.tes.exception.TaskNotFoundException;
 import uk.ac.ebi.tsc.tesk.tes.model.TaskView;
@@ -192,6 +194,58 @@ class TesServiceImplDecisionTest {
         assertThatThrownBy(() -> this.service.cancelTask("missing", OTHER))
                 .isInstanceOf(TaskNotFoundException.class);
         verify(this.access).mayCancel(OTHER, "missing", null);
+    }
+
+    /** The task is read again after the decision: one that ended meanwhile isn't cancelled */
+    @Test
+    void cancel_allowed_endedDuringTheDecision_notCancelled() {
+        V1Job ended =
+                new V1Job()
+                        .metadata(this.taskmaster.getMetadata())
+                        .spec(this.taskmaster.getSpec())
+                        .status(new V1JobStatus().succeeded(1));
+        when(this.client.readTaskmasterJob(TASK)).thenReturn(this.taskmaster, ended);
+        when(this.access.mayCancel(any(), any(), any())).thenReturn(CancelDecision.ALLOWED);
+
+        assertThatThrownBy(() -> this.service.cancelTask(TASK, OTHER))
+                .isInstanceOf(CancelNotRunningTask.class);
+        verify(this.client, never()).labelJobAsCancelled(any());
+    }
+
+    /** A task deleted during the decision is 404 */
+    @Test
+    void cancel_allowed_goneDuringTheDecision_is404() {
+        when(this.client.readTaskmasterJob(TASK))
+                .thenReturn(this.taskmaster)
+                .thenThrow(new TaskNotFoundException(TASK));
+        when(this.access.mayCancel(any(), any(), any())).thenReturn(CancelDecision.ALLOWED);
+
+        assertThatThrownBy(() -> this.service.cancelTask(TASK, OTHER))
+                .isInstanceOf(TaskNotFoundException.class);
+        verify(this.client, never()).labelJobAsCancelled(any());
+    }
+
+    /** A task replaced by another one with the same ID during the decision is 404 */
+    @Test
+    void cancel_allowed_replacedDuringTheDecision_is404() {
+        this.taskmaster.getMetadata().uid("uid-1");
+        V1ObjectMeta replacementMeta =
+                new V1ObjectMeta()
+                        .name(TASK)
+                        .uid("uid-2")
+                        .putLabelsItem(LABEL_JOBTYPE_KEY, LABEL_JOBTYPE_VALUE_TASKM);
+        CreatorLabels.put(replacementMeta, OWNER);
+        V1Job replacement =
+                new V1Job()
+                        .metadata(replacementMeta)
+                        .spec(this.taskmaster.getSpec())
+                        .status(new V1JobStatus().active(1));
+        when(this.client.readTaskmasterJob(TASK)).thenReturn(this.taskmaster, replacement);
+        when(this.access.mayCancel(any(), any(), any())).thenReturn(CancelDecision.ALLOWED);
+
+        assertThatThrownBy(() -> this.service.cancelTask(TASK, OTHER))
+                .isInstanceOf(TaskNotFoundException.class);
+        verify(this.client, never()).labelJobAsCancelled(any());
     }
 
     @Test

@@ -535,7 +535,16 @@ public class TesServiceImpl implements TesService {
         if (decision == TaskAccess.CancelDecision.NOT_FOUND || task.isEmpty()) {
             throw new TaskNotFoundException(taskId);
         }
-        return task.get();
+        // read again after the decision, which can take a while: the task's current state decides
+        // whether it is cancelled, and a task that was deleted, or replaced by another one with the
+        // same ID (another job UID), isn't the task the decision service allowed (404)
+        String allowedUid = task.get().getTaskmaster().getJob().getMetadata().getUid();
+        return this.readOwnedTask(taskId)
+                .filter(current ->
+                        Objects.equals(
+                                allowedUid,
+                                current.getTaskmaster().getJob().getMetadata().getUid()))
+                .orElseThrow(() -> new TaskNotFoundException(taskId));
     }
 
     private static boolean isStartedAndNotLabelledCancelled(V1Pod pod) {

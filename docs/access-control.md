@@ -233,7 +233,7 @@ default, except while the decision service is down.
 Operation | Request | Result
 --- | --- | ---
 Get a task | `GetTask` (with `view` `MINIMAL`, `BASIC` or `FULL`) on the resource type `tes_task`, id the task ID, with the properties `owner`, `state` and `tags` of the stored task; for a task that doesn't exist, or one without an exact owner (see [Task creators](#task-creators)), no properties | allowed: the task, whoever owns it; denied, or a task that doesn't exist: `404 Not Found`
-Cancel a task | `CancelTask` on the same resource | allowed: the task is cancelled, whoever owns it (a task that doesn't exist: `404`); denied: `403 Forbidden` if the caller may get the task (asking `GetTask`, without a view, if getting is switched on; else if it is the task's creator), otherwise `404 Not Found`
+Cancel a task | `CancelTask` on the same resource | allowed: the task is cancelled, whoever owns it (a task that doesn't exist: `404`; TESK reads the task again after the decision, so a task that ended meanwhile isn't cancelled, and one that was deleted or replaced by another task with the same ID gives `404`); denied: `403 Forbidden` if the caller may get the task (asking `GetTask`, without a view, if getting is switched on; else if it is the task's creator), otherwise `404 Not Found`
 List tasks | `ListTasks` (with `view`) on the resource type `tes_task_set`, id `own`, once per page | by the list scope in the answer (below)
 
 The decision service is asked for tasks that don't exist too, so that the
