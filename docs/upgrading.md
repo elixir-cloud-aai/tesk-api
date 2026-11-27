@@ -2,47 +2,98 @@
 
 ## To 2.1.0
 
-- **Service clients: audiences per client (breaking).** With tokens of
-  service clients on (`TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED`),
-  each client is listed with its own audiences, and a client's token is
-  accepted only for one of them
-  ([#215](https://github.com/elixir-cloud-aai/tesk-api/issues/215)): one
-  JSON variable, `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS`, replaces
-  `TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS` and
-  `TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE`, which are removed:
-  with either of them still set (also to an empty value: remove them), or
-  without the new one, TESK API doesn't start. Convert them as follows (see [Tokens of
-  services](access-control.md#settings)):
+- **Authentication with the token validator (breaking, security).** TESK
+  API checks every access token itself, against the keys of the configured
+  issuers, and no longer calls the user info endpoint of the provider
+  ([#227](https://github.com/elixir-cloud-aai/tesk-api/issues/227); see
+  [Token validation](access-control.md#token-validation)):
 
-    ```bash
-    # 2.0.0
-    TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS=gateway,smoke
-    TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE=https://tesk.example.org
-    # 2.1.0
-    TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENTS='{"gateway": {"audiences": ["https://tesk.example.org"]}, "smoke": {"audiences": ["https://tesk.example.org"]}}'
-    ```
+    * **The default profile is `auth`** (before: `noauth`). TESK API doesn't
+      start with it unless at least one issuer is set. To run without
+      authentication, set `SPRING_PROFILES_ACTIVE=noauth` explicitly (TESK
+      API logs a warning at startup); only for installations that nobody else
+      can reach.
+    * **New settings** (`tesk.api.auth.*`, see
+      [Settings](access-control.md#settings)): the issuers
+      (`TESK_API_AUTH_ISSUERS_<i>_URL`), the audiences of users' tokens per
+      issuer (`…_AUDIENCES`: the client IDs of your front ends, e.g. a portal
+      and the Swagger UI, `TESK_API_SWAGGER_OAUTH_CLIENT_ID`), and the service
+      clients per issuer (`…_SERVICECLIENTS_<j>_CLIENTID`). User tokens are now
+      refused unless they are JWT access tokens (`typ` `at+jwt`) of a
+      configured issuer with one of its audiences: check that your provider
+      issues such tokens to your front ends before you upgrade (LS Login
+      does).
+    * **`SECURITY_OAUTH2_RESOURCE_USER_INFO_URI` is ignored**; remove it.
+    * **The service clients' settings are removed**, and with one of them
+      still set (also to an empty value: remove them), in any profile, TESK
+      API doesn't start, and names the setting with what replaces it:
 
-    Each client gets the former shared audience; then give each client its
-    own audiences where your provider allows, so that one client's tokens
-    aren't accepted for another's. Without `…_AUDIENCE` (any audience), give
-    each client its audiences: any audience is no longer the default.
-    `{"allowAnyAudience": true}` keeps the former behaviour for a client,
-    but accepts every token that the issuer issues to it, also tokens meant
-    for other services (so a token leaked from or replayed by another
-    service works at TESK API): use it only for testing or while setting up
-    a federation, not in production (TESK API logs a warning at startup for
-    each such client; see [Trust
-    implications](access-control.md#trust-implications)). For a downgrade to
-    2.0.0, restore `…_CLIENT_IDS` and `…_AUDIENCE`: 2.0.0 ignores
-    `…_CLIENTS`, and without `…_CLIENT_IDS` it doesn't start. With the
-    Helm chart of TESK, use the chart release that renders the new variable
-    (`auth.tokenClients.clients` as a map from client ID to `audiences`, see
-    [TESK#336](https://github.com/elixir-cloud-aai/TESK/issues/336)); older
-    chart releases render the removed variables, which stop TESK API 2.1.0
-    from starting. During a rolling update, pods of 2.0.0 still accept
-    every listed client's tokens for the former shared audience: the
-    audiences per client hold once the rollout has completed. Without
-    service clients, nothing changes.
+        Removed (`TESK_API_AUTHORISATION_SERVICE_CLIENTS_…`) | Replaced by
+        --- | ---
+        `…_ENABLED` | nothing: listing a client accepts its tokens
+        `…_ISSUER` | `TESK_API_AUTH_ISSUERS_<i>_URL`
+        `…_CLIENTS` (JSON, also `…_CLIENT_IDS` and `…_AUDIENCE` of 2.0.0) | `TESK_API_AUTH_ISSUERS_<i>_SERVICECLIENTS_<j>_CLIENTID`, and `…_ALLOWANYAUDIENCE` instead of `allowAnyAudience`
+        `…_JWKS_URI` | `TESK_API_AUTH_ISSUERS_<i>_JWKSURI`
+        `…_CLIENT_CLAIM` | `TESK_API_AUTH_ISSUERS_<i>_CLIENTCLAIM`
+        `…_REQUIRE_ACCESS_TOKEN_TYPE` | `TESK_API_AUTH_REQUIRE_ACCESS_TOKEN_TYPE` (for all tokens)
+        `…_REQUIRE_CLIENT_SUBJECT` | nothing: a client's own token has the client ID as `sub`
+        `…_CLOCK_SKEW_SECONDS` | `TESK_API_AUTH_CLOCK_SKEW_SECONDS` (for all tokens)
+
+        For example:
+
+        ```bash
+        # 2.0.0
+        TESK_API_AUTHORISATION_SERVICE_CLIENTS_ENABLED=true
+        TESK_API_AUTHORISATION_SERVICE_CLIENTS_ISSUER=https://login.aai.lifescience-ri.eu/oidc/
+        TESK_API_AUTHORISATION_SERVICE_CLIENTS_CLIENT_IDS=gateway
+        TESK_API_AUTHORISATION_SERVICE_CLIENTS_AUDIENCE=https://tesk.example.org
+        # 2.1.0
+        TESK_API_AUTH_ISSUERS_0_URL=https://login.aai.lifescience-ri.eu/oidc/
+        TESK_API_AUTH_ISSUERS_0_AUDIENCES=<portal client ID>
+        TESK_API_AUTH_ISSUERS_0_SERVICECLIENTS_0_CLIENTID=gateway
+        ```
+
+        Service clients listed under no issuer
+        (`TESK_API_AUTH_SERVICE_CLIENTS_*`) stop TESK API from starting too.
+    * **Audiences of service clients:** a client's own token is accepted only
+      with the client's own ID in its `aud` (before: any of the audiences
+      listed for it, or any audience without `…_AUDIENCE`). Register each
+      service client at your provider so that its tokens name its own client
+      ID as audience. `…_ALLOWANYAUDIENCE=true` accepts the client's tokens
+      whatever their audience, but also tokens meant for other services (so
+      a token leaked from or replayed by another service works at TESK API):
+      use it only for testing or while setting up a federation, not in
+      production (TESK API logs a warning at startup for each such client;
+      see [Trust implications](access-control.md#trust-implications)).
+    * **Owners are `<iss>|<sub>`.** Callers are identified by the issuer and
+      the subject of their token together, for users and service clients
+      alike (see [Task creators](access-control.md#task-creators)); new tasks
+      record that owner ID. **Tasks from before the redesign are unreachable
+      (`404`); delete them.** Tasks created by earlier versions record the
+      bare `sub`, belong to nobody, and are missing from lists, and there is
+      no migration. Upgrade when no tasks run, or let running tasks end
+      first. Then list the tasks and their creators with `kubectl get jobs
+      -n <namespace> -l job-type=taskmaster --output
+      custom-columns='NAME:.metadata.name,CREATOR:.metadata.annotations.creator-user-id'`,
+      and delete those whose creator has no `|` (or none) by name, with
+      their executors' jobs and ConfigMaps (see "Deleted tasks" under [To
+      1.2.0](#to-120)), once nobody needs them. With `noauth`, the owner
+      stays `anonymousUser`.
+    * **`503 Service Unavailable`** answers a token whose issuer's keys
+      can't be fetched (before: `401 Unauthorized`), so that clients retry.
+    * **Tokens are ignored on public endpoints:** service info (unless
+      `TESK_API_SERVICE_INFO_PUBLIC` is `false`), the API description and the
+      Swagger UI answer with any token as without one (before: `401` with an
+      invalid token).
+    * **Delegated tokens** (with an `act` claim, from a token exchange) are
+      refused (`401`), until a later release accepts them.
+
+    For a downgrade to 2.0.0, restore the former settings, and the profile
+    `auth` if you used it; tasks created by 2.1.0 belong to nobody there.
+    During a rolling update, pods of 2.0.0 still check tokens at the user
+    info endpoint and find tasks by the bare `sub`: the new rules hold once
+    the rollout has completed. With the Helm chart of TESK, use a chart
+    release that renders the new settings.
 - **Group model removed (breaking, security).** TESK API has no groups,
   teams, team admins or super admins any more, and no rights from a claim
   of the user info
@@ -61,7 +112,8 @@
       leave them out. Handle stuck or abusive tasks through Kubernetes (e.g.
       with `kubectl`);
     * tasks created before 1.2.0, which have only the old creator label
-      `creator-user-id`, belong to nobody: there is no migration;
+      `creator-user-id`, belong to nobody: there is no migration (nor for
+      later tasks, see above);
     * the tag `GROUP_NAME` is a tag like any other, new tasks get no label or
       annotation `creator-group-name`, and `logs[0].metadata` has no
       `GROUP_NAME`.
@@ -71,8 +123,8 @@
     `…_GROUP_SUFFIX`, `…_DELIMITER`, `…_PARENT_GROUP`, `…_ENV_SUBGROUP`,
     `…_BASE_GROUP`, `…_ADMIN_SUBGROUP`, `…_CLAIM_ENABLED`, `…_CLAIM_NAME`,
     `…_CLAIM_VALUES`, `…_LEGACY_USER_LABELS` and `…_TASK_VISIBILITY`, and
-    any other setting under `tesk.api.authorisation` except
-    `tesk.api.authorisation.service-clients.*`. With one of them still set,
+    any other setting under `tesk.api.authorisation` (the service clients'
+    too, see above). With one of them still set,
     in any profile (also to an empty value: remove them), TESK API doesn't
     start, and names the setting. With the Helm chart of TESK, use a chart
     release that no longer renders them.

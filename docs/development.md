@@ -132,16 +132,14 @@ redesign's changes are in:
   the change updates the status.
 - The tests run TESK with the `auth` profile against a mock OpenID Connect
   provider (`MockIdp`: discovery, keys, tokens signed as the callers need
-  them, and a user info endpoint that answers like LS Login's), a mock
+  them, and a user info endpoint that answers like LS Login's, for T4a), a mock
   decision service (`MockPdp`: a stand-in for the owner-only reference policy
   of [tes-authz](https://github.com/elixir-cloud-aai/tes-authz), with failure
   modes, recording the requests) and a mock Kubernetes API (`MockCluster`:
-  running tasks of given owners). `Harness` holds the settings of both the
-  current access control and the redesign (`tesk.api.auth.*`,
-  `tesk.api.authz.*`, without effect until the changes use them); each change
-  removes the settings it deletes. `Owners.of` is the owner ID that the mock
-  tasks carry: the subject now, `<iss>|<sub>` once tokens are validated
-  locally, switched there in one place.
+  running tasks of given owners). `Harness` holds the settings of the
+  redesign (`tesk.api.auth.*`, and `tesk.api.authz.*`, without effect until
+  T4a uses them). `Owners.of` is the owner ID that the mock tasks carry:
+  `<iss>|<sub>` (the subject alone before T3b).
 
 The changes (slices) of the redesign that `pending.csv` names, in their
 order; each is a pull request of its own, stacked on the previous one, and
@@ -224,10 +222,17 @@ git config blame.ignoreRevsFile .git-blame-ignore-revs
 ## Token validation
 
 The package `uk.ac.ebi.tsc.tesk.config.security.token` holds the token
-validation of the access control redesign. It is not used by the application
-yet: requests are still authenticated as described in [Access
-control](access-control.md), until a later change switches authentication to
-it, and its settings (`tesk.api.auth.*`) have no effect until then.
+validation (see [Token validation](access-control.md#token-validation) for
+what it checks, and [Settings](access-control.md#settings) for its settings).
+With the `auth` profile, `ResourceServerConfiguration` creates the validator
+and plugs it into the resource server of Spring Security as an
+`OpaqueTokenIntrospector` (`TokenValidatorIntrospector`): a refused token
+gives `401` with `invalid_token`, unavailable keys give `503`
+(`TokenCheckUnavailableException`, answered by
+`CustomAuthenticationEntryPoint`), and an accepted token gives an
+`AuthenticatedUser` whose user name is the owner ID. A `BearerTokenResolver`
+ignores the `Authorization` header on the public paths, so that tokens there
+are never checked.
 
 - `TokenValidator` is the one interface for token validation: it takes the
   bearer token and returns the caller (`TokenPrincipal`), or throws an
@@ -260,7 +265,7 @@ it, and its settings (`tesk.api.auth.*`) have no effect until then.
   and a `sub` that equals a listed client's ID is refused.
 - `allow-any-audience` (per service client, default `false`) accepts that
   client's own tokens whatever their `aud`, or without one, like
-  `allowAnyAudience` of the current service-client settings. It is opt-in and
+  `allowAnyAudience` of the former service-client settings. It is opt-in and
   meant for testing, and for setting up a federation while the clients'
   audiences at the identity provider are still being sorted out. Its risk:
   every token that the issuer issues to that client is accepted, also tokens

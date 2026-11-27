@@ -18,10 +18,10 @@ The API description (OpenAPI 3.1) is at `/v3/api-docs` (JSON) and
 before 2.0.0, an alias of `/v3/api-docs` in 2.0.0), is gone in 2.1.0 and
 later (see [Upgrading](upgrading.md#to-210)).
 
-With the `auth` profile, all endpoints need a valid access token, except the
-API description, the Swagger UI (if it is on) and, unless
-`TESK_API_SERVICE_INFO_PUBLIC` is `false`, service info; see [Access
-control](access-control.md).
+With the `auth` profile (the default), all endpoints need a valid access
+token, except the API description, the Swagger UI (if it is on) and, unless
+`TESK_API_SERVICE_INFO_PUBLIC` is `false`, service info, which ignore tokens;
+see [Access control](access-control.md).
 
 ## Listing tasks
 
@@ -363,7 +363,8 @@ Status code | Meaning
 --- | ---
 200 | OK: successful request
 400 | Bad request: validation error, or cancellation of a task that doesn't run
-401 | Unauthorized: no access token in the request, or an invalid token (see [Token validation](access-control.md#token-validation) for the `WWW-Authenticate` header and the body)
+401 | Unauthorized: with the `auth` profile, no access token in the request, or an invalid one: one that fails a check of [Token validation](access-control.md#token-validation), e.g. of an unknown issuer, with a wrong audience, expired, or delegated (see [Token validation](access-control.md#token-validation) for the `WWW-Authenticate` header and the body)
 403 | Forbidden: the caller may not do this (with the `auth` profile, creating a task, for now; see [Authorisation](access-control.md#authorisation))
-404 | Not found: no task with this ID, or a task of another user
+404 | Not found: no task with this ID, or a task of another caller (with the `auth` profile also one created before 2.1.0, see [Task creators](access-control.md#task-creators))
 500 | Something else went wrong (possibly the configuration)
+503 | Service unavailable: with the `auth` profile, the access token can't be checked now, because the keys of its issuer can't be fetched (see [Token validation](access-control.md#token-validation)); try again later. Since 2.1.0

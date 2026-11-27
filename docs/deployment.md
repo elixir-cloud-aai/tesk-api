@@ -94,16 +94,17 @@ To run TESK API outside of Kubernetes, e.g. against a local cluster such as
 a `KUBECONFIG` file for that cluster:
 
 ```bash
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=noauth
 ```
 
-or with the image, reachable from your machine only (it runs without
-authentication by default, with the rights of your kubeconfig, `KUBECONFIG` or
-`~/.kube/config`):
+or with the image, reachable from your machine only, without
+authentication (`noauth`), with the rights of your kubeconfig, `KUBECONFIG` or
+`~/.kube/config`:
 
 ```bash
 docker run --rm --publish 127.0.0.1:8080:8080 --user "$(id -u):0" \
   --volume "${KUBECONFIG:-${HOME}/.kube/config}:/home/tesk/.kube/config:ro" \
+  --env SPRING_PROFILES_ACTIVE=noauth \
   elixircloud/tesk-api:latest
 ```
 
@@ -114,6 +115,8 @@ TESK_API_SWAGGER_UI_ENABLED=true` (see [API](api.md#swagger-ui)).
 
 ## Access control
 
-By default (`noauth` profile), TESK API needs no token, and every user sees
-all tasks. For deployments that others can reach, switch on the `auth`
-profile; see [Access control](access-control.md).
+By default (`auth` profile, since 2.1.0), TESK API needs a valid access
+token of a configured issuer for every operation on tasks, and doesn't start
+without an issuer (`TESK_API_AUTH_ISSUERS_0_URL`); see [Access
+control](access-control.md). The `noauth` profile, without authentication,
+is only for installations that nobody else can reach, e.g. on your machine.
