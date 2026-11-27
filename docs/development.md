@@ -153,8 +153,9 @@ T4a | Asks the decision service (AuthZEN, tes-authz) on create, with the entitle
 T4b | Lets the decision service decide further operations (`tesk.api.authz.operations`), with list scopes and failure behaviour per operation | `all-operations` (but create); the `fail-open` cells already pass with T2 and T4a
 T6 | Accepts exchanged tokens (RFC 8693) of trusted actors and records the actor | Row 16, the recorded actor
 
-Until T6, tokens with an `act` claim are refused (`401`), so rows 14-16 are
-pending for T6. Failing open (`fail-open`) falls back to the owner-only decision,
+Until T6, tokens with an `act` claim are refused (`401`), so all cells of
+rows 14-16 stay pending until T6 (see `pending.csv`), whatever slice the
+table names for them. Failing open (`fail-open`) falls back to the owner-only decision,
 never to allowing everything, and create never fails open.
 
 Row 9 (unlisted service client) uses a client token whose audience TESK
