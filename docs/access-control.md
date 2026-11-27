@@ -240,7 +240,11 @@ The decision service is asked for tasks that don't exist too, so that the
 answers don't tell whether another user's task exists. The subject is the
 caller, as for create, but its claims come from the token only: the user
 info endpoint is asked on create only. Each request has a new
-`X-Request-ID` (a cancel that is denied may take two).
+`X-Request-ID` (a cancel that is denied may take two). Your policy must
+answer every request with a boolean `decision`, also for tasks without
+properties (in Rego, e.g. `default decision := false`): otherwise a
+missing task gives a failed decision (`503` when failing closed), while
+another user's task gives `404`, which tells callers which tasks exist.
 
 Answer to `ListTasks` | List scope | The list holds
 --- | --- | ---

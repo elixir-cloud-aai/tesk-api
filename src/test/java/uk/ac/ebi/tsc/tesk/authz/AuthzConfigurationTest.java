@@ -197,18 +197,28 @@ public class AuthzConfigurationTest {
                         "TESK_API_AUTHZ_OPERATIONS", "create,get,list,cancel",
                         "TESK_API_AUTHZ_FAILURE_GET", "open",
                         "TESK_API_AUTHZ_FAILURE_CANCEL", "closed");
-        AuthzProperties bound =
-                new Binder(
-                                ConfigurationPropertySources.from(
-                                        new SystemEnvironmentPropertySource(
-                                                StandardEnvironment
-                                                        .SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
-                                                environment)))
-                        .bind("tesk.api.authz", AuthzProperties.class)
-                        .get();
+        AuthzProperties bound = bindEnvironment(environment);
         assertThat(bound.getOperations()).containsExactly("create", "get", "list", "cancel");
         assertThat(bound.getFailure())
                 .containsOnly(Map.entry("get", "open"), Map.entry("cancel", "closed"));
+        assertThat(
+                        bindEnvironment(
+                                        Map.of(
+                                                "TESK_API_AUTHZ_OPERATIONS_0", "create",
+                                                "TESK_API_AUTHZ_OPERATIONS_1", "get"))
+                                .getOperations())
+                .containsExactly("create", "get");
+    }
+
+    /** The settings as Spring binds them from these environment variables */
+    private static AuthzProperties bindEnvironment(Map<String, Object> environment) {
+        return new Binder(
+                        ConfigurationPropertySources.from(
+                                new SystemEnvironmentPropertySource(
+                                        StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                                        environment)))
+                .bind("tesk.api.authz", AuthzProperties.class)
+                .get();
     }
 
     @Test

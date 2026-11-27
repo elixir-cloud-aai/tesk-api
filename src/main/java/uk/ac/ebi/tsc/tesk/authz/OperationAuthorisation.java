@@ -241,7 +241,7 @@ public class OperationAuthorisation implements TaskAccess {
         }
         logger.debug(
                 "Decision service answered {} on {} {} (request {})",
-                DecisionServiceClient.isAllowed(answer) ? "allow" : "deny",
+                decision.booleanValue() ? "allow" : "deny",
                 action,
                 resource.get("id"),
                 requestId);
