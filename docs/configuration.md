@@ -159,8 +159,10 @@ when the job is created: a refused pod leaves the job without pods
 (`FailedCreate` events on the job, e.g. `must be less than or equal to
 memory limit of 1Gi`).
 
-The containers get their limits as follows, so that a namespace's default
-limit never applies to a resource that has a request of its own:
+Kubernetes adds the default limit to every container without a limit for
+that resource, also to one with a request, and refuses the pod if the
+default is below the request. So, by default, TESK gives each container a
+limit for every resource that it requests:
 
 Container | CPU | Memory
 --- | --- | ---
@@ -170,6 +172,9 @@ Filers | From the taskmaster's `FILER_RESOURCES` (request 100m, limit 1) | From 
 
 The values in parentheses are the defaults; the filers have them since
 taskmaster 0.13.0 (before: none, and the `LimitRange`'s defaults applied).
+If you set `TESK_API_TASKMASTER_RESOURCES` or `FILER_RESOURCES` with a
+request but without a limit for a resource, the namespace's default limit
+applies to it, and must not be below the request.
 
 Before 2.1.0, executors of tasks with both `cpu_cores` and `ram_gb` got a
 memory request but no memory limit. In a namespace whose default memory
