@@ -189,11 +189,38 @@
   ([#209](https://github.com/elixir-cloud-aai/tesk-api/issues/209); see
   [Restricted clusters](configuration.md#restricted-clusters)). They are
   unset by default, and the pods' security contexts stay as they were. In
-  such namespaces, the filers need taskmaster 0.12.0 or later
-  (`TESK_API_TASKMASTER_IMAGE_VERSION` and
-  `TESK_API_TASKMASTER_FILER_IMAGE_VERSION`; the default is still 0.11.0). The
+  such namespaces, the filers need taskmaster 0.12.0 or later (the new
+  default is 0.13.0, see below). The
   executors' pod security context from the ConfigMap `CONFIGMAP` still
   works; the new setting goes on top of it.
+- **Taskmaster and filer of tesk-core 0.13.0 (behaviour change).** Without
+  other settings, TESK API runs the taskmaster
+  `docker.io/elixircloud/tesk-core-taskmaster:0.13.0` and the filer
+  `docker.io/elixircloud/tesk-core-filer:0.13.0` instead of 0.11.0
+  ([#211](https://github.com/elixir-cloud-aai/tesk-api/issues/211)), so
+  that the features that need tesk-core 0.12.0 or later (e.g.
+  `ignore_error`, output file logs, filers in restricted namespaces) and the
+  resource limits of the filers work by default. Deployments that set
+  `TESK_API_TASKMASTER_IMAGE_VERSION` and
+  `TESK_API_TASKMASTER_FILER_IMAGE_VERSION` (e.g. with the Helm chart of
+  TESK) keep their versions. Before you move to 0.13.0, read the [upgrade
+  notes of tesk-core](https://tesk.readthedocs.io/en/latest/tesk-core/upgrading/#0130)
+  (from 0.11.0, also those of 0.12.0); in short:
+    - `ram_gb` is a hard memory limit also for tasks that set `cpu_cores`:
+      executors that use more memory than their task's `ram_gb` are
+      stopped (`OOMKilled`), and the task ends in `EXECUTOR_ERROR`.
+    - The filers request CPU 100m and memory 128Mi and are limited to CPU
+      1 and memory 512Mi by default (before: none, or a `LimitRange`'s
+      defaults). In namespaces with a `LimitRange` whose minimum is above
+      these requests or whose maximum is below these limits, or for
+      transfers that need more, set the taskmaster's `FILER_RESOURCES`
+      (`TESK_API_TASKMASTER_ENVIRONMENT_FILER_RESOURCES`, `{}` for none;
+      see [CPU quotas](configuration.md#cpu-quotas)).
+    - From 1.2.0, upgrade in the order of [To 2.0.0](#to-200) ("Upgrade
+      order for filer labels"): while replicas of TESK API 1.2.0 still
+      serve requests, keep `TESK_API_TASKMASTER_IMAGE_VERSION` at your
+      current version, or use the `Recreate` strategy. From 2.0.0, nothing
+      to do.
 
 ## To 2.0.0
 
